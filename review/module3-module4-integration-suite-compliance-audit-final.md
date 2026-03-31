@@ -8,9 +8,9 @@ Scope: Audit of the compliance review itself against the approved integration sp
 
 This document validates whether the existing compliance review is itself accurate, complete, and proportionate. It is a corrective synthesis over three artifacts:
 
-1. The approved specification in [testspecs/module3-module4-integration-test-suite-specification.md](/home/chris/dev/nightfall-photo-ingress/testspecs/module3-module4-integration-test-suite-specification.md)
-2. The implemented suite in [tests/integration/conftest.py](/home/chris/dev/nightfall-photo-ingress/tests/integration/conftest.py) and [tests/integration](/home/chris/dev/nightfall-photo-ingress/tests/integration)
-3. The first compliance review in [review/module3-module4-integration-suite-spec-compliance-review.md](/home/chris/dev/nightfall-photo-ingress/review/module3-module4-integration-suite-spec-compliance-review.md)
+1. The approved specification in [testspecs/module3-module4-integration-test-suite-specification.md]((root)/testspecs/module3-module4-integration-test-suite-specification.md)
+2. The implemented suite in [tests/integration/conftest.py]((root)/tests/integration/conftest.py) and [tests/integration]((root)/tests/integration)
+3. The first compliance review in [review/module3-module4-integration-suite-spec-compliance-review.md]((root)/review/module3-module4-integration-suite-spec-compliance-review.md)
 
 The goal is not to restate the earlier review, but to correct any overstatement, understatement, duplication, or missed structural issues.
 
@@ -20,7 +20,7 @@ The existing compliance review is directionally correct and useful, but not full
 
 High-level verdict:
 
-1. It correctly identifies the largest structural risk: the synthetic Module 3 to Module 4 handoff reconstruction in [tests/integration/conftest.py](/home/chris/dev/nightfall-photo-ingress/tests/integration/conftest.py).
+1. It correctly identifies the largest structural risk: the synthetic Module 3 to Module 4 handoff reconstruction in [tests/integration/conftest.py]((root)/tests/integration/conftest.py).
 2. It correctly identifies several under-tested cases: 8, 17, 19, 23, and 26.
 3. It overstates a few gaps without acknowledging current partial coverage.
 4. It misses several fixture-level and determinism risks.
@@ -100,7 +100,7 @@ The existing review assigns High severity. That is appropriate.
 
 Reason:
 
-1. The test harness reconstructs `StagedCandidate` objects in [tests/integration/conftest.py](/home/chris/dev/nightfall-photo-ingress/tests/integration/conftest.py) from test-side reduced candidates instead of consuming a production-owned boundary DTO, file, or mapper.
+1. The test harness reconstructs `StagedCandidate` objects in [tests/integration/conftest.py]((root)/tests/integration/conftest.py) from test-side reduced candidates instead of consuming a production-owned boundary DTO, file, or mapper.
 2. This can hide drift in field naming, normalization, or ordering.
 3. It can also produce false confidence for crash/replay scenarios that bypass the real handoff.
 
@@ -243,7 +243,7 @@ Severity: Medium
 
 ### High
 
-1. Synthetic boundary reconstruction in [tests/integration/conftest.py](/home/chris/dev/nightfall-photo-ingress/tests/integration/conftest.py)
+1. Synthetic boundary reconstruction in [tests/integration/conftest.py]((root)/tests/integration/conftest.py)
 2. Positional zip coupling between reduced candidates and downloaded paths
 3. Case 19 purpose mismatch
 4. Case 23 weak operator-facing summary validation

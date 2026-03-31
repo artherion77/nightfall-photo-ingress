@@ -8,7 +8,7 @@ Scope: Priority-ordered hardening work to bring the implemented Module 3 and Mod
 
 ## P0 Critical Boundary Fidelity
 
-- [ ] Replace the synthetic boundary reconstruction in [tests/integration/conftest.py](/home/chris/dev/nightfall-photo-ingress/tests/integration/conftest.py) with a single explicit production-owned handoff artifact or boundary adapter.
+- [ ] Replace the synthetic boundary reconstruction in [tests/integration/conftest.py]((root)/tests/integration/conftest.py) with a single explicit production-owned handoff artifact or boundary adapter.
 - [ ] Remove the positional zip coupling between reduced candidates and `poll_result.downloaded_paths`.
 - [ ] Add a dedicated regression test proving that candidate ordering mismatches cannot silently bind the wrong staged file to the wrong ingest candidate.
 
@@ -52,7 +52,7 @@ Scope: Priority-ordered hardening work to bring the implemented Module 3 and Mod
 ## Already Completed Baseline Items
 
 - [x] Required integration fixture names exist
-- [x] All seven required integration test files exist under [tests/integration](/home/chris/dev/nightfall-photo-ingress/tests/integration)
+- [x] All seven required integration test files exist under [tests/integration]((root)/tests/integration)
 - [x] All 26 specification cases are represented by name or direct mapping
 - [x] Same-pool and cross-pool paths are both represented
 - [x] Reject and purged registry preconditions are covered
