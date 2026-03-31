@@ -63,6 +63,9 @@ class IngestBatchResult:
     accepted_count: int
     discarded_count: int
     prefilter_discard_count: int
+    size_mismatch_count: int
+    zero_byte_reject_count: int
+    zero_byte_quarantine_count: int
 
 
 @dataclass(frozen=True)
@@ -106,6 +109,9 @@ class IngestDecisionEngine:
         storage_template: str,
         staging_on_same_pool: bool,
         input_schema_version: int = INGEST_INPUT_SCHEMA_VERSION,
+        pre_hash_size_verify: bool = True,
+        zero_byte_policy: str = "allow",
+        quarantine_dir: Path | None = None,
     ) -> IngestBatchResult:
         """Process staged candidates and return batch summary."""
 
@@ -113,6 +119,11 @@ class IngestDecisionEngine:
             candidates=candidates,
             input_schema_version=input_schema_version,
         )
+        if zero_byte_policy not in {"allow", "quarantine", "reject"}:
+            raise IngestError(
+                "Invalid zero_byte_policy: "
+                f"{zero_byte_policy}. Expected one of allow/quarantine/reject"
+            )
 
         outcomes: list[IngestOutcome] = []
 
@@ -122,6 +133,9 @@ class IngestDecisionEngine:
                 accepted_root=accepted_root,
                 storage_template=storage_template,
                 staging_on_same_pool=staging_on_same_pool,
+                pre_hash_size_verify=pre_hash_size_verify,
+                zero_byte_policy=zero_byte_policy,
+                quarantine_dir=quarantine_dir,
             )
             outcomes.append(outcome)
 
@@ -132,12 +146,18 @@ class IngestDecisionEngine:
             if item.action in {"discard_accepted", "discard_rejected", "discard_purged", "missing_staged"}
         )
         prefilter_discard_count = sum(1 for item in outcomes if item.prefilter_hit)
+        size_mismatch_count = sum(1 for item in outcomes if item.action == "size_mismatch")
+        zero_byte_reject_count = sum(1 for item in outcomes if item.action == "reject_zero_byte")
+        zero_byte_quarantine_count = sum(1 for item in outcomes if item.action == "quarantine_zero_byte")
 
         return IngestBatchResult(
             outcomes=tuple(outcomes),
             accepted_count=accepted_count,
             discarded_count=discarded_count,
             prefilter_discard_count=prefilter_discard_count,
+            size_mismatch_count=size_mismatch_count,
+            zero_byte_reject_count=zero_byte_reject_count,
+            zero_byte_quarantine_count=zero_byte_quarantine_count,
         )
 
     def cleanup_staging_tmp_files(self, *, staging_dir: Path, tmp_ttl_minutes: int) -> int:
@@ -308,6 +328,9 @@ class IngestDecisionEngine:
         accepted_root: Path,
         storage_template: str,
         staging_on_same_pool: bool,
+        pre_hash_size_verify: bool,
+        zero_byte_policy: str,
+        quarantine_dir: Path | None,
     ) -> IngestOutcome:
         """Process one staged candidate through prefilter and hash decisioning."""
 
@@ -334,6 +357,53 @@ class IngestDecisionEngine:
                 destination_path=None,
                 prefilter_hit=False,
             )
+
+        actual_size = path.stat().st_size
+        if pre_hash_size_verify and candidate.size_bytes is not None and candidate.size_bytes != actual_size:
+            self._journal_append(
+                op_id=op_id,
+                phase="size_mismatch",
+                candidate=candidate,
+            )
+            self._handle_quarantine_or_delete(
+                path=path,
+                quarantine_dir=quarantine_dir,
+                category="size_mismatch",
+            )
+            return IngestOutcome(
+                account_name=candidate.account_name,
+                onedrive_id=candidate.onedrive_id,
+                action="size_mismatch",
+                sha256=None,
+                destination_path=None,
+                prefilter_hit=False,
+            )
+
+        if actual_size == 0:
+            if zero_byte_policy == "reject":
+                path.unlink(missing_ok=True)
+                return IngestOutcome(
+                    account_name=candidate.account_name,
+                    onedrive_id=candidate.onedrive_id,
+                    action="reject_zero_byte",
+                    sha256=None,
+                    destination_path=None,
+                    prefilter_hit=False,
+                )
+            if zero_byte_policy == "quarantine":
+                self._handle_quarantine_or_delete(
+                    path=path,
+                    quarantine_dir=quarantine_dir,
+                    category="zero_byte",
+                )
+                return IngestOutcome(
+                    account_name=candidate.account_name,
+                    onedrive_id=candidate.onedrive_id,
+                    action="quarantine_zero_byte",
+                    sha256=None,
+                    destination_path=None,
+                    prefilter_hit=False,
+                )
 
         # Metadata prefilter can skip expensive hashing for known OneDrive id+metadata.
         prefiltered = self._prefilter_status(candidate)
@@ -531,3 +601,17 @@ class IngestDecisionEngine:
             destination_path=destination_path,
             sha256=sha256,
         )
+
+    @staticmethod
+    def _handle_quarantine_or_delete(*, path: Path, quarantine_dir: Path | None, category: str) -> None:
+        """Move problematic files to quarantine when configured, else delete."""
+
+        if quarantine_dir is None:
+            path.unlink(missing_ok=True)
+            return
+
+        target = quarantine_dir / category / path.name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if target.exists():
+            target = target.with_name(f"{target.stem}-{int(datetime.now(UTC).timestamp())}{target.suffix}")
+        path.replace(target)

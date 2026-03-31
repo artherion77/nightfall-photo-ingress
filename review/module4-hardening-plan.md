@@ -100,10 +100,10 @@ Commit scope:
 
 ## M4-H6 Ingest integrity and policy controls
 
-- [ ] Add optional pre-hash size verification against candidate metadata.
-- [ ] Add explicit zero-byte policy (`allow`, `quarantine`, `reject`).
-- [ ] Add mismatch audit reasons and counters.
-- [ ] Add tests for wrong size, missing size, and zero-byte branches.
+- [x] Add optional pre-hash size verification against candidate metadata.
+- [x] Add explicit zero-byte policy (`allow`, `quarantine`, `reject`).
+- [x] Add mismatch audit reasons and counters.
+- [x] Add tests for wrong size, missing size, and zero-byte branches.
 
 Commit scope:
 - Ingest policy flags and decision logic
