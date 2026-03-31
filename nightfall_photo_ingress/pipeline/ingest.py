@@ -8,6 +8,7 @@ accepted queue storage without touching the permanent library.
 from __future__ import annotations
 
 import sqlite3
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -63,6 +64,8 @@ class IngestBatchResult:
     accepted_count: int
     discarded_count: int
     prefilter_discard_count: int
+    prefilter_hit_count: int
+    prefilter_miss_count: int
     size_mismatch_count: int
     zero_byte_reject_count: int
     zero_byte_quarantine_count: int
@@ -112,6 +115,8 @@ class IngestDecisionEngine:
         pre_hash_size_verify: bool = True,
         zero_byte_policy: str = "allow",
         quarantine_dir: Path | None = None,
+        worker_count: int = 1,
+        size_aware_scheduling: bool = True,
     ) -> IngestBatchResult:
         """Process staged candidates and return batch summary."""
 
@@ -124,21 +129,60 @@ class IngestDecisionEngine:
                 "Invalid zero_byte_policy: "
                 f"{zero_byte_policy}. Expected one of allow/quarantine/reject"
             )
+        if worker_count < 1:
+            raise IngestError("worker_count must be >= 1")
 
         outcomes: list[IngestOutcome] = []
         batch_run_id = uuid4().hex
         sequence_no = 0
 
-        for candidate in candidates:
-            outcome = self._process_one(
-                candidate=candidate,
-                accepted_root=accepted_root,
-                storage_template=storage_template,
-                staging_on_same_pool=staging_on_same_pool,
-                pre_hash_size_verify=pre_hash_size_verify,
-                zero_byte_policy=zero_byte_policy,
-                quarantine_dir=quarantine_dir,
+        indexed_candidates = list(enumerate(candidates))
+        if size_aware_scheduling:
+            indexed_candidates.sort(
+                key=lambda item: ((item[1].size_bytes if item[1].size_bytes is not None else -1), -item[0]),
+                reverse=True,
             )
+
+        if worker_count <= 1:
+            ordered_results = [
+                (
+                    index,
+                    candidate,
+                    self._process_one(
+                        candidate=candidate,
+                        accepted_root=accepted_root,
+                        storage_template=storage_template,
+                        staging_on_same_pool=staging_on_same_pool,
+                        pre_hash_size_verify=pre_hash_size_verify,
+                        zero_byte_policy=zero_byte_policy,
+                        quarantine_dir=quarantine_dir,
+                    ),
+                )
+                for index, candidate in indexed_candidates
+            ]
+        else:
+            with ThreadPoolExecutor(max_workers=worker_count) as executor:
+                futures = {
+                    executor.submit(
+                        self._process_one,
+                        candidate=candidate,
+                        accepted_root=accepted_root,
+                        storage_template=storage_template,
+                        staging_on_same_pool=staging_on_same_pool,
+                        pre_hash_size_verify=pre_hash_size_verify,
+                        zero_byte_policy=zero_byte_policy,
+                        quarantine_dir=quarantine_dir,
+                    ): (index, candidate)
+                    for index, candidate in indexed_candidates
+                }
+                ordered_results = [
+                    (index, candidate, future.result())
+                    for future, (index, candidate) in futures.items()
+                ]
+
+        ordered_results.sort(key=lambda item: item[0])
+
+        for _index, candidate, outcome in ordered_results:
             outcomes.append(outcome)
             sequence_no += 1
             self._registry.append_ingest_terminal_event(
@@ -159,6 +203,8 @@ class IngestDecisionEngine:
             if item.action in {"discard_accepted", "discard_rejected", "discard_purged", "missing_staged"}
         )
         prefilter_discard_count = sum(1 for item in outcomes if item.prefilter_hit)
+        prefilter_hit_count = sum(1 for item in outcomes if item.prefilter_hit)
+        prefilter_miss_count = sum(1 for item in outcomes if not item.prefilter_hit)
         size_mismatch_count = sum(1 for item in outcomes if item.action == "size_mismatch")
         zero_byte_reject_count = sum(1 for item in outcomes if item.action == "reject_zero_byte")
         zero_byte_quarantine_count = sum(1 for item in outcomes if item.action == "quarantine_zero_byte")
@@ -168,6 +214,8 @@ class IngestDecisionEngine:
             accepted_count=accepted_count,
             discarded_count=discarded_count,
             prefilter_discard_count=prefilter_discard_count,
+            prefilter_hit_count=prefilter_hit_count,
+            prefilter_miss_count=prefilter_miss_count,
             size_mismatch_count=size_mismatch_count,
             zero_byte_reject_count=zero_byte_reject_count,
             zero_byte_quarantine_count=zero_byte_quarantine_count,

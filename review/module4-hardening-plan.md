@@ -125,10 +125,10 @@ Commit scope:
 
 ## M4-H8 Performance and scalability improvements
 
-- [ ] Add optional bounded ingest worker pool.
-- [ ] Add size-aware scheduling strategy.
-- [ ] Add metadata prefilter hit/miss diagnostics to reduce unnecessary hash I/O.
-- [ ] Add throughput benchmarks and regression guardrails.
+- [x] Add optional bounded ingest worker pool.
+- [x] Add size-aware scheduling strategy.
+- [x] Add metadata prefilter hit/miss diagnostics to reduce unnecessary hash I/O.
+- [x] Add throughput benchmarks and regression guardrails.
 
 Commit scope:
 - Worker orchestration + scheduling
