@@ -176,6 +176,14 @@ def poll_accounts(
                 max_runtime_seconds=app_config.core.max_poll_runtime_seconds,
                 tmp_ttl_minutes=app_config.core.tmp_ttl_minutes,
                 integrity_mode=app_config.core.integrity_mode,
+                delta_loop_resync_threshold=app_config.core.delta_loop_resync_threshold,
+                delta_breaker_ghost_threshold=app_config.core.delta_breaker_ghost_threshold,
+                delta_breaker_stale_page_threshold=(
+                    app_config.core.delta_breaker_stale_page_threshold
+                ),
+                delta_breaker_cooldown_seconds=(
+                    app_config.core.delta_breaker_cooldown_seconds
+                ),
                 poll_run_id=poll_run_id,
                 policy=policy,
                 sleeper=sleeper,
@@ -252,6 +260,10 @@ def poll_account_once(
     max_runtime_seconds: int = 300,
     tmp_ttl_minutes: int = 120,
     integrity_mode: str = "strict",
+    delta_loop_resync_threshold: int = 3,
+    delta_breaker_ghost_threshold: int = 10,
+    delta_breaker_stale_page_threshold: int = 10,
+    delta_breaker_cooldown_seconds: int = 300,
     policy: RetryPolicy = DEFAULT_POLICY,
     sleeper: Callable[[float], None] = time.sleep,
     jitter_fn: Callable[[], float] | None = None,
@@ -273,6 +285,11 @@ def poll_account_once(
     start_monotonic = monotonic()
 
     account_staging_root = staging_root / account.name
+    incident_state = _load_incident_state(account.delta_cursor)
+    if _is_breaker_cooldown_active(incident_state):
+        _record_ghost_reason(delta_anomaly_counts, "delta_breaker_cooldown_active")
+        return [], 0, {}, delta_anomaly_counts
+
     _recover_staging_tmp_files(
         staging_dir=account_staging_root,
         ttl_minutes=tmp_ttl_minutes,
@@ -307,6 +324,20 @@ def poll_account_once(
             )
 
         if next_url in seen_next_links:
+            loop_incidents = _increment_loop_incident(account.delta_cursor)
+            if loop_incidents >= delta_loop_resync_threshold:
+                _record_ghost_reason(
+                    delta_anomaly_counts,
+                    "delta_forced_resync_after_loop_threshold",
+                )
+                _mark_resync_required(
+                    cursor_path=account.delta_cursor,
+                    account_name=account.name,
+                    reason="delta_forced_resync_after_loop_threshold",
+                    resync_url=None,
+                )
+                _reset_loop_incidents(account.delta_cursor)
+                return [], 0, {}, delta_anomaly_counts
             _record_ghost_reason(delta_anomaly_counts, "delta_nextlink_cycle_detected")
             raise GraphError(
                 f"Delta nextLink cycle detected for account '{account.name}'",
@@ -397,6 +428,15 @@ def poll_account_once(
         if key in _EXPORTED_DIAGNOSTIC_KEYS:
             _record_ghost_reason(delta_anomaly_counts, f"diag_{key}", count=value)
 
+    stale_count = delta_anomaly_counts.get("delta_replayed_item_id", 0)
+    ghost_total = sum(ghost_reason_counts.values())
+    if stale_count >= delta_breaker_stale_page_threshold:
+        _record_ghost_reason(delta_anomaly_counts, "delta_breaker_armed_stale_page")
+        _arm_breaker_cooldown(account.delta_cursor, delta_breaker_cooldown_seconds)
+    elif ghost_total >= delta_breaker_ghost_threshold:
+        _record_ghost_reason(delta_anomaly_counts, "delta_breaker_armed_ghost")
+        _arm_breaker_cooldown(account.delta_cursor, delta_breaker_cooldown_seconds)
+
     _save_cursor(account.delta_cursor, delta_link)
     _clear_resync_marker(account.delta_cursor)
 
@@ -412,6 +452,79 @@ def poll_account_once(
         ),
     )
     return downloaded_paths, len(candidates), ghost_reason_counts, delta_anomaly_counts
+
+
+def _incident_state_path(cursor_path: Path) -> Path:
+    """Return persistent incident state path derived from cursor path."""
+
+    if cursor_path.suffix:
+        return cursor_path.with_suffix(cursor_path.suffix + ".incidents.json")
+    return Path(str(cursor_path) + ".incidents.json")
+
+
+def _load_incident_state(cursor_path: Path) -> dict[str, object]:
+    """Load persistent incident state for breaker/escalation logic."""
+
+    path = _incident_state_path(cursor_path)
+    if not path.exists():
+        return {}
+
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+    if not isinstance(raw, dict):
+        return {}
+    return raw
+
+
+def _save_incident_state(cursor_path: Path, payload: dict[str, object]) -> None:
+    """Persist incident state atomically."""
+
+    path = _incident_state_path(cursor_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
+    tmp.replace(path)
+
+
+def _is_breaker_cooldown_active(state: dict[str, object]) -> bool:
+    """Return True when cooldown window has not yet elapsed."""
+
+    cooldown_until = state.get("cooldown_until_epoch")
+    if isinstance(cooldown_until, (int, float)):
+        return time.time() < float(cooldown_until)
+    return False
+
+
+def _arm_breaker_cooldown(cursor_path: Path, cooldown_seconds: int) -> None:
+    """Set cooldown in incident state for current account."""
+
+    state = _load_incident_state(cursor_path)
+    state["cooldown_until_epoch"] = time.time() + float(cooldown_seconds)
+    _save_incident_state(cursor_path, state)
+
+
+def _increment_loop_incident(cursor_path: Path) -> int:
+    """Increment repeated loop incident counter and return new value."""
+
+    state = _load_incident_state(cursor_path)
+    current = state.get("loop_incidents")
+    if not isinstance(current, int):
+        current = 0
+    current += 1
+    state["loop_incidents"] = current
+    _save_incident_state(cursor_path, state)
+    return current
+
+
+def _reset_loop_incidents(cursor_path: Path) -> None:
+    """Reset loop incident counter after escalation to forced resync."""
+
+    state = _load_incident_state(cursor_path)
+    state["loop_incidents"] = 0
+    _save_incident_state(cursor_path, state)
 
 
 def _apply_delta_page_to_reducer(

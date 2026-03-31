@@ -68,3 +68,24 @@ def test_v2_drift_thresholds_validate_ordering(tmp_path: Path) -> None:
     )
     with pytest.raises(ConfigError, match="drift_warning_threshold_ratio"):
         load_config(cfg)
+
+
+def test_v2_delta_loop_resync_threshold_must_be_positive(tmp_path: Path) -> None:
+    cfg = _write_config(tmp_path, "\ndelta_loop_resync_threshold = 0\n")
+    with pytest.raises(ConfigError, match="delta_loop_resync_threshold"):
+        load_config(cfg)
+
+
+def test_v2_delta_breaker_thresholds_must_be_positive(tmp_path: Path) -> None:
+    cfg = _write_config(
+        tmp_path,
+        "\ndelta_breaker_ghost_threshold = 0\ndelta_breaker_stale_page_threshold = -1\n",
+    )
+    with pytest.raises(ConfigError, match="delta_breaker_ghost_threshold"):
+        load_config(cfg)
+
+
+def test_v2_delta_breaker_cooldown_must_be_positive(tmp_path: Path) -> None:
+    cfg = _write_config(tmp_path, "\ndelta_breaker_cooldown_seconds = 0\n")
+    with pytest.raises(ConfigError, match="delta_breaker_cooldown_seconds"):
+        load_config(cfg)

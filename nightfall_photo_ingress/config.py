@@ -55,6 +55,10 @@ class CoreConfig:
     drift_critical_threshold_ratio: float = 0.20
     drift_min_events_for_evaluation: int = 20
     drift_fail_fast_enabled: bool = True
+    delta_loop_resync_threshold: int = 3
+    delta_breaker_ghost_threshold: int = 10
+    delta_breaker_stale_page_threshold: int = 10
+    delta_breaker_cooldown_seconds: int = 300
 
 
 @dataclass(frozen=True)
@@ -245,6 +249,30 @@ def _parse_core(parser: configparser.ConfigParser, errors: list[str]) -> CoreCon
             errors,
             default=True,
         ),
+        delta_loop_resync_threshold=_get_int(
+            core,
+            "delta_loop_resync_threshold",
+            errors,
+            default=3,
+        ),
+        delta_breaker_ghost_threshold=_get_int(
+            core,
+            "delta_breaker_ghost_threshold",
+            errors,
+            default=10,
+        ),
+        delta_breaker_stale_page_threshold=_get_int(
+            core,
+            "delta_breaker_stale_page_threshold",
+            errors,
+            default=10,
+        ),
+        delta_breaker_cooldown_seconds=_get_int(
+            core,
+            "delta_breaker_cooldown_seconds",
+            errors,
+            default=300,
+        ),
     )
 
 
@@ -279,6 +307,10 @@ def _default_core() -> CoreConfig:
         drift_critical_threshold_ratio=0.20,
         drift_min_events_for_evaluation=20,
         drift_fail_fast_enabled=True,
+        delta_loop_resync_threshold=3,
+        delta_breaker_ghost_threshold=10,
+        delta_breaker_stale_page_threshold=10,
+        delta_breaker_cooldown_seconds=300,
     )
 
 
@@ -396,6 +428,18 @@ def _validate_core(core: CoreConfig, errors: list[str]) -> None:
 
     if core.drift_min_events_for_evaluation <= 0:
         errors.append("[core] drift_min_events_for_evaluation must be > 0")
+
+    if core.delta_loop_resync_threshold <= 0:
+        errors.append("[core] delta_loop_resync_threshold must be > 0")
+
+    if core.delta_breaker_ghost_threshold <= 0:
+        errors.append("[core] delta_breaker_ghost_threshold must be > 0")
+
+    if core.delta_breaker_stale_page_threshold <= 0:
+        errors.append("[core] delta_breaker_stale_page_threshold must be > 0")
+
+    if core.delta_breaker_cooldown_seconds <= 0:
+        errors.append("[core] delta_breaker_cooldown_seconds must be > 0")
 
     if "{original}" not in core.storage_template and "{sha8}" not in core.storage_template:
         errors.append("[core] storage_template must include at least {original} or {sha8}")
