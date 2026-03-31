@@ -146,7 +146,7 @@ Append-only event stream.
 ### 7.1 Poll execution model
 - Triggered by systemd timer.
 - One global process lock for full poll run.
-- Process accounts serially in deterministic order.
+- Process accounts serially in deterministic order: declaration order in config file.
 - Per-account cursor and token cache are isolated.
 
 ### 7.2 Candidate decision flow
@@ -189,7 +189,11 @@ Safety depends on registry idempotency.
 Live Photo support is mandatory in V1.
 
 ### 8.2 V1 behavior
-- Detect likely pairs (HEIC/JPEG + MOV) by capture timestamp and filename stem heuristics.
+- Detect likely pairs (HEIC/JPEG + MOV) using configurable heuristics with V1 defaults:
+  - `live_photo_capture_tolerance_seconds = 3`
+  - `live_photo_stem_mode = exact_stem`
+  - `live_photo_component_order = photo_first`
+  - `live_photo_conflict_policy = nearest_capture_time`
 - Ingest each component as independent file with its own hash and decision path.
 - Persist pair linkage in `live_photo_pairs`.
 - Do not merge or transcode components.
@@ -229,7 +233,8 @@ Pre-seed accepted hashes from permanent library to avoid unnecessary OneDrive do
 - CLI command: `photo-ingress sync-import [--path ...] [--dry-run]`
 - Parse hash cache files and seed mapping rows in a dedicated table (`external_hash_cache`).
 - When OneDrive metadata provides SHA1, check imported cache first:
-  - If OneDrive SHA1 matches imported entry, classify as already accepted and skip download.
+  - If OneDrive SHA1 matches imported entry and `verify_sha256_on_first_download=false`, classify as already accepted and skip download.
+  - If OneDrive SHA1 matches imported entry and `verify_sha256_on_first_download=true` (default), perform one verification download to compute server-side SHA-256 before future metadata-only skips.
   - If no match, continue normal staging + SHA-256 path.
 
 Important:

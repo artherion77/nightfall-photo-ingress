@@ -39,14 +39,20 @@ Example structure:
 [core]
 config_version = 1
 poll_interval_minutes = 15
+process_accounts_in_config_order = true
 staging_path = /mnt/ssd/photo-ingress/staging
 accepted_path = /nightfall/media/photo-ingress/accepted
 trash_path = /nightfall/media/photo-ingress/trash
 registry_path = /mnt/ssd/photo-ingress/registry.db
 staging_on_same_pool = false
 storage_template = {yyyy}/{mm}/{sha8}-{original}
+verify_sha256_on_first_download = true
 max_downloads_per_poll = 200
 max_poll_runtime_seconds = 300
+live_photo_capture_tolerance_seconds = 3
+live_photo_stem_mode = exact_stem
+live_photo_component_order = photo_first
+live_photo_conflict_policy = nearest_capture_time
 sync_hash_import_enabled = true
 sync_hash_import_path = /nightfall/media/pictures
 sync_hash_import_glob = .hashes.sha1
@@ -92,6 +98,8 @@ console_format = json
 | `registry_path` | path | none | SQLite registry file path. |
 | `staging_on_same_pool` | bool | false | Enables rename move optimization when true. |
 | `storage_template` | string | `{yyyy}/{mm}/{sha8}-{original}` | Template for accepted queue file layout. |
+| `process_accounts_in_config_order` | bool | true | Process enabled accounts serially in the order they appear in the config file. |
+| `verify_sha256_on_first_download` | bool | true | If advisory SHA1 prefilter indicates a match, still force one first-download SHA-256 verification before trusting skip behavior. |
 
 ### Optional Keys
 
@@ -102,6 +110,10 @@ console_format = json
 | `tmp_ttl_minutes` | int | 120 | Cleanup TTL for incomplete `.tmp` files. |
 | `failed_ttl_hours` | int | 24 | Cleanup TTL for failed artifacts. |
 | `orphan_ttl_days` | int | 7 | Cleanup TTL for orphaned staged files. |
+| `live_photo_capture_tolerance_seconds` | int | 3 | Maximum capture-time delta for correlating Live Photo components. |
+| `live_photo_stem_mode` | string | `exact_stem` | Filename stem comparison mode for pair detection (`exact_stem` in V1). |
+| `live_photo_component_order` | string | `photo_first` | Preferred logical ordering of pair members (`photo_first` in V1). |
+| `live_photo_conflict_policy` | string | `nearest_capture_time` | Rule to resolve candidate conflicts when multiple pair matches are possible. |
 | `sync_hash_import_enabled` | bool | true | Enable hash import sync mode from permanent library. |
 | `sync_hash_import_path` | path | none | Read-only permanent library root (for hash import mode). |
 | `sync_hash_import_glob` | string | `.hashes.sha1` | Hash cache file pattern to reuse from immich-rmdups flow. |
@@ -153,6 +165,7 @@ The storage template supports the following variables:
 
 - `config_version` must match the implementation-supported version.
 - At least one account must be enabled.
+- When `process_accounts_in_config_order=true`, enabled accounts are processed serially in declaration order from the INI file.
 - Account names must be unique and match `^[a-z0-9_-]+$`.
 - All configured directories must exist or be creatable.
 - Mount roots must exist before startup (fail fast if missing).
@@ -161,6 +174,7 @@ The storage template supports the following variables:
 - `storage_template` must include at least `{original}` or `{sha8}`.
 - `sync_hash_import_path` must be readable when sync import is enabled.
 - `token_cache` and `delta_cursor` paths must not be reused by multiple accounts.
+- `live_photo_stem_mode`, `live_photo_component_order`, and `live_photo_conflict_policy` must be validated against allowed enumerations.
 
 ---
 
@@ -170,6 +184,7 @@ The storage template supports the following variables:
 - The operator periodically moves accepted files into `/nightfall/media/pictures/...` manually, outside ingress visibility.
 - The registry remains the source of truth for prior acceptance. Files moved out of `accepted_path` must still remain blocked from re-download.
 - In sync mode, the CLI imports hashes from permanent library hash caches (`.hashes.sha1`) to pre-seed accepted records and reduce re-hashing cost.
+- With `verify_sha256_on_first_download=true` (default), imported/advisory SHA1 matches are not trusted as canonical identity until one server-side SHA-256 confirmation occurs.
 
 ---
 

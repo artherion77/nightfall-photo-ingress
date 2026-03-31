@@ -131,3 +131,38 @@ Field notes:
   - `design/configspec.md`
   - `design/v1-baseline-spec.md`
   - `design/refinements.md`
+
+## DEC-20260331-04: Deterministic multi-account order and Live Photo/SHA1 anti-drift config defaults
+- Status: accepted
+- Date (UTC): 2026-03-31 18:00:00 UTC
+- Scope: pipeline
+- Decision:
+  - Process enabled accounts serially in declaration order from the config file.
+  - Expose Live Photo pairing heuristics as configuration parameters with defaults:
+    - `live_photo_capture_tolerance_seconds = 3`
+    - `live_photo_stem_mode = exact_stem`
+    - `live_photo_component_order = photo_first`
+    - `live_photo_conflict_policy = nearest_capture_time`
+  - Add `verify_sha256_on_first_download = true` default to protect against advisory SHA1 collisions.
+- Rationale:
+  - Prevent implementation drift by encoding ordering and heuristics as explicit contract.
+  - Keep V1 behavior stable while preserving forward-compatible configuration surface.
+  - Ensure canonical identity remains server-side SHA-256 even when using imported SHA1 caches for optimization.
+- Alternatives Considered:
+  - Deterministic but sorted account order instead of config declaration order.
+  - Hard-coded Live Photo heuristics without config surface.
+  - Trust imported SHA1 cache without first-download SHA-256 verification.
+- Consequences:
+  - Config parser must preserve declaration order and validate new keys.
+  - V1 may still enforce default heuristic values while exposing parameters.
+  - Sync-import path must branch behavior based on verification flag.
+- Implementation Notes:
+  - OneDrive/account loops should not reorder enabled accounts.
+  - Advisory SHA1 matches are never canonical identity; SHA-256 remains the source of truth.
+- Supersedes:
+  - none
+- References:
+  - `design/configspec.md`
+  - `design/v1-baseline-spec.md`
+  - `design/refinements.md`
+  - `planning/iterative-implementation-roadmap.md`
