@@ -89,3 +89,22 @@ def test_v2_delta_breaker_cooldown_must_be_positive(tmp_path: Path) -> None:
     cfg = _write_config(tmp_path, "\ndelta_breaker_cooldown_seconds = 0\n")
     with pytest.raises(ConfigError, match="delta_breaker_cooldown_seconds"):
         load_config(cfg)
+
+
+def test_v2_account_worker_count_must_be_positive(tmp_path: Path) -> None:
+    cfg = _write_config(tmp_path, "\naccount_worker_count = 0\n")
+    with pytest.raises(ConfigError, match="account_worker_count"):
+        load_config(cfg)
+
+
+def test_v2_backpressure_thresholds_must_be_positive(tmp_path: Path) -> None:
+    cfg = _write_config(
+        tmp_path,
+        (
+            "\nbackpressure_retry_threshold = 0"
+            "\nbackpressure_transport_error_threshold = 0"
+            "\nbackpressure_cooldown_seconds = 0\n"
+        ),
+    )
+    with pytest.raises(ConfigError, match="backpressure_retry_threshold"):
+        load_config(cfg)

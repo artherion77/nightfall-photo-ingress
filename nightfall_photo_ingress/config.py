@@ -59,6 +59,11 @@ class CoreConfig:
     delta_breaker_ghost_threshold: int = 10
     delta_breaker_stale_page_threshold: int = 10
     delta_breaker_cooldown_seconds: int = 300
+    account_worker_count: int = 1
+    adaptive_backpressure_enabled: bool = True
+    backpressure_retry_threshold: int = 20
+    backpressure_transport_error_threshold: int = 5
+    backpressure_cooldown_seconds: int = 300
 
 
 @dataclass(frozen=True)
@@ -273,6 +278,36 @@ def _parse_core(parser: configparser.ConfigParser, errors: list[str]) -> CoreCon
             errors,
             default=300,
         ),
+        account_worker_count=_get_int(
+            core,
+            "account_worker_count",
+            errors,
+            default=1,
+        ),
+        adaptive_backpressure_enabled=_get_bool(
+            core,
+            "adaptive_backpressure_enabled",
+            errors,
+            default=True,
+        ),
+        backpressure_retry_threshold=_get_int(
+            core,
+            "backpressure_retry_threshold",
+            errors,
+            default=20,
+        ),
+        backpressure_transport_error_threshold=_get_int(
+            core,
+            "backpressure_transport_error_threshold",
+            errors,
+            default=5,
+        ),
+        backpressure_cooldown_seconds=_get_int(
+            core,
+            "backpressure_cooldown_seconds",
+            errors,
+            default=300,
+        ),
     )
 
 
@@ -311,6 +346,11 @@ def _default_core() -> CoreConfig:
         delta_breaker_ghost_threshold=10,
         delta_breaker_stale_page_threshold=10,
         delta_breaker_cooldown_seconds=300,
+        account_worker_count=1,
+        adaptive_backpressure_enabled=True,
+        backpressure_retry_threshold=20,
+        backpressure_transport_error_threshold=5,
+        backpressure_cooldown_seconds=300,
     )
 
 
@@ -440,6 +480,18 @@ def _validate_core(core: CoreConfig, errors: list[str]) -> None:
 
     if core.delta_breaker_cooldown_seconds <= 0:
         errors.append("[core] delta_breaker_cooldown_seconds must be > 0")
+
+    if core.account_worker_count <= 0:
+        errors.append("[core] account_worker_count must be > 0")
+
+    if core.backpressure_retry_threshold <= 0:
+        errors.append("[core] backpressure_retry_threshold must be > 0")
+
+    if core.backpressure_transport_error_threshold <= 0:
+        errors.append("[core] backpressure_transport_error_threshold must be > 0")
+
+    if core.backpressure_cooldown_seconds <= 0:
+        errors.append("[core] backpressure_cooldown_seconds must be > 0")
 
     if "{original}" not in core.storage_template and "{sha8}" not in core.storage_template:
         errors.append("[core] storage_template must include at least {original} or {sha8}")

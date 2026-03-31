@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 import json
 import logging
 from pathlib import Path
@@ -136,7 +137,8 @@ def poll_accounts(
             )
 
     auth = auth_client or OneDriveAuthClient()
-    results: list[AccountPollResult] = []
+    results_by_index: dict[int, AccountPollResult] = {}
+    deadline = monotonic() + app_config.core.max_poll_runtime_seconds
 
     poll_run_id = str(uuid4())
     _trace_event(
@@ -145,113 +147,48 @@ def poll_accounts(
         account_count=len(selected),
     )
 
-    for account in selected:
-        _trace_event(
-            "account_poll_start",
-            poll_run_id=poll_run_id,
-            account_name=account.name,
-        )
-        try:
-            with account_singleton_lock(account.token_cache):
-                token = auth.acquire_access_token(account)
-                current_access_token = token.token
+    worker_count = max(1, min(app_config.core.account_worker_count, len(selected)))
 
-                def refresh_access_token() -> str:
-                    """Refresh token once when Graph returns 401/403."""
-
-                    nonlocal current_access_token
-                    refreshed = auth.acquire_access_token(account)
-                    current_access_token = refreshed.token
-                    return current_access_token
-
-                with _build_client(http_client_factory) as client:
-                    (
-                        downloaded,
-                        candidate_count,
-                        ghost_reason_counts,
-                        delta_anomaly_counts,
-                    ) = poll_account_once(
-                        account=account,
-                        staging_root=app_config.core.staging_path,
-                        access_token=current_access_token,
-                        refresh_access_token=refresh_access_token,
-                        http_client=client,
-                        max_runtime_seconds=app_config.core.max_poll_runtime_seconds,
-                        tmp_ttl_minutes=app_config.core.tmp_ttl_minutes,
-                        integrity_mode=app_config.core.integrity_mode,
-                        delta_loop_resync_threshold=app_config.core.delta_loop_resync_threshold,
-                        delta_breaker_ghost_threshold=app_config.core.delta_breaker_ghost_threshold,
-                        delta_breaker_stale_page_threshold=(
-                            app_config.core.delta_breaker_stale_page_threshold
-                        ),
-                        delta_breaker_cooldown_seconds=(
-                            app_config.core.delta_breaker_cooldown_seconds
-                        ),
-                        poll_run_id=poll_run_id,
-                        policy=policy,
-                        sleeper=sleeper,
-                        jitter_fn=jitter_fn,
-                    )
-        except SingletonLockBusyError as exc:
-            raise GraphError(
-                (
-                    f"Account '{account.name}' is already being polled by another process."
-                ),
-                code="account_singleton_lock_busy",
-                account=account.name,
-                operation="poll_accounts",
-                safe_hint=str(exc),
-            ) from exc
-
-        drift_state, drift_ratio, drift_events = _evaluate_drift_state(
-            delta_anomaly_counts,
-            warning_threshold=app_config.core.drift_warning_threshold_ratio,
-            critical_threshold=app_config.core.drift_critical_threshold_ratio,
-            min_events=app_config.core.drift_min_events_for_evaluation,
-        )
-        _trace_event(
-            "drift_state_evaluated",
-            poll_run_id=poll_run_id,
-            account_name=account.name,
-            operation="drift_evaluation",
-            drift_state=drift_state,
-            drift_ratio=drift_ratio,
-            drift_events=drift_events,
-        )
-        if app_config.core.drift_fail_fast_enabled and drift_state == "critical":
-            raise GraphError(
-                f"Schema drift threshold exceeded for account '{account.name}'",
-                code="drift_threshold_critical",
-                account=account.name,
-                operation="poll_accounts",
-                safe_hint=(
-                    f"drift_state=critical drift_ratio={drift_ratio:.3f} "
-                    f"drift_events={drift_events}"
-                ),
+    if worker_count == 1:
+        for index, account in enumerate(selected):
+            results_by_index[index] = _poll_single_account(
+                account=account,
+                app_config=app_config,
+                auth=auth,
+                http_client_factory=http_client_factory,
+                poll_run_id=poll_run_id,
+                deadline=deadline,
+                policy=policy,
+                sleeper=sleeper,
+                jitter_fn=jitter_fn,
             )
-        results.append(
-            AccountPollResult(
-                account_name=account.name,
-                downloaded_paths=tuple(downloaded),
-                candidate_count=candidate_count,
-                ghost_item_count=sum(ghost_reason_counts.values()),
-                ghost_reason_counts=tuple(sorted(ghost_reason_counts.items())),
-                delta_anomaly_count=sum(delta_anomaly_counts.values()),
-                delta_anomaly_reason_counts=tuple(
-                    sorted(delta_anomaly_counts.items())
-                ),
-            )
-        )
+    else:
+        futures: dict[Future[AccountPollResult], int] = {}
+        with ThreadPoolExecutor(max_workers=worker_count) as pool:
+            for index, account in enumerate(selected):
+                remaining = deadline - monotonic()
+                if remaining <= 0:
+                    results_by_index[index] = _runtime_budget_exhausted_result(account.name)
+                    continue
+                future = pool.submit(
+                    _poll_single_account,
+                    account,
+                    app_config,
+                    auth,
+                    http_client_factory,
+                    poll_run_id,
+                    deadline,
+                    policy,
+                    sleeper,
+                    jitter_fn,
+                )
+                futures[future] = index
 
-        _trace_event(
-            "account_poll_end",
-            poll_run_id=poll_run_id,
-            account_name=account.name,
-            downloaded_count=len(downloaded),
-            candidate_count=candidate_count,
-            ghost_item_count=sum(ghost_reason_counts.values()),
-            delta_anomaly_count=sum(delta_anomaly_counts.values()),
-        )
+            for future in as_completed(futures):
+                index = futures[future]
+                results_by_index[index] = future.result()
+
+    results = tuple(results_by_index[idx] for idx in sorted(results_by_index))
 
     _trace_event(
         "poll_accounts_end",
@@ -259,7 +196,192 @@ def poll_accounts(
         result_count=len(results),
     )
 
-    return tuple(results)
+    return results
+
+
+def _runtime_budget_exhausted_result(account_name: str) -> AccountPollResult:
+    """Return a deterministic result when poll runtime budget is exhausted."""
+
+    anomaly_counts = {"scheduler_runtime_budget_exhausted": 1}
+    return AccountPollResult(
+        account_name=account_name,
+        downloaded_paths=tuple(),
+        candidate_count=0,
+        ghost_item_count=0,
+        ghost_reason_counts=tuple(),
+        delta_anomaly_count=1,
+        delta_anomaly_reason_counts=tuple(sorted(anomaly_counts.items())),
+    )
+
+
+def _poll_single_account(
+    account: AccountConfig,
+    app_config: AppConfig,
+    auth: OneDriveAuthClient,
+    http_client_factory: Callable[[], httpx.Client] | None,
+    poll_run_id: str,
+    deadline: float,
+    policy: RetryPolicy,
+    sleeper: Callable[[float], None],
+    jitter_fn: Callable[[], float] | None,
+) -> AccountPollResult:
+    """Poll a single account and return normalized result."""
+
+    _trace_event(
+        "account_poll_start",
+        poll_run_id=poll_run_id,
+        account_name=account.name,
+    )
+
+    remaining_budget = int(deadline - monotonic())
+    if remaining_budget <= 0:
+        result = _runtime_budget_exhausted_result(account.name)
+        _trace_event(
+            "account_poll_end",
+            poll_run_id=poll_run_id,
+            account_name=account.name,
+            downloaded_count=0,
+            candidate_count=0,
+            ghost_item_count=0,
+            delta_anomaly_count=result.delta_anomaly_count,
+        )
+        return result
+
+    try:
+        with account_singleton_lock(account.token_cache):
+            token = auth.acquire_access_token(account)
+            current_access_token = token.token
+
+            def refresh_access_token() -> str:
+                """Refresh token once when Graph returns 401/403."""
+
+                nonlocal current_access_token
+                refreshed = auth.acquire_access_token(account)
+                current_access_token = refreshed.token
+                return current_access_token
+
+            with _build_client(http_client_factory) as client:
+                (
+                    downloaded,
+                    candidate_count,
+                    ghost_reason_counts,
+                    delta_anomaly_counts,
+                ) = poll_account_once(
+                    account=account,
+                    staging_root=app_config.core.staging_path,
+                    access_token=current_access_token,
+                    refresh_access_token=refresh_access_token,
+                    http_client=client,
+                    max_runtime_seconds=min(
+                        app_config.core.max_poll_runtime_seconds,
+                        max(1, remaining_budget),
+                    ),
+                    tmp_ttl_minutes=app_config.core.tmp_ttl_minutes,
+                    integrity_mode=app_config.core.integrity_mode,
+                    delta_loop_resync_threshold=app_config.core.delta_loop_resync_threshold,
+                    delta_breaker_ghost_threshold=app_config.core.delta_breaker_ghost_threshold,
+                    delta_breaker_stale_page_threshold=(
+                        app_config.core.delta_breaker_stale_page_threshold
+                    ),
+                    delta_breaker_cooldown_seconds=(
+                        app_config.core.delta_breaker_cooldown_seconds
+                    ),
+                    poll_run_id=poll_run_id,
+                    policy=policy,
+                    sleeper=sleeper,
+                    jitter_fn=jitter_fn,
+                )
+    except SingletonLockBusyError as exc:
+        raise GraphError(
+            (
+                f"Account '{account.name}' is already being polled by another process."
+            ),
+            code="account_singleton_lock_busy",
+            account=account.name,
+            operation="poll_accounts",
+            safe_hint=str(exc),
+        ) from exc
+
+    drift_state, drift_ratio, drift_events = _evaluate_drift_state(
+        delta_anomaly_counts,
+        warning_threshold=app_config.core.drift_warning_threshold_ratio,
+        critical_threshold=app_config.core.drift_critical_threshold_ratio,
+        min_events=app_config.core.drift_min_events_for_evaluation,
+    )
+    _trace_event(
+        "drift_state_evaluated",
+        poll_run_id=poll_run_id,
+        account_name=account.name,
+        operation="drift_evaluation",
+        drift_state=drift_state,
+        drift_ratio=drift_ratio,
+        drift_events=drift_events,
+    )
+    if app_config.core.drift_fail_fast_enabled and drift_state == "critical":
+        raise GraphError(
+            f"Schema drift threshold exceeded for account '{account.name}'",
+            code="drift_threshold_critical",
+            account=account.name,
+            operation="poll_accounts",
+            safe_hint=(
+                f"drift_state=critical drift_ratio={drift_ratio:.3f} "
+                f"drift_events={drift_events}"
+            ),
+        )
+
+    result = AccountPollResult(
+        account_name=account.name,
+        downloaded_paths=tuple(downloaded),
+        candidate_count=candidate_count,
+        ghost_item_count=sum(ghost_reason_counts.values()),
+        ghost_reason_counts=tuple(sorted(ghost_reason_counts.items())),
+        delta_anomaly_count=sum(delta_anomaly_counts.values()),
+        delta_anomaly_reason_counts=tuple(sorted(delta_anomaly_counts.items())),
+    )
+
+    _apply_adaptive_backpressure(account, app_config, result)
+
+    _trace_event(
+        "account_poll_end",
+        poll_run_id=poll_run_id,
+        account_name=account.name,
+        downloaded_count=len(downloaded),
+        candidate_count=candidate_count,
+        ghost_item_count=sum(ghost_reason_counts.values()),
+        delta_anomaly_count=sum(delta_anomaly_counts.values()),
+    )
+    return result
+
+
+def _apply_adaptive_backpressure(
+    account: AccountConfig,
+    app_config: AppConfig,
+    result: AccountPollResult,
+) -> None:
+    """Apply account cooldown when retry/transport anomalies exceed thresholds."""
+
+    if not app_config.core.adaptive_backpressure_enabled:
+        return
+
+    counts = dict(result.delta_anomaly_reason_counts)
+    retry_total = counts.get("diag_retry_attempt_total", 0)
+    transport_total = counts.get("diag_retry_transport_error_total", 0)
+    if (
+        retry_total >= app_config.core.backpressure_retry_threshold
+        or transport_total >= app_config.core.backpressure_transport_error_threshold
+    ):
+        _arm_breaker_cooldown(
+            account.delta_cursor,
+            app_config.core.backpressure_cooldown_seconds,
+        )
+        _trace_event(
+            "adaptive_backpressure_armed",
+            account_name=account.name,
+            operation="adaptive_backpressure",
+            retry_total=retry_total,
+            transport_total=transport_total,
+            cooldown_seconds=app_config.core.backpressure_cooldown_seconds,
+        )
 
 
 def poll_account_once(
