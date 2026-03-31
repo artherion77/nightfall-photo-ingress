@@ -39,13 +39,13 @@ Scope:
 - Add capped exponential backoff with jitter fallback.
 
 Deliverables:
-- [ ] Retry policy module.
-- [ ] Deterministic test hooks for jitter/sleeper.
+	- [x] Retry policy module.
+	- [x] Deterministic test hooks for jitter/sleeper.
 
 Tests:
-- [ ] Unit: malformed/missing Retry-After fallback.
-- [ ] Unit: status classification matrix.
-- [ ] Unit: retry cap behavior.
+	- [x] Unit: malformed/missing Retry-After fallback.
+	- [x] Unit: status classification matrix.
+	- [x] Unit: retry cap behavior.
 
 Review gate:
 === STOP: Awaiting user feedback before proceeding ===

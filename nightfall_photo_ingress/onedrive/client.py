@@ -25,9 +25,16 @@ import httpx
 from ..config import AccountConfig, AppConfig
 from .auth import OneDriveAuthClient
 from .errors import DownloadError, GraphError, redact_url  # noqa: F401
+from .retry import (  # noqa: F401
+    DEFAULT_POLICY,
+    RETRYABLE_STATUS_CODES,
+    RetryPolicy,
+    classify_status,
+    compute_delay,
+    parse_retry_after,
+)
 
 GRAPH_BASE = "https://graph.microsoft.com/v1.0"
-RETRYABLE_STATUS_CODES = {429, 503}
 
 
 @dataclass(frozen=True)
@@ -57,11 +64,21 @@ def poll_accounts(
     account_name: str | None = None,
     auth_client: OneDriveAuthClient | None = None,
     http_client_factory: Callable[[], httpx.Client] | None = None,
+    policy: RetryPolicy = DEFAULT_POLICY,
+    sleeper: Callable[[float], None] = time.sleep,
+    jitter_fn: Callable[[], float] | None = None,
 ) -> tuple[AccountPollResult, ...]:
     """Poll enabled accounts in configured deterministic order.
 
     Downloads all delta candidates into account-scoped staging folders.
     Ingest decisioning is intentionally deferred to Module 4.
+
+    Args:
+        policy:     Retry/backoff policy applied to all HTTP calls in this run.
+        sleeper:    Callable used to pause between retries.  Replace with a
+                    no-op in tests to avoid real sleeps.
+        jitter_fn:  Optional jitter source.  Pass ``lambda: 0.0`` for fully
+                    deterministic test runs.
     """
 
     selected = app_config.ordered_enabled_accounts()
@@ -85,6 +102,9 @@ def poll_accounts(
                 staging_root=app_config.core.staging_path,
                 access_token=token.token,
                 http_client=client,
+                policy=policy,
+                sleeper=sleeper,
+                jitter_fn=jitter_fn,
             )
         results.append(
             AccountPollResult(
@@ -102,6 +122,9 @@ def poll_account_once(
     staging_root: Path,
     access_token: str,
     http_client: httpx.Client,
+    policy: RetryPolicy = DEFAULT_POLICY,
+    sleeper: Callable[[float], None] = time.sleep,
+    jitter_fn: Callable[[], float] | None = None,
 ) -> tuple[list[Path], int]:
     """Poll one account and download candidates into staging."""
 
@@ -113,7 +136,10 @@ def poll_account_once(
     delta_link: str | None = None
 
     while next_url:
-        payload = _graph_get_json(http_client, next_url, access_token)
+        payload = _graph_get_json(
+            http_client, next_url, access_token,
+            policy=policy, sleeper=sleeper, jitter_fn=jitter_fn,
+        )
         candidates.extend(parse_delta_items(account.name, payload))
         next_url = _as_str(payload.get("@odata.nextLink"))
         delta_link = _as_str(payload.get("@odata.deltaLink")) or delta_link
@@ -132,6 +158,9 @@ def poll_account_once(
         account_name=account.name,
         http_client=http_client,
         max_downloads=account.max_downloads,
+        policy=policy,
+        sleeper=sleeper,
+        jitter_fn=jitter_fn,
     )
 
     _save_cursor(account.delta_cursor, delta_link)
@@ -184,6 +213,9 @@ def download_candidates(
     account_name: str,
     http_client: httpx.Client,
     max_downloads: int | None,
+    policy: RetryPolicy = DEFAULT_POLICY,
+    sleeper: Callable[[float], None] = time.sleep,
+    jitter_fn: Callable[[], float] | None = None,
 ) -> list[Path]:
     """Download candidates into account-scoped staging folder."""
 
@@ -204,6 +236,9 @@ def download_candidates(
             http_client=http_client,
             url=candidate.download_url,
             destination=tmp_path,
+            policy=policy,
+            sleeper=sleeper,
+            jitter_fn=jitter_fn,
         )
         tmp_path.replace(final_path)
         downloaded.append(final_path)
@@ -215,27 +250,63 @@ def download_with_retry(
     http_client: httpx.Client,
     url: str,
     destination: Path,
-    max_attempts: int = 4,
+    policy: RetryPolicy = DEFAULT_POLICY,
     sleeper: Callable[[float], None] = time.sleep,
+    jitter_fn: Callable[[], float] | None = None,
 ) -> None:
-    """Download a file with bounded retries for transient statuses."""
+    """Download a file with bounded retries for transient statuses and transport errors.
 
+    Retry coverage:
+    - HTTP 429/500/502/503/504: transient server-side failures.
+    - ``httpx.RequestError``: connection resets, DNS failures, transport errors.
+
+    Back-off (priority order):
+    1. ``Retry-After`` header value parsed via :func:`parse_retry_after`
+       (supports numeric seconds and RFC 7231 HTTP-date).
+    2. Capped exponential back-off with optional jitter when no server hint.
+
+    Args:
+        policy:     Retry/backoff configuration.
+        sleeper:    Delay function; replace with a no-op in tests.
+        jitter_fn:  Jitter source; defaults to ``random.uniform(0, 1)``.
+                    Pass ``lambda: 0.0`` for deterministic test behaviour.
+    """
     destination.parent.mkdir(parents=True, exist_ok=True)
 
-    for attempt in range(1, max_attempts + 1):
-        response = http_client.get(url, timeout=120.0)
-        if response.status_code in RETRYABLE_STATUS_CODES:
-            if attempt >= max_attempts:
+    for attempt in range(1, policy.max_attempts + 1):
+        try:
+            response = http_client.get(url, timeout=120.0)
+        except httpx.RequestError as exc:
+            # Transport-level failure: connection reset, DNS error, timeout, etc.
+            if attempt >= policy.max_attempts:
+                raise DownloadError(
+                    "Download transport error after retries exhausted",
+                    url=url,
+                    code="download_transport_error",
+                    safe_hint=(
+                        f"Transport failure ({type(exc).__name__}) for "
+                        f"{redact_url(url)} after {policy.max_attempts} attempts"
+                    ),
+                ) from exc
+            delay = compute_delay(attempt, None, policy, jitter_fn)
+            sleeper(delay)
+            continue
+
+        if classify_status(response.status_code):
+            if attempt >= policy.max_attempts:
                 raise DownloadError(
                     "Download retry limit reached",
                     url=url,
                     code="download_retry_exhausted",
                     status_code=response.status_code,
-                    safe_hint=f"Retry limit ({max_attempts}) exceeded for {redact_url(url)}",
+                    safe_hint=(
+                        f"Retry limit ({policy.max_attempts}) exceeded for "
+                        f"{redact_url(url)}"
+                    ),
                 )
-            retry_after = response.headers.get("Retry-After")
-            sleep_seconds = float(retry_after) if retry_after else float(attempt)
-            sleeper(sleep_seconds)
+            retry_after = parse_retry_after(response.headers.get("Retry-After"))
+            delay = compute_delay(attempt, retry_after, policy, jitter_fn)
+            sleeper(delay)
             continue
 
         if response.status_code >= 400:
@@ -251,32 +322,83 @@ def download_with_retry(
 
 
 def _graph_get_json(
-    http_client: httpx.Client, url: str, access_token: str
+    http_client: httpx.Client,
+    url: str,
+    access_token: str,
+    policy: RetryPolicy = DEFAULT_POLICY,
+    sleeper: Callable[[float], None] = time.sleep,
+    jitter_fn: Callable[[], float] | None = None,
 ) -> dict[str, object]:
-    """Execute a Graph GET request and return parsed JSON payload."""
+    """Execute a Graph GET request and return parsed JSON payload.
 
-    response = http_client.get(
-        url,
-        headers={"Authorization": f"Bearer {access_token}"},
-        timeout=30.0,
+    Applies the same retry/backoff policy as :func:`download_with_retry`:
+    - HTTP 429/500/502/503/504 are retried with Retry-After / exponential back-off.
+    - Transport errors (``httpx.RequestError``) are retried up to
+      ``policy.max_attempts``.
+    """
+    for attempt in range(1, policy.max_attempts + 1):
+        try:
+            response = http_client.get(
+                url,
+                headers={"Authorization": f"Bearer {access_token}"},
+                timeout=30.0,
+            )
+        except httpx.RequestError as exc:
+            if attempt >= policy.max_attempts:
+                raise GraphError(
+                    "Graph transport error after retries exhausted",
+                    url=url,
+                    code="graph_transport_error",
+                    safe_hint=(
+                        f"Transport failure ({type(exc).__name__}) for "
+                        f"{redact_url(url)} after {policy.max_attempts} attempts"
+                    ),
+                ) from exc
+            delay = compute_delay(attempt, None, policy, jitter_fn)
+            sleeper(delay)
+            continue
+
+        if classify_status(response.status_code):
+            if attempt >= policy.max_attempts:
+                raise GraphError(
+                    "Graph request retry limit reached",
+                    url=url,
+                    code="graph_retry_exhausted",
+                    status_code=response.status_code,
+                    safe_hint=(
+                        f"HTTP {response.status_code} after {policy.max_attempts} "
+                        f"retries for {redact_url(url)}"
+                    ),
+                )
+            retry_after = parse_retry_after(response.headers.get("Retry-After"))
+            delay = compute_delay(attempt, retry_after, policy, jitter_fn)
+            sleeper(delay)
+            continue
+
+        if response.status_code >= 400:
+            raise GraphError(
+                "Graph request returned error status",
+                url=url,
+                status_code=response.status_code,
+                safe_hint=f"HTTP {response.status_code} for {redact_url(url)}",
+            )
+
+        try:
+            return json.loads(response.text)
+        except json.JSONDecodeError as exc:
+            raise GraphError(
+                "Invalid JSON in Graph response",
+                url=url,
+                code="graph_invalid_json",
+                safe_hint=f"JSON parse error for {redact_url(url)}",
+            ) from exc
+
+    # Unreachable: loop always returns or raises on the final attempt.
+    raise GraphError(  # pragma: no cover
+        "Unexpected retry loop exit",
+        url=url,
+        code="graph_retry_loop_exit",
     )
-    if response.status_code >= 400:
-        raise GraphError(
-            "Graph request returned error status",
-            url=url,
-            status_code=response.status_code,
-            safe_hint=f"HTTP {response.status_code} for {redact_url(url)}",
-        )
-
-    try:
-        return json.loads(response.text)
-    except json.JSONDecodeError as exc:
-        raise GraphError(
-            "Invalid JSON in Graph response",
-            url=url,
-            code="graph_invalid_json",
-            safe_hint=f"JSON parse error for {redact_url(url)}",
-        ) from exc
 
 
 def _build_initial_delta_url(account: AccountConfig) -> str:
