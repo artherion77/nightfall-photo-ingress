@@ -113,9 +113,9 @@ Commit scope:
 
 ## M4-H7 Audit completeness and ordering metadata
 
-- [ ] Ensure all terminal outcomes emit audit events (`missing_staged`, recovery decisions, quarantine).
-- [ ] Add `batch_run_id` and monotonic sequence number to audit metadata.
-- [ ] Add tests verifying event ordering and completeness under mixed outcomes.
+- [x] Ensure all terminal outcomes emit audit events (`missing_staged`, recovery decisions, quarantine).
+- [x] Add `batch_run_id` and monotonic sequence number to audit metadata.
+- [x] Add tests verifying event ordering and completeness under mixed outcomes.
 
 Commit scope:
 - Audit payload enrichment

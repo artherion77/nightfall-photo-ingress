@@ -63,6 +63,7 @@ class Registry:
         with self._connect() as conn:
             _set_pragmas(conn)
             _run_migrations(conn)
+            _ensure_optional_tables(conn)
 
     def create_or_update_file(
         self,
@@ -441,6 +442,53 @@ class Registry:
             conn.commit()
             return int(cursor.lastrowid)
 
+    def append_ingest_terminal_event(
+        self,
+        *,
+        batch_run_id: str,
+        sequence_no: int,
+        account: str,
+        onedrive_id: str,
+        sha256: str | None,
+        action: str,
+        reason: str | None,
+        actor: str,
+    ) -> int:
+        """Append terminal ingest event with batch and sequence metadata."""
+
+        now = _utc_now()
+        with self._connect() as conn:
+            _set_pragmas(conn)
+            conn.execute("BEGIN IMMEDIATE")
+            cursor = conn.execute(
+                """
+                INSERT INTO ingest_terminal_audit (
+                    batch_run_id,
+                    sequence_no,
+                    account,
+                    onedrive_id,
+                    sha256,
+                    action,
+                    reason,
+                    actor,
+                    ts
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    batch_run_id,
+                    sequence_no,
+                    account,
+                    onedrive_id,
+                    sha256,
+                    action,
+                    reason,
+                    actor,
+                    now,
+                ),
+            )
+            conn.commit()
+            return int(cursor.lastrowid)
+
     def get_file(self, *, sha256: str) -> FileRecord | None:
         """Return one file row by SHA-256 or None when missing."""
 
@@ -547,6 +595,28 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
         conn.executescript(_migration_v1_sql())
         conn.execute(f"PRAGMA user_version = {LATEST_SCHEMA_VERSION}")
         conn.commit()
+
+
+def _ensure_optional_tables(conn: sqlite3.Connection) -> None:
+    """Create additive optional tables used by newer runtime features."""
+
+    conn.executescript(
+        """
+CREATE TABLE IF NOT EXISTS ingest_terminal_audit (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    batch_run_id TEXT NOT NULL,
+    sequence_no INTEGER NOT NULL,
+    account TEXT NOT NULL,
+    onedrive_id TEXT NOT NULL,
+    sha256 TEXT,
+    action TEXT NOT NULL,
+    reason TEXT,
+    actor TEXT NOT NULL,
+    ts TEXT NOT NULL
+);
+        """
+    )
+    conn.commit()
 
 
 def _migration_v1_sql() -> str:

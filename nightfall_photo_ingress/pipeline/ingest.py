@@ -126,6 +126,8 @@ class IngestDecisionEngine:
             )
 
         outcomes: list[IngestOutcome] = []
+        batch_run_id = uuid4().hex
+        sequence_no = 0
 
         for candidate in candidates:
             outcome = self._process_one(
@@ -138,6 +140,17 @@ class IngestDecisionEngine:
                 quarantine_dir=quarantine_dir,
             )
             outcomes.append(outcome)
+            sequence_no += 1
+            self._registry.append_ingest_terminal_event(
+                batch_run_id=batch_run_id,
+                sequence_no=sequence_no,
+                account=candidate.account_name,
+                onedrive_id=candidate.onedrive_id,
+                sha256=outcome.sha256,
+                action=outcome.action,
+                reason=self._terminal_reason_from_outcome(outcome),
+                actor="ingest_pipeline",
+            )
 
         accepted_count = sum(1 for item in outcomes if item.action == "accepted")
         discarded_count = sum(
@@ -601,6 +614,20 @@ class IngestDecisionEngine:
             destination_path=destination_path,
             sha256=sha256,
         )
+
+    @staticmethod
+    def _terminal_reason_from_outcome(outcome: IngestOutcome) -> str:
+        """Return normalized reason metadata for terminal outcome events."""
+
+        if outcome.prefilter_hit:
+            return "metadata_prefilter"
+        if outcome.action == "accepted":
+            return "unknown_hash"
+        if outcome.action.startswith("discard_"):
+            return "known_hash"
+        if outcome.action in {"missing_staged", "size_mismatch", "reject_zero_byte", "quarantine_zero_byte"}:
+            return outcome.action
+        return "terminal_outcome"
 
     @staticmethod
     def _handle_quarantine_or_delete(*, path: Path, quarantine_dir: Path | None, category: str) -> None:
