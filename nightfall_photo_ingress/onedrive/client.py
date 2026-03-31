@@ -16,6 +16,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
+import hashlib
 import json
 import logging
 from pathlib import Path
@@ -75,8 +76,49 @@ class RemoteCandidate:
     name: str
     relative_path: str
     size_bytes: int | None
-    modified_time: str
+    raw_modified_time: str | None
+    normalized_modified_time: str
     download_url: str
+
+    @property
+    def modified_time(self) -> str:
+        """Backward-compatible alias for normalized modified timestamp."""
+
+        return self.normalized_modified_time
+
+
+@dataclass(frozen=True)
+class AccountPollPayload:
+    """Payload section of poll result used by downstream ingestion."""
+
+    downloaded_paths: tuple[Path, ...]
+    candidate_count: int
+
+
+@dataclass(frozen=True)
+class AccountPollAnomalies:
+    """Anomaly section of poll result."""
+
+    ghost_item_count: int
+    ghost_reason_counts: tuple[tuple[str, int], ...]
+    delta_anomaly_count: int
+    delta_anomaly_reason_counts: tuple[tuple[str, int], ...]
+
+
+@dataclass(frozen=True)
+class AccountPollDiagnostics:
+    """Diagnostics section of poll result."""
+
+    counters: tuple[tuple[str, int], ...]
+
+
+@dataclass(frozen=True)
+class AccountPollLifecycleState:
+    """Lifecycle state section for poll result."""
+
+    state: str
+    drift_ratio: float
+    drift_events: int
 
 
 @dataclass(frozen=True)
@@ -84,12 +126,46 @@ class AccountPollResult:
     """Result summary for one account poll cycle."""
 
     account_name: str
-    downloaded_paths: tuple[Path, ...]
-    candidate_count: int
-    ghost_item_count: int
-    ghost_reason_counts: tuple[tuple[str, int], ...]
-    delta_anomaly_count: int
-    delta_anomaly_reason_counts: tuple[tuple[str, int], ...]
+    payload: AccountPollPayload
+    anomalies: AccountPollAnomalies
+    diagnostics: AccountPollDiagnostics
+    lifecycle_state: AccountPollLifecycleState
+
+    @property
+    def downloaded_paths(self) -> tuple[Path, ...]:
+        """Backward-compatible alias for payload.downloaded_paths."""
+
+        return self.payload.downloaded_paths
+
+    @property
+    def candidate_count(self) -> int:
+        """Backward-compatible alias for payload.candidate_count."""
+
+        return self.payload.candidate_count
+
+    @property
+    def ghost_item_count(self) -> int:
+        """Backward-compatible alias for anomalies.ghost_item_count."""
+
+        return self.anomalies.ghost_item_count
+
+    @property
+    def ghost_reason_counts(self) -> tuple[tuple[str, int], ...]:
+        """Backward-compatible alias for anomalies.ghost_reason_counts."""
+
+        return self.anomalies.ghost_reason_counts
+
+    @property
+    def delta_anomaly_count(self) -> int:
+        """Backward-compatible alias for anomalies.delta_anomaly_count."""
+
+        return self.anomalies.delta_anomaly_count
+
+    @property
+    def delta_anomaly_reason_counts(self) -> tuple[tuple[str, int], ...]:
+        """Backward-compatible alias for anomalies.delta_anomaly_reason_counts."""
+
+        return self.anomalies.delta_anomaly_reason_counts
 
 
 @dataclass(frozen=True)
@@ -205,12 +281,19 @@ def _runtime_budget_exhausted_result(account_name: str) -> AccountPollResult:
     anomaly_counts = {"scheduler_runtime_budget_exhausted": 1}
     return AccountPollResult(
         account_name=account_name,
-        downloaded_paths=tuple(),
-        candidate_count=0,
-        ghost_item_count=0,
-        ghost_reason_counts=tuple(),
-        delta_anomaly_count=1,
-        delta_anomaly_reason_counts=tuple(sorted(anomaly_counts.items())),
+        payload=AccountPollPayload(downloaded_paths=tuple(), candidate_count=0),
+        anomalies=AccountPollAnomalies(
+            ghost_item_count=0,
+            ghost_reason_counts=tuple(),
+            delta_anomaly_count=1,
+            delta_anomaly_reason_counts=tuple(sorted(anomaly_counts.items())),
+        ),
+        diagnostics=AccountPollDiagnostics(counters=tuple()),
+        lifecycle_state=AccountPollLifecycleState(
+            state="skipped_runtime_budget",
+            drift_ratio=0.0,
+            drift_events=0,
+        ),
     )
 
 
@@ -329,14 +412,25 @@ def _poll_single_account(
             ),
         )
 
+    anomaly_counts, diagnostics = _split_anomaly_and_diagnostics(delta_anomaly_counts)
     result = AccountPollResult(
         account_name=account.name,
-        downloaded_paths=tuple(downloaded),
-        candidate_count=candidate_count,
-        ghost_item_count=sum(ghost_reason_counts.values()),
-        ghost_reason_counts=tuple(sorted(ghost_reason_counts.items())),
-        delta_anomaly_count=sum(delta_anomaly_counts.values()),
-        delta_anomaly_reason_counts=tuple(sorted(delta_anomaly_counts.items())),
+        payload=AccountPollPayload(
+            downloaded_paths=tuple(downloaded),
+            candidate_count=candidate_count,
+        ),
+        anomalies=AccountPollAnomalies(
+            ghost_item_count=sum(ghost_reason_counts.values()),
+            ghost_reason_counts=tuple(sorted(ghost_reason_counts.items())),
+            delta_anomaly_count=sum(anomaly_counts.values()),
+            delta_anomaly_reason_counts=tuple(sorted(anomaly_counts.items())),
+        ),
+        diagnostics=AccountPollDiagnostics(counters=tuple(sorted(diagnostics.items()))),
+        lifecycle_state=AccountPollLifecycleState(
+            state=drift_state,
+            drift_ratio=drift_ratio,
+            drift_events=drift_events,
+        ),
     )
 
     _apply_adaptive_backpressure(account, app_config, result)
@@ -363,9 +457,9 @@ def _apply_adaptive_backpressure(
     if not app_config.core.adaptive_backpressure_enabled:
         return
 
-    counts = dict(result.delta_anomaly_reason_counts)
-    retry_total = counts.get("diag_retry_attempt_total", 0)
-    transport_total = counts.get("diag_retry_transport_error_total", 0)
+    counts = dict(result.diagnostics.counters)
+    retry_total = counts.get("retry_attempt_total", 0)
+    transport_total = counts.get("retry_transport_error_total", 0)
     if (
         retry_total >= app_config.core.backpressure_retry_threshold
         or transport_total >= app_config.core.backpressure_transport_error_threshold
@@ -785,12 +879,13 @@ def download_candidates(
     lifecycle_journal = target_root / "_lifecycle.journal.jsonl"
     quarantine_root = target_root / "_quarantine"
     quarantine_root.mkdir(parents=True, exist_ok=True)
+    used_basenames: set[str] = set()
 
     for index, candidate in enumerate(candidates):
         if limit > 0 and index >= limit:
             break
 
-        safe_base = _safe_staging_basename(candidate.item_id)
+        safe_base = _unique_staging_basename(candidate.item_id, used_basenames)
         suffix = _safe_extension(candidate.name)
         tmp_path = target_root / f"{safe_base}.tmp"
         final_path = target_root / f"{safe_base}{suffix}"
@@ -1587,6 +1682,20 @@ def _safe_staging_basename(item_id: str) -> str:
     return sanitized[:120]
 
 
+def _unique_staging_basename(item_id: str, used_basenames: set[str]) -> str:
+    """Return deterministic unique basename when sanitization collisions occur."""
+
+    base = _safe_staging_basename(item_id)
+    if base not in used_basenames:
+        used_basenames.add(base)
+        return base
+
+    suffix = hashlib.sha256(item_id.encode("utf-8")).hexdigest()[:8]
+    candidate = f"{base}-{suffix}"
+    used_basenames.add(candidate)
+    return candidate
+
+
 def _safe_extension(name: str) -> str:
     """Return a safe file extension for staging artifacts."""
 
@@ -1637,10 +1746,26 @@ def _build_candidate_from_payload(
         name=name,
         relative_path=_extract_relative_path(raw),
         size_bytes=size_bytes,
-        modified_time=_as_str(raw.get("lastModifiedDateTime"))
+        raw_modified_time=_as_str(raw.get("lastModifiedDateTime")),
+        normalized_modified_time=_as_str(raw.get("lastModifiedDateTime"))
         or datetime.now(timezone.utc).isoformat(),
         download_url=download_url,
     )
+
+
+def _split_anomaly_and_diagnostics(
+    counts: dict[str, int],
+) -> tuple[dict[str, int], dict[str, int]]:
+    """Split mixed anomaly+diagnostic counters into explicit sections."""
+
+    anomalies: dict[str, int] = {}
+    diagnostics: dict[str, int] = {}
+    for key, value in counts.items():
+        if key.startswith("diag_"):
+            diagnostics[key[5:]] = value
+        else:
+            anomalies[key] = value
+    return anomalies, diagnostics
 
 
 def _classify_invalid_candidate_reason(raw: dict[str, object]) -> str:

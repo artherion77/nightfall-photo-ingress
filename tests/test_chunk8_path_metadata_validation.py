@@ -133,7 +133,8 @@ def test_download_candidates_sanitizes_staging_paths(tmp_path: Path) -> None:
         name="IMG_0001.HEIC",
         relative_path="",
         size_bytes=3,
-        modified_time="2026-01-01T00:00:00Z",
+        raw_modified_time="2026-01-01T00:00:00Z",
+        normalized_modified_time="2026-01-01T00:00:00Z",
         download_url="https://download/1",
     )
 
