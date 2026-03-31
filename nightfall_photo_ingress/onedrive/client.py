@@ -29,6 +29,7 @@ import httpx
 
 from ..config import AccountConfig, AppConfig
 from .auth import AuthError, OneDriveAuthClient
+from .cache_lock import SingletonLockBusyError, account_singleton_lock
 from .errors import DownloadError, GraphError, GraphResyncRequired, redact_url  # noqa: F401
 from .retry import (  # noqa: F401
     DEFAULT_POLICY,
@@ -150,45 +151,57 @@ def poll_accounts(
             poll_run_id=poll_run_id,
             account_name=account.name,
         )
-        token = auth.acquire_access_token(account)
-        current_access_token = token.token
+        try:
+            with account_singleton_lock(account.token_cache):
+                token = auth.acquire_access_token(account)
+                current_access_token = token.token
 
-        def refresh_access_token() -> str:
-            """Refresh token once when Graph returns 401/403."""
+                def refresh_access_token() -> str:
+                    """Refresh token once when Graph returns 401/403."""
 
-            nonlocal current_access_token
-            refreshed = auth.acquire_access_token(account)
-            current_access_token = refreshed.token
-            return current_access_token
+                    nonlocal current_access_token
+                    refreshed = auth.acquire_access_token(account)
+                    current_access_token = refreshed.token
+                    return current_access_token
 
-        with _build_client(http_client_factory) as client:
-            (
-                downloaded,
-                candidate_count,
-                ghost_reason_counts,
-                delta_anomaly_counts,
-            ) = poll_account_once(
-                account=account,
-                staging_root=app_config.core.staging_path,
-                access_token=current_access_token,
-                refresh_access_token=refresh_access_token,
-                http_client=client,
-                max_runtime_seconds=app_config.core.max_poll_runtime_seconds,
-                tmp_ttl_minutes=app_config.core.tmp_ttl_minutes,
-                integrity_mode=app_config.core.integrity_mode,
-                delta_loop_resync_threshold=app_config.core.delta_loop_resync_threshold,
-                delta_breaker_ghost_threshold=app_config.core.delta_breaker_ghost_threshold,
-                delta_breaker_stale_page_threshold=(
-                    app_config.core.delta_breaker_stale_page_threshold
+                with _build_client(http_client_factory) as client:
+                    (
+                        downloaded,
+                        candidate_count,
+                        ghost_reason_counts,
+                        delta_anomaly_counts,
+                    ) = poll_account_once(
+                        account=account,
+                        staging_root=app_config.core.staging_path,
+                        access_token=current_access_token,
+                        refresh_access_token=refresh_access_token,
+                        http_client=client,
+                        max_runtime_seconds=app_config.core.max_poll_runtime_seconds,
+                        tmp_ttl_minutes=app_config.core.tmp_ttl_minutes,
+                        integrity_mode=app_config.core.integrity_mode,
+                        delta_loop_resync_threshold=app_config.core.delta_loop_resync_threshold,
+                        delta_breaker_ghost_threshold=app_config.core.delta_breaker_ghost_threshold,
+                        delta_breaker_stale_page_threshold=(
+                            app_config.core.delta_breaker_stale_page_threshold
+                        ),
+                        delta_breaker_cooldown_seconds=(
+                            app_config.core.delta_breaker_cooldown_seconds
+                        ),
+                        poll_run_id=poll_run_id,
+                        policy=policy,
+                        sleeper=sleeper,
+                        jitter_fn=jitter_fn,
+                    )
+        except SingletonLockBusyError as exc:
+            raise GraphError(
+                (
+                    f"Account '{account.name}' is already being polled by another process."
                 ),
-                delta_breaker_cooldown_seconds=(
-                    app_config.core.delta_breaker_cooldown_seconds
-                ),
-                poll_run_id=poll_run_id,
-                policy=policy,
-                sleeper=sleeper,
-                jitter_fn=jitter_fn,
-            )
+                code="account_singleton_lock_busy",
+                account=account.name,
+                operation="poll_accounts",
+                safe_hint=str(exc),
+            ) from exc
 
         drift_state, drift_ratio, drift_events = _evaluate_drift_state(
             delta_anomaly_counts,

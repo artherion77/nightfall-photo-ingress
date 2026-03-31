@@ -15,9 +15,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import hashlib
 import json
 from pathlib import Path
 import os
+import stat
 
 import msal
 
@@ -97,6 +99,11 @@ class OneDriveAuthClient:
     ) -> tuple[msal.PublicClientApplication, msal.SerializableTokenCache]:
         """Create a PublicClientApplication seeded from account cache file."""
 
+        self._ensure_cache_parent(account.token_cache)
+        self._validate_secure_parent_dir(account.token_cache.parent)
+        if account.token_cache.exists():
+            self._validate_secure_file(account.token_cache, 0o600)
+
         cache = msal.SerializableTokenCache()
         if account.token_cache.exists():
             try:
@@ -152,6 +159,9 @@ class OneDriveAuthClient:
         if not identity_path.exists():
             return None
 
+        self._validate_secure_parent_dir(identity_path.parent)
+        self._validate_secure_file(identity_path, 0o600)
+
         try:
             payload = json.loads(identity_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
@@ -174,6 +184,8 @@ class OneDriveAuthClient:
                 account=account.name,
                 operation="identity_load",
             )
+
+        self._validate_identity_integrity(payload, account)
 
         identity: dict[str, str] = {}
         for key in ("home_account_id", "username"):
@@ -200,6 +212,8 @@ class OneDriveAuthClient:
             value = selected.get(key)
             if isinstance(value, str) and value:
                 payload[key] = value
+
+        payload["integrity_sha256"] = self._identity_integrity_hash(payload, account)
 
         identity_path = self._identity_path(account.token_cache)
         identity_path.parent.mkdir(parents=True, exist_ok=True)
@@ -270,6 +284,84 @@ class OneDriveAuthClient:
 
         cache_path.parent.mkdir(parents=True, exist_ok=True)
         os.chmod(cache_path.parent, 0o700)
+
+    @staticmethod
+    def _validate_secure_parent_dir(path: Path) -> None:
+        """Validate parent directory is owner-only (0700)."""
+
+        if not path.exists():
+            return
+
+        mode = stat.S_IMODE(path.stat().st_mode)
+        if mode != 0o700:
+            raise AuthError(
+                f"Insecure permissions on '{path}'. Expected 0700.",
+                operation="permission_check",
+                safe_hint=f"directory mode={oct(mode)}",
+            )
+
+    @staticmethod
+    def _validate_secure_file(path: Path, expected_mode: int) -> None:
+        """Validate file is owner-only (0600 by default)."""
+
+        mode = stat.S_IMODE(path.stat().st_mode)
+        if mode != expected_mode:
+            raise AuthError(
+                f"Insecure permissions on '{path}'. Expected {oct(expected_mode)}.",
+                operation="permission_check",
+                safe_hint=f"file mode={oct(mode)}",
+            )
+
+    @staticmethod
+    def _identity_integrity_hash(payload: dict[str, str], account: AccountConfig) -> str:
+        """Compute deterministic integrity hash for identity sidecar payload."""
+
+        canonical = {
+            "account": account.name,
+            "client_id": account.client_id,
+            "home_account_id": payload.get("home_account_id", ""),
+            "username": payload.get("username", ""),
+            "local_account_id": payload.get("local_account_id", ""),
+        }
+        raw = json.dumps(canonical, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+    def _validate_identity_integrity(
+        self,
+        payload: dict[str, object],
+        account: AccountConfig,
+    ) -> None:
+        """Validate identity sidecar integrity attestation."""
+
+        expected = payload.get("integrity_sha256")
+        if not isinstance(expected, str) or not expected:
+            raise AuthError(
+                (
+                    f"Identity metadata integrity missing for '{account.name}'. "
+                    "Run auth-setup to rebind token identity."
+                ),
+                account=account.name,
+                operation="identity_load",
+                safe_hint="missing integrity_sha256",
+            )
+
+        source: dict[str, str] = {}
+        for key in ("home_account_id", "username", "local_account_id"):
+            value = payload.get(key)
+            if isinstance(value, str) and value:
+                source[key] = value
+
+        actual = self._identity_integrity_hash(source, account)
+        if actual != expected:
+            raise AuthError(
+                (
+                    f"Identity metadata integrity mismatch for '{account.name}'. "
+                    "Run auth-setup to rebind token identity."
+                ),
+                account=account.name,
+                operation="identity_load",
+                safe_hint="identity sidecar hash mismatch",
+            )
 
     @staticmethod
     def _extract_token(

@@ -168,7 +168,9 @@ def test_corrupted_cache_is_quarantined(monkeypatch: pytest.MonkeyPatch, tmp_pat
 
     account = _make_account(tmp_path)
     account.token_cache.parent.mkdir(parents=True, exist_ok=True)
+    account.token_cache.parent.chmod(0o700)
     account.token_cache.write_text("not-json", encoding="utf-8")
+    account.token_cache.chmod(0o600)
 
     monkeypatch.setattr(
         "nightfall_photo_ingress.onedrive.auth.msal.SerializableTokenCache",
@@ -188,13 +190,25 @@ def test_wrong_bound_identity_fails_closed(monkeypatch: pytest.MonkeyPatch, tmp_
 
     account = _make_account(tmp_path)
     account.token_cache.parent.mkdir(parents=True, exist_ok=True)
+    account.token_cache.parent.chmod(0o700)
     account.token_cache.write_text("{}", encoding="utf-8")
+    account.token_cache.chmod(0o600)
 
     identity_path = account.token_cache.with_suffix(account.token_cache.suffix + ".identity.json")
+    auth = OneDriveAuthClient()
+    identity_payload = {
+        "home_account_id": "expected",
+        "username": "owner@example.com",
+    }
+    identity_payload["integrity_sha256"] = auth._identity_integrity_hash(
+        identity_payload,
+        account,
+    )
     identity_path.write_text(
-        json.dumps({"home_account_id": "expected", "username": "owner@example.com"}),
+        json.dumps(identity_payload),
         encoding="utf-8",
     )
+    identity_path.chmod(0o600)
 
     monkeypatch.setattr(
         "nightfall_photo_ingress.onedrive.auth.msal.SerializableTokenCache",
@@ -209,7 +223,7 @@ def test_wrong_bound_identity_fails_closed(monkeypatch: pytest.MonkeyPatch, tmp_
     )
 
     with pytest.raises(AuthError, match="identity mismatch"):
-        OneDriveAuthClient().acquire_access_token(account)
+        auth.acquire_access_token(account)
 
 
 def test_graph_401_triggers_single_token_refresh(tmp_path: Path) -> None:

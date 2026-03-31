@@ -213,6 +213,6 @@ Review gate:
 - [x] V2-5 committed
 - [x] V2-6 committed
 - [x] V2-7 committed
-- [ ] V2-8 committed
+- [x] V2-8 committed
 - [ ] V2-9 committed
 - [ ] V2-10 committed
