@@ -1,4 +1,4 @@
-"""Module 4 integration tests for staging restart recovery behavior."""
+"""Ingest pipeline integration tests for staging restart recovery behavior."""
 
 from __future__ import annotations
 

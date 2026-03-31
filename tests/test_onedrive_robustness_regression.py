@@ -1,4 +1,4 @@
-"""Robustness regression suite for OneDrive Module 3 behavior.
+"""Robustness regression suite for OneDrive client behavior.
 
 These tests intentionally combine multiple failure modes in one flow to prevent
 future regressions across chunk boundaries.

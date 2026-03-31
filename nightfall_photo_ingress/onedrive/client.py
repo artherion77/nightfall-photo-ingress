@@ -1,6 +1,6 @@
-"""Microsoft Graph client and poll orchestration for Module 3.
+"""Microsoft Graph client and poll orchestration for the OneDrive client.
 
-Module 3 scope:
+OneDrive client scope:
 - delta pagination and candidate parsing
 - per-account cursor persistence
 - staging downloads with retry/backoff handling
@@ -192,7 +192,7 @@ def poll_accounts(
     """Poll enabled accounts in configured deterministic order.
 
     Downloads all delta candidates into account-scoped staging folders.
-    Ingest decisioning is intentionally deferred to Module 4.
+    Ingest decisioning is intentionally deferred to the ingest pipeline.
 
     Args:
         policy:     Retry/backoff policy applied to all HTTP calls in this run.

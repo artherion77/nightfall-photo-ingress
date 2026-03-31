@@ -1,1 +1,1 @@
-"""OneDrive adapter package for Module 3."""
+"""OneDrive adapter package for the OneDrive client component."""

@@ -4,7 +4,7 @@ Incremental ingest service for photos, starting with a OneDrive adapter.
 
 ## Current scope
 
-This repository now includes a hardened Module 3 OneDrive polling client with:
+This repository now includes a hardened OneDrive client polling component with:
 - deterministic account polling order
 - delta pagination guards and resync markers
 - streamed staging downloads with integrity checks

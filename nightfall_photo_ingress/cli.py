@@ -77,7 +77,7 @@ def _cmd_auth_setup(args: argparse.Namespace) -> int:
 
 
 def _cmd_poll(args: argparse.Namespace) -> int:
-    """Run OneDrive account polling and staging download for Module 3."""
+    """Run OneDrive account polling and staging download for the OneDrive client."""
 
     try:
         app_config = load_config(args.path)

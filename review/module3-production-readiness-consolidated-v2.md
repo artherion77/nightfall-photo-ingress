@@ -1,11 +1,11 @@
-# Module 3 Production-Readiness Consolidated Review (Merged Stages 1-3 + Final)
+# OneDrive Client Production-Readiness Consolidated Review (Merged Stages 1-3 + Final)
 
 Date: 2026-03-31
 Scope: OneDrive client, auth/cache behavior, delta orchestration, staging download boundary.
 
 ## Executive verdict
 
-Module 3 is substantially hardened and test-covered, but it is not yet at full production-grade for a critical foreign-ingress boundary. Remaining high risks are concentrated in crash-boundary durability, integrity when remote metadata is weak, and schema-drift fail-fast policy.
+The OneDrive client is substantially hardened and test-covered, but it is not yet at full production-grade for a critical foreign-ingress boundary. Remaining high risks are concentrated in crash-boundary durability, integrity when remote metadata is weak, and schema-drift fail-fast policy.
 
 ## Merged findings by category
 
@@ -29,8 +29,8 @@ Module 3 is substantially hardened and test-covered, but it is not yet at full p
   - Why it matters: staging drift and ambiguous downstream behavior.
   - Recommendation: startup reconciliation for stale `.tmp` files with age-based quarantine/cleanup.
 
-- **Weakness (high):** Crash after rename-before-hash/registry insertion has no explicit bridging journal in Module 3.
-  - Why it matters: re-download ambiguity until Module 4 state catches up.
+- **Weakness (high):** Crash after rename-before-hash/registry insertion has no explicit bridging journal in the OneDrive client.
+  - Why it matters: re-download ambiguity until ingest pipeline state catches up.
   - Recommendation: append-only local download lifecycle journal (`started`, `completed`, `ready_for_hash`).
 
 - **Weakness (medium):** Crash during delta pagination can replay safely but may incur excess work if cursor checkpoint timing is unlucky.
@@ -107,7 +107,7 @@ Module 3 is substantially hardened and test-covered, but it is not yet at full p
   - Why it matters: inefficient behavior under sustained incidents.
   - Recommendation: adaptive per-account cooldown/circuit breaker.
 
-### 8. Integration readiness for Module 4
+### 8. Integration readiness for the ingest pipeline
 
 - **Weakness (medium):** Result contract blends diagnostics and anomalies.
   - Why it matters: consumer complexity and contract drift risk.
@@ -125,7 +125,7 @@ Module 3 is substantially hardened and test-covered, but it is not yet at full p
 
 ### High
 1. Startup crash-recovery reconciliation for staging artifacts missing.
-2. Download lifecycle journal bridging to Module 4 missing.
+2. Download lifecycle journal bridging to the ingest pipeline missing.
 3. Integrity policy when expected size is missing/unreliable is incomplete.
 4. Schema drift threshold-based fail-fast behavior missing.
 
@@ -141,14 +141,14 @@ Module 3 is substantially hardened and test-covered, but it is not yet at full p
 9. Optional bounded parallelism missing.
 10. Graph query shaping not yet leveraged.
 11. Adaptive queue-aware backpressure controls missing.
-12. Output contract sectioning for Module 4 should be tightened.
+12. Output contract sectioning for the ingest pipeline should be tightened.
 13. Raw vs normalized timestamp provenance split incomplete.
 14. Sanitized ID collision guard (hash suffix) missing.
 15. Explicit remediation-class mapping in errors could be improved.
 
 ### Low
-1. Additional queue-pressure metrics for Module 4 scheduling can be improved.
+1. Additional queue-pressure metrics for ingest pipeline scheduling can be improved.
 
 ## Most critical residual risk summary
 
-The highest residual risk is silent correctness erosion under real-world failure combinations: process crashes around staging boundaries, uncertain file integrity when upstream metadata is weak, and severe schema drift without fail-fast thresholds. These should be resolved before treating Module 3 as fully production-ready for a critical ingress boundary.
+The highest residual risk is silent correctness erosion under real-world failure combinations: process crashes around staging boundaries, uncertain file integrity when upstream metadata is weak, and severe schema drift without fail-fast thresholds. These should be resolved before treating the OneDrive client as fully production-ready for a critical ingress boundary.

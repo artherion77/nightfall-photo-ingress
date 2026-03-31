@@ -1,6 +1,6 @@
-"""Authentication helpers for OneDrive adapter.
+"""Authentication helpers for the OneDrive client.
 
-Module 3 scope:
+OneDrive client scope:
 - account-scoped token cache management
 - device-code auth setup
 - silent token refresh for polling

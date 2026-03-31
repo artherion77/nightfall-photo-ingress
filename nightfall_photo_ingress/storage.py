@@ -1,4 +1,4 @@
-"""Storage helpers for Module 4 ingest workflows.
+"""Storage helpers for ingest pipeline workflows.
 
 This module handles destination path rendering and durable staging-to-accepted
 commit behavior for both same-pool and cross-pool cases.

@@ -1,6 +1,6 @@
-"""Ingest decision engine for Module 4.
+"""Ingest decision engine for the ingest pipeline.
 
-This module takes staged candidates from Module 3, computes authoritative
+This module takes staged candidates from the OneDrive client, computes authoritative
 content hashes, applies registry-backed policy decisions, and persists files in
 accepted queue storage without touching the permanent library.
 """
@@ -160,7 +160,7 @@ class IngestDecisionEngine:
                 sha256=prefiltered[1],
                 action=f"prefilter_{prefiltered[0]}",
                 reason="metadata_index_match",
-                actor="module4_ingest",
+                actor="ingest_pipeline",
             )
             return IngestOutcome(
                 account_name=candidate.account_name,
@@ -218,7 +218,7 @@ class IngestDecisionEngine:
                 sha256=file_hash,
                 action="accepted",
                 reason="unknown_hash",
-                actor="module4_ingest",
+                actor="ingest_pipeline",
             )
             return IngestOutcome(
                 account_name=candidate.account_name,
@@ -248,7 +248,7 @@ class IngestDecisionEngine:
             sha256=file_hash,
             action=f"discard_{record.status}",
             reason="known_hash",
-            actor="module4_ingest",
+            actor="ingest_pipeline",
         )
         return IngestOutcome(
             account_name=candidate.account_name,

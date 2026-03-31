@@ -1,4 +1,4 @@
-"""Module 4 unit and integration tests for ingest decision workflows."""
+"""Ingest pipeline unit and integration tests for decision workflows."""
 
 from __future__ import annotations
 

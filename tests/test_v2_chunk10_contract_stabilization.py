@@ -1,4 +1,4 @@
-"""Dedicated tests for V2-10 Module 4 interface contract stabilization."""
+"""Dedicated tests for V2-10 ingest pipeline interface contract stabilization."""
 
 from __future__ import annotations
 

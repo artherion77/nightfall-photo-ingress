@@ -1,4 +1,4 @@
-# Module 3 Robustness Review Synthesis (Stage 1 + 2 + 3)
+# OneDrive Client Robustness Review Synthesis (Stage 1 + 2 + 3)
 
 Date: 2026-03-31
 Scope: OneDrive adapter only (auth + delta + download)
@@ -15,7 +15,7 @@ Legend:
 - Covered S2: identified in second-stage cross-validation
 - New S3: additional refinement from this stage
 
-| Failure vector | Covered S1 | Covered S2 | New S3 detail | Current Module 3 status |
+| Failure vector | Covered S1 | Covered S2 | New S3 detail | Current OneDrive client status |
 |---|---|---|---|---|
 | Inconsistent delta feeds (duplicates/missing/out-of-order) | Partial | Yes | Clarify merge semantics must be last-write-wins by item ID within poll page sequence | Not handled |
 | Missing or incorrect metadata.hashes | Partial | Yes | Explicitly treat hashes as advisory telemetry only, never trust for accept/reject | Partially handled |
@@ -149,7 +149,7 @@ Missing critical tests:
 
 ## 6. Review conclusion
 
-Module 3 is functionally useful for controlled happy paths but not production-robust for real Graph/OneDrive behavior under throttling, delta anomalies, token churn, and large-file transfer instability.
+The OneDrive client is functionally useful for controlled happy paths but not production-robust for real Graph/OneDrive behavior under throttling, delta anomalies, token churn, and large-file transfer instability.
 
 The highest-risk gaps are:
 1. Delta state-machine hardening (410, loops, replay anomalies)
