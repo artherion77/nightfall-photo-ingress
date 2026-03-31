@@ -55,13 +55,13 @@ Commit scope:
 
 ## M4-H3 Staging reconciliation and drift reporting
 
-- [ ] Extend recovery beyond `.tmp` age cleanup.
-- [ ] Classify and handle:
+- [x] Extend recovery beyond `.tmp` age cleanup.
+- [x] Classify and handle:
   - stale temp
   - completed-but-unpersisted
   - orphan unknown artifacts
-- [ ] Add quarantine folder workflow instead of blind delete for suspicious files.
-- [ ] Emit drift counters and threshold warnings.
+- [x] Add quarantine folder workflow instead of blind delete for suspicious files.
+- [x] Emit drift counters and threshold warnings.
 
 Commit scope:
 - Reconciliation logic

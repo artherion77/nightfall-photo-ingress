@@ -62,6 +62,17 @@ class IngestBatchResult:
     prefilter_discard_count: int
 
 
+@dataclass(frozen=True)
+class StagingDriftReport:
+    """Classification summary for staging reconciliation passes."""
+
+    stale_temp_count: int
+    completed_unpersisted_count: int
+    orphan_unknown_count: int
+    quarantined_count: int
+    warnings: tuple[str, ...]
+
+
 class IngestDecisionEngine:
     """Apply ingest policy matrix for staged files.
 
@@ -143,6 +154,90 @@ class IngestDecisionEngine:
                 removed += 1
 
         return removed
+
+    def reconcile_staging_drift(
+        self,
+        *,
+        staging_dir: Path,
+        quarantine_dir: Path,
+        tmp_ttl_minutes: int,
+        failed_ttl_hours: int,
+        orphan_ttl_days: int,
+        warning_threshold: int = 10,
+    ) -> StagingDriftReport:
+        """Reconcile staging drift with explicit classification and quarantine.
+
+        Categories:
+        - stale temp: expired .tmp files
+        - completed-but-unpersisted: completed files older than failed TTL
+        - orphan unknown: files older than orphan TTL
+        """
+
+        if not staging_dir.exists():
+            return StagingDriftReport(
+                stale_temp_count=0,
+                completed_unpersisted_count=0,
+                orphan_unknown_count=0,
+                quarantined_count=0,
+                warnings=(),
+            )
+
+        now = datetime.now(UTC).timestamp()
+        stale_temp = 0
+        completed_unpersisted = 0
+        orphan_unknown = 0
+        quarantined = 0
+
+        tmp_ttl_seconds = max(1, tmp_ttl_minutes) * 60
+        failed_ttl_seconds = max(1, failed_ttl_hours) * 3600
+        orphan_ttl_seconds = max(1, orphan_ttl_days) * 86400
+
+        for candidate in staging_dir.rglob("*"):
+            if not candidate.is_file():
+                continue
+            try:
+                age = now - candidate.stat().st_mtime
+            except OSError:
+                continue
+
+            category: str | None = None
+            if candidate.suffix == ".tmp" and age > tmp_ttl_seconds:
+                stale_temp += 1
+                category = "stale_temp"
+            elif candidate.suffix != ".tmp" and age > orphan_ttl_seconds:
+                orphan_unknown += 1
+                category = "orphan_unknown"
+            elif candidate.suffix != ".tmp" and age > failed_ttl_seconds:
+                completed_unpersisted += 1
+                category = "completed_unpersisted"
+
+            if category is None:
+                continue
+
+            quarantine_path = quarantine_dir / category / candidate.name
+            quarantine_path.parent.mkdir(parents=True, exist_ok=True)
+            if quarantine_path.exists():
+                quarantine_path = quarantine_path.with_name(
+                    f"{quarantine_path.stem}-{int(now)}{quarantine_path.suffix}"
+                )
+            candidate.replace(quarantine_path)
+            quarantined += 1
+
+        warnings: list[str] = []
+        if stale_temp >= warning_threshold:
+            warnings.append(f"stale_temp_threshold_exceeded:{stale_temp}")
+        if completed_unpersisted >= warning_threshold:
+            warnings.append(f"completed_unpersisted_threshold_exceeded:{completed_unpersisted}")
+        if orphan_unknown >= warning_threshold:
+            warnings.append(f"orphan_unknown_threshold_exceeded:{orphan_unknown}")
+
+        return StagingDriftReport(
+            stale_temp_count=stale_temp,
+            completed_unpersisted_count=completed_unpersisted,
+            orphan_unknown_count=orphan_unknown,
+            quarantined_count=quarantined,
+            warnings=tuple(warnings),
+        )
 
     def replay_interrupted_operations(self) -> dict[str, int]:
         """Reconcile interrupted ingest operations recorded in lifecycle journal."""
