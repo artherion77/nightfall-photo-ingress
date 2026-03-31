@@ -151,14 +151,14 @@ Scope:
 - Add one retry path for 401/403 Graph requests with forced token refresh.
 
 Deliverables:
-- [ ] Cache lock abstraction.
-- [ ] Identity binding fields persisted and validated.
-- [ ] Refresh-once request wrapper.
+- [x] Cache lock abstraction.
+- [x] Identity binding fields persisted and validated.
+- [x] Refresh-once request wrapper.
 
 Tests:
-- [ ] Unit: corrupted cache handling path.
-- [ ] Unit: wrong-account cache does not silently proceed.
-- [ ] Integration (mocked): 401 then refreshed token succeeds.
+- [x] Unit: corrupted cache handling path.
+- [x] Unit: wrong-account cache does not silently proceed.
+- [x] Integration (mocked): 401 then refreshed token succeeds.
 
 Review gate:
 === STOP: Awaiting user feedback before proceeding ===
@@ -239,7 +239,7 @@ Review gate:
 - [x] Chunk 4 committed
 - [x] Chunk 5 committed
 - [x] Chunk 6 committed
-- [ ] Chunk 7 committed
+- [x] Chunk 7 committed
 - [ ] Chunk 8 committed
 - [ ] Chunk 9 committed
 - [ ] Chunk 10 committed

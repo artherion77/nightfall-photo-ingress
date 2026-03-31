@@ -25,7 +25,7 @@ from urllib.parse import quote
 import httpx
 
 from ..config import AccountConfig, AppConfig
-from .auth import OneDriveAuthClient
+from .auth import AuthError, OneDriveAuthClient
 from .errors import DownloadError, GraphError, GraphResyncRequired, redact_url  # noqa: F401
 from .retry import (  # noqa: F401
     DEFAULT_POLICY,
@@ -111,6 +111,16 @@ def poll_accounts(
 
     for account in selected:
         token = auth.acquire_access_token(account)
+        current_access_token = token.token
+
+        def refresh_access_token() -> str:
+            """Refresh token once when Graph returns 401/403."""
+
+            nonlocal current_access_token
+            refreshed = auth.acquire_access_token(account)
+            current_access_token = refreshed.token
+            return current_access_token
+
         with _build_client(http_client_factory) as client:
             (
                 downloaded,
@@ -120,7 +130,8 @@ def poll_accounts(
             ) = poll_account_once(
                 account=account,
                 staging_root=app_config.core.staging_path,
-                access_token=token.token,
+                access_token=current_access_token,
+                refresh_access_token=refresh_access_token,
                 http_client=client,
                 max_runtime_seconds=app_config.core.max_poll_runtime_seconds,
                 policy=policy,
@@ -149,6 +160,7 @@ def poll_account_once(
     staging_root: Path,
     access_token: str,
     http_client: httpx.Client,
+    refresh_access_token: Callable[[], str] | None = None,
     max_delta_pages: int = DEFAULT_MAX_DELTA_PAGES,
     max_runtime_seconds: int = 300,
     policy: RetryPolicy = DEFAULT_POLICY,
@@ -204,6 +216,7 @@ def poll_account_once(
                 http_client,
                 next_url,
                 access_token,
+                refresh_access_token=refresh_access_token,
                 policy=policy,
                 sleeper=sleeper,
                 jitter_fn=jitter_fn,
@@ -252,6 +265,7 @@ def poll_account_once(
         access_token=access_token,
         http_client=http_client,
         max_downloads=account.max_downloads,
+                refresh_access_token=refresh_access_token,
         policy=policy,
         sleeper=sleeper,
         jitter_fn=jitter_fn,
@@ -386,7 +400,8 @@ def download_candidates(
     account_name: str,
     access_token: str,
     http_client: httpx.Client,
-    max_downloads: int | None,
+    refresh_access_token: Callable[[], str] | None = None,
+    max_downloads: int | None = None,
     policy: RetryPolicy = DEFAULT_POLICY,
     sleeper: Callable[[float], None] = time.sleep,
     jitter_fn: Callable[[], float] | None = None,
@@ -424,6 +439,7 @@ def download_candidates(
             refreshed_url, ghost_reason = _resolve_download_url_once(
                 item_id=candidate.item_id,
                 access_token=access_token,
+                refresh_access_token=refresh_access_token,
                 http_client=http_client,
                 policy=policy,
                 sleeper=sleeper,
@@ -534,6 +550,7 @@ def _is_download_url_unreachable(error: DownloadError) -> bool:
 def _resolve_download_url_once(
     item_id: str,
     access_token: str,
+    refresh_access_token: Callable[[], str] | None,
     http_client: httpx.Client,
     policy: RetryPolicy,
     sleeper: Callable[[float], None],
@@ -555,6 +572,7 @@ def _resolve_download_url_once(
             http_client,
             metadata_url,
             access_token,
+            refresh_access_token=refresh_access_token,
             policy=policy,
             sleeper=sleeper,
             jitter_fn=jitter_fn,
@@ -714,6 +732,7 @@ def _graph_get_json(
     policy: RetryPolicy = DEFAULT_POLICY,
     sleeper: Callable[[float], None] = time.sleep,
     jitter_fn: Callable[[], float] | None = None,
+    refresh_access_token: Callable[[], str] | None = None,
 ) -> dict[str, object]:
     """Execute a Graph GET request and return parsed JSON payload.
 
@@ -722,6 +741,7 @@ def _graph_get_json(
     - Transport errors (``httpx.RequestError``) are retried up to
       ``policy.max_attempts``.
     """
+    refreshed_once = False
     for attempt in range(1, policy.max_attempts + 1):
         try:
             response = http_client.get(
@@ -742,6 +762,31 @@ def _graph_get_json(
                 ) from exc
             delay = compute_delay(attempt, None, policy, jitter_fn)
             sleeper(delay)
+            continue
+
+        if response.status_code in {401, 403}:
+            if refreshed_once or refresh_access_token is None:
+                raise GraphError(
+                    "Graph authentication failed",
+                    url=url,
+                    code="graph_auth_failed",
+                    status_code=response.status_code,
+                    safe_hint=(
+                        f"HTTP {response.status_code} for {redact_url(url)} "
+                        "after refresh attempt"
+                    ),
+                )
+            try:
+                access_token = refresh_access_token()
+            except AuthError as exc:
+                raise GraphError(
+                    "Graph token refresh failed",
+                    url=url,
+                    code="graph_auth_refresh_failed",
+                    status_code=response.status_code,
+                    safe_hint=f"Token refresh failed for {redact_url(url)}",
+                ) from exc
+            refreshed_once = True
             continue
 
         if classify_status(response.status_code):
