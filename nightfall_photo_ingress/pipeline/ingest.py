@@ -11,6 +11,7 @@ import sqlite3
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from uuid import uuid4
 
 from ..registry import Registry
 from ..storage import (
@@ -19,6 +20,7 @@ from ..storage import (
     render_storage_relative_path,
     sha256_file,
 )
+from .journal import IngestOperationJournal
 
 
 class IngestError(RuntimeError):
@@ -68,8 +70,19 @@ class IngestDecisionEngine:
     - accepted/rejected/purged known hash: discard staged file
     """
 
-    def __init__(self, registry: Registry) -> None:
+    def __init__(
+        self,
+        registry: Registry,
+        *,
+        journal_path: Path | None = None,
+        journal_max_bytes: int = 5 * 1024 * 1024,
+    ) -> None:
         self._registry = registry
+        self._journal = (
+            IngestOperationJournal(path=journal_path, max_bytes=journal_max_bytes)
+            if journal_path is not None
+            else None
+        )
 
     def process_batch(
         self,
@@ -131,6 +144,59 @@ class IngestDecisionEngine:
 
         return removed
 
+    def replay_interrupted_operations(self) -> dict[str, int]:
+        """Reconcile interrupted ingest operations recorded in lifecycle journal."""
+
+        if self._journal is None:
+            return {
+                "interrupted_total": 0,
+                "quarantined_destinations": 0,
+                "removed_staging": 0,
+            }
+
+        records = self._journal.read_all()
+        by_op: dict[str, list] = {}
+        for record in records:
+            by_op.setdefault(record.op_id, []).append(record)
+
+        interrupted_total = 0
+        quarantined_destinations = 0
+        removed_staging = 0
+
+        for op_id, op_records in by_op.items():
+            phases = {item.phase for item in op_records}
+            if "registry_persisted" in phases:
+                continue
+
+            interrupted_total += 1
+            latest = op_records[-1]
+            staging_path = Path(latest.staging_path)
+            destination_path = Path(latest.destination_path) if latest.destination_path else None
+
+            if destination_path is not None and destination_path.exists():
+                quarantine = destination_path.with_suffix(destination_path.suffix + ".orphaned")
+                destination_path.replace(quarantine)
+                quarantined_destinations += 1
+
+            if staging_path.exists():
+                staging_path.unlink(missing_ok=True)
+                removed_staging += 1
+
+            if latest.sha256 is not None and self._registry.get_file(sha256=latest.sha256) is not None:
+                self._registry.append_audit_event(
+                    sha256=latest.sha256,
+                    action="recovery_interrupted_ingest",
+                    reason=f"journal_replay:{op_id}",
+                    actor="ingest_pipeline",
+                )
+
+        self._journal.clear()
+        return {
+            "interrupted_total": interrupted_total,
+            "quarantined_destinations": quarantined_destinations,
+            "removed_staging": removed_staging,
+        }
+
     def _process_one(
         self,
         *,
@@ -142,7 +208,20 @@ class IngestDecisionEngine:
         """Process one staged candidate through prefilter and hash decisioning."""
 
         path = candidate.staging_path
+        op_id = f"{candidate.account_name}:{candidate.onedrive_id}:{uuid4().hex[:12]}"
+
+        self._journal_append(
+            op_id=op_id,
+            phase="ingest_started",
+            candidate=candidate,
+        )
+
         if not path.exists():
+            self._journal_append(
+                op_id=op_id,
+                phase="missing_staged",
+                candidate=candidate,
+            )
             return IngestOutcome(
                 account_name=candidate.account_name,
                 onedrive_id=candidate.onedrive_id,
@@ -172,6 +251,12 @@ class IngestDecisionEngine:
             )
 
         file_hash = sha256_file(path)
+        self._journal_append(
+            op_id=op_id,
+            phase="hash_completed",
+            candidate=candidate,
+            sha256=file_hash,
+        )
         record = self._registry.get_file(sha256=file_hash)
 
         if record is None:
@@ -187,6 +272,13 @@ class IngestDecisionEngine:
                 destination_path=destination,
                 staging_on_same_pool=staging_on_same_pool,
             )
+            self._journal_append(
+                op_id=op_id,
+                phase="storage_committed",
+                candidate=candidate,
+                destination_path=destination,
+                sha256=file_hash,
+            )
 
             size_bytes = destination.stat().st_size
             self._registry.finalize_unknown_ingest(
@@ -199,6 +291,13 @@ class IngestDecisionEngine:
                 source_path=candidate.relative_path,
                 modified_time=candidate.modified_time,
                 actor="ingest_pipeline",
+            )
+            self._journal_append(
+                op_id=op_id,
+                phase="registry_persisted",
+                candidate=candidate,
+                destination_path=destination,
+                sha256=file_hash,
             )
             return IngestOutcome(
                 account_name=candidate.account_name,
@@ -220,6 +319,12 @@ class IngestDecisionEngine:
             modified_time=candidate.modified_time,
             size_bytes=known_size,
             actor="ingest_pipeline",
+        )
+        self._journal_append(
+            op_id=op_id,
+            phase="registry_persisted",
+            candidate=candidate,
+            sha256=file_hash,
         )
         return IngestOutcome(
             account_name=candidate.account_name,
@@ -266,3 +371,24 @@ class IngestDecisionEngine:
         if status not in {"accepted", "rejected", "purged"}:
             return None
         return status, sha256
+
+    def _journal_append(
+        self,
+        *,
+        op_id: str,
+        phase: str,
+        candidate: StagedCandidate,
+        destination_path: Path | None = None,
+        sha256: str | None = None,
+    ) -> None:
+        if self._journal is None:
+            return
+        self._journal.append(
+            op_id=op_id,
+            phase=phase,
+            account=candidate.account_name,
+            onedrive_id=candidate.onedrive_id,
+            staging_path=candidate.staging_path,
+            destination_path=destination_path,
+            sha256=sha256,
+        )

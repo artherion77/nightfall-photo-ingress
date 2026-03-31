@@ -37,14 +37,14 @@ Commit scope:
 
 ## M4-H2 Crash-boundary operation journal + replay
 
-- [ ] Add append-only lifecycle journal for ingest phases:
+- [x] Add append-only lifecycle journal for ingest phases:
   - `ingest_started`
   - `hash_completed`
   - `storage_committed`
   - `registry_persisted`
-- [ ] Implement startup replay/reconcile logic for interrupted records.
-- [ ] Ensure journal entries are durable and rotation policy is defined.
-- [ ] Add crash simulation tests for each boundary.
+- [x] Implement startup replay/reconcile logic for interrupted records.
+- [x] Ensure journal entries are durable and rotation policy is defined.
+- [x] Add crash simulation tests for each boundary.
 
 Commit scope:
 - New journal helper(s)
