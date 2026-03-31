@@ -18,6 +18,7 @@ from datetime import datetime
 import json
 from pathlib import Path
 import time
+from time import monotonic
 from typing import Callable, Iterable
 from urllib.parse import quote
 
@@ -25,7 +26,7 @@ import httpx
 
 from ..config import AccountConfig, AppConfig
 from .auth import OneDriveAuthClient
-from .errors import DownloadError, GraphError, redact_url  # noqa: F401
+from .errors import DownloadError, GraphError, GraphResyncRequired, redact_url  # noqa: F401
 from .retry import (  # noqa: F401
     DEFAULT_POLICY,
     RETRYABLE_STATUS_CODES,
@@ -36,6 +37,7 @@ from .retry import (  # noqa: F401
 )
 
 GRAPH_BASE = "https://graph.microsoft.com/v1.0"
+DEFAULT_MAX_DELTA_PAGES = 1000
 
 
 @dataclass(frozen=True)
@@ -60,6 +62,8 @@ class AccountPollResult:
     candidate_count: int
     ghost_item_count: int
     ghost_reason_counts: tuple[tuple[str, int], ...]
+    delta_anomaly_count: int
+    delta_anomaly_reason_counts: tuple[tuple[str, int], ...]
 
 
 def poll_accounts(
@@ -100,11 +104,17 @@ def poll_accounts(
     for account in selected:
         token = auth.acquire_access_token(account)
         with _build_client(http_client_factory) as client:
-            downloaded, candidate_count, ghost_reason_counts = poll_account_once(
+            (
+                downloaded,
+                candidate_count,
+                ghost_reason_counts,
+                delta_anomaly_counts,
+            ) = poll_account_once(
                 account=account,
                 staging_root=app_config.core.staging_path,
                 access_token=token.token,
                 http_client=client,
+                max_runtime_seconds=app_config.core.max_poll_runtime_seconds,
                 policy=policy,
                 sleeper=sleeper,
                 jitter_fn=jitter_fn,
@@ -116,6 +126,10 @@ def poll_accounts(
                 candidate_count=candidate_count,
                 ghost_item_count=sum(ghost_reason_counts.values()),
                 ghost_reason_counts=tuple(sorted(ghost_reason_counts.items())),
+                delta_anomaly_count=sum(delta_anomaly_counts.values()),
+                delta_anomaly_reason_counts=tuple(
+                    sorted(delta_anomaly_counts.items())
+                ),
             )
         )
 
@@ -127,10 +141,12 @@ def poll_account_once(
     staging_root: Path,
     access_token: str,
     http_client: httpx.Client,
+    max_delta_pages: int = DEFAULT_MAX_DELTA_PAGES,
+    max_runtime_seconds: int = 300,
     policy: RetryPolicy = DEFAULT_POLICY,
     sleeper: Callable[[float], None] = time.sleep,
     jitter_fn: Callable[[], float] | None = None,
-) -> tuple[list[Path], int, dict[str, int]]:
+) -> tuple[list[Path], int, dict[str, int], dict[str, int]]:
     """Poll one account and download candidates into staging."""
 
     cursor = _load_cursor(account.delta_cursor)
@@ -139,12 +155,69 @@ def poll_account_once(
     candidates: list[RemoteCandidate] = []
     next_url: str | None = delta_url
     delta_link: str | None = None
+    seen_next_links: set[str] = set()
+    seen_item_ids: set[str] = set()
+    delta_anomaly_counts: dict[str, int] = {}
+    page_count = 0
+    start_monotonic = monotonic()
 
     while next_url:
-        payload = _graph_get_json(
-            http_client, next_url, access_token,
-            policy=policy, sleeper=sleeper, jitter_fn=jitter_fn,
-        )
+        if monotonic() - start_monotonic > max_runtime_seconds:
+            _record_ghost_reason(delta_anomaly_counts, "delta_runtime_limit_exceeded")
+            raise GraphError(
+                f"Delta polling exceeded runtime limit for account '{account.name}'",
+                code="delta_runtime_limit_exceeded",
+                account=account.name,
+                operation="poll_account_once",
+            )
+
+        if page_count >= max_delta_pages:
+            _record_ghost_reason(delta_anomaly_counts, "delta_page_limit_exceeded")
+            raise GraphError(
+                f"Delta polling exceeded max pages for account '{account.name}'",
+                code="delta_page_limit_exceeded",
+                account=account.name,
+                operation="poll_account_once",
+            )
+
+        if next_url in seen_next_links:
+            _record_ghost_reason(delta_anomaly_counts, "delta_nextlink_cycle_detected")
+            raise GraphError(
+                f"Delta nextLink cycle detected for account '{account.name}'",
+                code="delta_nextlink_cycle_detected",
+                account=account.name,
+                operation="poll_account_once",
+            )
+        seen_next_links.add(next_url)
+
+        try:
+            payload = _graph_get_json(
+                http_client,
+                next_url,
+                access_token,
+                policy=policy,
+                sleeper=sleeper,
+                jitter_fn=jitter_fn,
+            )
+        except GraphResyncRequired as exc:
+            _record_ghost_reason(delta_anomaly_counts, "delta_resync_required_410")
+            _mark_resync_required(
+                cursor_path=account.delta_cursor,
+                account_name=account.name,
+                reason="delta_resync_required_410",
+                resync_url=exc.resync_url,
+            )
+            return [], 0, {}, delta_anomaly_counts
+
+        page_count += 1
+        replay_count = _count_replayed_item_ids(payload, seen_item_ids)
+        if replay_count > 0:
+            _record_ghost_reason(
+                delta_anomaly_counts,
+                "delta_replayed_item_id",
+                count=replay_count,
+            )
+
         candidates.extend(parse_delta_items(account.name, payload))
         next_url = _as_str(payload.get("@odata.nextLink"))
         delta_link = _as_str(payload.get("@odata.deltaLink")) or delta_link
@@ -170,7 +243,8 @@ def poll_account_once(
     )
 
     _save_cursor(account.delta_cursor, delta_link)
-    return downloaded_paths, len(candidates), ghost_reason_counts
+    _clear_resync_marker(account.delta_cursor)
+    return downloaded_paths, len(candidates), ghost_reason_counts, delta_anomaly_counts
 
 
 def parse_delta_items(
@@ -292,10 +366,70 @@ def download_candidates(
     return downloaded, ghost_reason_counts
 
 
-def _record_ghost_reason(reason_counts: dict[str, int], reason: str) -> None:
-    """Increment a ghost-item reason counter."""
+def _record_ghost_reason(reason_counts: dict[str, int], reason: str, count: int = 1) -> None:
+    """Increment a reason counter by count."""
 
-    reason_counts[reason] = reason_counts.get(reason, 0) + 1
+    reason_counts[reason] = reason_counts.get(reason, 0) + count
+
+
+def _count_replayed_item_ids(payload: dict[str, object], seen_item_ids: set[str]) -> int:
+    """Count repeated item IDs across delta pages.
+
+    This is a lightweight stale/replay anomaly detector and does not alter the
+    candidate set. Deduplication semantics are handled in later hardening chunks.
+    """
+
+    raw_items = payload.get("value")
+    if not isinstance(raw_items, list):
+        return 0
+
+    replay_count = 0
+    for raw in raw_items:
+        if not isinstance(raw, dict):
+            continue
+        item_id = _as_str(raw.get("id"))
+        if not item_id:
+            continue
+        if item_id in seen_item_ids:
+            replay_count += 1
+        else:
+            seen_item_ids.add(item_id)
+    return replay_count
+
+
+def _resync_marker_path(cursor_path: Path) -> Path:
+    """Return the resync marker path derived from a cursor path."""
+
+    if cursor_path.suffix:
+        return cursor_path.with_suffix(cursor_path.suffix + ".resync.json")
+    return Path(str(cursor_path) + ".resync.json")
+
+
+def _mark_resync_required(
+    cursor_path: Path,
+    account_name: str,
+    reason: str,
+    resync_url: str | None,
+) -> None:
+    """Persist a marker indicating this account requires a delta resync."""
+
+    marker_path = _resync_marker_path(cursor_path)
+    marker_path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "account": account_name,
+        "required_at": datetime.utcnow().isoformat() + "Z",
+        "reason": reason,
+        "resync_url": resync_url,
+    }
+    tmp_path = marker_path.with_suffix(marker_path.suffix + ".tmp")
+    tmp_path.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
+    tmp_path.replace(marker_path)
+
+
+def _clear_resync_marker(cursor_path: Path) -> None:
+    """Delete any stale resync marker after successful cursor persistence."""
+
+    _resync_marker_path(cursor_path).unlink(missing_ok=True)
 
 
 def _is_download_url_unreachable(error: DownloadError) -> bool:
@@ -533,6 +667,15 @@ def _graph_get_json(
             delay = compute_delay(attempt, retry_after, policy, jitter_fn)
             sleeper(delay)
             continue
+
+        if response.status_code == 410:
+            raise GraphResyncRequired(
+                "Graph delta cursor is no longer valid and requires resync",
+                url=url,
+                status_code=response.status_code,
+                resync_url=response.headers.get("Location"),
+                safe_hint=f"HTTP 410 for {redact_url(url)}",
+            )
 
         if response.status_code >= 400:
             raise GraphError(

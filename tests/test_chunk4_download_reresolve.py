@@ -83,7 +83,7 @@ def test_download_url_reresolve_succeeds_after_first_403(tmp_path: Path) -> None
         }
     )
 
-    downloaded, candidate_count, ghost_reason_counts = poll_account_once(
+    downloaded, candidate_count, ghost_reason_counts, delta_anomaly_counts = poll_account_once(
         account=account,
         staging_root=tmp_path / "staging",
         access_token="token",
@@ -94,6 +94,7 @@ def test_download_url_reresolve_succeeds_after_first_403(tmp_path: Path) -> None
     assert len(downloaded) == 1
     assert downloaded[0].read_bytes() == b"one"
     assert ghost_reason_counts == {}
+    assert delta_anomaly_counts == {}
 
 
 def test_missing_download_url_after_refresh_is_classified_as_ghost(tmp_path: Path) -> None:
@@ -120,7 +121,7 @@ def test_missing_download_url_after_refresh_is_classified_as_ghost(tmp_path: Pat
         }
     )
 
-    downloaded, candidate_count, ghost_reason_counts = poll_account_once(
+    downloaded, candidate_count, ghost_reason_counts, delta_anomaly_counts = poll_account_once(
         account=account,
         staging_root=tmp_path / "staging",
         access_token="token",
@@ -130,6 +131,7 @@ def test_missing_download_url_after_refresh_is_classified_as_ghost(tmp_path: Pat
     assert candidate_count == 1
     assert downloaded == []
     assert ghost_reason_counts == {"ghost_missing_download_url_after_refresh": 1}
+    assert delta_anomaly_counts == {}
 
 
 def test_still_unreachable_after_refresh_is_classified_as_ghost(tmp_path: Path) -> None:
@@ -160,7 +162,7 @@ def test_still_unreachable_after_refresh_is_classified_as_ghost(tmp_path: Path) 
         }
     )
 
-    downloaded, candidate_count, ghost_reason_counts = poll_account_once(
+    downloaded, candidate_count, ghost_reason_counts, delta_anomaly_counts = poll_account_once(
         account=account,
         staging_root=tmp_path / "staging",
         access_token="token",
@@ -170,6 +172,7 @@ def test_still_unreachable_after_refresh_is_classified_as_ghost(tmp_path: Path) 
     assert candidate_count == 1
     assert downloaded == []
     assert ghost_reason_counts == {"ghost_download_unreachable_after_refresh": 1}
+    assert delta_anomaly_counts == {}
 
 
 def test_refresh_404_classified_as_item_not_found_ghost(tmp_path: Path) -> None:
@@ -196,7 +199,7 @@ def test_refresh_404_classified_as_item_not_found_ghost(tmp_path: Path) -> None:
         }
     )
 
-    downloaded, candidate_count, ghost_reason_counts = poll_account_once(
+    downloaded, candidate_count, ghost_reason_counts, delta_anomaly_counts = poll_account_once(
         account=account,
         staging_root=tmp_path / "staging",
         access_token="token",
@@ -206,3 +209,4 @@ def test_refresh_404_classified_as_item_not_found_ghost(tmp_path: Path) -> None:
     assert candidate_count == 1
     assert downloaded == []
     assert ghost_reason_counts == {"ghost_item_not_found_on_refresh": 1}
+    assert delta_anomaly_counts == {}

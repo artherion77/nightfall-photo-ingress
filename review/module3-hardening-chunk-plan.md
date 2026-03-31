@@ -105,14 +105,14 @@ Scope:
 - Add stale/replay anomaly counters.
 
 Deliverables:
-- [ ] Pagination guardrails.
-- [ ] 410 handling path.
-- [ ] Resync marker persistence.
+- [x] Pagination guardrails.
+- [x] 410 handling path.
+- [x] Resync marker persistence.
 
 Tests:
-- [ ] Unit: repeated nextLink terminates with explicit error.
-- [ ] Integration (mocked): 410 response triggers resync flow.
-- [ ] Unit: page ceiling enforcement.
+- [x] Unit: repeated nextLink terminates with explicit error.
+- [x] Integration (mocked): 410 response triggers resync flow.
+- [x] Unit: page ceiling enforcement.
 
 Review gate:
 === STOP: Awaiting user feedback before proceeding ===
@@ -237,7 +237,7 @@ Review gate:
 - [x] Chunk 2 committed
 - [x] Chunk 3 committed
 - [x] Chunk 4 committed
-- [ ] Chunk 5 committed
+- [x] Chunk 5 committed
 - [ ] Chunk 6 committed
 - [ ] Chunk 7 committed
 - [ ] Chunk 8 committed
