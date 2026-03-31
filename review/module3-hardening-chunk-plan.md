@@ -128,13 +128,13 @@ Scope:
 - Preserve audit traces for dropped duplicates.
 
 Deliverables:
-- [ ] Candidate reducer component.
-- [ ] Reducer stats in logs.
+- [x] Candidate reducer component.
+- [x] Reducer stats in logs.
 
 Tests:
-- [ ] Unit: duplicate file events collapse deterministically.
-- [ ] Unit: delete+create rename pattern normalization.
-- [ ] Unit: out-of-order events produce stable final state.
+- [x] Unit: duplicate file events collapse deterministically.
+- [x] Unit: delete+create rename pattern normalization.
+- [x] Unit: out-of-order events produce stable final state.
 
 Review gate:
 === STOP: Awaiting user feedback before proceeding ===
@@ -238,7 +238,7 @@ Review gate:
 - [x] Chunk 3 committed
 - [x] Chunk 4 committed
 - [x] Chunk 5 committed
-- [ ] Chunk 6 committed
+- [x] Chunk 6 committed
 - [ ] Chunk 7 committed
 - [ ] Chunk 8 committed
 - [ ] Chunk 9 committed

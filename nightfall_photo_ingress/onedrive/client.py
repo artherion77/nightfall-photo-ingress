@@ -66,6 +66,14 @@ class AccountPollResult:
     delta_anomaly_reason_counts: tuple[tuple[str, int], ...]
 
 
+@dataclass(frozen=True)
+class _ReducerEntry:
+    """Internal reducer slot representing the latest event for an item ID."""
+
+    sequence: int
+    candidate: RemoteCandidate | None
+
+
 def poll_accounts(
     app_config: AppConfig,
     account_name: str | None = None,
@@ -152,7 +160,8 @@ def poll_account_once(
     cursor = _load_cursor(account.delta_cursor)
     delta_url = cursor or _build_initial_delta_url(account)
 
-    candidates: list[RemoteCandidate] = []
+    reducer: dict[str, _ReducerEntry] = {}
+    reducer_sequence = 0
     next_url: str | None = delta_url
     delta_link: str | None = None
     seen_next_links: set[str] = set()
@@ -217,8 +226,13 @@ def poll_account_once(
                 "delta_replayed_item_id",
                 count=replay_count,
             )
-
-        candidates.extend(parse_delta_items(account.name, payload))
+        reducer_sequence = _apply_delta_page_to_reducer(
+            account_name=account.name,
+            payload=payload,
+            reducer=reducer,
+            start_sequence=reducer_sequence,
+            anomaly_counts=delta_anomaly_counts,
+        )
         next_url = _as_str(payload.get("@odata.nextLink"))
         delta_link = _as_str(payload.get("@odata.deltaLink")) or delta_link
 
@@ -230,6 +244,7 @@ def poll_account_once(
             operation="poll_account_once",
         )
 
+    candidates = _materialize_reduced_candidates(reducer)
     downloaded_paths, ghost_reason_counts = download_candidates(
         candidates=candidates,
         staging_root=staging_root,
@@ -245,6 +260,84 @@ def poll_account_once(
     _save_cursor(account.delta_cursor, delta_link)
     _clear_resync_marker(account.delta_cursor)
     return downloaded_paths, len(candidates), ghost_reason_counts, delta_anomaly_counts
+
+
+def _apply_delta_page_to_reducer(
+    account_name: str,
+    payload: dict[str, object],
+    reducer: dict[str, _ReducerEntry],
+    start_sequence: int,
+    anomaly_counts: dict[str, int],
+) -> int:
+    """Apply one delta page to an in-run reducer keyed by item ID.
+
+    Rules:
+    - Only file entries with a download URL become candidates.
+    - Deletion events set a tombstone (candidate None).
+    - Repeated events for the same item ID overwrite previous state.
+    - Last observed event wins, with deletion precedence when last event is a
+      tombstone.
+    """
+
+    raw_items = payload.get("value")
+    if not isinstance(raw_items, list):
+        return start_sequence
+
+    sequence = start_sequence
+    for raw in raw_items:
+        if not isinstance(raw, dict):
+            continue
+
+        item_id = _as_str(raw.get("id"))
+        if not item_id:
+            _record_ghost_reason(anomaly_counts, "delta_item_missing_id")
+            continue
+
+        sequence += 1
+        had_previous = item_id in reducer
+        if had_previous:
+            _record_ghost_reason(anomaly_counts, "delta_reducer_event_overwrite")
+
+        if "deleted" in raw:
+            reducer[item_id] = _ReducerEntry(sequence=sequence, candidate=None)
+            _record_ghost_reason(anomaly_counts, "delta_reducer_tombstone_event")
+            continue
+
+        if "file" not in raw:
+            # Non-file entities are ignored by ingestion candidate logic.
+            continue
+
+        download_url = _as_str(raw.get("@microsoft.graph.downloadUrl"))
+        if not download_url:
+            _record_ghost_reason(anomaly_counts, "delta_file_missing_download_url")
+            continue
+
+        candidate = RemoteCandidate(
+            account_name=account_name,
+            item_id=item_id,
+            name=_as_str(raw.get("name")) or "",
+            relative_path=_extract_relative_path(raw),
+            size_bytes=int(raw.get("size", 0)),
+            modified_time=_as_str(raw.get("lastModifiedDateTime"))
+            or datetime.utcnow().isoformat(),
+            download_url=download_url,
+        )
+        reducer[item_id] = _ReducerEntry(sequence=sequence, candidate=candidate)
+
+    return sequence
+
+
+def _materialize_reduced_candidates(
+    reducer: dict[str, _ReducerEntry],
+) -> list[RemoteCandidate]:
+    """Return deterministic candidates from reducer state.
+
+    Candidates are emitted in ascending last-event sequence order so repeated
+    events produce a stable and auditable final list.
+    """
+
+    ordered = sorted(reducer.values(), key=lambda entry: entry.sequence)
+    return [entry.candidate for entry in ordered if entry.candidate is not None]
 
 
 def parse_delta_items(

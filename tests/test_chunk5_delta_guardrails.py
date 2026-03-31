@@ -225,7 +225,7 @@ def test_successful_poll_clears_existing_resync_marker(tmp_path: Path) -> None:
 
 
 def test_replayed_item_ids_are_counted_as_delta_anomaly(tmp_path: Path) -> None:
-    """Repeated item IDs across pages should be surfaced via anomaly counters."""
+    """Repeated item IDs across pages should be surfaced and reduced deterministically."""
 
     account = _make_account(tmp_path, "alice", "/Camera Roll")
     client = _FakeClient(
@@ -262,7 +262,10 @@ def test_replayed_item_ids_are_counted_as_delta_anomaly(tmp_path: Path) -> None:
         http_client=client,
     )
 
-    assert candidate_count == 2
-    assert len(downloaded) == 2
+    assert candidate_count == 1
+    assert len(downloaded) == 1
     assert ghost_counts == {}
-    assert anomaly_counts == {"delta_replayed_item_id": 1}
+    assert anomaly_counts == {
+        "delta_replayed_item_id": 1,
+        "delta_reducer_event_overwrite": 1,
+    }
