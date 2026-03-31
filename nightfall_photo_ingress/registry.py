@@ -191,6 +191,192 @@ class Registry:
             )
             conn.commit()
 
+    def finalize_unknown_ingest(
+        self,
+        *,
+        sha256: str,
+        size_bytes: int,
+        original_filename: str,
+        current_path: str,
+        account: str,
+        onedrive_id: str,
+        source_path: str,
+        modified_time: str,
+        actor: str,
+        fail_after_step: int | None = None,
+    ) -> None:
+        """Persist unknown-hash ingest state in one atomic transaction.
+
+        This updates all related tables as one unit: files, accepted_records,
+        metadata_index, file_origins, and audit_log.
+        """
+
+        now = _utc_now()
+        with self._connect() as conn:
+            _set_pragmas(conn)
+            conn.execute("BEGIN IMMEDIATE")
+
+            step = 1
+            conn.execute(
+                """
+                INSERT INTO files (
+                    sha256,
+                    size_bytes,
+                    status,
+                    original_filename,
+                    current_path,
+                    created_at,
+                    updated_at
+                ) VALUES (?, ?, 'accepted', ?, ?, ?, ?)
+                ON CONFLICT(sha256) DO UPDATE SET
+                    size_bytes = excluded.size_bytes,
+                    status = 'accepted',
+                    original_filename = COALESCE(excluded.original_filename, files.original_filename),
+                    current_path = excluded.current_path,
+                    updated_at = excluded.updated_at
+                """,
+                (sha256, size_bytes, original_filename, current_path, now, now),
+            )
+            if fail_after_step == step:
+                conn.rollback()
+                raise RegistryError("Injected failure after files write")
+
+            step = 2
+            conn.execute(
+                """
+                INSERT INTO accepted_records (
+                    sha256,
+                    account,
+                    source_path,
+                    accepted_at
+                ) VALUES (?, ?, ?, ?)
+                """,
+                (sha256, account, source_path, now),
+            )
+            if fail_after_step == step:
+                conn.rollback()
+                raise RegistryError("Injected failure after accepted_records write")
+
+            step = 3
+            conn.execute(
+                """
+                INSERT INTO metadata_index (
+                    account,
+                    onedrive_id,
+                    size_bytes,
+                    modified_time,
+                    sha256,
+                    created_at,
+                    updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(account, onedrive_id) DO UPDATE SET
+                    size_bytes = excluded.size_bytes,
+                    modified_time = excluded.modified_time,
+                    sha256 = excluded.sha256,
+                    updated_at = excluded.updated_at
+                """,
+                (account, onedrive_id, size_bytes, modified_time, sha256, now, now),
+            )
+            if fail_after_step == step:
+                conn.rollback()
+                raise RegistryError("Injected failure after metadata_index write")
+
+            step = 4
+            conn.execute(
+                """
+                INSERT INTO file_origins (
+                    account,
+                    onedrive_id,
+                    sha256,
+                    path_hint,
+                    first_seen_at,
+                    last_seen_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(account, onedrive_id) DO UPDATE SET
+                    sha256 = excluded.sha256,
+                    path_hint = excluded.path_hint,
+                    last_seen_at = excluded.last_seen_at
+                """,
+                (account, onedrive_id, sha256, source_path, now, now),
+            )
+            if fail_after_step == step:
+                conn.rollback()
+                raise RegistryError("Injected failure after file_origins write")
+
+            step = 5
+            conn.execute(
+                "INSERT INTO audit_log (sha256, action, reason, actor, ts) VALUES (?, 'accepted', 'unknown_hash', ?, ?)",
+                (sha256, actor, now),
+            )
+            if fail_after_step == step:
+                conn.rollback()
+                raise RegistryError("Injected failure after audit_log write")
+
+            conn.commit()
+
+    def finalize_known_ingest(
+        self,
+        *,
+        sha256: str,
+        known_status: str,
+        account: str,
+        onedrive_id: str,
+        source_path: str,
+        modified_time: str,
+        size_bytes: int,
+        actor: str,
+    ) -> None:
+        """Persist known-hash ingest side effects in one atomic transaction."""
+
+        if known_status not in ALLOWED_FILE_STATUSES:
+            raise RegistryError(f"Invalid known status: {known_status}")
+
+        now = _utc_now()
+        with self._connect() as conn:
+            _set_pragmas(conn)
+            conn.execute("BEGIN IMMEDIATE")
+            conn.execute(
+                """
+                INSERT INTO metadata_index (
+                    account,
+                    onedrive_id,
+                    size_bytes,
+                    modified_time,
+                    sha256,
+                    created_at,
+                    updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(account, onedrive_id) DO UPDATE SET
+                    size_bytes = excluded.size_bytes,
+                    modified_time = excluded.modified_time,
+                    sha256 = excluded.sha256,
+                    updated_at = excluded.updated_at
+                """,
+                (account, onedrive_id, size_bytes, modified_time, sha256, now, now),
+            )
+            conn.execute(
+                """
+                INSERT INTO file_origins (
+                    account,
+                    onedrive_id,
+                    sha256,
+                    path_hint,
+                    first_seen_at,
+                    last_seen_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(account, onedrive_id) DO UPDATE SET
+                    sha256 = excluded.sha256,
+                    path_hint = excluded.path_hint,
+                    last_seen_at = excluded.last_seen_at
+                """,
+                (account, onedrive_id, sha256, source_path, now, now),
+            )
+            conn.execute(
+                "INSERT INTO audit_log (sha256, action, reason, actor, ts) VALUES (?, ?, 'known_hash', ?, ?)",
+                (sha256, f"discard_{known_status}", actor, now),
+            )
+            conn.commit()
+
     def clear_current_path(self, *, sha256: str) -> None:
         """Clear current_path when operators manually move files out of queue."""
 

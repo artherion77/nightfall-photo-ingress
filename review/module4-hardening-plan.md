@@ -23,10 +23,10 @@ This plan is prioritized by production risk and designed so each chunk can be im
 
 ## M4-H1 Atomic ingest finalize transaction
 
-- [ ] Implement one registry API for ingest-finalize in a single transaction.
-- [ ] Ensure updates include: `files`, `accepted_records`, `metadata_index`, `file_origins`, `audit_log`.
-- [ ] Add rollback behavior tests for injected failures at each internal step.
-- [ ] Add regression test for idempotent replay after simulated crash.
+- [x] Implement one registry API for ingest-finalize in a single transaction.
+- [x] Ensure updates include: `files`, `accepted_records`, `metadata_index`, `file_origins`, `audit_log`.
+- [x] Add rollback behavior tests for injected failures at each internal step.
+- [x] Add regression test for idempotent replay after simulated crash.
 
 Commit scope:
 - Registry API changes

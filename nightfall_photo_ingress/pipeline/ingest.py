@@ -189,35 +189,15 @@ class IngestDecisionEngine:
             )
 
             size_bytes = destination.stat().st_size
-            self._registry.create_or_update_file(
+            self._registry.finalize_unknown_ingest(
                 sha256=file_hash,
                 size_bytes=size_bytes,
-                status="accepted",
                 original_filename=candidate.original_filename,
                 current_path=str(destination),
-            )
-            self._registry.record_acceptance(
-                sha256=file_hash,
                 account=candidate.account_name,
+                onedrive_id=candidate.onedrive_id,
                 source_path=candidate.relative_path,
-            )
-            self._registry.upsert_metadata_index(
-                account=candidate.account_name,
-                onedrive_id=candidate.onedrive_id,
-                size_bytes=size_bytes,
                 modified_time=candidate.modified_time,
-                sha256=file_hash,
-            )
-            self._registry.upsert_file_origin(
-                sha256=file_hash,
-                account=candidate.account_name,
-                onedrive_id=candidate.onedrive_id,
-                path_hint=candidate.relative_path,
-            )
-            self._registry.append_audit_event(
-                sha256=file_hash,
-                action="accepted",
-                reason="unknown_hash",
                 actor="ingest_pipeline",
             )
             return IngestOutcome(
@@ -229,25 +209,16 @@ class IngestDecisionEngine:
                 prefilter_hit=False,
             )
 
-        self._registry.upsert_metadata_index(
-            account=candidate.account_name,
-            onedrive_id=candidate.onedrive_id,
-            size_bytes=path.stat().st_size,
-            modified_time=candidate.modified_time,
-            sha256=file_hash,
-        )
-        self._registry.upsert_file_origin(
-            sha256=file_hash,
-            account=candidate.account_name,
-            onedrive_id=candidate.onedrive_id,
-            path_hint=candidate.relative_path,
-        )
-
+        known_size = path.stat().st_size
         path.unlink(missing_ok=True)
-        self._registry.append_audit_event(
+        self._registry.finalize_known_ingest(
             sha256=file_hash,
-            action=f"discard_{record.status}",
-            reason="known_hash",
+            known_status=record.status,
+            account=candidate.account_name,
+            onedrive_id=candidate.onedrive_id,
+            source_path=candidate.relative_path,
+            modified_time=candidate.modified_time,
+            size_bytes=known_size,
             actor="ingest_pipeline",
         )
         return IngestOutcome(
