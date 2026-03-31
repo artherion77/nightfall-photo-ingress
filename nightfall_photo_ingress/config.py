@@ -17,6 +17,7 @@ SUPPORTED_PROVIDER = "onedrive"
 SUPPORTED_STEM_MODE = {"exact_stem"}
 SUPPORTED_COMPONENT_ORDER = {"photo_first"}
 SUPPORTED_CONFLICT_POLICY = {"nearest_capture_time"}
+SUPPORTED_INTEGRITY_MODES = {"strict", "tolerant"}
 
 
 class ConfigError(ValueError):
@@ -49,6 +50,11 @@ class CoreConfig:
     sync_hash_import_enabled: bool
     sync_hash_import_path: Path
     sync_hash_import_glob: str
+    integrity_mode: str = "strict"
+    drift_warning_threshold_ratio: float = 0.05
+    drift_critical_threshold_ratio: float = 0.20
+    drift_min_events_for_evaluation: int = 20
+    drift_fail_fast_enabled: bool = True
 
 
 @dataclass(frozen=True)
@@ -214,6 +220,31 @@ def _parse_core(parser: configparser.ConfigParser, errors: list[str]) -> CoreCon
         sync_hash_import_enabled=_get_bool(core, "sync_hash_import_enabled", errors, default=True),
         sync_hash_import_path=_get_path(core, "sync_hash_import_path", errors, required=True),
         sync_hash_import_glob=_get_str(core, "sync_hash_import_glob", errors, default=".hashes.sha1"),
+        integrity_mode=_get_str(core, "integrity_mode", errors, default="strict"),
+        drift_warning_threshold_ratio=_get_float(
+            core,
+            "drift_warning_threshold_ratio",
+            errors,
+            default=0.05,
+        ),
+        drift_critical_threshold_ratio=_get_float(
+            core,
+            "drift_critical_threshold_ratio",
+            errors,
+            default=0.20,
+        ),
+        drift_min_events_for_evaluation=_get_int(
+            core,
+            "drift_min_events_for_evaluation",
+            errors,
+            default=20,
+        ),
+        drift_fail_fast_enabled=_get_bool(
+            core,
+            "drift_fail_fast_enabled",
+            errors,
+            default=True,
+        ),
     )
 
 
@@ -243,6 +274,11 @@ def _default_core() -> CoreConfig:
         sync_hash_import_enabled=True,
         sync_hash_import_path=Path("/nightfall/media/pictures"),
         sync_hash_import_glob=".hashes.sha1",
+        integrity_mode="strict",
+        drift_warning_threshold_ratio=0.05,
+        drift_critical_threshold_ratio=0.20,
+        drift_min_events_for_evaluation=20,
+        drift_fail_fast_enabled=True,
     )
 
 
@@ -340,6 +376,26 @@ def _validate_core(core: CoreConfig, errors: list[str]) -> None:
             "[core] live_photo_conflict_policy must be one of: "
             f"{sorted(SUPPORTED_CONFLICT_POLICY)}"
         )
+
+    if core.integrity_mode not in SUPPORTED_INTEGRITY_MODES:
+        errors.append(
+            "[core] integrity_mode must be one of: "
+            f"{sorted(SUPPORTED_INTEGRITY_MODES)}"
+        )
+
+    if core.drift_warning_threshold_ratio < 0:
+        errors.append("[core] drift_warning_threshold_ratio must be >= 0")
+
+    if core.drift_critical_threshold_ratio < 0:
+        errors.append("[core] drift_critical_threshold_ratio must be >= 0")
+
+    if core.drift_warning_threshold_ratio > core.drift_critical_threshold_ratio:
+        errors.append(
+            "[core] drift_warning_threshold_ratio must be <= drift_critical_threshold_ratio"
+        )
+
+    if core.drift_min_events_for_evaluation <= 0:
+        errors.append("[core] drift_min_events_for_evaluation must be > 0")
 
     if "{original}" not in core.storage_template and "{sha8}" not in core.storage_template:
         errors.append("[core] storage_template must include at least {original} or {sha8}")
@@ -450,6 +506,29 @@ def _get_int(
     except ValueError:
         errors.append(f"[{section.name}] key must be integer: {key}")
         return 0 if default is None else default
+
+
+def _get_float(
+    section: configparser.SectionProxy,
+    key: str,
+    errors: list[str],
+    *,
+    required: bool = False,
+    default: float | None = None,
+) -> float:
+    """Read a float key and record errors on invalid values."""
+
+    raw = section.get(key, fallback=None)
+    if raw is None:
+        if required:
+            errors.append(f"[{section.name}] missing required key: {key}")
+            return 0.0
+        return 0.0 if default is None else default
+    try:
+        return float(raw.strip())
+    except ValueError:
+        errors.append(f"[{section.name}] key must be float: {key}")
+        return 0.0 if default is None else default
 
 
 def _get_optional_int(

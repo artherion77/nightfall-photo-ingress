@@ -14,7 +14,7 @@ Chunk 1 change:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 import logging
 from pathlib import Path
@@ -71,7 +71,7 @@ class RemoteCandidate:
     item_id: str
     name: str
     relative_path: str
-    size_bytes: int
+    size_bytes: int | None
     modified_time: str
     download_url: str
 
@@ -173,10 +173,39 @@ def poll_accounts(
                 refresh_access_token=refresh_access_token,
                 http_client=client,
                 max_runtime_seconds=app_config.core.max_poll_runtime_seconds,
+                tmp_ttl_minutes=app_config.core.tmp_ttl_minutes,
+                integrity_mode=app_config.core.integrity_mode,
                 poll_run_id=poll_run_id,
                 policy=policy,
                 sleeper=sleeper,
                 jitter_fn=jitter_fn,
+            )
+
+        drift_state, drift_ratio, drift_events = _evaluate_drift_state(
+            delta_anomaly_counts,
+            warning_threshold=app_config.core.drift_warning_threshold_ratio,
+            critical_threshold=app_config.core.drift_critical_threshold_ratio,
+            min_events=app_config.core.drift_min_events_for_evaluation,
+        )
+        _trace_event(
+            "drift_state_evaluated",
+            poll_run_id=poll_run_id,
+            account_name=account.name,
+            operation="drift_evaluation",
+            drift_state=drift_state,
+            drift_ratio=drift_ratio,
+            drift_events=drift_events,
+        )
+        if app_config.core.drift_fail_fast_enabled and drift_state == "critical":
+            raise GraphError(
+                f"Schema drift threshold exceeded for account '{account.name}'",
+                code="drift_threshold_critical",
+                account=account.name,
+                operation="poll_accounts",
+                safe_hint=(
+                    f"drift_state=critical drift_ratio={drift_ratio:.3f} "
+                    f"drift_events={drift_events}"
+                ),
             )
         results.append(
             AccountPollResult(
@@ -220,6 +249,8 @@ def poll_account_once(
     poll_run_id: str | None = None,
     max_delta_pages: int = DEFAULT_MAX_DELTA_PAGES,
     max_runtime_seconds: int = 300,
+    tmp_ttl_minutes: int = 120,
+    integrity_mode: str = "strict",
     policy: RetryPolicy = DEFAULT_POLICY,
     sleeper: Callable[[float], None] = time.sleep,
     jitter_fn: Callable[[], float] | None = None,
@@ -239,6 +270,13 @@ def poll_account_once(
     diagnostics_counts: dict[str, int] = {}
     page_count = 0
     start_monotonic = monotonic()
+
+    account_staging_root = staging_root / account.name
+    _recover_staging_tmp_files(
+        staging_dir=account_staging_root,
+        ttl_minutes=tmp_ttl_minutes,
+        diagnostics_counts=diagnostics_counts,
+    )
 
     while next_url:
         _trace_event(
@@ -343,6 +381,7 @@ def poll_account_once(
         access_token=access_token,
         http_client=http_client,
         max_downloads=account.max_downloads,
+        integrity_mode=integrity_mode,
         refresh_access_token=refresh_access_token,
         poll_run_id=poll_run_id,
         diagnostics_counts=diagnostics_counts,
@@ -478,6 +517,7 @@ def download_candidates(
     refresh_access_token: Callable[[], str] | None = None,
     poll_run_id: str | None = None,
     max_downloads: int | None = None,
+    integrity_mode: str = "strict",
     diagnostics_counts: dict[str, int] | None = None,
     policy: RetryPolicy = DEFAULT_POLICY,
     sleeper: Callable[[float], None] = time.sleep,
@@ -491,6 +531,9 @@ def download_candidates(
     downloaded: list[Path] = []
     ghost_reason_counts: dict[str, int] = {}
     limit = max_downloads if max_downloads is not None else 0
+    lifecycle_journal = target_root / "_lifecycle.journal.jsonl"
+    quarantine_root = target_root / "_quarantine"
+    quarantine_root.mkdir(parents=True, exist_ok=True)
 
     for index, candidate in enumerate(candidates):
         if limit > 0 and index >= limit:
@@ -500,6 +543,25 @@ def download_candidates(
         suffix = _safe_extension(candidate.name)
         tmp_path = target_root / f"{safe_base}.tmp"
         final_path = target_root / f"{safe_base}{suffix}"
+
+        if candidate.size_bytes is None:
+            _increment_counter(diagnostics_counts, "integrity_uncertain_total")
+            if integrity_mode == "strict":
+                _increment_counter(diagnostics_counts, "integrity_strict_blocked_total")
+                _record_ghost_reason(
+                    ghost_reason_counts,
+                    "integrity_missing_expected_size_blocked",
+                )
+                continue
+
+        _append_lifecycle_event(
+            lifecycle_journal,
+            event_type="download_started",
+            account_name=account_name,
+            item_id=candidate.item_id,
+            path=tmp_path,
+            diagnostics_counts=diagnostics_counts,
+        )
         try:
             download_with_retry(
                 http_client=http_client,
@@ -514,6 +576,7 @@ def download_candidates(
                 jitter_fn=jitter_fn,
             )
         except DownloadError as first_error:
+            tmp_path.unlink(missing_ok=True)
             if not _is_download_url_unreachable(first_error):
                 raise
 
@@ -548,6 +611,7 @@ def download_candidates(
                     jitter_fn=jitter_fn,
                 )
             except DownloadError as refreshed_error:
+                tmp_path.unlink(missing_ok=True)
                 if _is_download_url_unreachable(refreshed_error):
                     _record_ghost_reason(
                         ghost_reason_counts,
@@ -556,7 +620,42 @@ def download_candidates(
                     continue
                 raise
 
+        _append_lifecycle_event(
+            lifecycle_journal,
+            event_type="download_completed",
+            account_name=account_name,
+            item_id=candidate.item_id,
+            path=tmp_path,
+            diagnostics_counts=diagnostics_counts,
+        )
+
+        if candidate.size_bytes is None and integrity_mode == "tolerant":
+            quarantine_path = quarantine_root / f"{safe_base}{suffix}"
+            tmp_path.replace(quarantine_path)
+            _increment_counter(diagnostics_counts, "integrity_quarantined_total")
+            _record_ghost_reason(
+                ghost_reason_counts,
+                "integrity_missing_expected_size_quarantined",
+            )
+            _append_lifecycle_event(
+                lifecycle_journal,
+                event_type="download_quarantined",
+                account_name=account_name,
+                item_id=candidate.item_id,
+                path=quarantine_path,
+                diagnostics_counts=diagnostics_counts,
+            )
+            continue
+
         tmp_path.replace(final_path)
+        _append_lifecycle_event(
+            lifecycle_journal,
+            event_type="ready_for_hash",
+            account_name=account_name,
+            item_id=candidate.item_id,
+            path=final_path,
+            diagnostics_counts=diagnostics_counts,
+        )
         downloaded.append(final_path)
 
     return downloaded, ghost_reason_counts
@@ -625,7 +724,7 @@ def _mark_resync_required(
     marker_path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "account": account_name,
-        "required_at": datetime.utcnow().isoformat() + "Z",
+        "required_at": datetime.now(timezone.utc).isoformat(),
         "reason": reason,
         "resync_url": resync_url,
     }
@@ -1269,13 +1368,17 @@ def _build_candidate_from_payload(
     if not download_url:
         return None
 
-    size_raw = raw.get("size", 0)
-    try:
-        size_bytes = int(size_raw)
-    except (TypeError, ValueError):
-        return None
-    if size_bytes < 0:
-        return None
+    size_raw = raw.get("size")
+    size_bytes: int | None
+    if size_raw is None:
+        size_bytes = None
+    else:
+        try:
+            size_bytes = int(size_raw)
+        except (TypeError, ValueError):
+            return None
+        if size_bytes < 0:
+            return None
 
     return RemoteCandidate(
         account_name=account_name,
@@ -1284,7 +1387,7 @@ def _build_candidate_from_payload(
         relative_path=_extract_relative_path(raw),
         size_bytes=size_bytes,
         modified_time=_as_str(raw.get("lastModifiedDateTime"))
-        or datetime.utcnow().isoformat(),
+        or datetime.now(timezone.utc).isoformat(),
         download_url=download_url,
     )
 
@@ -1304,7 +1407,9 @@ def _classify_invalid_candidate_reason(raw: dict[str, object]) -> str:
     if not download_url:
         return "delta_file_missing_download_url"
 
-    size_raw = raw.get("size", 0)
+    size_raw = raw.get("size")
+    if size_raw is None:
+        return "delta_file_missing_size"
     try:
         size_value = int(size_raw)
     except (TypeError, ValueError):
@@ -1313,3 +1418,94 @@ def _classify_invalid_candidate_reason(raw: dict[str, object]) -> str:
         return "delta_file_invalid_size"
 
     return "delta_file_invalid_payload"
+
+
+def _recover_staging_tmp_files(
+    staging_dir: Path,
+    ttl_minutes: int,
+    diagnostics_counts: dict[str, int] | None,
+) -> None:
+    """Reconcile stale .tmp artifacts in account staging directory.
+
+    Recovery policy:
+    - files ending with ``.tmp`` older than TTL are moved to quarantine,
+      preserving evidence for operator inspection.
+    - finalized files are never touched.
+    """
+
+    if not staging_dir.exists():
+        return
+
+    tmp_quarantine = staging_dir / "_recovery_quarantine"
+    now_epoch = time.time()
+    ttl_seconds = max(ttl_minutes, 0) * 60
+
+    for path in staging_dir.iterdir():
+        if not path.is_file() or path.suffix != ".tmp":
+            continue
+
+        age_seconds = now_epoch - path.stat().st_mtime
+        if age_seconds < ttl_seconds:
+            continue
+
+        tmp_quarantine.mkdir(parents=True, exist_ok=True)
+        quarantine_target = tmp_quarantine / f"{path.name}.{int(now_epoch)}"
+        path.replace(quarantine_target)
+        _increment_counter(diagnostics_counts, "staging_tmp_files_quarantined_total")
+
+
+def _append_lifecycle_event(
+    journal_path: Path,
+    event_type: str,
+    account_name: str,
+    item_id: str,
+    path: Path,
+    diagnostics_counts: dict[str, int] | None,
+) -> None:
+    """Append a lifecycle event to account journal as JSONL."""
+
+    journal_path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "event": event_type,
+        "account": account_name,
+        "item_id": item_id,
+        "path": str(path),
+    }
+    with journal_path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(payload, sort_keys=True))
+        handle.write("\n")
+    _increment_counter(diagnostics_counts, "lifecycle_events_written_total")
+
+
+def _evaluate_drift_state(
+    anomaly_counts: dict[str, int],
+    warning_threshold: float,
+    critical_threshold: float,
+    min_events: int,
+) -> tuple[str, float, int]:
+    """Evaluate drift state from anomaly counters.
+
+    Drift-sensitive anomalies are those related to malformed/missing item fields.
+    """
+
+    drift_prefixes = (
+        "delta_item_missing_",
+        "delta_file_missing_",
+        "delta_file_invalid_",
+    )
+    drift_events = sum(
+        value
+        for key, value in anomaly_counts.items()
+        if key.startswith(drift_prefixes)
+    )
+    total_events = max(sum(anomaly_counts.values()), 1)
+    drift_ratio = drift_events / float(total_events)
+
+    if drift_events < min_events:
+        return "normal", drift_ratio, drift_events
+    if drift_ratio >= critical_threshold:
+        return "critical", drift_ratio, drift_events
+    if drift_ratio >= warning_threshold:
+        return "warning", drift_ratio, drift_events
+    return "normal", drift_ratio, drift_events

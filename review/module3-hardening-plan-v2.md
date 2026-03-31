@@ -208,10 +208,10 @@ Review gate:
 
 - [x] V2-1 committed
 - [ ] V2-2 committed
-- [ ] V2-3 committed
-- [ ] V2-4 committed
-- [ ] V2-5 committed
-- [ ] V2-6 committed
+- [x] V2-3 committed
+- [x] V2-4 committed
+- [x] V2-5 committed
+- [x] V2-6 committed
 - [ ] V2-7 committed
 - [ ] V2-8 committed
 - [ ] V2-9 committed
