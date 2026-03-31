@@ -7,6 +7,7 @@ commit behavior for both same-pool and cross-pool cases.
 from __future__ import annotations
 
 import hashlib
+import os
 import re
 import shutil
 from dataclasses import dataclass
@@ -73,7 +74,13 @@ def render_storage_relative_path(
     rendered = rendered.replace("{mm}", f"{timestamp.month:02d}")
     rendered = rendered.replace("{sha8}", sha256[:8])
     rendered = rendered.replace("{original}", safe_name)
-    return Path(rendered)
+
+    path = Path(rendered)
+    if path.is_absolute():
+        raise StorageError("Storage template must render a relative path")
+    if any(part in {"..", ""} for part in path.parts):
+        raise StorageError("Storage template renders unsafe path components")
+    return path
 
 
 def choose_collision_safe_destination(base_path: Path) -> Path:
@@ -97,6 +104,7 @@ def commit_staging_to_accepted(
     source_path: Path,
     destination_path: Path,
     staging_on_same_pool: bool,
+    destination_root: Path | None = None,
 ) -> CommitResult:
     """Persist one staged file into accepted queue storage safely.
 
@@ -107,10 +115,15 @@ def commit_staging_to_accepted(
     if not source_path.exists():
         raise StorageError(f"Staged source missing: {source_path}")
 
+    if destination_root is not None:
+        _ensure_within_root(destination_path, destination_root)
+
     destination_path.parent.mkdir(parents=True, exist_ok=True)
 
     if staging_on_same_pool:
         source_path.replace(destination_path)
+        _fsync_path(destination_path)
+        _fsync_parent_dir(destination_path)
         written = destination_path.stat().st_size
         return CommitResult(
             destination_path=destination_path,
@@ -135,7 +148,9 @@ def commit_staging_to_accepted(
         tmp_destination.unlink(missing_ok=True)
         raise StorageError("Cross-pool copy hash mismatch")
 
+    _fsync_path(tmp_destination)
     tmp_destination.replace(destination_path)
+    _fsync_parent_dir(destination_path)
     source_path.unlink(missing_ok=True)
     return CommitResult(
         destination_path=destination_path,
@@ -155,3 +170,37 @@ def _parse_timestamp(value: str) -> datetime:
         return parsed
     except Exception:
         return datetime.now(timezone.utc)
+
+
+def _ensure_within_root(destination_path: Path, destination_root: Path) -> None:
+    """Reject destination paths that escape the configured accepted root."""
+
+    resolved_root = destination_root.resolve()
+    resolved_destination = destination_path.resolve(strict=False)
+    if not str(resolved_destination).startswith(str(resolved_root) + os.sep) and resolved_destination != resolved_root:
+        raise StorageError(
+            f"Destination escapes accepted root: destination={resolved_destination} root={resolved_root}"
+        )
+
+
+def _fsync_path(path: Path) -> None:
+    """Flush file contents and metadata to disk for durability."""
+
+    try:
+        with path.open("rb") as handle:
+            os.fsync(handle.fileno())
+    except OSError as exc:
+        raise StorageError(f"Failed to fsync file: {path}: {exc}") from exc
+
+
+def _fsync_parent_dir(path: Path) -> None:
+    """Flush parent directory metadata for rename/copy durability."""
+
+    try:
+        fd = os.open(path.parent, os.O_RDONLY)
+        try:
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+    except OSError as exc:
+        raise StorageError(f"Failed to fsync parent directory: {path.parent}: {exc}") from exc

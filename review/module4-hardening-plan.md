@@ -86,10 +86,10 @@ Commit scope:
 
 ## M4-H5 Storage durability and root-containment hardening
 
-- [ ] Enforce destination path resolved-under-root check before write.
-- [ ] Add fsync durability step for cross-pool copy path before final replace.
-- [ ] Add safer template normalization and reject unsafe path components.
-- [ ] Add tests for traversal attempts and power-loss-simulated copy boundaries.
+- [x] Enforce destination path resolved-under-root check before write.
+- [x] Add fsync durability step for cross-pool copy path before final replace.
+- [x] Add safer template normalization and reject unsafe path components.
+- [x] Add tests for traversal attempts and power-loss-simulated copy boundaries.
 
 Commit scope:
 - Storage helper hardening

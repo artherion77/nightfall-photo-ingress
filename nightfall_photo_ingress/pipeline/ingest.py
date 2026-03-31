@@ -375,6 +375,7 @@ class IngestDecisionEngine:
                 source_path=path,
                 destination_path=destination,
                 staging_on_same_pool=staging_on_same_pool,
+                destination_root=accepted_root,
             )
             self._journal_append(
                 op_id=op_id,
