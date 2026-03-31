@@ -10,8 +10,10 @@ import argparse
 import logging
 from typing import Sequence
 
-from .config import validate_config_file
+from .config import AppConfig, load_config, validate_config_file
 from .logging_bootstrap import configure_logging
+from .onedrive.auth import AuthError, OneDriveAuthClient
+from .onedrive.client import GraphError, poll_accounts
 
 LOGGER = logging.getLogger(__name__)
 
@@ -31,10 +33,12 @@ def _build_parser() -> argparse.ArgumentParser:
 
     auth = subparsers.add_parser("auth-setup", help="Initialize account authentication.")
     auth.add_argument("--account", help="Optional account name.", default=None)
+    auth.add_argument("--path", default="/etc/nightfall/photo-ingress.conf")
     auth.set_defaults(handler=_cmd_auth_setup)
 
     poll = subparsers.add_parser("poll", help="Run one poll cycle.")
     poll.add_argument("--account", help="Optional account name.", default=None)
+    poll.add_argument("--path", default="/etc/nightfall/photo-ingress.conf")
     poll.set_defaults(handler=_cmd_poll)
 
     reject = subparsers.add_parser("reject", help="Reject a hash permanently.")
@@ -59,17 +63,38 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def _cmd_auth_setup(args: argparse.Namespace) -> int:
-    """Stub command for Module 0."""
+    """Run OneDrive device-code authentication setup for one account."""
 
-    LOGGER.info("auth-setup is not implemented in Module 0", extra={"account": args.account})
-    return 0
+    try:
+        app_config = load_config(args.path)
+        account = _resolve_target_account(app_config, args.account)
+        OneDriveAuthClient().auth_setup(account)
+        LOGGER.info("auth setup completed", extra={"account": account.name})
+        return 0
+    except (AuthError, ValueError) as exc:
+        LOGGER.error(str(exc))
+        return 2
 
 
 def _cmd_poll(args: argparse.Namespace) -> int:
-    """Stub command for Module 0."""
+    """Run OneDrive account polling and staging download for Module 3."""
 
-    LOGGER.info("poll is not implemented in Module 0", extra={"account": args.account})
-    return 0
+    try:
+        app_config = load_config(args.path)
+        results = poll_accounts(app_config, account_name=args.account)
+        for result in results:
+            LOGGER.info(
+                "poll completed",
+                extra={
+                    "account": result.account_name,
+                    "candidates": result.candidate_count,
+                    "downloaded": len(result.downloaded_paths),
+                },
+            )
+        return 0
+    except (GraphError, AuthError, ValueError) as exc:
+        LOGGER.error(str(exc))
+        return 2
 
 
 def _cmd_reject(args: argparse.Namespace) -> int:
@@ -106,6 +131,25 @@ def _cmd_config_check(args: argparse.Namespace) -> int:
     for err in errors:
         print(f"ERROR: {err}")
     return 2
+
+
+def _resolve_target_account(app_config: AppConfig, requested_name: str | None):
+    """Resolve the account target for auth setup.
+
+    If no account is requested, exactly one enabled account must exist.
+    """
+
+    enabled = app_config.ordered_enabled_accounts()
+    if requested_name:
+        for account in enabled:
+            if account.name == requested_name:
+                return account
+        raise ValueError(f"Enabled account not found: {requested_name}")
+
+    if len(enabled) == 1:
+        return enabled[0]
+
+    raise ValueError("Multiple enabled accounts found; pass --account")
 
 
 def main(argv: Sequence[str] | None = None) -> int:
