@@ -55,6 +55,14 @@ _EXPORTED_DIAGNOSTIC_KEYS = {
 }
 
 
+def _trace_event(event: str, **fields: object) -> None:
+    """Emit a structured trace event for OneDrive network operations."""
+
+    payload = {"event": event}
+    payload.update(fields)
+    LOGGER.info("onedrive_trace", extra=payload)
+
+
 @dataclass(frozen=True)
 class RemoteCandidate:
     """Normalized OneDrive file candidate emitted from delta responses."""
@@ -128,7 +136,19 @@ def poll_accounts(
     auth = auth_client or OneDriveAuthClient()
     results: list[AccountPollResult] = []
 
+    poll_run_id = str(uuid4())
+    _trace_event(
+        "poll_accounts_start",
+        poll_run_id=poll_run_id,
+        account_count=len(selected),
+    )
+
     for account in selected:
+        _trace_event(
+            "account_poll_start",
+            poll_run_id=poll_run_id,
+            account_name=account.name,
+        )
         token = auth.acquire_access_token(account)
         current_access_token = token.token
 
@@ -153,6 +173,7 @@ def poll_accounts(
                 refresh_access_token=refresh_access_token,
                 http_client=client,
                 max_runtime_seconds=app_config.core.max_poll_runtime_seconds,
+                poll_run_id=poll_run_id,
                 policy=policy,
                 sleeper=sleeper,
                 jitter_fn=jitter_fn,
@@ -171,6 +192,22 @@ def poll_accounts(
             )
         )
 
+        _trace_event(
+            "account_poll_end",
+            poll_run_id=poll_run_id,
+            account_name=account.name,
+            downloaded_count=len(downloaded),
+            candidate_count=candidate_count,
+            ghost_item_count=sum(ghost_reason_counts.values()),
+            delta_anomaly_count=sum(delta_anomaly_counts.values()),
+        )
+
+    _trace_event(
+        "poll_accounts_end",
+        poll_run_id=poll_run_id,
+        result_count=len(results),
+    )
+
     return tuple(results)
 
 
@@ -180,6 +217,7 @@ def poll_account_once(
     access_token: str,
     http_client: httpx.Client,
     refresh_access_token: Callable[[], str] | None = None,
+    poll_run_id: str | None = None,
     max_delta_pages: int = DEFAULT_MAX_DELTA_PAGES,
     max_runtime_seconds: int = 300,
     policy: RetryPolicy = DEFAULT_POLICY,
@@ -203,6 +241,14 @@ def poll_account_once(
     start_monotonic = monotonic()
 
     while next_url:
+        _trace_event(
+            "delta_page_start",
+            poll_run_id=poll_run_id,
+            account_name=account.name,
+            page_index=page_count + 1,
+            operation="delta_page",
+            delta_url=redact_url(next_url),
+        )
         if monotonic() - start_monotonic > max_runtime_seconds:
             _record_ghost_reason(delta_anomaly_counts, "delta_runtime_limit_exceeded")
             raise GraphError(
@@ -236,6 +282,8 @@ def poll_account_once(
                 http_client,
                 next_url,
                 access_token,
+                account_name=account.name,
+                poll_run_id=poll_run_id,
                 refresh_access_token=refresh_access_token,
                 diagnostics_counts=diagnostics_counts,
                 policy=policy,
@@ -269,6 +317,15 @@ def poll_account_once(
         )
         next_url = _as_str(payload.get("@odata.nextLink"))
         delta_link = _as_str(payload.get("@odata.deltaLink")) or delta_link
+        _trace_event(
+            "delta_page_end",
+            poll_run_id=poll_run_id,
+            account_name=account.name,
+            page_index=page_count,
+            operation="delta_page",
+            has_next=bool(next_url),
+            has_delta_link=bool(delta_link),
+        )
 
     if delta_link is None:
         raise GraphError(
@@ -287,6 +344,7 @@ def poll_account_once(
         http_client=http_client,
         max_downloads=account.max_downloads,
         refresh_access_token=refresh_access_token,
+        poll_run_id=poll_run_id,
         diagnostics_counts=diagnostics_counts,
         policy=policy,
         sleeper=sleeper,
@@ -418,6 +476,7 @@ def download_candidates(
     access_token: str,
     http_client: httpx.Client,
     refresh_access_token: Callable[[], str] | None = None,
+    poll_run_id: str | None = None,
     max_downloads: int | None = None,
     diagnostics_counts: dict[str, int] | None = None,
     policy: RetryPolicy = DEFAULT_POLICY,
@@ -447,6 +506,8 @@ def download_candidates(
                 url=candidate.download_url,
                 destination=tmp_path,
                 expected_size=candidate.size_bytes,
+                account_name=account_name,
+                poll_run_id=poll_run_id,
                 diagnostics_counts=diagnostics_counts,
                 policy=policy,
                 sleeper=sleeper,
@@ -461,6 +522,8 @@ def download_candidates(
                 access_token=access_token,
                 refresh_access_token=refresh_access_token,
                 http_client=http_client,
+                account_name=account_name,
+                poll_run_id=poll_run_id,
                 diagnostics_counts=diagnostics_counts,
                 policy=policy,
                 sleeper=sleeper,
@@ -477,6 +540,8 @@ def download_candidates(
                     url=refreshed_url,
                     destination=tmp_path,
                     expected_size=candidate.size_bytes,
+                    account_name=account_name,
+                    poll_run_id=poll_run_id,
                     diagnostics_counts=diagnostics_counts,
                     policy=policy,
                     sleeper=sleeper,
@@ -586,6 +651,8 @@ def _resolve_download_url_once(
     access_token: str,
     refresh_access_token: Callable[[], str] | None,
     http_client: httpx.Client,
+    account_name: str,
+    poll_run_id: str | None,
     diagnostics_counts: dict[str, int] | None,
     policy: RetryPolicy,
     sleeper: Callable[[float], None],
@@ -607,6 +674,8 @@ def _resolve_download_url_once(
             http_client,
             metadata_url,
             access_token,
+            account_name=account_name,
+            poll_run_id=poll_run_id,
             refresh_access_token=refresh_access_token,
             diagnostics_counts=diagnostics_counts,
             policy=policy,
@@ -629,6 +698,8 @@ def download_with_retry(
     url: str,
     destination: Path,
     expected_size: int | None = None,
+    account_name: str | None = None,
+    poll_run_id: str | None = None,
     policy: RetryPolicy = DEFAULT_POLICY,
     sleeper: Callable[[float], None] = time.sleep,
     jitter_fn: Callable[[], float] | None = None,
@@ -664,6 +735,17 @@ def download_with_retry(
             pass
 
     for attempt in range(1, policy.max_attempts + 1):
+        _trace_event(
+            "download_attempt_start",
+            poll_run_id=poll_run_id,
+            account_name=account_name,
+            operation="download",
+            attempt=attempt,
+            max_attempts=policy.max_attempts,
+            url=redact_url(url),
+            expected_size=expected_size,
+            destination=destination,
+        )
         _increment_counter(diagnostics_counts, "download_request_total")
         try:
             response = http_client.get(url, timeout=120.0)
@@ -683,6 +765,17 @@ def download_with_retry(
                     ),
                 ) from exc
             delay = compute_delay(attempt, None, policy, jitter_fn)
+            _trace_event(
+                "download_retry_scheduled",
+                poll_run_id=poll_run_id,
+                account_name=account_name,
+                operation="download",
+                attempt=attempt,
+                reason="transport_error",
+                delay_seconds=delay,
+                error_type=type(exc).__name__,
+                url=redact_url(url),
+            )
             sleeper(delay)
             continue
 
@@ -704,6 +797,18 @@ def download_with_retry(
                 )
             retry_after = parse_retry_after(response.headers.get("Retry-After"))
             delay = compute_delay(attempt, retry_after, policy, jitter_fn)
+            _trace_event(
+                "download_retry_scheduled",
+                poll_run_id=poll_run_id,
+                account_name=account_name,
+                operation="download",
+                attempt=attempt,
+                reason="http_retryable_status",
+                status_code=response.status_code,
+                retry_after=retry_after,
+                delay_seconds=delay,
+                url=redact_url(url),
+            )
             sleeper(delay)
             continue
 
@@ -748,6 +853,17 @@ def download_with_retry(
                         ),
                     )
                 delay = compute_delay(attempt, None, policy, jitter_fn)
+                _trace_event(
+                    "download_retry_scheduled",
+                    poll_run_id=poll_run_id,
+                    account_name=account_name,
+                    operation="download",
+                    attempt=attempt,
+                    reason="empty_body",
+                    delay_seconds=delay,
+                    expected_size=expected_size,
+                    url=redact_url(url),
+                )
                 sleeper(delay)
                 continue
 
@@ -765,8 +881,32 @@ def download_with_retry(
                         ),
                     )
                 delay = compute_delay(attempt, None, policy, jitter_fn)
+                _trace_event(
+                    "download_retry_scheduled",
+                    poll_run_id=poll_run_id,
+                    account_name=account_name,
+                    operation="download",
+                    attempt=attempt,
+                    reason="size_mismatch",
+                    delay_seconds=delay,
+                    expected_size=expected_size,
+                    bytes_written=bytes_written,
+                    url=redact_url(url),
+                )
                 sleeper(delay)
                 continue
+
+        _trace_event(
+            "download_attempt_success",
+            poll_run_id=poll_run_id,
+            account_name=account_name,
+            operation="download",
+            attempt=attempt,
+            status_code=response.status_code,
+            bytes_written=bytes_written,
+            destination=destination,
+            url=redact_url(url),
+        )
 
         return
 
@@ -781,6 +921,8 @@ def _graph_get_json(
     refresh_access_token: Callable[[], str] | None = None,
     *,
     diagnostics_counts: dict[str, int] | None = None,
+    account_name: str | None = None,
+    poll_run_id: str | None = None,
 ) -> dict[str, object]:
     """Execute a Graph GET request and return parsed JSON payload.
 
@@ -799,6 +941,16 @@ def _graph_get_json(
         }
         _increment_counter(diagnostics_counts, "graph_request_total")
         _increment_counter(diagnostics_counts, "graph_client_request_id_sent_total")
+        _trace_event(
+            "graph_request_attempt_start",
+            poll_run_id=poll_run_id,
+            account_name=account_name,
+            operation="graph_get",
+            attempt=attempt,
+            max_attempts=policy.max_attempts,
+            client_request_id=client_request_id,
+            url=redact_url(url),
+        )
         try:
             response = http_client.get(
                 url,
@@ -819,6 +971,18 @@ def _graph_get_json(
                     ),
                 ) from exc
             delay = compute_delay(attempt, None, policy, jitter_fn)
+            _trace_event(
+                "graph_retry_scheduled",
+                poll_run_id=poll_run_id,
+                account_name=account_name,
+                operation="graph_get",
+                attempt=attempt,
+                reason="transport_error",
+                delay_seconds=delay,
+                error_type=type(exc).__name__,
+                client_request_id=client_request_id,
+                url=redact_url(url),
+            )
             sleeper(delay)
             continue
 
@@ -835,6 +999,16 @@ def _graph_get_json(
         if response.status_code in {401, 403}:
             support_suffix = _response_support_suffix(response)
             _increment_counter(diagnostics_counts, "auth_refresh_attempt_total")
+            _trace_event(
+                "graph_auth_refresh_attempt",
+                poll_run_id=poll_run_id,
+                account_name=account_name,
+                operation="graph_get",
+                attempt=attempt,
+                status_code=response.status_code,
+                client_request_id=client_request_id,
+                url=redact_url(url),
+            )
             if refreshed_once or refresh_access_token is None:
                 raise GraphError(
                     "Graph authentication failed",
@@ -849,8 +1023,27 @@ def _graph_get_json(
             try:
                 access_token = refresh_access_token()
                 _increment_counter(diagnostics_counts, "auth_refresh_success_total")
+                _trace_event(
+                    "graph_auth_refresh_success",
+                    poll_run_id=poll_run_id,
+                    account_name=account_name,
+                    operation="graph_get",
+                    attempt=attempt,
+                    client_request_id=client_request_id,
+                    url=redact_url(url),
+                )
             except AuthError as exc:
                 _increment_counter(diagnostics_counts, "auth_refresh_failure_total")
+                _trace_event(
+                    "graph_auth_refresh_failure",
+                    poll_run_id=poll_run_id,
+                    account_name=account_name,
+                    operation="graph_get",
+                    attempt=attempt,
+                    client_request_id=client_request_id,
+                    error_code=getattr(exc, "code", None),
+                    url=redact_url(url),
+                )
                 raise GraphError(
                     "Graph token refresh failed",
                     url=url,
@@ -882,6 +1075,19 @@ def _graph_get_json(
                 )
             retry_after = parse_retry_after(response.headers.get("Retry-After"))
             delay = compute_delay(attempt, retry_after, policy, jitter_fn)
+            _trace_event(
+                "graph_retry_scheduled",
+                poll_run_id=poll_run_id,
+                account_name=account_name,
+                operation="graph_get",
+                attempt=attempt,
+                reason="http_retryable_status",
+                status_code=response.status_code,
+                retry_after=retry_after,
+                delay_seconds=delay,
+                client_request_id=client_request_id,
+                url=redact_url(url),
+            )
             sleeper(delay)
             continue
 
@@ -909,7 +1115,7 @@ def _graph_get_json(
             )
 
         try:
-            return json.loads(response.text)
+            payload = json.loads(response.text)
         except json.JSONDecodeError as exc:
             raise GraphError(
                 "Invalid JSON in Graph response",
@@ -917,6 +1123,20 @@ def _graph_get_json(
                 code="graph_invalid_json",
                 safe_hint=f"JSON parse error for {redact_url(url)}",
             ) from exc
+
+        _trace_event(
+            "graph_request_attempt_success",
+            poll_run_id=poll_run_id,
+            account_name=account_name,
+            operation="graph_get",
+            attempt=attempt,
+            status_code=response.status_code,
+            client_request_id=client_request_id,
+            request_id=request_id,
+            correlation_id=correlation_id,
+            url=redact_url(url),
+        )
+        return payload
 
     # Unreachable: loop always returns or raises on the final attempt.
     raise GraphError(  # pragma: no cover
