@@ -27,6 +27,9 @@ class IngestError(RuntimeError):
     """Raised when ingest engine processing fails."""
 
 
+INGEST_INPUT_SCHEMA_VERSION = 1
+
+
 @dataclass(frozen=True)
 class StagedCandidate:
     """Candidate file and metadata passed from download stage to ingest stage."""
@@ -102,8 +105,14 @@ class IngestDecisionEngine:
         accepted_root: Path,
         storage_template: str,
         staging_on_same_pool: bool,
+        input_schema_version: int = INGEST_INPUT_SCHEMA_VERSION,
     ) -> IngestBatchResult:
         """Process staged candidates and return batch summary."""
+
+        self._validate_batch_contract(
+            candidates=candidates,
+            input_schema_version=input_schema_version,
+        )
 
         outcomes: list[IngestOutcome] = []
 
@@ -466,6 +475,40 @@ class IngestDecisionEngine:
         if status not in {"accepted", "rejected", "purged"}:
             return None
         return status, sha256
+
+    def _validate_batch_contract(
+        self,
+        *,
+        candidates: list[StagedCandidate],
+        input_schema_version: int,
+    ) -> None:
+        """Fail fast when ingest boundary payload is incompatible or malformed."""
+
+        if input_schema_version != INGEST_INPUT_SCHEMA_VERSION:
+            raise IngestError(
+                "Incompatible ingest input schema version: "
+                f"got={input_schema_version} expected={INGEST_INPUT_SCHEMA_VERSION}"
+            )
+
+        for index, candidate in enumerate(candidates):
+            if not candidate.account_name.strip():
+                raise IngestError(f"Malformed candidate[{index}]: account_name is required")
+            if not candidate.onedrive_id.strip():
+                raise IngestError(f"Malformed candidate[{index}]: onedrive_id is required")
+            if not candidate.original_filename.strip():
+                raise IngestError(f"Malformed candidate[{index}]: original_filename is required")
+            if not candidate.relative_path.startswith("/"):
+                raise IngestError(
+                    f"Malformed candidate[{index}]: relative_path must start with '/': {candidate.relative_path}"
+                )
+            try:
+                datetime.fromisoformat(candidate.modified_time.replace("Z", "+00:00"))
+            except ValueError as exc:
+                raise IngestError(
+                    f"Malformed candidate[{index}]: modified_time is not valid ISO-8601"
+                ) from exc
+            if candidate.size_bytes is not None and candidate.size_bytes < 0:
+                raise IngestError(f"Malformed candidate[{index}]: size_bytes must be >= 0")
 
     def _journal_append(
         self,

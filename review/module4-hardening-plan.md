@@ -72,10 +72,10 @@ Commit scope:
 
 ## M4-H4 Contract validation at ingest boundary
 
-- [ ] Add explicit schema/version field for ingest input payload.
-- [ ] Add strict validator for required candidate fields and allowed formats.
-- [ ] Fail-fast on incompatible contract with actionable errors.
-- [ ] Add compatibility tests with malformed and version-mismatch payloads.
+- [x] Add explicit schema/version field for ingest input payload.
+- [x] Add strict validator for required candidate fields and allowed formats.
+- [x] Fail-fast on incompatible contract with actionable errors.
+- [x] Add compatibility tests with malformed and version-mismatch payloads.
 
 Commit scope:
 - Contract datamodel/validator
