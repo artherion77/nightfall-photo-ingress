@@ -17,7 +17,8 @@ from uuid import uuid4
 from ..registry import Registry
 from ..storage import (
     commit_staging_to_accepted,
-    choose_collision_safe_destination,
+    choose_collision_safe_destination_with_threshold,
+    lint_storage_template,
     render_storage_relative_path,
     sha256_file,
 )
@@ -117,6 +118,7 @@ class IngestDecisionEngine:
         quarantine_dir: Path | None = None,
         worker_count: int = 1,
         size_aware_scheduling: bool = True,
+        collision_max_attempts: int = 10_000,
     ) -> IngestBatchResult:
         """Process staged candidates and return batch summary."""
 
@@ -131,6 +133,14 @@ class IngestDecisionEngine:
             )
         if worker_count < 1:
             raise IngestError("worker_count must be >= 1")
+        if collision_max_attempts < 1:
+            raise IngestError("collision_max_attempts must be >= 1")
+
+        template_findings = lint_storage_template(storage_template)
+        if template_findings:
+            raise IngestError(
+                "Unsafe storage template detected: " + ",".join(template_findings)
+            )
 
         outcomes: list[IngestOutcome] = []
         batch_run_id = uuid4().hex
@@ -156,6 +166,7 @@ class IngestDecisionEngine:
                         pre_hash_size_verify=pre_hash_size_verify,
                         zero_byte_policy=zero_byte_policy,
                         quarantine_dir=quarantine_dir,
+                        collision_max_attempts=collision_max_attempts,
                     ),
                 )
                 for index, candidate in indexed_candidates
@@ -172,6 +183,7 @@ class IngestDecisionEngine:
                         pre_hash_size_verify=pre_hash_size_verify,
                         zero_byte_policy=zero_byte_policy,
                         quarantine_dir=quarantine_dir,
+                        collision_max_attempts=collision_max_attempts,
                     ): (index, candidate)
                     for index, candidate in indexed_candidates
                 }
@@ -392,6 +404,7 @@ class IngestDecisionEngine:
         pre_hash_size_verify: bool,
         zero_byte_policy: str,
         quarantine_dir: Path | None,
+        collision_max_attempts: int,
     ) -> IngestOutcome:
         """Process one staged candidate through prefilter and hash decisioning."""
 
@@ -501,7 +514,10 @@ class IngestDecisionEngine:
                 original_filename=candidate.original_filename,
                 modified_time_iso=candidate.modified_time,
             )
-            destination = choose_collision_safe_destination(accepted_root / relative)
+            destination = choose_collision_safe_destination_with_threshold(
+                base_path=accepted_root / relative,
+                max_attempts=collision_max_attempts,
+            )
             commit_staging_to_accepted(
                 source_path=path,
                 destination_path=destination,

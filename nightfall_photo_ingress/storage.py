@@ -86,17 +86,32 @@ def render_storage_relative_path(
 def choose_collision_safe_destination(base_path: Path) -> Path:
     """Return a unique destination path by adding numeric suffix on conflicts."""
 
+    return choose_collision_safe_destination_with_threshold(
+        base_path=base_path,
+        max_attempts=10_000,
+    )
+
+
+def choose_collision_safe_destination_with_threshold(*, base_path: Path, max_attempts: int) -> Path:
+    """Return a unique destination path with explicit collision-loop threshold."""
+
+    if max_attempts < 1:
+        raise StorageError("max_attempts must be >= 1")
+
     if not base_path.exists():
         return base_path
 
     stem = base_path.stem
     suffix = base_path.suffix
     parent = base_path.parent
-    for index in range(1, 10_000):
+    for index in range(1, max_attempts + 1):
         candidate = parent / f"{stem}-{index}{suffix}"
         if not candidate.exists():
             return candidate
-    raise StorageError(f"Unable to find collision-safe destination for {base_path}")
+    raise StorageError(
+        "Collision threshold exceeded while generating destination path: "
+        f"base={base_path} attempts={max_attempts}"
+    )
 
 
 def commit_staging_to_accepted(
@@ -105,6 +120,8 @@ def commit_staging_to_accepted(
     destination_path: Path,
     staging_on_same_pool: bool,
     destination_root: Path | None = None,
+    file_mode: int = 0o640,
+    dir_mode: int = 0o750,
 ) -> CommitResult:
     """Persist one staged file into accepted queue storage safely.
 
@@ -119,9 +136,11 @@ def commit_staging_to_accepted(
         _ensure_within_root(destination_path, destination_root)
 
     destination_path.parent.mkdir(parents=True, exist_ok=True)
+    os.chmod(destination_path.parent, dir_mode)
 
     if staging_on_same_pool:
         source_path.replace(destination_path)
+        os.chmod(destination_path, file_mode)
         _fsync_path(destination_path)
         _fsync_parent_dir(destination_path)
         written = destination_path.stat().st_size
@@ -150,6 +169,7 @@ def commit_staging_to_accepted(
 
     _fsync_path(tmp_destination)
     tmp_destination.replace(destination_path)
+    os.chmod(destination_path, file_mode)
     _fsync_parent_dir(destination_path)
     source_path.unlink(missing_ok=True)
     return CommitResult(
@@ -170,6 +190,26 @@ def _parse_timestamp(value: str) -> datetime:
         return parsed
     except Exception:
         return datetime.now(timezone.utc)
+
+
+def lint_storage_template(storage_template: str) -> list[str]:
+    """Return security findings for unsafe storage template patterns."""
+
+    findings: list[str] = []
+    if storage_template.startswith("/"):
+        findings.append("template_must_be_relative")
+    if ".." in storage_template:
+        findings.append("template_contains_traversal")
+    if "{original}" not in storage_template and "{sha8}" not in storage_template:
+        findings.append("template_missing_filename_component")
+
+    supported = {"yyyy", "mm", "sha8", "original"}
+    placeholders = re.findall(r"\{([^{}]+)\}", storage_template)
+    for placeholder in placeholders:
+        if placeholder not in supported:
+            findings.append(f"template_unknown_placeholder:{{{placeholder}}}")
+
+    return findings
 
 
 def _ensure_within_root(destination_path: Path, destination_root: Path) -> None:

@@ -138,10 +138,10 @@ Commit scope:
 
 ## M4-H9 Security policy tightening
 
-- [ ] Enforce output file/directory permission policy.
-- [ ] Add collision-loop threshold telemetry and alerts.
-- [ ] Add template policy linter for unsafe patterns.
-- [ ] Add security-focused tests for permissions and name/path edge cases.
+- [x] Enforce output file/directory permission policy.
+- [x] Add collision-loop threshold telemetry and alerts.
+- [x] Add template policy linter for unsafe patterns.
+- [x] Add security-focused tests for permissions and name/path edge cases.
 
 Commit scope:
 - Security policy helpers
