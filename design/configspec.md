@@ -1,0 +1,155 @@
+# nightfall-photo-ingress Configuration Specification
+This document defines the structure, required fields, defaults, and validation rules for the central configuration file used by the nightfall-photo-ingress service.
+
+Format: INI
+Location: /etc/nightfall/onedrive-ingest.conf (recommended)
+
+---
+
+## 1. Global Structure
+
+The configuration file consists of:
+- A `[core]` section for global settings.
+- One `[account.<name>]` section per OneDrive account.
+- Optional `[logging]` section for local format overrides.
+
+Example structure:
+
+```ini
+[core]
+config_version = 1
+poll_interval_minutes = 15
+staging_path = /mnt/ssd/onedrive-ingest/staging
+accepted_path = /nightfall/media/onedrive-ingest/accepted
+trash_path = /nightfall/media/onedrive-ingest/trash
+registry_path = /mnt/ssd/onedrive-ingest/registry.db
+staging_on_same_pool = false
+storage_template = {yyyy}/{mm}/{sha8}-{original}
+max_downloads_per_poll = 200
+max_poll_runtime_seconds = 300
+sync_hash_import_enabled = true
+sync_hash_import_path = /nightfall/media/pictures
+sync_hash_import_glob = .hashes.sha1
+
+[account.christopher]
+enabled = true
+display_name = Christopher iPhone
+authority = https://login.microsoftonline.com/consumers
+client_id = REPLACE_WITH_CLIENT_ID
+onedrive_root = /Camera Roll
+token_cache = /mnt/ssd/onedrive-ingest/tokens/christopher.json
+delta_cursor = /mnt/ssd/onedrive-ingest/cursors/christopher.cursor
+
+[account.danny]
+enabled = false
+display_name = Danny iPhone
+authority = https://login.microsoftonline.com/consumers
+client_id = REPLACE_WITH_CLIENT_ID
+onedrive_root = /Camera Roll
+token_cache = /mnt/ssd/onedrive-ingest/tokens/danny.json
+delta_cursor = /mnt/ssd/onedrive-ingest/cursors/danny.cursor
+
+[logging]
+log_level = INFO
+console_format = json
+```
+
+---
+
+## 2. [core] Section
+
+### Required Keys
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `config_version` | int | 1 | Config schema version. Must match supported value. |
+| `poll_interval_minutes` | int | 15 | Poll interval used by timer cadence. |
+| `staging_path` | path | none | SSD-backed staging directory. |
+| `accepted_path` | path | none | Ingress-visible accepted queue. Operator later moves files manually to permanent library. |
+| `trash_path` | path | none | Directory watched by systemd .path unit for reject workflow. |
+| `registry_path` | path | none | SQLite registry file path. |
+| `staging_on_same_pool` | bool | false | Enables rename move optimization when true. |
+| `storage_template` | string | `{yyyy}/{mm}/{sha8}-{original}` | Template for accepted queue file layout. |
+
+### Optional Keys
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `max_downloads_per_poll` | int | 200 | Backpressure control per poll run. |
+| `max_poll_runtime_seconds` | int | 300 | Runtime cap for a single poll run. |
+| `tmp_ttl_minutes` | int | 120 | Cleanup TTL for incomplete `.tmp` files. |
+| `failed_ttl_hours` | int | 24 | Cleanup TTL for failed artifacts. |
+| `orphan_ttl_days` | int | 7 | Cleanup TTL for orphaned staged files. |
+| `sync_hash_import_enabled` | bool | true | Enable hash import sync mode from permanent library. |
+| `sync_hash_import_path` | path | none | Read-only permanent library root (for hash import mode). |
+| `sync_hash_import_glob` | string | `.hashes.sha1` | Hash cache file pattern to reuse from immich-rmdups flow. |
+
+---
+
+## 3. [account.<name>] Sections
+
+Each account section defines one OneDrive personal account.
+
+### Required Keys
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `enabled` | bool | Whether this account is active. |
+| `authority` | string | Microsoft identity authority, default should be consumers endpoint. |
+| `client_id` | string | Azure app registration client ID. |
+| `onedrive_root` | path | Root folder to poll (for example `/Camera Roll`). |
+| `token_cache` | path | Path to MSAL token cache file. |
+| `delta_cursor` | path | Path to delta cursor file. |
+
+### Optional Keys
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `display_name` | string | section name | Human-readable account label for logs. |
+| `max_downloads` | int | inherits from core | Per-account download cap override. |
+
+---
+
+## 4. Template Variables
+
+The storage template supports the following variables:
+
+| Variable | Description |
+|----------|-------------|
+| `{yyyy}` | Year (UTC) |
+| `{mm}` | Month (UTC, zero-padded) |
+| `{dd}` | Day (UTC, zero-padded) |
+| `{sha256}` | Full SHA-256 hash |
+| `{sha8}` | First 8 characters of SHA-256 |
+| `{original}` | Original filename from OneDrive (sanitized) |
+| `{account}` | Account name |
+
+---
+
+## 5. Validation Rules
+
+- `config_version` must match the implementation-supported version.
+- At least one account must be enabled.
+- Account names must be unique and match `^[a-z0-9_-]+$`.
+- All configured directories must exist or be creatable.
+- Mount roots must exist before startup (fail fast if missing).
+- `token_cache` files must be mode 0600 and parent directory mode 0700.
+- `delta_cursor` paths must be writable.
+- `storage_template` must include at least `{original}` or `{sha8}`.
+- `sync_hash_import_path` must be readable when sync import is enabled.
+- `token_cache` and `delta_cursor` paths must not be reused by multiple accounts.
+
+---
+
+## 6. Operational Notes
+
+- `accepted_path` is not the permanent archive. It is the ingress queue destination.
+- The operator periodically moves accepted files into `/nightfall/media/pictures/...` manually, outside ingress visibility.
+- The registry remains the source of truth for prior acceptance. Files moved out of `accepted_path` must still remain blocked from re-download.
+- In sync mode, the CLI imports hashes from permanent library hash caches (`.hashes.sha1`) to pre-seed accepted records and reduce re-hashing cost.
+
+---
+
+## 7. Summary
+
+This specification defines a strict and migration-ready configuration model with multi-account support, resilient state tracking, and an explicit boundary between ingress queue storage and the permanent photo library.

@@ -6,15 +6,15 @@
 
 ---
 
-## Overview
+## 1. Overview
 
 A fully automated, server-side OneDrive-based photo ingest pipeline that feeds into the nightfall archival system. iOS devices upload photos to OneDrive (treated as an untrusted but reliable transport layer). A Linux server running ZFS storage ("nightfall"), Immich, and custom ingest services pulls those files down, validates them, and manages their lifecycle independently of Immich.
 
-**Immich's role is limited to indexing and viewing.** It reads a read-only external library directory; it does not control ingest, lifecycle, or retention decisions.
+**Immich's role is limited to indexing and viewing permanent library content only.** The ingress service writes into an accepted queue, while the operator manually promotes files into `/nightfall/media/pictures/...` outside ingress visibility. Ingress still blocks re-downloads using persistent acceptance history in the registry.
 
 ---
 
-## High-Level Architecture
+## 2. High-Level Architecture
 
 ```
 iOS Camera Roll
@@ -41,23 +41,27 @@ iOS Camera Roll
 │                    + insert registry    │
 │                                         │
 │  /nightfall/media/onedrive-ingest/      │  ← HDD pool
-│    accepted/   ← Immich read-only lib   │
-│    trash/      ← rejection trigger      │
+│    accepted/   ← ingress queue           │
+│    trash/      ← rejection trigger       │
 └─────────────────────────────────────────┘
       │
-      │  read-only bind-mount
+     │  manual operator move/copy
       ▼
-  Immich (LXC container)
-  external library → periodic rescan
+  /nightfall/media/pictures/... (permanent library)
+     │
+     │  read-only bind-mount
+     ▼
+  Immich (LXC container) external library
 ```
 
 ---
 
-## Design Constraints and Goals
+## 3. Design Constraints and Goals
 
 - **Fully automated** — no user behavior assumptions on iOS.
-- **Robust against Immich changes** — the pipeline operates independently; a fresh Immich DB simply rescans `accepted/`.
+- **Robust against Immich changes** — the pipeline operates independently; a fresh Immich DB simply rescans the permanent library.
 - **Reject-once, reject-forever** — a rejected SHA-256 is never ingested again regardless of re-uploads.
+- **Accepted-history persistence** — manually moving files out of `accepted/` must not cause future re-downloads.
 - **Minimize unnecessary I/O** — metadata pre-filtering avoids downloading files that are already known; HDD only spun up at accept-commit time.
 - **English-only** — all inline comments, logs, and documentation are in English.
 - **Auditable** — every state transition is recorded in an immutable `audit_log` table.
@@ -65,7 +69,7 @@ iOS Camera Roll
 
 ---
 
-## Storage Layout
+## 4. Storage Layout
 
 ```
 ssdpool/onedrive-ingest  →  /mnt/ssd/onedrive-ingest/
@@ -75,8 +79,11 @@ ssdpool/onedrive-ingest  →  /mnt/ssd/onedrive-ingest/
   delta_cursor           — last Graph API delta link (plain text)
 
 nightfall/media/onedrive-ingest  →  /nightfall/media/onedrive-ingest/
-  accepted/              — committed files; Immich mounts this read-only
+   accepted/              — committed files; ingress queue only
   trash/                 — operator drops files here to trigger rejection
+
+nightfall/media/pictures  →  /nightfall/media/pictures/
+   ...                    — permanent library, read-only to ingress (used by Immich and sync-import)
 ```
 
 **ZFS datasets to create (manual pre-requisite):**
@@ -88,7 +95,7 @@ zfs create -o mountpoint=/nightfall/media/onedrive-ingest nightfall/media/onedri
 
 ---
 
-## Hash Registry Design
+## 5. Hash Registry Design
 
 ### Schema
 
@@ -120,6 +127,16 @@ CREATE TABLE audit_log (
     actor           TEXT NOT NULL,   -- 'pipeline', 'cli', 'trash_watch'
     ts              TEXT NOT NULL    -- ISO-8601 UTC
 );
+
+CREATE TABLE accepted_records (
+   sha256            TEXT PRIMARY KEY,
+   accepted_at       TEXT NOT NULL,
+   original_filename TEXT,
+   storage_relpath   TEXT,
+   account_name      TEXT NOT NULL,
+   onedrive_id       TEXT,
+   source_modified_time TEXT
+);
 ```
 
 ### Properties
@@ -128,12 +145,13 @@ CREATE TABLE audit_log (
 - **Auditable**: `audit_log` is append-only; no rows are ever deleted from it.
 - **Concurrent-safe**: `BEGIN EXCLUSIVE` transaction for all write paths; SQLite WAL mode.
 - **Resilient to restarts**: staging files named `{onedrive_id}.tmp` during download → renamed on completion; a crashed run leaves `.tmp` files that are cleaned up on next start.
+- **Move-safe**: `accepted_records` preserves acceptance history even if files are manually moved out of `accepted/`.
 
 ---
 
-## Pipeline Behavior
+## 6. Pipeline Behavior
 
-### Poll cycle (every 15 min via systemd timer)
+### 6.1 Poll Cycle (every 15 min via systemd timer)
 
 1. Acquire OAuth2 token silently (MSAL refresh token flow).
 2. Call Graph API delta endpoint for the configured OneDrive folder.
@@ -145,14 +163,27 @@ CREATE TABLE audit_log (
    e. **Registry lookup**:
       - `rejected` → delete from staging; append `rejected_duplicate` to `audit_log`.
       - `accepted` → delete from staging; append `duplicate_skipped` to `audit_log`.
-      - `unknown` → move to `accepted/YYYY/MM/{filename}`; insert `files` row as `accepted`; insert `metadata_index` row; append `accepted` to `audit_log`.
+      - `unknown` → move to `accepted/YYYY/MM/{filename}`; insert `files` row as `accepted`; insert `accepted_records`; insert `metadata_index` row; append `accepted` to `audit_log`.
 4. Persist updated delta cursor.
 
-### Rejection flow
+### 6.2 Live Photo Support in V1
+
+   - Pair detection is required in V1.
+   - Ingest tracks likely Live Photo components (for example HEIC/JPEG + MOV) as separate physical files.
+   - Pair linkage metadata is persisted for audit and future tooling.
+   - Merge/export workflows are deferred to V2.
+
+### 6.3 Sync Hash Import Mode
+
+   - A CLI sync mode imports known hashes from `/nightfall/media/pictures/...`.
+   - It reuses `.hashes.sha1` files generated by `nightfall-immich-rmdups.sh`.
+   - Imported hashes are used for pre-filtering to reduce unnecessary downloads and hashing.
+
+### 6.4 Rejection Flow
 
 **Via trash directory (filesystem trigger):**
 1. Operator places (or moves) a file into `/nightfall/media/onedrive-ingest/trash/`.
-2. systemd `.path` unit fires `nightfall-onedrive-trash.service`.
+2. systemd `.path` unit fires `nightfall-photo-ingress-trash.service`.
 3. Service computes SHA-256 of each file in `trash/`.
 4. Looks up accepted path from registry, removes from `accepted/`.
 5. Updates registry `status = 'rejected'`; appends `audit_log` row with `actor = 'trash_watch'`.
@@ -160,7 +191,7 @@ CREATE TABLE audit_log (
 
 **Via CLI:**
 ```bash
-nightfall-onedrive reject <sha256> [--reason "..."]
+nightfall-photo-ingress reject <sha256> [--reason "..."]
 ```
 - Idempotent: if already `rejected`, logs and exits cleanly.
 - Removes file from `accepted/` if present.
@@ -168,7 +199,7 @@ nightfall-onedrive reject <sha256> [--reason "..."]
 
 ---
 
-## Edge Cases and Mitigations
+## 7. Edge Cases and Mitigations
 
 | Edge case | Mitigation |
 |---|---|
@@ -179,12 +210,13 @@ nightfall-onedrive reject <sha256> [--reason "..."]
 | Cross-pool atomic move | If staging (SSD) and accepted (HDD) are different ZFS pools: `shutil.copy2` → verify SHA-256 → `unlink` staging; controlled by `STAGING_SAME_POOL` config flag |
 | Concurrent poll runs | systemd `Type=oneshot` prevents overlap; SQLite `BEGIN EXCLUSIVE` as secondary guard |
 | Auth token expiry | MSAL handles refresh transparently; alert email after ≥3 consecutive auth failures |
-| Immich DB purge or upgrade | Pipeline is Immich-independent; `accepted/` directory is the source of truth; Immich rescans automatically |
+| Operator manually moves accepted files away | `accepted_records` table preserves acceptance truth independent of current file location |
+| Immich DB purge or upgrade | Pipeline is Immich-independent; permanent library remains the viewer source of truth |
 | HDD spin-up discipline | Staging, hashing, and registry all on SSD; HDD only written at accept-commit (atomic move/copy) |
 
 ---
 
-## Tech Stack
+## 8. Tech Stack
 
 | Component | Choice | Justification |
 |---|---|---|
@@ -194,14 +226,14 @@ nightfall-onedrive reject <sha256> [--reason "..."]
 | Registry | `sqlite3` (stdlib) | ACID transactions; no extra deps; auditable via SQL; portable |
 | Schema types | `TypedDict` (stdlib) | Matches nightfall-mcp style — no Pydantic dependency |
 | Logging | `logging` + JSON formatter | Structured English logs; feeds journald via stdout |
-| Process model | systemd timer + `.path` unit | Matches existing nightfall patterns exactly |
+| Process model | host-level systemd timer + `.path` unit | Matches existing nightfall patterns exactly; no container for V1 |
 
 **Runtime dependencies:** `httpx`, `msal`  
 **Dev dependencies:** `pytest`, `pytest-mock`
 
 ---
 
-## File Layout (planned project structure)
+## 9. File Layout (Planned Project Structure)
 
 ```
 nightfall-photo-ingress/
@@ -227,10 +259,10 @@ nightfall-photo-ingress/
 ├── conf/
 │   └── onedrive-ingest.conf      — .ini format; installed to /etc/nightfall/
 ├── systemd/
-│   ├── nightfall-onedrive-poll.service
-│   ├── nightfall-onedrive-poll.timer
-│   ├── nightfall-onedrive-trash.path
-│   └── nightfall-onedrive-trash.service
+│   ├── nightfall-photo-ingress-poll.service
+│   ├── nightfall-photo-ingress-poll.timer
+│   ├── nightfall-photo-ingress-trash.path
+│   └── nightfall-photo-ingress-trash.service
 ├── install/
 │   ├── install.sh
 │   └── uninstall.sh
@@ -244,7 +276,7 @@ nightfall-photo-ingress/
 
 ---
 
-## Implementation Phases
+## 10. Implementation Phases
 
 ### Phase 1 — Azure App Registration + Auth
 
@@ -257,7 +289,7 @@ Steps:
    - Enable **"Allow public client flows"**
    - Add API permissions: `Files.Read` (Microsoft Graph, delegated) + `offline_access`
 2. Record the **Application (client) ID** — stored in `/etc/nightfall/onedrive-ingest.conf`
-3. Run `nightfall-onedrive auth-setup` once on the server:
+3. Run `nightfall-photo-ingress auth-setup` once on the server:
    - Prints a device-code URL and code
    - Operator opens URL on any browser, signs in
    - Token cache written to `/mnt/ssd/onedrive-ingest/token_cache.json` (mode 0600)
@@ -289,24 +321,17 @@ Steps:
 
 **Deliverable:** Registry fully functional; `pytest tests/test_registry.py` and `pytest tests/test_ingest.py` green.
 
-### Phase 4 — ZFS + Immich External Library Wiring
+### Phase 4 — Accepted Queue and Permanent Library Boundary
 
-**Goal:** Accepted files are visible in Immich with zero manual intervention.
+**Goal:** Keep ingress and permanent library ownership separate, while preserving dedupe history.
 
 Steps:
 1. Create ZFS datasets (see Storage Layout above)
-2. Add read-only bind-mount to `containers/immich/opt/immich/docker-compose.yml`:
-   ```yaml
-   - /nightfall/media/onedrive-ingest/accepted:/usr/src/app/onedrive-library:ro
-   ```
-3. Register external library in Immich via API:
-   ```
-   POST /api/library
-   { "name": "OneDrive Ingest", "importPaths": ["/usr/src/app/onedrive-library"] }
-   ```
-4. Verify: delete a file from `accepted/` → Immich marks it offline on next scan (no schema migration required)
+2. Ensure ingress has write access to `accepted/` and no write access to `/nightfall/media/pictures/...`
+3. Document operator workflow for manually moving files from `accepted/` to permanent library
+4. Validate that manually moved files remain blocked from re-download due to registry acceptance history
 
-**Deliverable:** First end-to-end photo visible in Immich after a successful poll cycle.
+**Deliverable:** Files can be moved out of accepted queue without regressing dedupe behavior.
 
 ### Phase 5 — Trash → Rejected Pipeline
 
@@ -314,8 +339,8 @@ Steps:
 
 Steps:
 1. `cli.py`: `reject` subcommand and `process-trash` subcommand
-2. `systemd/nightfall-onedrive-trash.path`: watches `/nightfall/media/onedrive-ingest/trash/`
-3. `systemd/nightfall-onedrive-trash.service`: runs `nightfall-onedrive process-trash` on activation
+2. `systemd/nightfall-photo-ingress-trash.path`: watches `/nightfall/media/onedrive-ingest/trash/`
+3. `systemd/nightfall-photo-ingress-trash.service`: runs `nightfall-photo-ingress process-trash` on activation
 4. Both paths share `registry.mark_rejected(sha256, reason, actor)` — idempotent
 
 **Deliverable:** Drop a previously accepted file into trash → it disappears from `accepted/`; re-upload is silently discarded at next poll.
@@ -330,11 +355,23 @@ Steps:
 3. Alert emails: consecutive auth failures (≥3), SSD dataset >90% full, ingest errors
 4. Install scripts following nightfall-scripts conventions (`install.sh`, `uninstall.sh`)
 
-**Deliverable:** `pytest tests/` fully green; systemd timers enabled and observable via `journalctl -u nightfall-onedrive-poll`.
+**Deliverable:** `pytest tests/` fully green; systemd timers enabled and observable via `journalctl -u nightfall-photo-ingress-poll`.
+
+### Phase 7 — Sync Import + Live Photo Pairing
+
+**Goal:** Reduce duplicate downloads and support modern iPhone defaults in V1.
+
+Steps:
+1. Add `sync-import` CLI command to parse `.hashes.sha1` from `/nightfall/media/pictures/...`
+2. Persist imported hash index for pre-filter checks during poll
+3. Add Live Photo pair detection and pair-link persistence in registry
+4. Validate paired/unpaired behavior with HEIC/JPEG + MOV test fixtures
+
+**Deliverable:** Sync import is operational and Live Photo pairing metadata is written in V1.
 
 ---
 
-## Configuration File (conf/onedrive-ingest.conf)
+## 11. Configuration File (conf/onedrive-ingest.conf)
 
 ```ini
 [onedrive]
@@ -374,23 +411,25 @@ auth_failure_threshold = 3
 
 ---
 
-## Verification Checklist
+## 12. Verification Checklist
 
-1. `nightfall-onedrive auth-setup` completes; token file written at mode 0600
-2. `nightfall-onedrive poll --dry-run` lists known OneDrive items without downloading
-3. End-to-end: single photo ingested; appears in `accepted/YYYY/MM/`; SHA-256 in registry; visible in Immich after scan
+1. `nightfall-photo-ingress auth-setup` completes; token file written at mode 0600
+2. `nightfall-photo-ingress poll --dry-run` lists known OneDrive items without downloading
+3. End-to-end: single photo ingested; appears in `accepted/YYYY/MM/`; SHA-256 in registry
 4. Re-run poll; confirm file NOT downloaded again (metadata_index hit)
 5. Move accepted file to trash/; confirm it is removed from accepted/ and registry status = `rejected`
 6. Re-upload same photo to OneDrive; run poll; confirm file is silently discarded (audit_log entry: `rejected_duplicate`)
-7. `nightfall-onedrive reject <sha256>` runs idempotently (no error if already rejected)
-8. `pytest tests/` all green with mocked HTTP and mocked filesystem
-9. `journalctl -u nightfall-onedrive-poll` shows structured JSON log output
+7. `nightfall-photo-ingress reject <sha256>` runs idempotently (no error if already rejected)
+8. Move accepted files manually to `/nightfall/media/pictures/...`; confirm no re-download occurs on future polls
+9. Run `sync-import`; confirm imported hashes reduce candidate downloads
+10. Verify Live Photo pair metadata is recorded for HEIC/JPEG + MOV sets
+11. `pytest tests/` all green with mocked HTTP and mocked filesystem
+12. `journalctl -u nightfall-photo-ingress-poll` shows structured JSON log output
 
 ---
 
-## Open Questions (for refinement)
+## 13. Open Questions (for Refinement)
 
-1. **Immich library path**: Should the new `accepted/` be a sub-path inside the existing `library` mount, or a separate mount point? Separate mount is recommended to avoid mixing library sources.
-2. **iOS folder structure**: Does iOS upload to a flat `/Camera Roll/` or does it create dated sub-folders? The delta API handles this recursively regardless, but affects accepted/ layout expectations.
+1. **Live Photo heuristics**: pick stem+capture-time tolerance and define conflict behavior when multiple MOV candidates exist.
+2. **Sync import trust model**: confirm whether imported SHA1 matches should always skip download, or only skip after minimum metadata checks.
 3. **Scope of `Files.Read` permission**: `Files.Read` is sufficient for personal accounts via the `/me/drive` endpoint. Confirm whether the specific Camera Roll folder is accessible or if a broader scope is needed.
-4. **Multi-account support**: Is this pipeline expected to support multiple iOS devices / OneDrive accounts? Current design handles one account; multi-account would require per-account token caches and namespaced staging dirs.
