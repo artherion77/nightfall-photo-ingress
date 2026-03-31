@@ -1,6 +1,6 @@
 # photo-ingress Iterative Implementation Roadmap
 
-Status: Module 1 completed, awaiting review
+Status: Module 2 completed, awaiting review
 Date: 2026-03-31
 Owner: Systems Engineering
 
@@ -153,22 +153,22 @@ Build the SQLite system-of-record with schema versioning, append-only audit logg
 - transaction helpers
 
 ### Implementation steps
-- [ ] Implement DB initialization and schema creation at version 1.
-- [ ] Implement migration framework scaffold for future versions.
-- [ ] Implement CRUD operations for file status transitions.
-- [ ] Implement immutable audit event append API.
-- [ ] Implement account-aware origin/provenance upsert logic.
+- [x] Implement DB initialization and schema creation at version 1.
+- [x] Implement migration framework scaffold for future versions.
+- [x] Implement CRUD operations for file status transitions.
+- [x] Implement immutable audit event append API.
+- [x] Implement account-aware origin/provenance upsert logic.
 
 ### Unit tests
-- [ ] Fresh DB initialization test.
-- [ ] Migration idempotency test.
-- [ ] Status transition transaction test (`accepted -> rejected -> purged`).
-- [ ] Audit immutability test.
-- [ ] Accepted history retained when physical file path disappears test.
+- [x] Fresh DB initialization test.
+- [x] Migration idempotency test.
+- [x] Status transition transaction test (`accepted -> rejected -> purged`).
+- [x] Audit immutability test.
+- [x] Accepted history retained when physical file path disappears test.
 
 ### Integration tests
-- [ ] End-to-end DB lifecycle test from empty DB to populated records.
-- [ ] Simulated restart test preserving consistency.
+- [x] End-to-end DB lifecycle test from empty DB to populated records.
+- [x] Simulated restart test preserving consistency.
 
 ### Expected artifacts
 - `nightfall_photo_ingress/registry.py`
