@@ -38,6 +38,7 @@ from .retry import (  # noqa: F401
     compute_delay,
     parse_retry_after,
 )
+from .safe_logging import sanitize_extra
 
 GRAPH_BASE = "https://graph.microsoft.com/v1.0"
 DEFAULT_MAX_DELTA_PAGES = 1000
@@ -60,7 +61,7 @@ def _trace_event(event: str, **fields: object) -> None:
 
     payload = {"event": event}
     payload.update(fields)
-    LOGGER.info("onedrive_trace", extra=payload)
+    LOGGER.info("onedrive_trace", extra=sanitize_extra(payload))
 
 
 @dataclass(frozen=True)
@@ -401,12 +402,14 @@ def poll_account_once(
 
     LOGGER.info(
         "account poll diagnostics",
-        extra={
+        extra=sanitize_extra(
+            {
             "account": account.name,
             "diagnostic_counts": dict(sorted(diagnostics_counts.items())),
             "ghost_reason_counts": dict(sorted(ghost_reason_counts.items())),
             "delta_anomaly_counts": dict(sorted(delta_anomaly_counts.items())),
-        },
+            }
+        ),
     )
     return downloaded_paths, len(candidates), ghost_reason_counts, delta_anomaly_counts
 

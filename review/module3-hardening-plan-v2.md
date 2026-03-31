@@ -207,7 +207,7 @@ Review gate:
 ## Tick-off checklist
 
 - [x] V2-1 committed
-- [ ] V2-2 committed
+- [x] V2-2 committed
 - [x] V2-3 committed
 - [x] V2-4 committed
 - [x] V2-5 committed
