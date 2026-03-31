@@ -1,8 +1,28 @@
-# nightfall-photo-ingress Configuration Specification
-This document defines the structure, required fields, defaults, and validation rules for the central configuration file used by the nightfall-photo-ingress service.
+# photo-ingress Configuration Specification
+This document defines the structure, required fields, defaults, and validation rules for the central configuration file used by the photo-ingress service.
 
 Format: INI
-Location: /etc/nightfall/onedrive-ingest.conf (recommended)
+Location: /etc/nightfall/photo-ingress.conf (recommended)
+
+---
+
+## 0. Naming Matrix (Canonical V1)
+
+| Scope | Canonical Name | Notes |
+|---|---|---|
+| Project and service | `photo-ingress` | Primary operational name |
+| Source adapter | `onedrive` | Current source adapter |
+| Config file | `/etc/nightfall/photo-ingress.conf` | Central versioned INI file |
+| SSD dataset | `ssdpool/photo-ingress` | Working set and state |
+| SSD mountpoint | `/mnt/ssd/photo-ingress` | Staging, registry, token cache, cursors |
+| HDD dataset | `nightfall/media/photo-ingress` | Ingress queue and trash boundary |
+| HDD mountpoint | `/nightfall/media/photo-ingress` | `accepted/` and `trash/` |
+| Permanent library | `/nightfall/media/pictures` | Read-only from ingress perspective |
+| Status file | `/run/nightfall-status.d/photo-ingress.json` | Health state export path |
+
+Naming policy:
+- Use `photo-ingress` for all service-level naming.
+- Keep `onedrive` explicit for adapter/account fields and module paths.
 
 ---
 
@@ -19,10 +39,10 @@ Example structure:
 [core]
 config_version = 1
 poll_interval_minutes = 15
-staging_path = /mnt/ssd/onedrive-ingest/staging
-accepted_path = /nightfall/media/onedrive-ingest/accepted
-trash_path = /nightfall/media/onedrive-ingest/trash
-registry_path = /mnt/ssd/onedrive-ingest/registry.db
+staging_path = /mnt/ssd/photo-ingress/staging
+accepted_path = /nightfall/media/photo-ingress/accepted
+trash_path = /nightfall/media/photo-ingress/trash
+registry_path = /mnt/ssd/photo-ingress/registry.db
 staging_on_same_pool = false
 storage_template = {yyyy}/{mm}/{sha8}-{original}
 max_downloads_per_poll = 200
@@ -34,20 +54,22 @@ sync_hash_import_glob = .hashes.sha1
 [account.christopher]
 enabled = true
 display_name = Christopher iPhone
+provider = onedrive
 authority = https://login.microsoftonline.com/consumers
 client_id = REPLACE_WITH_CLIENT_ID
 onedrive_root = /Camera Roll
-token_cache = /mnt/ssd/onedrive-ingest/tokens/christopher.json
-delta_cursor = /mnt/ssd/onedrive-ingest/cursors/christopher.cursor
+token_cache = /mnt/ssd/photo-ingress/tokens/christopher.json
+delta_cursor = /mnt/ssd/photo-ingress/cursors/christopher.cursor
 
 [account.danny]
 enabled = false
 display_name = Danny iPhone
+provider = onedrive
 authority = https://login.microsoftonline.com/consumers
 client_id = REPLACE_WITH_CLIENT_ID
 onedrive_root = /Camera Roll
-token_cache = /mnt/ssd/onedrive-ingest/tokens/danny.json
-delta_cursor = /mnt/ssd/onedrive-ingest/cursors/danny.cursor
+token_cache = /mnt/ssd/photo-ingress/tokens/danny.json
+delta_cursor = /mnt/ssd/photo-ingress/cursors/danny.cursor
 
 [logging]
 log_level = INFO
@@ -95,6 +117,7 @@ Each account section defines one OneDrive personal account.
 | Key | Type | Description |
 |-----|------|-------------|
 | `enabled` | bool | Whether this account is active. |
+| `provider` | string | Source adapter identifier. V1 must be `onedrive`. |
 | `authority` | string | Microsoft identity authority, default should be consumers endpoint. |
 | `client_id` | string | Azure app registration client ID. |
 | `onedrive_root` | path | Root folder to poll (for example `/Camera Roll`). |

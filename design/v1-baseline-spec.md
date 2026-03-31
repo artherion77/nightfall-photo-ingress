@@ -1,4 +1,4 @@
-# nightfall-photo-ingress V1 Baseline Specification
+# photo-ingress V1 Baseline Specification
 
 Status: accepted baseline
 Date: 2026-03-31
@@ -12,7 +12,7 @@ Date: 2026-03-31
 - OneDrive ingest for one or more personal Microsoft accounts.
 - Polling via Microsoft Graph delta API.
 - SSD staging download area and authoritative global SQLite registry.
-- Accepted queue in `/nightfall/media/onedrive-ingest/accepted`.
+- Accepted queue in `/nightfall/media/photo-ingress/accepted`.
 - Reject flow via trash watcher and CLI reject command.
 - Live Photo support in V1 (pair detection and metadata linkage).
 - Sync import mode from permanent library hash caches (`.hashes.sha1`).
@@ -26,10 +26,27 @@ Date: 2026-03-31
 
 ---
 
-## 2. System Boundaries
+## 2. Canonical Naming Matrix (V1)
+
+| Scope | Canonical Name | Notes |
+|---|---|---|
+| Project and service | `photo-ingress` | Primary operational identifier |
+| Source adapter | `onedrive` | Current adapter; adapter name remains explicit |
+| CLI command | `photo-ingress` | Main operator interface |
+| Config file | `/etc/nightfall/photo-ingress.conf` | Single central config |
+| SSD dataset (container) | `ssdpool/photo-ingress` | Staging and state |
+| SSD mountpoint | `/mnt/ssd/photo-ingress` | Registry, token, cursor, staging |
+| HDD dataset (container) | `nightfall/media/photo-ingress` | Queue + trash boundary |
+| HDD mountpoint | `/nightfall/media/photo-ingress` | Accepted queue and trash |
+| Permanent library | `/nightfall/media/pictures` | Read-only for ingress |
+| Status file | `/run/nightfall-status.d/photo-ingress.json` | Health export |
+
+---
+
+## 3. System Boundaries
 
 - Source authority for new media candidates: OneDrive delta stream.
-- Ingest authority for accept/reject lifecycle: nightfall-photo-ingress registry.
+- Ingest authority for accept/reject lifecycle: photo-ingress registry.
 - Immich role: viewer/indexer over permanent library only.
 
 Important boundary:
@@ -39,29 +56,29 @@ Important boundary:
 
 ---
 
-## 3. Storage Layout
+## 4. Storage Layout
 
 ### SSD pool (always-on logic)
-- `/mnt/ssd/onedrive-ingest/staging/`
-- `/mnt/ssd/onedrive-ingest/registry.db`
-- `/mnt/ssd/onedrive-ingest/tokens/<account>.json`
-- `/mnt/ssd/onedrive-ingest/cursors/<account>.cursor`
+- `/mnt/ssd/photo-ingress/staging/`
+- `/mnt/ssd/photo-ingress/registry.db`
+- `/mnt/ssd/photo-ingress/tokens/<account>.json`
+- `/mnt/ssd/photo-ingress/cursors/<account>.cursor`
 
 ### HDD pool (operator boundary)
-- `/nightfall/media/onedrive-ingest/accepted/` (ingress queue destination)
-- `/nightfall/media/onedrive-ingest/trash/` (rejection trigger)
+- `/nightfall/media/photo-ingress/accepted/` (ingress queue destination)
+- `/nightfall/media/photo-ingress/trash/` (rejection trigger)
 - `/nightfall/media/pictures/...` (permanent library, read-only to ingress)
 
 ---
 
-## 4. Data Model (SQLite)
+## 5. Data Model (SQLite)
 
-### 4.1 Schema versioning
+### 5.1 Schema versioning
 - Use `PRAGMA user_version`.
 - V1 target schema version: 1.
 - Migrations must be transactional and idempotent.
 
-### 4.2 Required tables
+### 5.2 Required tables
 
 #### files
 Canonical per-hash status table.
@@ -114,7 +131,7 @@ Append-only event stream.
 
 ---
 
-## 5. Configuration Contract (V1)
+## 6. Configuration Contract (V1)
 
 - Required keys and defaults are defined in `design/configspec.md`.
 - At least one `account.<name>` section must be enabled.
@@ -124,15 +141,15 @@ Append-only event stream.
 
 ---
 
-## 6. Pipeline Runtime Behavior
+## 7. Pipeline Runtime Behavior
 
-### 6.1 Poll execution model
+### 7.1 Poll execution model
 - Triggered by systemd timer.
 - One global process lock for full poll run.
 - Process accounts serially in deterministic order.
 - Per-account cursor and token cache are isolated.
 
-### 6.2 Candidate decision flow
+### 7.2 Candidate decision flow
 For each delta file candidate:
 1. Metadata pre-filter using `(account_name, onedrive_id, size, modified_time)`.
 2. If unresolved, download to staging as `.tmp` then finalize temp name.
@@ -142,21 +159,21 @@ For each delta file candidate:
    - `accepted`: delete staged file, audit duplicate skipped.
    - unknown: write to accepted queue, mark accepted in `files` + `accepted_records`, insert/update `metadata_index`, audit accepted.
 
-### 6.3 Accepted queue semantics
+### 7.3 Accepted queue semantics
 - Write target uses configurable template, default `{yyyy}/{mm}/{sha8}-{original}`.
 - Accepted queue is expected to be drained manually by operator.
 - Registry acceptance history remains valid even if queue files disappear later.
 
-### 6.4 Cross-pool move behavior
+### 7.4 Cross-pool move behavior
 - If `staging_on_same_pool = true`: use atomic rename.
 - Else: use copy2, verify content hash, then unlink staging file.
 
-### 6.5 Retry and backpressure
+### 7.5 Retry and backpressure
 - Max downloads and max runtime per poll from config.
 - Retry HTTP errors with exponential backoff and jitter.
 - Respect Graph `Retry-After` for 429/503.
 
-### 6.6 Delta cursor fallback
+### 7.6 Delta cursor fallback
 On invalid/lost cursor:
 1. Attempt delta recovery bootstrap.
 2. Optional bounded backfill.
@@ -166,50 +183,50 @@ Safety depends on registry idempotency.
 
 ---
 
-## 7. Live Photo Support in V1
+## 8. Live Photo Support in V1
 
-### 7.1 Requirement
+### 8.1 Requirement
 Live Photo support is mandatory in V1.
 
-### 7.2 V1 behavior
+### 8.2 V1 behavior
 - Detect likely pairs (HEIC/JPEG + MOV) by capture timestamp and filename stem heuristics.
 - Ingest each component as independent file with its own hash and decision path.
 - Persist pair linkage in `live_photo_pairs`.
 - Do not merge or transcode components.
 
-### 7.3 Pairing guarantees
+### 8.3 Pairing guarantees
 - Pairing is best-effort and audit-visible.
 - Unpaired components are still accepted/rejected independently.
 
 ---
 
-## 8. Reject Workflows
+## 9. Reject Workflows
 
-### 8.1 Trash-driven reject
-- systemd `.path` watches `/nightfall/media/onedrive-ingest/trash`.
+### 9.1 Trash-driven reject
+- systemd `.path` watches `/nightfall/media/photo-ingress/trash`.
 - Service processes new files, hashes them, marks `rejected`, appends audit records, removes queue/trash copies if found.
 
-### 8.2 CLI reject
-- `nightfall-photo-ingress reject <sha256> [--reason ...]`
+### 9.2 CLI reject
+- `photo-ingress reject <sha256> [--reason ...]`
 - Account-agnostic and idempotent.
 - If already rejected, return success with no-op audit event.
 
 ---
 
-## 9. Sync Hash Import Mode (V1)
+## 10. Sync Hash Import Mode (V1)
 
-### 9.1 Purpose
+### 10.1 Purpose
 Pre-seed accepted hashes from permanent library to avoid unnecessary OneDrive downloads.
 
-### 9.2 Data source
+### 10.2 Data source
 - Read-only permanent library path (default `/nightfall/media/pictures`).
 - Reuse `.hashes.sha1` files generated by `nightfall-immich-rmdups.sh`.
 - Expected format:
   - First line: `DIRECTORY_HASH <value>`
   - Following lines: `<sha1> <filepath>` style hash rows.
 
-### 9.3 Import behavior
-- CLI command: `nightfall-photo-ingress sync-import [--path ...] [--dry-run]`
+### 10.3 Import behavior
+- CLI command: `photo-ingress sync-import [--path ...] [--dry-run]`
 - Parse hash cache files and seed mapping rows in a dedicated table (`external_hash_cache`).
 - When OneDrive metadata provides SHA1, check imported cache first:
   - If OneDrive SHA1 matches imported entry, classify as already accepted and skip download.
@@ -221,14 +238,14 @@ Important:
 
 ---
 
-## 10. Observability and Health
+## 11. Observability and Health
 
-### 10.1 Logs
+### 11.1 Logs
 - JSON logs by default for service runs.
 - Optional human format for interactive CLI.
 - Required context keys: `account`, `action`, `status`, `sha256`, `filename`.
 
-### 10.2 Health state machine
+### 11.2 Health state machine
 States:
 - `healthy`
 - `degraded`
@@ -237,13 +254,13 @@ States:
 - `ingest_error`
 - `registry_corrupt`
 
-### 10.3 Status export
-- Write status JSON to `/run/nightfall-status.d/onedrive-ingest.json` using atomic write+rename.
+### 11.3 Status export
+- Write status JSON to `/run/nightfall-status.d/photo-ingress.json` using atomic write+rename.
 - Must remain compatible with nightfall-mcp health consumption.
 
 ---
 
-## 11. Security Baseline
+## 12. Security Baseline
 
 - No token credentials in environment variables.
 - MSAL cache files stored on disk with strict modes.
@@ -252,7 +269,7 @@ States:
 
 ---
 
-## 12. V1 Acceptance Criteria
+## 13. V1 Acceptance Criteria
 
 - Multi-account delta polling works with per-account cursors.
 - Accepted hashes persist and prevent re-download after manual file moves out of accepted queue.

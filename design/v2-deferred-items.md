@@ -1,4 +1,4 @@
-# nightfall-photo-ingress Deferred Items for V2
+# photo-ingress Deferred Items for V2
 
 Status: deferred backlog
 Date: 2026-03-31

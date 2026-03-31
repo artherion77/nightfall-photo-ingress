@@ -1,4 +1,4 @@
-# nightfall-photo-ingress: Architecture Design
+# photo-ingress: Architecture Design
 
 **Status:** DRAFT — pending review  
 **Date:** 2026-03-31  
@@ -11,6 +11,23 @@
 A fully automated, server-side OneDrive-based photo ingest pipeline that feeds into the nightfall archival system. iOS devices upload photos to OneDrive (treated as an untrusted but reliable transport layer). A Linux server running ZFS storage ("nightfall"), Immich, and custom ingest services pulls those files down, validates them, and manages their lifecycle independently of Immich.
 
 **Immich's role is limited to indexing and viewing permanent library content only.** The ingress service writes into an accepted queue, while the operator manually promotes files into `/nightfall/media/pictures/...` outside ingress visibility. Ingress still blocks re-downloads using persistent acceptance history in the registry.
+
+### 1.1 Naming Matrix (Canonical V1)
+
+| Scope | Canonical Name | Notes |
+|---|---|---|
+| Project and service | `photo-ingress` | Primary name in docs, CLI, and operational language |
+| Source adapter | `onedrive` | Current adapter; kept explicit in config and module names |
+| Python package | `nightfall_photo_ingress` | Keeps namespace alignment with existing nightfall Python projects |
+| CLI command | `photo-ingress` | Main operational command |
+| Config file | `/etc/nightfall/photo-ingress.conf` | Single versioned INI file |
+| systemd units | `photo-ingress-poll.*`, `photo-ingress-trash.*` | Host-level systemd runtime |
+| SSD ZFS dataset (container) | `ssdpool/photo-ingress` | Always-on staging, cursors, token caches, registry |
+| SSD mountpoint | `/mnt/ssd/photo-ingress` | Working set for low-latency operations |
+| HDD ZFS dataset (container) | `nightfall/media/photo-ingress` | Queue/trash boundary on nightfall pool |
+| HDD mountpoint | `/nightfall/media/photo-ingress` | `accepted/` and `trash/` live here |
+| Permanent library root | `/nightfall/media/pictures` | Read-only to ingress, indexed by Immich |
+| Health status file | `/run/nightfall-status.d/photo-ingress.json` | Exported each poll cycle |
 
 ---
 
@@ -28,7 +45,7 @@ iOS Camera Roll
 ┌─────────────────────────────────────────┐
 │           nightfall server              │
 │                                         │
-│  /mnt/ssd/onedrive-ingest/staging/      │  ← SSD; temp download area
+│  /mnt/ssd/photo-ingress/staging/      │  ← SSD; temp download area
 │       │                                 │
 │       │  SHA-256 hash                   │
 │       │  registry lookup                │
@@ -40,7 +57,7 @@ iOS Camera Roll
 │       └─ unknown  → move to accepted/   │
 │                    + insert registry    │
 │                                         │
-│  /nightfall/media/onedrive-ingest/      │  ← HDD pool
+│  /nightfall/media/photo-ingress/      │  ← HDD pool
 │    accepted/   ← ingress queue           │
 │    trash/      ← rejection trigger       │
 └─────────────────────────────────────────┘
@@ -72,13 +89,13 @@ iOS Camera Roll
 ## 4. Storage Layout
 
 ```
-ssdpool/onedrive-ingest  →  /mnt/ssd/onedrive-ingest/
+ssdpool/photo-ingress  →  /mnt/ssd/photo-ingress/
   staging/               — files downloaded from OneDrive, pending hash + decision
   registry.db            — SQLite hash registry (the system of record)
   token_cache.json       — MSAL OAuth2 token cache (chmod 600)
   delta_cursor           — last Graph API delta link (plain text)
 
-nightfall/media/onedrive-ingest  →  /nightfall/media/onedrive-ingest/
+nightfall/media/photo-ingress  →  /nightfall/media/photo-ingress/
    accepted/              — committed files; ingress queue only
   trash/                 — operator drops files here to trigger rejection
 
@@ -89,8 +106,8 @@ nightfall/media/pictures  →  /nightfall/media/pictures/
 **ZFS datasets to create (manual pre-requisite):**
 
 ```bash
-zfs create -o mountpoint=/mnt/ssd/onedrive-ingest ssdpool/onedrive-ingest
-zfs create -o mountpoint=/nightfall/media/onedrive-ingest nightfall/media/onedrive-ingest
+zfs create -o mountpoint=/mnt/ssd/photo-ingress ssdpool/photo-ingress
+zfs create -o mountpoint=/nightfall/media/photo-ingress nightfall/media/photo-ingress
 ```
 
 ---
@@ -157,7 +174,7 @@ CREATE TABLE accepted_records (
 2. Call Graph API delta endpoint for the configured OneDrive folder.
 3. For each changed `file` item:
    a. **Metadata pre-filter**: look up `metadata_index` by `(onedrive_id, size, modified_time)`. If hit and SHA-256 is in `files`, skip — no download needed.
-   b. **Download** file to `/mnt/ssd/onedrive-ingest/staging/{onedrive_id}.tmp` (streaming, chunked).
+   b. **Download** file to `/mnt/ssd/photo-ingress/staging/{onedrive_id}.tmp` (streaming, chunked).
    c. Rename `.tmp` → `{onedrive_id}.{ext}` on success.
    d. **Compute SHA-256** (streaming 64 KB chunks; never loads full file into memory).
    e. **Registry lookup**:
@@ -182,8 +199,8 @@ CREATE TABLE accepted_records (
 ### 6.4 Rejection Flow
 
 **Via trash directory (filesystem trigger):**
-1. Operator places (or moves) a file into `/nightfall/media/onedrive-ingest/trash/`.
-2. systemd `.path` unit fires `nightfall-photo-ingress-trash.service`.
+1. Operator places (or moves) a file into `/nightfall/media/photo-ingress/trash/`.
+2. systemd `.path` unit fires `photo-ingress-trash.service`.
 3. Service computes SHA-256 of each file in `trash/`.
 4. Looks up accepted path from registry, removes from `accepted/`.
 5. Updates registry `status = 'rejected'`; appends `audit_log` row with `actor = 'trash_watch'`.
@@ -191,7 +208,7 @@ CREATE TABLE accepted_records (
 
 **Via CLI:**
 ```bash
-nightfall-photo-ingress reject <sha256> [--reason "..."]
+photo-ingress reject <sha256> [--reason "..."]
 ```
 - Idempotent: if already `rejected`, logs and exits cleanly.
 - Removes file from `accepted/` if present.
@@ -236,7 +253,7 @@ nightfall-photo-ingress reject <sha256> [--reason "..."]
 ## 9. File Layout (Planned Project Structure)
 
 ```
-nightfall-photo-ingress/
+photo-ingress/
 ├── pyproject.toml
 ├── README.md
 ├── design/
@@ -257,12 +274,12 @@ nightfall-photo-ingress/
 │   │   └── ingest.py             — hash + registry decision + atomic move
 │   └── cli.py                    — entry points: auth-setup, poll, reject, process-trash
 ├── conf/
-│   └── onedrive-ingest.conf      — .ini format; installed to /etc/nightfall/
+│   └── photo-ingress.conf      — .ini format; installed to /etc/nightfall/
 ├── systemd/
-│   ├── nightfall-photo-ingress-poll.service
-│   ├── nightfall-photo-ingress-poll.timer
-│   ├── nightfall-photo-ingress-trash.path
-│   └── nightfall-photo-ingress-trash.service
+│   ├── photo-ingress-poll.service
+│   ├── photo-ingress-poll.timer
+│   ├── photo-ingress-trash.path
+│   └── photo-ingress-trash.service
 ├── install/
 │   ├── install.sh
 │   └── uninstall.sh
@@ -288,11 +305,11 @@ Steps:
    - Redirect URI: `https://login.microsoftonline.com/common/oauth2/nativeclient`
    - Enable **"Allow public client flows"**
    - Add API permissions: `Files.Read` (Microsoft Graph, delegated) + `offline_access`
-2. Record the **Application (client) ID** — stored in `/etc/nightfall/onedrive-ingest.conf`
-3. Run `nightfall-photo-ingress auth-setup` once on the server:
+2. Record the **Application (client) ID** — stored in `/etc/nightfall/photo-ingress.conf`
+3. Run `photo-ingress auth-setup` once on the server:
    - Prints a device-code URL and code
    - Operator opens URL on any browser, signs in
-   - Token cache written to `/mnt/ssd/onedrive-ingest/token_cache.json` (mode 0600)
+   - Token cache written to `/mnt/ssd/photo-ingress/token_cache.json` (mode 0600)
 
 **Deliverable:** `onedrive/auth.py` — MSAL `PublicClientApplication` with device-code flow + silent refresh.
 
@@ -304,7 +321,7 @@ Steps:
 1. `onedrive/client.py`: `GraphClient` wrapping `httpx`; methods:
    - `get_delta(folder_path)` → yields `DeltaItem` TypedDicts
    - `download_file(download_url, dest_path)` → streaming chunked write
-2. Delta cursor: persisted to `/mnt/ssd/onedrive-ingest/delta_cursor`; on loss, falls back to `?token=latest`
+2. Delta cursor: persisted to `/mnt/ssd/photo-ingress/delta_cursor`; on loss, falls back to `?token=latest`
 3. `pipeline/poller.py`: metadata pre-filter using `metadata_index`; staging file naming `{onedrive_id}.tmp` → `{onedrive_id}.{ext}`
 4. `--dry-run` flag: lists delta items without downloading
 
@@ -339,8 +356,8 @@ Steps:
 
 Steps:
 1. `cli.py`: `reject` subcommand and `process-trash` subcommand
-2. `systemd/nightfall-photo-ingress-trash.path`: watches `/nightfall/media/onedrive-ingest/trash/`
-3. `systemd/nightfall-photo-ingress-trash.service`: runs `nightfall-photo-ingress process-trash` on activation
+2. `systemd/photo-ingress-trash.path`: watches `/nightfall/media/photo-ingress/trash/`
+3. `systemd/photo-ingress-trash.service`: runs `photo-ingress process-trash` on activation
 4. Both paths share `registry.mark_rejected(sha256, reason, actor)` — idempotent
 
 **Deliverable:** Drop a previously accepted file into trash → it disappears from `accepted/`; re-upload is silently discarded at next poll.
@@ -351,11 +368,11 @@ Steps:
 
 Steps:
 1. JSON log formatter: every line includes `ts`, `level`, `component`, `msg`, and context fields (`sha256`, `filename`, `status`) — feeds journald via stdout
-2. Status file: write `/run/nightfall-status.d/onedrive-ingest.json` after each poll run — consumed by nightfall-mcp `HealthService`
+2. Status file: write `/run/nightfall-status.d/photo-ingress.json` after each poll run — consumed by nightfall-mcp `HealthService`
 3. Alert emails: consecutive auth failures (≥3), SSD dataset >90% full, ingest errors
 4. Install scripts following nightfall-scripts conventions (`install.sh`, `uninstall.sh`)
 
-**Deliverable:** `pytest tests/` fully green; systemd timers enabled and observable via `journalctl -u nightfall-photo-ingress-poll`.
+**Deliverable:** `pytest tests/` fully green; systemd timers enabled and observable via `journalctl -u photo-ingress-poll`.
 
 ### Phase 7 — Sync Import + Live Photo Pairing
 
@@ -371,7 +388,7 @@ Steps:
 
 ---
 
-## 11. Configuration File (conf/onedrive-ingest.conf)
+## 11. Configuration File (conf/photo-ingress.conf)
 
 ```ini
 [onedrive]
@@ -386,14 +403,14 @@ authority = https://login.microsoftonline.com/consumers
 
 [paths]
 # SSD-backed working area
-staging_dir = /mnt/ssd/onedrive-ingest/staging
-registry_db = /mnt/ssd/onedrive-ingest/registry.db
-token_cache  = /mnt/ssd/onedrive-ingest/token_cache.json
-delta_cursor = /mnt/ssd/onedrive-ingest/delta_cursor
+staging_dir = /mnt/ssd/photo-ingress/staging
+registry_db = /mnt/ssd/photo-ingress/registry.db
+token_cache  = /mnt/ssd/photo-ingress/token_cache.json
+delta_cursor = /mnt/ssd/photo-ingress/delta_cursor
 
 # HDD pool — accepted files and trash trigger
-accepted_dir = /nightfall/media/onedrive-ingest/accepted
-trash_dir    = /nightfall/media/onedrive-ingest/trash
+accepted_dir = /nightfall/media/photo-ingress/accepted
+trash_dir    = /nightfall/media/photo-ingress/trash
 
 # Set to true if staging and accepted are on the same ZFS pool
 # (enables os.replace() atomic rename; otherwise shutil.copy2 + verify + unlink)
@@ -413,18 +430,18 @@ auth_failure_threshold = 3
 
 ## 12. Verification Checklist
 
-1. `nightfall-photo-ingress auth-setup` completes; token file written at mode 0600
-2. `nightfall-photo-ingress poll --dry-run` lists known OneDrive items without downloading
+1. `photo-ingress auth-setup` completes; token file written at mode 0600
+2. `photo-ingress poll --dry-run` lists known OneDrive items without downloading
 3. End-to-end: single photo ingested; appears in `accepted/YYYY/MM/`; SHA-256 in registry
 4. Re-run poll; confirm file NOT downloaded again (metadata_index hit)
 5. Move accepted file to trash/; confirm it is removed from accepted/ and registry status = `rejected`
 6. Re-upload same photo to OneDrive; run poll; confirm file is silently discarded (audit_log entry: `rejected_duplicate`)
-7. `nightfall-photo-ingress reject <sha256>` runs idempotently (no error if already rejected)
+7. `photo-ingress reject <sha256>` runs idempotently (no error if already rejected)
 8. Move accepted files manually to `/nightfall/media/pictures/...`; confirm no re-download occurs on future polls
 9. Run `sync-import`; confirm imported hashes reduce candidate downloads
 10. Verify Live Photo pair metadata is recorded for HEIC/JPEG + MOV sets
 11. `pytest tests/` all green with mocked HTTP and mocked filesystem
-12. `journalctl -u nightfall-photo-ingress-poll` shows structured JSON log output
+12. `journalctl -u photo-ingress-poll` shows structured JSON log output
 
 ---
 

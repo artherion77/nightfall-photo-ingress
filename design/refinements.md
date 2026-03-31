@@ -1,5 +1,16 @@
-# Refinement List for nightfall-photo-ingress
+# Refinement List for photo-ingress
 This document synthesizes all refinement requirements derived from the architectural plan, user constraints, and structural analysis. Claude Code should use this list to refine the architecture, validate assumptions, and guide implementation decisions.
+
+---
+
+## 0. Naming and Adapter Policy
+
+- Primary service/project name: `photo-ingress`.
+- Current source adapter name: `onedrive`.
+- Canonical datasets and mountpoints:
+  - `ssdpool/photo-ingress` → `/mnt/ssd/photo-ingress`
+  - `nightfall/media/photo-ingress` → `/nightfall/media/photo-ingress`
+- Permanent library boundary remains `/nightfall/media/pictures`.
 
 ---
 
@@ -122,7 +133,7 @@ Define explicit states:
 
 ### E2 — Status Export
 - Write status JSON to:
-  `/run/nightfall-status.d/onedrive-ingest.json`
+  `/run/nightfall-status.d/photo-ingress.json`
 - Must be compatible with nightfall-mcp HealthService.
 
 ### E3 — Structured Logging
@@ -189,4 +200,4 @@ Define explicit states:
 ---
 
 ## I. Summary
-This refinement list defines the structural, architectural, and operational requirements needed to finalize the design of the nightfall-photo-ingress service. Claude Code should use this as the authoritative checklist for architecture refinement and implementation planning.
+This refinement list defines the structural, architectural, and operational requirements needed to finalize the design of the photo-ingress service. Claude Code should use this as the authoritative checklist for architecture refinement and implementation planning.
