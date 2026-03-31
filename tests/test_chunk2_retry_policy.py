@@ -54,6 +54,7 @@ def _resp(
     r.content = body
     r.text = text if text is not None else (body.decode() if body else "")
     r.headers = headers or {}
+    r.iter_bytes.return_value = [body] if body else []
     return r
 
 
@@ -208,7 +209,15 @@ class TestDownloadWithRetry:
         client = _mock_client(_resp(200, b"photo"))
         dest = tmp_path / "f.jpg"
         sleeper = MagicMock()
-        download_with_retry(client, "http://cdn.example.com/f", dest, _DL_POLICY, sleeper, _NO_JITTER)
+        download_with_retry(
+            client,
+            "http://cdn.example.com/f",
+            dest,
+            expected_size=5,
+            policy=_DL_POLICY,
+            sleeper=sleeper,
+            jitter_fn=_NO_JITTER,
+        )
         assert dest.read_bytes() == b"photo"
         sleeper.assert_not_called()
 
@@ -219,7 +228,15 @@ class TestDownloadWithRetry:
         )
         sleeper = MagicMock()
         dest = tmp_path / "f.jpg"
-        download_with_retry(client, "http://cdn.example.com/f", dest, _DL_POLICY, sleeper, _NO_JITTER)
+        download_with_retry(
+            client,
+            "http://cdn.example.com/f",
+            dest,
+            expected_size=2,
+            policy=_DL_POLICY,
+            sleeper=sleeper,
+            jitter_fn=_NO_JITTER,
+        )
         sleeper.assert_called_once_with(5.0)
         assert dest.read_bytes() == b"ok"
 
@@ -227,7 +244,15 @@ class TestDownloadWithRetry:
         client = _mock_client(_resp(429), _resp(200, b"ok"))
         sleeper = MagicMock()
         dest = tmp_path / "f.jpg"
-        download_with_retry(client, "http://cdn.example.com/f", dest, _DL_POLICY, sleeper, _NO_JITTER)
+        download_with_retry(
+            client,
+            "http://cdn.example.com/f",
+            dest,
+            expected_size=2,
+            policy=_DL_POLICY,
+            sleeper=sleeper,
+            jitter_fn=_NO_JITTER,
+        )
         # attempt=1, base=1.0 → 1.0 * 2^0 = 1.0 (zero jitter)
         sleeper.assert_called_once_with(1.0)
 
@@ -235,25 +260,57 @@ class TestDownloadWithRetry:
         client = _mock_client(_resp(500), _resp(200, b"ok"))
         sleeper = MagicMock()
         dest = tmp_path / "out"
-        download_with_retry(client, "http://cdn.example.com/f", dest, _DL_POLICY, sleeper, _NO_JITTER)
+        download_with_retry(
+            client,
+            "http://cdn.example.com/f",
+            dest,
+            expected_size=2,
+            policy=_DL_POLICY,
+            sleeper=sleeper,
+            jitter_fn=_NO_JITTER,
+        )
         assert sleeper.call_count == 1
 
     def test_502_retried(self, tmp_path: Path):
         client = _mock_client(_resp(502), _resp(200, b"ok"))
         dest = tmp_path / "out"
-        download_with_retry(client, "http://cdn.example.com/f", dest, _DL_POLICY, MagicMock(), _NO_JITTER)
+        download_with_retry(
+            client,
+            "http://cdn.example.com/f",
+            dest,
+            expected_size=2,
+            policy=_DL_POLICY,
+            sleeper=MagicMock(),
+            jitter_fn=_NO_JITTER,
+        )
 
     def test_504_retried(self, tmp_path: Path):
         client = _mock_client(_resp(504), _resp(200, b"ok"))
         dest = tmp_path / "out"
-        download_with_retry(client, "http://cdn.example.com/f", dest, _DL_POLICY, MagicMock(), _NO_JITTER)
+        download_with_retry(
+            client,
+            "http://cdn.example.com/f",
+            dest,
+            expected_size=2,
+            policy=_DL_POLICY,
+            sleeper=MagicMock(),
+            jitter_fn=_NO_JITTER,
+        )
 
     def test_retry_exhausted_raises_download_error(self, tmp_path: Path):
         client = _mock_client(_resp(429), _resp(429), _resp(429))
         sleeper = MagicMock()
         dest = tmp_path / "out"
         with pytest.raises(DownloadError) as exc_info:
-            download_with_retry(client, "http://cdn.example.com/f", dest, _DL_POLICY, sleeper, _NO_JITTER)
+            download_with_retry(
+                client,
+                "http://cdn.example.com/f",
+                dest,
+                expected_size=2,
+                policy=_DL_POLICY,
+                sleeper=sleeper,
+                jitter_fn=_NO_JITTER,
+            )
         assert exc_info.value.code == "download_retry_exhausted"
         # Sleeps after attempt 1 and 2; raises on attempt 3.
         assert sleeper.call_count == 2
@@ -262,7 +319,15 @@ class TestDownloadWithRetry:
         client = _mock_client(httpx.ConnectError("refused"), _resp(200, b"ok"))
         sleeper = MagicMock()
         dest = tmp_path / "out"
-        download_with_retry(client, "http://cdn.example.com/f", dest, _DL_POLICY, sleeper, _NO_JITTER)
+        download_with_retry(
+            client,
+            "http://cdn.example.com/f",
+            dest,
+            expected_size=2,
+            policy=_DL_POLICY,
+            sleeper=sleeper,
+            jitter_fn=_NO_JITTER,
+        )
         assert sleeper.call_count == 1
         assert dest.read_bytes() == b"ok"
 
@@ -274,7 +339,15 @@ class TestDownloadWithRetry:
         )
         dest = tmp_path / "out"
         with pytest.raises(DownloadError) as exc_info:
-            download_with_retry(client, "http://cdn.example.com/f", dest, _DL_POLICY, MagicMock(), _NO_JITTER)
+            download_with_retry(
+                client,
+                "http://cdn.example.com/f",
+                dest,
+                expected_size=2,
+                policy=_DL_POLICY,
+                sleeper=MagicMock(),
+                jitter_fn=_NO_JITTER,
+            )
         assert exc_info.value.code == "download_transport_error"
 
     def test_non_retryable_4xx_raised_immediately(self, tmp_path: Path):
@@ -282,7 +355,15 @@ class TestDownloadWithRetry:
         sleeper = MagicMock()
         dest = tmp_path / "out"
         with pytest.raises(DownloadError):
-            download_with_retry(client, "http://cdn.example.com/f", dest, _DL_POLICY, sleeper, _NO_JITTER)
+            download_with_retry(
+                client,
+                "http://cdn.example.com/f",
+                dest,
+                expected_size=2,
+                policy=_DL_POLICY,
+                sleeper=sleeper,
+                jitter_fn=_NO_JITTER,
+            )
         sleeper.assert_not_called()
 
     def test_sensitive_url_not_in_exception(self, tmp_path: Path):
@@ -291,7 +372,15 @@ class TestDownloadWithRetry:
         client = _mock_client(_resp(429), _resp(429), _resp(429))
         dest = tmp_path / "out"
         with pytest.raises(DownloadError) as exc_info:
-            download_with_retry(client, secret, dest, _DL_POLICY, MagicMock(), _NO_JITTER)
+            download_with_retry(
+                client,
+                secret,
+                dest,
+                expected_size=2,
+                policy=_DL_POLICY,
+                sleeper=MagicMock(),
+                jitter_fn=_NO_JITTER,
+            )
         assert "TOPSECRET" not in str(exc_info.value)
         assert "TOPSECRET" not in (exc_info.value.safe_hint or "")
 

@@ -61,14 +61,14 @@ Scope:
 - Ensure cleanup on failure and atomic finalize on success.
 
 Deliverables:
-- [ ] Streaming download path implemented.
-- [ ] Empty-body 200 anomaly handling.
-- [ ] Temp file cleanup guarantees documented.
+- [x] Streaming download path implemented.
+- [x] Empty-body 200 anomaly handling.
+- [x] Temp file cleanup guarantees documented.
 
 Tests:
-- [ ] Integration (mocked): large content streamed without memory buffering.
-- [ ] Unit: expected-size mismatch triggers retry/fail.
-- [ ] Unit: 200 + empty body with expected size > 0 is treated as anomaly.
+- [x] Integration (mocked): large content streamed without memory buffering.
+- [x] Unit: expected-size mismatch triggers retry/fail.
+- [x] Unit: 200 + empty body with expected size > 0 is treated as anomaly.
 
 Review gate:
 === STOP: Awaiting user feedback before proceeding ===
@@ -233,9 +233,9 @@ Review gate:
 
 ## Tick-off checklist (execution order)
 
-- [ ] Chunk 1 committed
-- [ ] Chunk 2 committed
-- [ ] Chunk 3 committed
+- [x] Chunk 1 committed
+- [x] Chunk 2 committed
+- [x] Chunk 3 committed
 - [ ] Chunk 4 committed
 - [ ] Chunk 5 committed
 - [ ] Chunk 6 committed

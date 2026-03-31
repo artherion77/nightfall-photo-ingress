@@ -236,6 +236,7 @@ def download_candidates(
             http_client=http_client,
             url=candidate.download_url,
             destination=tmp_path,
+            expected_size=candidate.size_bytes,
             policy=policy,
             sleeper=sleeper,
             jitter_fn=jitter_fn,
@@ -250,6 +251,7 @@ def download_with_retry(
     http_client: httpx.Client,
     url: str,
     destination: Path,
+    expected_size: int | None = None,
     policy: RetryPolicy = DEFAULT_POLICY,
     sleeper: Callable[[float], None] = time.sleep,
     jitter_fn: Callable[[], float] | None = None,
@@ -273,11 +275,21 @@ def download_with_retry(
     """
     destination.parent.mkdir(parents=True, exist_ok=True)
 
+    def _cleanup_partial() -> None:
+        """Remove partial download artifacts after failed attempts."""
+
+        try:
+            destination.unlink(missing_ok=True)
+        except OSError:
+            # Best effort cleanup: preserve primary download error context.
+            pass
+
     for attempt in range(1, policy.max_attempts + 1):
         try:
             response = http_client.get(url, timeout=120.0)
         except httpx.RequestError as exc:
             # Transport-level failure: connection reset, DNS error, timeout, etc.
+            _cleanup_partial()
             if attempt >= policy.max_attempts:
                 raise DownloadError(
                     "Download transport error after retries exhausted",
@@ -293,6 +305,7 @@ def download_with_retry(
             continue
 
         if classify_status(response.status_code):
+            _cleanup_partial()
             if attempt >= policy.max_attempts:
                 raise DownloadError(
                     "Download retry limit reached",
@@ -310,6 +323,7 @@ def download_with_retry(
             continue
 
         if response.status_code >= 400:
+            _cleanup_partial()
             raise DownloadError(
                 "Download request returned error status",
                 url=url,
@@ -317,7 +331,56 @@ def download_with_retry(
                 safe_hint=f"HTTP {response.status_code} for {redact_url(url)}",
             )
 
-        destination.write_bytes(response.content)
+        bytes_written = 0
+        try:
+            with destination.open("wb") as handle:
+                for chunk in response.iter_bytes(chunk_size=1024 * 1024):
+                    if not chunk:
+                        continue
+                    handle.write(chunk)
+                    bytes_written += len(chunk)
+        except OSError as exc:
+            _cleanup_partial()
+            raise DownloadError(
+                "Failed to write downloaded content to staging",
+                url=url,
+                code="download_write_error",
+                safe_hint=f"Write failure while saving {redact_url(url)}",
+            ) from exc
+
+        if expected_size is not None:
+            if expected_size > 0 and bytes_written == 0:
+                _cleanup_partial()
+                if attempt >= policy.max_attempts:
+                    raise DownloadError(
+                        "Download returned empty body for non-empty remote file",
+                        url=url,
+                        code="download_empty_body",
+                        safe_hint=(
+                            f"Expected {expected_size} bytes but received 0 for "
+                            f"{redact_url(url)}"
+                        ),
+                    )
+                delay = compute_delay(attempt, None, policy, jitter_fn)
+                sleeper(delay)
+                continue
+
+            if expected_size >= 0 and bytes_written != expected_size:
+                _cleanup_partial()
+                if attempt >= policy.max_attempts:
+                    raise DownloadError(
+                        "Downloaded byte count did not match expected size",
+                        url=url,
+                        code="download_size_mismatch",
+                        safe_hint=(
+                            f"Expected {expected_size} bytes, got {bytes_written} for "
+                            f"{redact_url(url)}"
+                        ),
+                    )
+                delay = compute_delay(attempt, None, policy, jitter_fn)
+                sleeper(delay)
+                continue
+
         return
 
 

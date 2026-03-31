@@ -29,6 +29,11 @@ class _FakeResponse:
         if self.headers is None:
             self.headers = {}
 
+    def iter_bytes(self, chunk_size: int = 1024 * 1024):
+        _ = chunk_size
+        if self.content:
+            yield self.content
+
 
 class _FakeClient:
     def __init__(self, mapping: dict[str, list[_FakeResponse]]) -> None:
@@ -148,6 +153,7 @@ def test_download_with_retry_honors_retry_after_header(tmp_path: Path) -> None:
         http_client=client,
         url="https://download/file",
         destination=destination,
+        expected_size=7,
         sleeper=lambda seconds: sleeps.append(seconds),
     )
 
@@ -166,7 +172,7 @@ def test_poll_account_once_paginates_downloads_and_persists_cursor(tmp_path: Pat
                     status_code=200,
                     text=(
                         '{"value":[{"id":"a1","name":"IMG_1.HEIC","file":{},'
-                        '"size":1,"lastModifiedDateTime":"2026-01-01T00:00:00Z",'
+                        '"size":3,"lastModifiedDateTime":"2026-01-01T00:00:00Z",'
                         '"@microsoft.graph.downloadUrl":"https://download/a1"}],'
                         '"@odata.nextLink":"https://next/page"}'
                     ),
@@ -177,7 +183,7 @@ def test_poll_account_once_paginates_downloads_and_persists_cursor(tmp_path: Pat
                     status_code=200,
                     text=(
                         '{"value":[{"id":"a2","name":"IMG_2.MOV","file":{},'
-                        '"size":2,"lastModifiedDateTime":"2026-01-01T00:00:01Z",'
+                        '"size":3,"lastModifiedDateTime":"2026-01-01T00:00:01Z",'
                         '"@microsoft.graph.downloadUrl":"https://download/a2"}],'
                         '"@odata.deltaLink":"https://delta/final"}'
                     ),
