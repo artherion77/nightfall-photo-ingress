@@ -198,13 +198,13 @@ Scope:
 - Add counters for throttling, ghost items, stale pages, retries, and resyncs.
 
 Deliverables:
-- [ ] Correlation ID plumbing.
-- [ ] Metrics/counter emission points.
-- [ ] Updated operator troubleshooting notes.
+- [x] Correlation ID plumbing.
+- [x] Metrics/counter emission points.
+- [x] Updated operator troubleshooting notes.
 
 Tests:
-- [ ] Unit: correlation IDs present in outbound headers.
-- [ ] Integration (mocked): counters increment per anomaly class.
+- [x] Unit: correlation IDs present in outbound headers.
+- [x] Integration (mocked): counters increment per anomaly class.
 
 Review gate:
 === STOP: Awaiting user feedback before proceeding ===
@@ -219,12 +219,12 @@ Scope:
 - Add CI target for robustness suite.
 
 Deliverables:
-- [ ] tests/test_onedrive_robustness_regression.py
-- [ ] CI command and docs update.
+- [x] tests/test_onedrive_robustness_regression.py
+- [x] CI command and docs update.
 
 Tests:
-- [ ] Full regression suite green.
-- [ ] No sensitive URLs in logs/asserted outputs.
+- [x] Full regression suite green.
+- [x] No sensitive URLs in logs/asserted outputs.
 
 Review gate:
 === STOP: Awaiting user feedback before proceeding ===
@@ -241,8 +241,8 @@ Review gate:
 - [x] Chunk 6 committed
 - [x] Chunk 7 committed
 - [x] Chunk 8 committed
-- [ ] Chunk 9 committed
-- [ ] Chunk 10 committed
+- [x] Chunk 9 committed
+- [x] Chunk 10 committed
 
 ## Suggested commit message template per chunk
 

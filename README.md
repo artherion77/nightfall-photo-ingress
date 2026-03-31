@@ -2,15 +2,15 @@
 
 Incremental ingest service for photos, starting with a OneDrive adapter.
 
-## Module 0 scope
+## Current scope
 
-This repository currently provides project skeleton artifacts only:
-- package layout
-- CLI command stubs
-- logging bootstrap helper
-- pytest harness
-
-No ingest or provider logic is implemented yet.
+This repository now includes a hardened Module 3 OneDrive polling client with:
+- deterministic account polling order
+- delta pagination guards and resync markers
+- streamed staging downloads with integrity checks
+- retry/backoff handling for Graph and download requests
+- structured redacted error taxonomy
+- diagnostics counters for retries/throttling/resync/ghost scenarios
 
 ## Local development commands
 
@@ -19,6 +19,20 @@ python -m pip install -e ".[dev]"
 pytest
 python -m nightfall_photo_ingress --help
 nightfall-photo-ingress --help
+```
+
+## Robustness regression suite (Chunk 10)
+
+Run only resilience scenarios:
+
+```bash
+pytest -m robustness tests/test_onedrive_robustness_regression.py
+```
+
+Run all tests except resilience scenarios:
+
+```bash
+pytest -m "not robustness"
 ```
 
 ## CLI stubs available in Module 0

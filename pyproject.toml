@@ -25,6 +25,9 @@ nightfall-photo-ingress = "nightfall_photo_ingress.cli:main"
 minversion = "8.0"
 addopts = "-ra"
 testpaths = ["tests"]
+markers = [
+  "robustness: end-to-end resilience regression scenarios for Module 3",
+]
 
 [tool.setuptools]
 package-dir = {"" = "."}

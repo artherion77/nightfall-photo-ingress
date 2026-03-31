@@ -16,12 +16,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 import json
+import logging
 from pathlib import Path
 import re
 import time
 from time import monotonic
 from typing import Callable, Iterable
 from urllib.parse import quote
+from uuid import uuid4
 
 import httpx
 
@@ -39,6 +41,18 @@ from .retry import (  # noqa: F401
 
 GRAPH_BASE = "https://graph.microsoft.com/v1.0"
 DEFAULT_MAX_DELTA_PAGES = 1000
+LOGGER = logging.getLogger(__name__)
+_EXPORTED_DIAGNOSTIC_KEYS = {
+    "retry_attempt_total",
+    "retry_transport_error_total",
+    "throttle_response_total",
+    "resync_required_total",
+    "auth_refresh_attempt_total",
+    "auth_refresh_success_total",
+    "auth_refresh_failure_total",
+    "graph_response_request_id_seen_total",
+    "graph_response_correlation_id_seen_total",
+}
 
 
 @dataclass(frozen=True)
@@ -184,6 +198,7 @@ def poll_account_once(
     seen_next_links: set[str] = set()
     seen_item_ids: set[str] = set()
     delta_anomaly_counts: dict[str, int] = {}
+    diagnostics_counts: dict[str, int] = {}
     page_count = 0
     start_monotonic = monotonic()
 
@@ -222,6 +237,7 @@ def poll_account_once(
                 next_url,
                 access_token,
                 refresh_access_token=refresh_access_token,
+                diagnostics_counts=diagnostics_counts,
                 policy=policy,
                 sleeper=sleeper,
                 jitter_fn=jitter_fn,
@@ -270,14 +286,31 @@ def poll_account_once(
         access_token=access_token,
         http_client=http_client,
         max_downloads=account.max_downloads,
-                refresh_access_token=refresh_access_token,
+        refresh_access_token=refresh_access_token,
+        diagnostics_counts=diagnostics_counts,
         policy=policy,
         sleeper=sleeper,
         jitter_fn=jitter_fn,
     )
 
+    # Fold diagnostics into anomaly map under explicit "diag_" keys so
+    # callers can consume one counter dictionary without interface churn.
+    for key, value in diagnostics_counts.items():
+        if key in _EXPORTED_DIAGNOSTIC_KEYS:
+            _record_ghost_reason(delta_anomaly_counts, f"diag_{key}", count=value)
+
     _save_cursor(account.delta_cursor, delta_link)
     _clear_resync_marker(account.delta_cursor)
+
+    LOGGER.info(
+        "account poll diagnostics",
+        extra={
+            "account": account.name,
+            "diagnostic_counts": dict(sorted(diagnostics_counts.items())),
+            "ghost_reason_counts": dict(sorted(ghost_reason_counts.items())),
+            "delta_anomaly_counts": dict(sorted(delta_anomaly_counts.items())),
+        },
+    )
     return downloaded_paths, len(candidates), ghost_reason_counts, delta_anomaly_counts
 
 
@@ -386,6 +419,7 @@ def download_candidates(
     http_client: httpx.Client,
     refresh_access_token: Callable[[], str] | None = None,
     max_downloads: int | None = None,
+    diagnostics_counts: dict[str, int] | None = None,
     policy: RetryPolicy = DEFAULT_POLICY,
     sleeper: Callable[[float], None] = time.sleep,
     jitter_fn: Callable[[], float] | None = None,
@@ -413,6 +447,7 @@ def download_candidates(
                 url=candidate.download_url,
                 destination=tmp_path,
                 expected_size=candidate.size_bytes,
+                diagnostics_counts=diagnostics_counts,
                 policy=policy,
                 sleeper=sleeper,
                 jitter_fn=jitter_fn,
@@ -426,6 +461,7 @@ def download_candidates(
                 access_token=access_token,
                 refresh_access_token=refresh_access_token,
                 http_client=http_client,
+                diagnostics_counts=diagnostics_counts,
                 policy=policy,
                 sleeper=sleeper,
                 jitter_fn=jitter_fn,
@@ -441,6 +477,7 @@ def download_candidates(
                     url=refreshed_url,
                     destination=tmp_path,
                     expected_size=candidate.size_bytes,
+                    diagnostics_counts=diagnostics_counts,
                     policy=policy,
                     sleeper=sleeper,
                     jitter_fn=jitter_fn,
@@ -464,6 +501,18 @@ def _record_ghost_reason(reason_counts: dict[str, int], reason: str, count: int 
     """Increment a reason counter by count."""
 
     reason_counts[reason] = reason_counts.get(reason, 0) + count
+
+
+def _increment_counter(
+    counters: dict[str, int] | None,
+    key: str,
+    count: int = 1,
+) -> None:
+    """Increment an optional diagnostics counter dictionary safely."""
+
+    if counters is None:
+        return
+    counters[key] = counters.get(key, 0) + count
 
 
 def _count_replayed_item_ids(payload: dict[str, object], seen_item_ids: set[str]) -> int:
@@ -537,6 +586,7 @@ def _resolve_download_url_once(
     access_token: str,
     refresh_access_token: Callable[[], str] | None,
     http_client: httpx.Client,
+    diagnostics_counts: dict[str, int] | None,
     policy: RetryPolicy,
     sleeper: Callable[[float], None],
     jitter_fn: Callable[[], float] | None,
@@ -558,6 +608,7 @@ def _resolve_download_url_once(
             metadata_url,
             access_token,
             refresh_access_token=refresh_access_token,
+            diagnostics_counts=diagnostics_counts,
             policy=policy,
             sleeper=sleeper,
             jitter_fn=jitter_fn,
@@ -581,6 +632,8 @@ def download_with_retry(
     policy: RetryPolicy = DEFAULT_POLICY,
     sleeper: Callable[[float], None] = time.sleep,
     jitter_fn: Callable[[], float] | None = None,
+    *,
+    diagnostics_counts: dict[str, int] | None = None,
 ) -> None:
     """Download a file with bounded retries for transient statuses and transport errors.
 
@@ -611,11 +664,14 @@ def download_with_retry(
             pass
 
     for attempt in range(1, policy.max_attempts + 1):
+        _increment_counter(diagnostics_counts, "download_request_total")
         try:
             response = http_client.get(url, timeout=120.0)
         except httpx.RequestError as exc:
             # Transport-level failure: connection reset, DNS error, timeout, etc.
             _cleanup_partial()
+            _increment_counter(diagnostics_counts, "retry_attempt_total")
+            _increment_counter(diagnostics_counts, "retry_transport_error_total")
             if attempt >= policy.max_attempts:
                 raise DownloadError(
                     "Download transport error after retries exhausted",
@@ -632,6 +688,9 @@ def download_with_retry(
 
         if classify_status(response.status_code):
             _cleanup_partial()
+            _increment_counter(diagnostics_counts, "retry_attempt_total")
+            if response.status_code in {429, 503}:
+                _increment_counter(diagnostics_counts, "throttle_response_total")
             if attempt >= policy.max_attempts:
                 raise DownloadError(
                     "Download retry limit reached",
@@ -677,6 +736,7 @@ def download_with_retry(
         if expected_size is not None:
             if expected_size > 0 and bytes_written == 0:
                 _cleanup_partial()
+                _increment_counter(diagnostics_counts, "retry_attempt_total")
                 if attempt >= policy.max_attempts:
                     raise DownloadError(
                         "Download returned empty body for non-empty remote file",
@@ -693,6 +753,7 @@ def download_with_retry(
 
             if expected_size >= 0 and bytes_written != expected_size:
                 _cleanup_partial()
+                _increment_counter(diagnostics_counts, "retry_attempt_total")
                 if attempt >= policy.max_attempts:
                     raise DownloadError(
                         "Downloaded byte count did not match expected size",
@@ -718,6 +779,8 @@ def _graph_get_json(
     sleeper: Callable[[float], None] = time.sleep,
     jitter_fn: Callable[[], float] | None = None,
     refresh_access_token: Callable[[], str] | None = None,
+    *,
+    diagnostics_counts: dict[str, int] | None = None,
 ) -> dict[str, object]:
     """Execute a Graph GET request and return parsed JSON payload.
 
@@ -728,13 +791,23 @@ def _graph_get_json(
     """
     refreshed_once = False
     for attempt in range(1, policy.max_attempts + 1):
+        client_request_id = str(uuid4())
+        request_headers = {
+            "Authorization": f"Bearer {access_token}",
+            "client-request-id": client_request_id,
+            "return-client-request-id": "true",
+        }
+        _increment_counter(diagnostics_counts, "graph_request_total")
+        _increment_counter(diagnostics_counts, "graph_client_request_id_sent_total")
         try:
             response = http_client.get(
                 url,
-                headers={"Authorization": f"Bearer {access_token}"},
+                headers=request_headers,
                 timeout=30.0,
             )
         except httpx.RequestError as exc:
+            _increment_counter(diagnostics_counts, "retry_attempt_total")
+            _increment_counter(diagnostics_counts, "retry_transport_error_total")
             if attempt >= policy.max_attempts:
                 raise GraphError(
                     "Graph transport error after retries exhausted",
@@ -749,7 +822,19 @@ def _graph_get_json(
             sleeper(delay)
             continue
 
+        request_id = response.headers.get("request-id")
+        correlation_id = response.headers.get("x-ms-correlation-request-id")
+        if request_id:
+            _increment_counter(diagnostics_counts, "graph_response_request_id_seen_total")
+        if correlation_id:
+            _increment_counter(
+                diagnostics_counts,
+                "graph_response_correlation_id_seen_total",
+            )
+
         if response.status_code in {401, 403}:
+            support_suffix = _response_support_suffix(response)
+            _increment_counter(diagnostics_counts, "auth_refresh_attempt_total")
             if refreshed_once or refresh_access_token is None:
                 raise GraphError(
                     "Graph authentication failed",
@@ -758,23 +843,32 @@ def _graph_get_json(
                     status_code=response.status_code,
                     safe_hint=(
                         f"HTTP {response.status_code} for {redact_url(url)} "
-                        "after refresh attempt"
+                        f"after refresh attempt{support_suffix}"
                     ),
                 )
             try:
                 access_token = refresh_access_token()
+                _increment_counter(diagnostics_counts, "auth_refresh_success_total")
             except AuthError as exc:
+                _increment_counter(diagnostics_counts, "auth_refresh_failure_total")
                 raise GraphError(
                     "Graph token refresh failed",
                     url=url,
                     code="graph_auth_refresh_failed",
                     status_code=response.status_code,
-                    safe_hint=f"Token refresh failed for {redact_url(url)}",
+                    safe_hint=(
+                        f"Token refresh failed for {redact_url(url)}"
+                        f"{support_suffix}"
+                    ),
                 ) from exc
             refreshed_once = True
             continue
 
         if classify_status(response.status_code):
+            support_suffix = _response_support_suffix(response)
+            _increment_counter(diagnostics_counts, "retry_attempt_total")
+            if response.status_code in {429, 503}:
+                _increment_counter(diagnostics_counts, "throttle_response_total")
             if attempt >= policy.max_attempts:
                 raise GraphError(
                     "Graph request retry limit reached",
@@ -783,7 +877,7 @@ def _graph_get_json(
                     status_code=response.status_code,
                     safe_hint=(
                         f"HTTP {response.status_code} after {policy.max_attempts} "
-                        f"retries for {redact_url(url)}"
+                        f"retries for {redact_url(url)}{support_suffix}"
                     ),
                 )
             retry_after = parse_retry_after(response.headers.get("Retry-After"))
@@ -792,20 +886,26 @@ def _graph_get_json(
             continue
 
         if response.status_code == 410:
+            _increment_counter(diagnostics_counts, "resync_required_total")
+            support_suffix = _response_support_suffix(response)
             raise GraphResyncRequired(
                 "Graph delta cursor is no longer valid and requires resync",
                 url=url,
                 status_code=response.status_code,
                 resync_url=response.headers.get("Location"),
-                safe_hint=f"HTTP 410 for {redact_url(url)}",
+                safe_hint=f"HTTP 410 for {redact_url(url)}{support_suffix}",
             )
 
         if response.status_code >= 400:
+            support_suffix = _response_support_suffix(response)
             raise GraphError(
                 "Graph request returned error status",
                 url=url,
                 status_code=response.status_code,
-                safe_hint=f"HTTP {response.status_code} for {redact_url(url)}",
+                safe_hint=(
+                    f"HTTP {response.status_code} for {redact_url(url)}"
+                    f"{support_suffix}"
+                ),
             )
 
         try:
@@ -891,6 +991,21 @@ def _as_str(value: object) -> str | None:
     if isinstance(value, str):
         return value
     return str(value)
+
+
+def _response_support_suffix(response: httpx.Response) -> str:
+    """Return a compact support diagnostics suffix from Graph response headers."""
+
+    request_id = response.headers.get("request-id")
+    correlation_id = response.headers.get("x-ms-correlation-request-id")
+    parts: list[str] = []
+    if request_id:
+        parts.append(f"request-id={request_id}")
+    if correlation_id:
+        parts.append(f"correlation-id={correlation_id}")
+    if not parts:
+        return ""
+    return " (" + ", ".join(parts) + ")"
 
 
 def _safe_staging_basename(item_id: str) -> str:
