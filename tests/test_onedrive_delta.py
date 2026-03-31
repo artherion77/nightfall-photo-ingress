@@ -194,7 +194,7 @@ def test_poll_account_once_paginates_downloads_and_persists_cursor(tmp_path: Pat
         }
     )
 
-    downloaded, candidate_count = poll_account_once(
+    downloaded, candidate_count, ghost_reason_counts = poll_account_once(
         account=account,
         staging_root=tmp_path / "staging",
         access_token="token",
@@ -202,6 +202,7 @@ def test_poll_account_once_paginates_downloads_and_persists_cursor(tmp_path: Pat
     )
 
     assert candidate_count == 2
+    assert ghost_reason_counts == {}
     assert len(downloaded) == 2
     assert account.delta_cursor.read_text(encoding="utf-8") == "https://delta/final"
 
@@ -253,6 +254,7 @@ def test_poll_accounts_runs_enabled_accounts_in_config_order(tmp_path: Path) -> 
 
     assert call_order == ["zzz", "aaa"]
     assert [res.account_name for res in results] == ["zzz", "aaa"]
+    assert [res.ghost_item_count for res in results] == [0, 0]
     assert first.delta_cursor.read_text(encoding="utf-8") == "https://delta/zzz"
     assert second.delta_cursor.read_text(encoding="utf-8") == "https://delta/aaa"
 

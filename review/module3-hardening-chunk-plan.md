@@ -84,12 +84,12 @@ Scope:
 - Emit actionable counters/reason codes.
 
 Deliverables:
-- [ ] Re-resolve flow added.
-- [ ] Ghost-item reason codes.
+- [x] Re-resolve flow added.
+- [x] Ghost-item reason codes.
 
 Tests:
-- [ ] Integration (mocked): first URL fails, refresh succeeds.
-- [ ] Integration (mocked): refresh fails -> ghost item classification.
+- [x] Integration (mocked): first URL fails, refresh succeeds.
+- [x] Integration (mocked): refresh fails -> ghost item classification.
 
 Review gate:
 === STOP: Awaiting user feedback before proceeding ===
@@ -236,7 +236,7 @@ Review gate:
 - [x] Chunk 1 committed
 - [x] Chunk 2 committed
 - [x] Chunk 3 committed
-- [ ] Chunk 4 committed
+- [x] Chunk 4 committed
 - [ ] Chunk 5 committed
 - [ ] Chunk 6 committed
 - [ ] Chunk 7 committed

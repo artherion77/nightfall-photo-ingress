@@ -19,6 +19,7 @@ import json
 from pathlib import Path
 import time
 from typing import Callable, Iterable
+from urllib.parse import quote
 
 import httpx
 
@@ -57,6 +58,8 @@ class AccountPollResult:
     account_name: str
     downloaded_paths: tuple[Path, ...]
     candidate_count: int
+    ghost_item_count: int
+    ghost_reason_counts: tuple[tuple[str, int], ...]
 
 
 def poll_accounts(
@@ -97,7 +100,7 @@ def poll_accounts(
     for account in selected:
         token = auth.acquire_access_token(account)
         with _build_client(http_client_factory) as client:
-            downloaded, candidate_count = poll_account_once(
+            downloaded, candidate_count, ghost_reason_counts = poll_account_once(
                 account=account,
                 staging_root=app_config.core.staging_path,
                 access_token=token.token,
@@ -111,6 +114,8 @@ def poll_accounts(
                 account_name=account.name,
                 downloaded_paths=tuple(downloaded),
                 candidate_count=candidate_count,
+                ghost_item_count=sum(ghost_reason_counts.values()),
+                ghost_reason_counts=tuple(sorted(ghost_reason_counts.items())),
             )
         )
 
@@ -125,7 +130,7 @@ def poll_account_once(
     policy: RetryPolicy = DEFAULT_POLICY,
     sleeper: Callable[[float], None] = time.sleep,
     jitter_fn: Callable[[], float] | None = None,
-) -> tuple[list[Path], int]:
+) -> tuple[list[Path], int, dict[str, int]]:
     """Poll one account and download candidates into staging."""
 
     cursor = _load_cursor(account.delta_cursor)
@@ -152,10 +157,11 @@ def poll_account_once(
             operation="poll_account_once",
         )
 
-    downloaded_paths = download_candidates(
+    downloaded_paths, ghost_reason_counts = download_candidates(
         candidates=candidates,
         staging_root=staging_root,
         account_name=account.name,
+        access_token=access_token,
         http_client=http_client,
         max_downloads=account.max_downloads,
         policy=policy,
@@ -164,7 +170,7 @@ def poll_account_once(
     )
 
     _save_cursor(account.delta_cursor, delta_link)
-    return downloaded_paths, len(candidates)
+    return downloaded_paths, len(candidates), ghost_reason_counts
 
 
 def parse_delta_items(
@@ -211,18 +217,20 @@ def download_candidates(
     candidates: Iterable[RemoteCandidate],
     staging_root: Path,
     account_name: str,
+    access_token: str,
     http_client: httpx.Client,
     max_downloads: int | None,
     policy: RetryPolicy = DEFAULT_POLICY,
     sleeper: Callable[[float], None] = time.sleep,
     jitter_fn: Callable[[], float] | None = None,
-) -> list[Path]:
+) -> tuple[list[Path], dict[str, int]]:
     """Download candidates into account-scoped staging folder."""
 
     target_root = staging_root / account_name
     target_root.mkdir(parents=True, exist_ok=True)
 
     downloaded: list[Path] = []
+    ghost_reason_counts: dict[str, int] = {}
     limit = max_downloads if max_downloads is not None else 0
 
     for index, candidate in enumerate(candidates):
@@ -232,19 +240,107 @@ def download_candidates(
         suffix = Path(candidate.name).suffix or ".bin"
         tmp_path = target_root / f"{candidate.item_id}.tmp"
         final_path = target_root / f"{candidate.item_id}{suffix}"
-        download_with_retry(
-            http_client=http_client,
-            url=candidate.download_url,
-            destination=tmp_path,
-            expected_size=candidate.size_bytes,
+        try:
+            download_with_retry(
+                http_client=http_client,
+                url=candidate.download_url,
+                destination=tmp_path,
+                expected_size=candidate.size_bytes,
+                policy=policy,
+                sleeper=sleeper,
+                jitter_fn=jitter_fn,
+            )
+        except DownloadError as first_error:
+            if not _is_download_url_unreachable(first_error):
+                raise
+
+            refreshed_url, ghost_reason = _resolve_download_url_once(
+                item_id=candidate.item_id,
+                access_token=access_token,
+                http_client=http_client,
+                policy=policy,
+                sleeper=sleeper,
+                jitter_fn=jitter_fn,
+            )
+
+            if refreshed_url is None:
+                _record_ghost_reason(ghost_reason_counts, ghost_reason)
+                continue
+
+            try:
+                download_with_retry(
+                    http_client=http_client,
+                    url=refreshed_url,
+                    destination=tmp_path,
+                    expected_size=candidate.size_bytes,
+                    policy=policy,
+                    sleeper=sleeper,
+                    jitter_fn=jitter_fn,
+                )
+            except DownloadError as refreshed_error:
+                if _is_download_url_unreachable(refreshed_error):
+                    _record_ghost_reason(
+                        ghost_reason_counts,
+                        "ghost_download_unreachable_after_refresh",
+                    )
+                    continue
+                raise
+
+        tmp_path.replace(final_path)
+        downloaded.append(final_path)
+
+    return downloaded, ghost_reason_counts
+
+
+def _record_ghost_reason(reason_counts: dict[str, int], reason: str) -> None:
+    """Increment a ghost-item reason counter."""
+
+    reason_counts[reason] = reason_counts.get(reason, 0) + 1
+
+
+def _is_download_url_unreachable(error: DownloadError) -> bool:
+    """Return True when a download URL appears stale or inaccessible."""
+
+    return error.status_code in {401, 403, 404}
+
+
+def _resolve_download_url_once(
+    item_id: str,
+    access_token: str,
+    http_client: httpx.Client,
+    policy: RetryPolicy,
+    sleeper: Callable[[float], None],
+    jitter_fn: Callable[[], float] | None,
+) -> tuple[str | None, str]:
+    """Refresh a single item's metadata once to retrieve a fresh download URL.
+
+    Returns:
+        (new_url, reason_code)
+            - new_url is non-None when refresh succeeded.
+            - reason_code is always set and can be emitted as an actionable
+              ghost-item counter key.
+    """
+
+    escaped_id = quote(item_id, safe="")
+    metadata_url = f"{GRAPH_BASE}/me/drive/items/{escaped_id}"
+    try:
+        payload = _graph_get_json(
+            http_client,
+            metadata_url,
+            access_token,
             policy=policy,
             sleeper=sleeper,
             jitter_fn=jitter_fn,
         )
-        tmp_path.replace(final_path)
-        downloaded.append(final_path)
+    except GraphError as exc:
+        if exc.status_code == 404:
+            return None, "ghost_item_not_found_on_refresh"
+        raise
 
-    return downloaded
+    refreshed = _as_str(payload.get("@microsoft.graph.downloadUrl"))
+    if not refreshed:
+        return None, "ghost_missing_download_url_after_refresh"
+    return refreshed, "download_url_refreshed"
 
 
 def download_with_retry(
