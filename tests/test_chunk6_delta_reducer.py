@@ -61,7 +61,7 @@ def test_duplicate_file_events_collapse_to_last_observed(tmp_path: Path) -> None
     account = _make_account(tmp_path, "alice", "/Camera Roll")
     client = _FakeClient(
         {
-            "https://graph.microsoft.com/v1.0/me/drive/root:/Camera Roll:/delta": [
+            "https://graph.microsoft.com/v1.0/me/drive/root:/Camera%20Roll:/delta": [
                 _FakeResponse(
                     status_code=200,
                     text=(
@@ -86,7 +86,7 @@ def test_duplicate_file_events_collapse_to_last_observed(tmp_path: Path) -> None
 
     assert candidate_count == 1
     assert len(downloaded) == 1
-    assert downloaded[0].name == "dup1.HEIC"
+    assert downloaded[0].name == "dup1.heic"
     assert downloaded[0].read_bytes() == b"new!"
     assert ghost_counts == {}
     assert anomaly_counts == {
@@ -101,7 +101,7 @@ def test_delete_then_create_for_same_item_id_keeps_final_create(tmp_path: Path) 
     account = _make_account(tmp_path, "alice", "/Camera Roll")
     client = _FakeClient(
         {
-            "https://graph.microsoft.com/v1.0/me/drive/root:/Camera Roll:/delta": [
+            "https://graph.microsoft.com/v1.0/me/drive/root:/Camera%20Roll:/delta": [
                 _FakeResponse(
                     status_code=200,
                     text=(
@@ -140,7 +140,7 @@ def test_create_then_delete_for_same_item_id_emits_no_candidate(tmp_path: Path) 
     account = _make_account(tmp_path, "alice", "/Camera Roll")
     client = _FakeClient(
         {
-            "https://graph.microsoft.com/v1.0/me/drive/root:/Camera Roll:/delta": [
+            "https://graph.microsoft.com/v1.0/me/drive/root:/Camera%20Roll:/delta": [
                 _FakeResponse(
                     status_code=200,
                     text=(
@@ -177,7 +177,7 @@ def test_out_of_order_multi_item_events_produce_stable_final_state(tmp_path: Pat
     account = _make_account(tmp_path, "alice", "/Camera Roll")
     client = _FakeClient(
         {
-            "https://graph.microsoft.com/v1.0/me/drive/root:/Camera Roll:/delta": [
+            "https://graph.microsoft.com/v1.0/me/drive/root:/Camera%20Roll:/delta": [
                 _FakeResponse(
                     status_code=200,
                     text=(
@@ -207,7 +207,7 @@ def test_out_of_order_multi_item_events_produce_stable_final_state(tmp_path: Pat
     )
 
     assert candidate_count == 2
-    assert [p.name for p in downloaded] == ["a.HEIC", "c.HEIC"]
+    assert [p.name for p in downloaded] == ["a.heic", "c.heic"]
     assert [p.read_bytes() for p in downloaded] == [b"a2", b"c1"]
     assert ghost_counts == {}
     assert anomaly_counts == {

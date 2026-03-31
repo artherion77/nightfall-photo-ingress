@@ -68,7 +68,7 @@ def test_repeated_nextlink_fails_with_explicit_cycle_error(tmp_path: Path) -> No
     account = _make_account(tmp_path, "alice", "/Camera Roll")
     client = _FakeClient(
         {
-            "https://graph.microsoft.com/v1.0/me/drive/root:/Camera Roll:/delta": [
+            "https://graph.microsoft.com/v1.0/me/drive/root:/Camera%20Roll:/delta": [
                 _FakeResponse(
                     status_code=200,
                     text='{"value":[],"@odata.nextLink":"https://next/same"}',
@@ -100,7 +100,7 @@ def test_http_410_triggers_resync_marker_and_no_cursor_write(tmp_path: Path) -> 
     account = _make_account(tmp_path, "alice", "/Camera Roll")
     client = _FakeClient(
         {
-            "https://graph.microsoft.com/v1.0/me/drive/root:/Camera Roll:/delta": [
+            "https://graph.microsoft.com/v1.0/me/drive/root:/Camera%20Roll:/delta": [
                 _FakeResponse(
                     status_code=410,
                     headers={"Location": "https://graph.microsoft.com/v1.0/me/drive/root/delta?token=resync"},
@@ -136,7 +136,7 @@ def test_page_ceiling_enforced(tmp_path: Path) -> None:
     account = _make_account(tmp_path, "alice", "/Camera Roll")
     client = _FakeClient(
         {
-            "https://graph.microsoft.com/v1.0/me/drive/root:/Camera Roll:/delta": [
+            "https://graph.microsoft.com/v1.0/me/drive/root:/Camera%20Roll:/delta": [
                 _FakeResponse(
                     status_code=200,
                     text='{"value":[],"@odata.nextLink":"https://next/1"}',
@@ -169,7 +169,7 @@ def test_runtime_limit_enforced(tmp_path: Path) -> None:
     account = _make_account(tmp_path, "alice", "/Camera Roll")
     client = _FakeClient(
         {
-            "https://graph.microsoft.com/v1.0/me/drive/root:/Camera Roll:/delta": [
+            "https://graph.microsoft.com/v1.0/me/drive/root:/Camera%20Roll:/delta": [
                 _FakeResponse(
                     status_code=200,
                     text='{"value":[],"@odata.nextLink":"https://next/1"}',
@@ -200,7 +200,7 @@ def test_successful_poll_clears_existing_resync_marker(tmp_path: Path) -> None:
 
     client = _FakeClient(
         {
-            "https://graph.microsoft.com/v1.0/me/drive/root:/Camera Roll:/delta": [
+            "https://graph.microsoft.com/v1.0/me/drive/root:/Camera%20Roll:/delta": [
                 _FakeResponse(
                     status_code=200,
                     text='{"value":[],"@odata.deltaLink":"https://delta/final"}',
@@ -230,7 +230,7 @@ def test_replayed_item_ids_are_counted_as_delta_anomaly(tmp_path: Path) -> None:
     account = _make_account(tmp_path, "alice", "/Camera Roll")
     client = _FakeClient(
         {
-            "https://graph.microsoft.com/v1.0/me/drive/root:/Camera Roll:/delta": [
+            "https://graph.microsoft.com/v1.0/me/drive/root:/Camera%20Roll:/delta": [
                 _FakeResponse(
                     status_code=200,
                     text=(

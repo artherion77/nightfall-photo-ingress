@@ -175,14 +175,14 @@ Scope:
 - Keep parent path metadata best-effort only.
 
 Deliverables:
-- [ ] Candidate validator.
-- [ ] Safe staging naming helper.
-- [ ] Encoded root delta URL builder.
+- [x] Candidate validator.
+- [x] Safe staging naming helper.
+- [x] Encoded root delta URL builder.
 
 Tests:
-- [ ] Unit: malformed payload values rejected with reason codes.
-- [ ] Unit: path encoding behavior for spaces/special chars.
-- [ ] Unit: missing parentReference handled safely.
+- [x] Unit: malformed payload values rejected with reason codes.
+- [x] Unit: path encoding behavior for spaces/special chars.
+- [x] Unit: missing parentReference handled safely.
 
 Review gate:
 === STOP: Awaiting user feedback before proceeding ===
@@ -240,7 +240,7 @@ Review gate:
 - [x] Chunk 5 committed
 - [x] Chunk 6 committed
 - [x] Chunk 7 committed
-- [ ] Chunk 8 committed
+- [x] Chunk 8 committed
 - [ ] Chunk 9 committed
 - [ ] Chunk 10 committed
 

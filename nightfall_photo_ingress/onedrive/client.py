@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from datetime import datetime
 import json
 from pathlib import Path
+import re
 import time
 from time import monotonic
 from typing import Callable, Iterable
@@ -72,6 +73,10 @@ class _ReducerEntry:
 
     sequence: int
     candidate: RemoteCandidate | None
+
+
+_SAFE_STAGING_BASENAME_RE = re.compile(r"[^A-Za-z0-9._-]+")
+_SAFE_EXTENSION_RE = re.compile(r"\.[A-Za-z0-9]{1,16}$")
 
 
 def poll_accounts(
@@ -321,22 +326,13 @@ def _apply_delta_page_to_reducer(
             # Non-file entities are ignored by ingestion candidate logic.
             continue
 
-        download_url = _as_str(raw.get("@microsoft.graph.downloadUrl"))
-        if not download_url:
-            _record_ghost_reason(anomaly_counts, "delta_file_missing_download_url")
+        validated = _build_candidate_from_payload(account_name, raw)
+        if validated is None:
+            reason = _classify_invalid_candidate_reason(raw)
+            _record_ghost_reason(anomaly_counts, reason)
             continue
 
-        candidate = RemoteCandidate(
-            account_name=account_name,
-            item_id=item_id,
-            name=_as_str(raw.get("name")) or "",
-            relative_path=_extract_relative_path(raw),
-            size_bytes=int(raw.get("size", 0)),
-            modified_time=_as_str(raw.get("lastModifiedDateTime"))
-            or datetime.utcnow().isoformat(),
-            download_url=download_url,
-        )
-        reducer[item_id] = _ReducerEntry(sequence=sequence, candidate=candidate)
+        reducer[item_id] = _ReducerEntry(sequence=sequence, candidate=validated)
 
     return sequence
 
@@ -374,22 +370,10 @@ def parse_delta_items(
         if "file" not in raw:
             continue
 
-        download_url = _as_str(raw.get("@microsoft.graph.downloadUrl"))
-        if not download_url:
+        validated = _build_candidate_from_payload(account_name, raw)
+        if validated is None:
             continue
-
-        parsed.append(
-            RemoteCandidate(
-                account_name=account_name,
-                item_id=_as_str(raw.get("id")) or "",
-                name=_as_str(raw.get("name")) or "",
-                relative_path=_extract_relative_path(raw),
-                size_bytes=int(raw.get("size", 0)),
-                modified_time=_as_str(raw.get("lastModifiedDateTime"))
-                or datetime.utcnow().isoformat(),
-                download_url=download_url,
-            )
-        )
+        parsed.append(validated)
 
     return tuple(parsed)
 
@@ -419,9 +403,10 @@ def download_candidates(
         if limit > 0 and index >= limit:
             break
 
-        suffix = Path(candidate.name).suffix or ".bin"
-        tmp_path = target_root / f"{candidate.item_id}.tmp"
-        final_path = target_root / f"{candidate.item_id}{suffix}"
+        safe_base = _safe_staging_basename(candidate.item_id)
+        suffix = _safe_extension(candidate.name)
+        tmp_path = target_root / f"{safe_base}.tmp"
+        final_path = target_root / f"{safe_base}{suffix}"
         try:
             download_with_retry(
                 http_client=http_client,
@@ -848,7 +833,12 @@ def _build_initial_delta_url(account: AccountConfig) -> str:
     if not root.startswith("/"):
         root = "/" + root
 
-    return f"{GRAPH_BASE}/me/drive/root:{root}:/delta"
+    # Encode each path segment explicitly to avoid Graph path addressing bugs
+    # with spaces or reserved characters in user-provided roots.
+    segments = [quote(segment, safe="") for segment in root.split("/") if segment]
+    encoded_root = "/" + "/".join(segments)
+
+    return f"{GRAPH_BASE}/me/drive/root:{encoded_root}:/delta"
 
 
 def _load_cursor(path: Path) -> str | None:
@@ -901,3 +891,90 @@ def _as_str(value: object) -> str | None:
     if isinstance(value, str):
         return value
     return str(value)
+
+
+def _safe_staging_basename(item_id: str) -> str:
+    """Return a filesystem-safe staging basename derived from item ID."""
+
+    sanitized = _SAFE_STAGING_BASENAME_RE.sub("_", item_id).strip("._-")
+    if not sanitized:
+        return "item"
+    return sanitized[:120]
+
+
+def _safe_extension(name: str) -> str:
+    """Return a safe file extension for staging artifacts."""
+
+    suffix = Path(name).suffix
+    if not suffix:
+        return ".bin"
+    if not _SAFE_EXTENSION_RE.fullmatch(suffix):
+        return ".bin"
+    return suffix.lower()
+
+
+def _build_candidate_from_payload(
+    account_name: str,
+    raw: dict[str, object],
+) -> RemoteCandidate | None:
+    """Build a validated candidate from raw Graph payload.
+
+    Returns None when required fields are missing or malformed.
+    """
+
+    item_id = _as_str(raw.get("id"))
+    if not item_id:
+        return None
+
+    name = _as_str(raw.get("name"))
+    if not name:
+        return None
+
+    download_url = _as_str(raw.get("@microsoft.graph.downloadUrl"))
+    if not download_url:
+        return None
+
+    size_raw = raw.get("size", 0)
+    try:
+        size_bytes = int(size_raw)
+    except (TypeError, ValueError):
+        return None
+    if size_bytes < 0:
+        return None
+
+    return RemoteCandidate(
+        account_name=account_name,
+        item_id=item_id,
+        name=name,
+        relative_path=_extract_relative_path(raw),
+        size_bytes=size_bytes,
+        modified_time=_as_str(raw.get("lastModifiedDateTime"))
+        or datetime.utcnow().isoformat(),
+        download_url=download_url,
+    )
+
+
+def _classify_invalid_candidate_reason(raw: dict[str, object]) -> str:
+    """Classify invalid candidate payload reason for anomaly counters."""
+
+    item_id = _as_str(raw.get("id"))
+    if not item_id:
+        return "delta_item_missing_id"
+
+    name = _as_str(raw.get("name"))
+    if not name:
+        return "delta_file_missing_name"
+
+    download_url = _as_str(raw.get("@microsoft.graph.downloadUrl"))
+    if not download_url:
+        return "delta_file_missing_download_url"
+
+    size_raw = raw.get("size", 0)
+    try:
+        size_value = int(size_raw)
+    except (TypeError, ValueError):
+        return "delta_file_invalid_size"
+    if size_value < 0:
+        return "delta_file_invalid_size"
+
+    return "delta_file_invalid_payload"

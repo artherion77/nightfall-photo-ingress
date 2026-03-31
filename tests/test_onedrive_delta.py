@@ -167,7 +167,7 @@ def test_poll_account_once_paginates_downloads_and_persists_cursor(tmp_path: Pat
     account = _make_account(tmp_path, "alice", "/Camera Roll")
     client = _FakeClient(
         {
-            "https://graph.microsoft.com/v1.0/me/drive/root:/Camera Roll:/delta": [
+            "https://graph.microsoft.com/v1.0/me/drive/root:/Camera%20Roll:/delta": [
                 _FakeResponse(
                     status_code=200,
                     text=(
@@ -267,7 +267,7 @@ def test_poll_account_once_errors_when_delta_link_missing(tmp_path: Path) -> Non
     account = _make_account(tmp_path, "alice", "/Camera Roll")
     client = _FakeClient(
         {
-            "https://graph.microsoft.com/v1.0/me/drive/root:/Camera Roll:/delta": [
+            "https://graph.microsoft.com/v1.0/me/drive/root:/Camera%20Roll:/delta": [
                 _FakeResponse(status_code=200, text='{"value":[]}')
             ]
         }

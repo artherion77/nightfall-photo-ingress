@@ -219,7 +219,7 @@ def test_graph_401_triggers_single_token_refresh(tmp_path: Path) -> None:
     app_config = _make_app_config(tmp_path, account)
     auth_client = _RefreshingAuthClient()
 
-    delta_url = "https://graph.microsoft.com/v1.0/me/drive/root:/Camera Roll:/delta"
+    delta_url = "https://graph.microsoft.com/v1.0/me/drive/root:/Camera%20Roll:/delta"
 
     def factory() -> _TokenAwareClient:
         return _TokenAwareClient(delta_url=delta_url)

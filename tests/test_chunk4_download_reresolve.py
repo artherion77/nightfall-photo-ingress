@@ -61,7 +61,7 @@ def test_download_url_reresolve_succeeds_after_first_403(tmp_path: Path) -> None
     account = _make_account(tmp_path, "alice", "/Camera Roll")
     client = _FakeClient(
         {
-            "https://graph.microsoft.com/v1.0/me/drive/root:/Camera Roll:/delta": [
+            "https://graph.microsoft.com/v1.0/me/drive/root:/Camera%20Roll:/delta": [
                 _FakeResponse(
                     status_code=200,
                     text=(
@@ -103,7 +103,7 @@ def test_missing_download_url_after_refresh_is_classified_as_ghost(tmp_path: Pat
     account = _make_account(tmp_path, "alice", "/Camera Roll")
     client = _FakeClient(
         {
-            "https://graph.microsoft.com/v1.0/me/drive/root:/Camera Roll:/delta": [
+            "https://graph.microsoft.com/v1.0/me/drive/root:/Camera%20Roll:/delta": [
                 _FakeResponse(
                     status_code=200,
                     text=(
@@ -140,7 +140,7 @@ def test_still_unreachable_after_refresh_is_classified_as_ghost(tmp_path: Path) 
     account = _make_account(tmp_path, "alice", "/Camera Roll")
     client = _FakeClient(
         {
-            "https://graph.microsoft.com/v1.0/me/drive/root:/Camera Roll:/delta": [
+            "https://graph.microsoft.com/v1.0/me/drive/root:/Camera%20Roll:/delta": [
                 _FakeResponse(
                     status_code=200,
                     text=(
@@ -181,7 +181,7 @@ def test_refresh_404_classified_as_item_not_found_ghost(tmp_path: Path) -> None:
     account = _make_account(tmp_path, "alice", "/Camera Roll")
     client = _FakeClient(
         {
-            "https://graph.microsoft.com/v1.0/me/drive/root:/Camera Roll:/delta": [
+            "https://graph.microsoft.com/v1.0/me/drive/root:/Camera%20Roll:/delta": [
                 _FakeResponse(
                     status_code=200,
                     text=(
