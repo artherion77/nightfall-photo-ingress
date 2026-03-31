@@ -1,0 +1,37 @@
+[core]
+config_version = 1
+poll_interval_minutes = 15
+process_accounts_in_config_order = true
+staging_path = /mnt/ssd/photo-ingress/staging
+accepted_path = /nightfall/media/photo-ingress/accepted
+trash_path = /nightfall/media/photo-ingress/trash
+registry_path = /mnt/ssd/photo-ingress/registry.db
+staging_on_same_pool = false
+storage_template = {yyyy}/{mm}/{sha8}-{original}
+verify_sha256_on_first_download = true
+max_downloads_per_poll = 200
+max_poll_runtime_seconds = 300
+tmp_ttl_minutes = 120
+failed_ttl_hours = 24
+orphan_ttl_days = 7
+live_photo_capture_tolerance_seconds = 3
+live_photo_stem_mode = exact_stem
+live_photo_component_order = photo_first
+live_photo_conflict_policy = nearest_capture_time
+sync_hash_import_enabled = true
+sync_hash_import_path = /nightfall/media/pictures
+sync_hash_import_glob = .hashes.sha1
+
+[account.primary]
+enabled = true
+display_name = Primary iPhone
+provider = onedrive
+authority = https://login.microsoftonline.com/consumers
+client_id = REPLACE_WITH_CLIENT_ID
+onedrive_root = /Camera Roll
+token_cache = /mnt/ssd/photo-ingress/tokens/primary.json
+delta_cursor = /mnt/ssd/photo-ingress/cursors/primary.cursor
+
+[logging]
+log_level = INFO
+console_format = json

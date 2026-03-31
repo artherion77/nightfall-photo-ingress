@@ -1,6 +1,6 @@
 # photo-ingress Iterative Implementation Roadmap
 
-Status: Planned (not implemented)
+Status: Module 1 completed, awaiting review
 Date: 2026-03-31
 Owner: Systems Engineering
 
@@ -43,20 +43,20 @@ Create a stable project scaffold, dependency management, CLI entrypoint shell, a
 - Logging bootstrap helper
 
 ### Implementation steps
-- [ ] Create package directories and `__init__.py` files.
-- [ ] Add `pyproject.toml` with runtime and dev dependencies.
-- [ ] Add CLI command group with stub commands (`auth-setup`, `poll`, `reject`, `process-trash`, `sync-import`).
-- [ ] Add base logger setup with JSON/human mode switch.
-- [ ] Add make-like command documentation in README (no implementation details yet).
+- [x] Create package directories and `__init__.py` files.
+- [x] Add `pyproject.toml` with runtime and dev dependencies.
+- [x] Add CLI command group with stub commands (`auth-setup`, `poll`, `reject`, `process-trash`, `sync-import`).
+- [x] Add base logger setup with JSON/human mode switch.
+- [x] Add make-like command documentation in README (no implementation details yet).
 
 ### Unit tests
-- [ ] CLI command registration test.
-- [ ] Logger mode selection test.
-- [ ] Basic import tests for package modules.
+- [x] CLI command registration test.
+- [x] Logger mode selection test.
+- [x] Basic import tests for package modules.
 
 ### Integration tests
-- [ ] `python -m nightfall_photo_ingress --help` returns exit code 0.
-- [ ] `pytest` runs and discovers tests in clean environment.
+- [x] `python -m nightfall_photo_ingress --help` returns exit code 0.
+- [x] `pytest` runs and discovers tests in clean environment.
 
 ### Expected artifacts
 - `pyproject.toml`
@@ -91,32 +91,32 @@ Implement strict INI configuration loading and validation from `/etc/nightfall/p
 - account ordering policy reader (declaration order)
 
 ### Implementation steps
-- [ ] Implement parser for `[core]`, `[logging]`, and `[account.*]` sections.
-- [ ] Validate required keys, path fields, booleans, integer ranges.
-- [ ] Enforce unique `token_cache` and `delta_cursor` per account.
-- [ ] Enforce provider support (`onedrive` only in V1, explicit error for others).
-- [ ] Implement `process_accounts_in_config_order` semantics (`true` default) using declaration order from config file.
-- [ ] Add and validate Live Photo pairing config keys with V1 defaults:
+- [x] Implement parser for `[core]`, `[logging]`, and `[account.*]` sections.
+- [x] Validate required keys, path fields, booleans, integer ranges.
+- [x] Enforce unique `token_cache` and `delta_cursor` per account.
+- [x] Enforce provider support (`onedrive` only in V1, explicit error for others).
+- [x] Implement `process_accounts_in_config_order` semantics (`true` default) using declaration order from config file.
+- [x] Add and validate Live Photo pairing config keys with V1 defaults:
   - `live_photo_capture_tolerance_seconds`
   - `live_photo_stem_mode`
   - `live_photo_component_order`
   - `live_photo_conflict_policy`
-- [ ] Add and validate `verify_sha256_on_first_download` (default `true`).
-- [ ] Add config diagnostics output command (`config-check`).
+- [x] Add and validate `verify_sha256_on_first_download` (default `true`).
+- [x] Add config diagnostics output command (`config-check`).
 
 ### Unit tests
-- [ ] Valid config round-trip parse test.
-- [ ] Missing-key and wrong-type validation tests.
-- [ ] Duplicate token/cursor path rejection test.
-- [ ] Unsupported provider rejection test.
-- [ ] Invalid account name pattern test.
-- [ ] Account declaration order preservation test.
-- [ ] Live Photo config default and enum validation tests.
-- [ ] `verify_sha256_on_first_download` default and bool parsing tests.
+- [x] Valid config round-trip parse test.
+- [x] Missing-key and wrong-type validation tests.
+- [x] Duplicate token/cursor path rejection test.
+- [x] Unsupported provider rejection test.
+- [x] Invalid account name pattern test.
+- [x] Account declaration order preservation test.
+- [x] Live Photo config default and enum validation tests.
+- [x] `verify_sha256_on_first_download` default and bool parsing tests.
 
 ### Integration tests
-- [ ] `config-check` against sample valid config exits 0.
-- [ ] `config-check` against sample invalid config exits non-zero and prints actionable messages.
+- [x] `config-check` against sample valid config exits 0.
+- [x] `config-check` against sample invalid config exits non-zero and prints actionable messages.
 
 ### Expected artifacts
 - `nightfall_photo_ingress/config.py`
