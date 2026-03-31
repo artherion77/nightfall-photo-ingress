@@ -11,14 +11,14 @@ from typing import Any, Callable
 import pytest
 
 from nightfall_photo_ingress.config import AccountConfig, AppConfig, CoreConfig, LoggingConfig
-from nightfall_photo_ingress.onedrive.client import RemoteCandidate, parse_delta_items, poll_accounts
-from nightfall_photo_ingress.pipeline.ingest import (
+from nightfall_photo_ingress.adapters.onedrive.client import RemoteCandidate, parse_delta_items, poll_accounts
+from nightfall_photo_ingress.domain.ingest import (
     INGEST_INPUT_SCHEMA_VERSION,
     IngestBatchResult,
     IngestDecisionEngine,
     StagedCandidate,
 )
-from nightfall_photo_ingress.registry import Registry
+from nightfall_photo_ingress.domain.registry import Registry
 
 
 @dataclass
@@ -294,7 +294,7 @@ class CrashInjectionHelper:
     def during_cross_pool_copy(self) -> None:
         """Crash after a partial cross-pool copy write."""
 
-        from nightfall_photo_ingress import storage as storage_module
+        from nightfall_photo_ingress.domain import storage as storage_module
 
         original_copy2 = storage_module.shutil.copy2
 

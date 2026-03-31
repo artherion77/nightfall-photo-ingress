@@ -6,3 +6,7 @@ __pycache__/
 *.pyd
 *.egg-info/
 .coverage
+build/
+dist/
+.mypy_cache/
+.ruff_cache/

@@ -2,6 +2,24 @@
 
 Incremental ingest service for photos, starting with a OneDrive adapter.
 
+## Project structure
+
+This repository uses a standard `src` layout so local imports match the installed
+wheel layout:
+
+```text
+nightfall-photo-ingress/
+├── pyproject.toml
+├── src/
+│   └── nightfall_photo_ingress/
+├── tests/
+├── conf/
+├── design/
+├── planning/
+├── review/
+└── testspecs/
+```
+
 ## Current scope
 
 This repository now includes a hardened OneDrive client polling component with:
@@ -19,6 +37,21 @@ python -m pip install -e ".[dev]"
 pytest
 python -m nightfall_photo_ingress --help
 nightfall-photo-ingress --help
+```
+
+## Build and install
+
+Build a wheel for deterministic deployment:
+
+```bash
+python -m build
+python -m pip install dist/*.whl
+```
+
+The installed console entry point is compatible with `systemd` units:
+
+```bash
+nightfall-photo-ingress poll --path /etc/nightfall/photo-ingress.conf
 ```
 
 ## Robustness regression suite (Chunk 10)

@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from nightfall_photo_ingress.onedrive.errors import DownloadError
-from nightfall_photo_ingress.pipeline.ingest import StagedCandidate
-from nightfall_photo_ingress.storage import sha256_file
+from nightfall_photo_ingress.adapters.onedrive.errors import DownloadError
+from nightfall_photo_ingress.domain.ingest import StagedCandidate
+from nightfall_photo_ingress.domain.storage import sha256_file
 
 
 def test_size_mismatch_between_metadata_and_staged_file_rejected_before_accept(

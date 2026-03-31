@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from nightfall_photo_ingress.storage import sha256_file
+from nightfall_photo_ingress.domain.storage import sha256_file
 
 
 def test_e2e_single_new_photo_same_pool_accepts_cleanly(
