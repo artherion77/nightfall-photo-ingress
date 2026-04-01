@@ -698,6 +698,34 @@ class Registry:
             updated_at=row["updated_at"],
         )
 
+    def get_live_photo_pair_for_member(self, *, sha256: str) -> LivePhotoPairRecord | None:
+        """Return pair containing given member SHA or None when not paired."""
+
+        with self._connect() as conn:
+            _set_pragmas(conn)
+            row = conn.execute(
+                """
+                SELECT pair_id, account, stem, photo_sha256, video_sha256, status, created_at, updated_at
+                FROM live_photo_pairs
+                WHERE photo_sha256 = ? OR video_sha256 = ?
+                LIMIT 1
+                """,
+                (sha256, sha256),
+            ).fetchone()
+
+        if row is None:
+            return None
+        return LivePhotoPairRecord(
+            pair_id=row["pair_id"],
+            account=row["account"],
+            stem=row["stem"],
+            photo_sha256=row["photo_sha256"],
+            video_sha256=row["video_sha256"],
+            status=row["status"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+        )
+
     def apply_live_photo_pair_status(
         self,
         *,

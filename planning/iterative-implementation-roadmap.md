@@ -437,20 +437,23 @@ Implement both operator-triggered rejection paths and ensure lifecycle states re
 - lifecycle transition validator
 
 ### Implementation steps
-- [ ] Implement `process-trash` command with idempotent behavior.
-- [ ] Implement `reject <sha256>` with reason/actor metadata.
-- [ ] Ensure accepted history retained even after queue file deletion.
-- [ ] Add guardrails for already-rejected and unknown hashes.
-- [ ] Emit structured audit events for all transitions.
+- [x] Implement `process-trash` command with idempotent behavior.
+- [x] Implement `reject <sha256>` with reason/actor metadata.
+- [x] Ensure accepted history retained even after queue file deletion.
+- [x] Add guardrails for already-rejected and unknown hashes.
+- [x] Emit structured audit events for all transitions.
+
+Current implementation note:
+- Trash processing and CLI reject now share the same rejection runtime, remove current accepted queue files when present, preserve acceptance history, and handle unknown content by creating rejected registry records.
 
 ### Unit tests
-- [ ] CLI rejection idempotency test.
-- [ ] Trash processing branch tests.
-- [ ] Transition validation tests.
+- [x] CLI rejection idempotency test.
+- [x] Trash processing branch tests.
+- [x] Transition validation tests.
 
 ### Integration tests
-- [ ] End-to-end reject and re-upload-block scenario.
-- [ ] Batch trash processing scenario.
+- [x] End-to-end reject and re-upload-block scenario.
+- [x] Batch trash processing scenario.
 
 ### Expected artifacts
 - `nightfall_photo_ingress/pipeline/reject.py`

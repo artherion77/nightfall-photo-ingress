@@ -14,6 +14,7 @@ from .config import AppConfig, load_config, validate_config_file
 from .logging_bootstrap import configure_logging
 from .adapters.onedrive.auth import AuthError, OneDriveAuthClient
 from .adapters.onedrive.client import GraphError, poll_accounts
+from .reject import RejectFlowError, process_trash, reject_sha256
 from .sync_import import SyncImportError, run_sync_import
 
 LOGGER = logging.getLogger(__name__)
@@ -44,9 +45,12 @@ def _build_parser() -> argparse.ArgumentParser:
 
     reject = subparsers.add_parser("reject", help="Reject a hash permanently.")
     reject.add_argument("sha256", nargs="?", help="SHA-256 to reject.")
+    reject.add_argument("--reason", default=None)
+    reject.add_argument("--path", default="/etc/nightfall/photo-ingress.conf")
     reject.set_defaults(handler=_cmd_reject)
 
     process_trash = subparsers.add_parser("process-trash", help="Process trash directory.")
+    process_trash.add_argument("--path", default="/etc/nightfall/photo-ingress.conf")
     process_trash.set_defaults(handler=_cmd_process_trash)
 
     sync_import = subparsers.add_parser(
@@ -100,18 +104,50 @@ def _cmd_poll(args: argparse.Namespace) -> int:
 
 
 def _cmd_reject(args: argparse.Namespace) -> int:
-    """Stub command for Module 0."""
+    """Reject one known or newly supplied file hash permanently."""
 
-    LOGGER.info("reject is not implemented in Module 0", extra={"sha256": args.sha256})
-    return 0
+    try:
+        app_config = load_config(args.path)
+        result = reject_sha256(
+            app_config,
+            sha256=args.sha256 or "",
+            reason=args.reason,
+            actor="cli",
+        )
+        LOGGER.info(
+            "reject completed",
+            extra={
+                "sha256": result.sha256,
+                "action": result.action,
+                "removed_paths": list(result.removed_paths),
+            },
+        )
+        return 0
+    except (RejectFlowError, ValueError) as exc:
+        LOGGER.error(str(exc))
+        return 2
 
 
 def _cmd_process_trash(args: argparse.Namespace) -> int:
-    """Stub command for Module 0."""
+    """Process all files currently present in configured trash path."""
 
-    _ = args
-    LOGGER.info("process-trash is not implemented in Module 0")
-    return 0
+    try:
+        app_config = load_config(args.path)
+        result = process_trash(app_config)
+        LOGGER.info(
+            "process-trash completed",
+            extra={
+                "processed_files": result.processed_files,
+                "rejected_files": result.rejected_files,
+                "noop_files": result.noop_files,
+                "unknown_files": result.unknown_files,
+                "removed_paths": list(result.removed_paths),
+            },
+        )
+        return 0
+    except (RejectFlowError, ValueError) as exc:
+        LOGGER.error(str(exc))
+        return 2
 
 
 def _cmd_sync_import(args: argparse.Namespace) -> int:
