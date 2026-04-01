@@ -97,6 +97,7 @@ cmd_create() {
 
     _info "Preparing host evidence/log directories ($([[ "$STAGING_VOLATILE" == "1" ]] && echo volatile || echo persistent)) ..."
     mkdir -p "$HOST_EVIDENCE_BASE" "$HOST_LOG_BASE"
+    chmod 777 "$HOST_EVIDENCE_BASE" "$HOST_LOG_BASE"
 
     _info "Launching container $CONTAINER (ubuntu:24.04, profiles: default+staging) ..."
     lxc launch ubuntu:24.04 "$CONTAINER" -p "$PROFILE_DEFAULT" -p "$PROFILE_STAGING"
@@ -116,9 +117,9 @@ cmd_create() {
     lxc exec "$CONTAINER" -- env STAGING_VOLATILE="$STAGING_VOLATILE" bash /tmp/setup.sh
 
     _info "Attaching tmpfs boundaries (/tmp, /var/tmp, /var/cache/nightfall-photo-ingress) ..."
-    lxc config device add "$CONTAINER" tmpfs-tmp disk source=tmpfs path=/tmp
-    lxc config device add "$CONTAINER" tmpfs-var-tmp disk source=tmpfs path=/var/tmp
-    lxc config device add "$CONTAINER" tmpfs-nightfall-cache disk source=tmpfs path=/var/cache/nightfall-photo-ingress
+    lxc config device add "$CONTAINER" tmpfs-tmp disk source=none path=/tmp
+    lxc config device add "$CONTAINER" tmpfs-var-tmp disk source=none path=/var/tmp
+    lxc config device add "$CONTAINER" tmpfs-nightfall-cache disk source=none path=/var/cache/nightfall-photo-ingress
 
     _info "Attaching bind-mounts ..."
     lxc config device add "$CONTAINER" evidence disk \
@@ -216,6 +217,10 @@ cmd_uninstall() {
     if [[ "$purge" == "1" ]]; then
         _info "Purging host evidence/log directories ..."
         rm -rf "$HOST_EVIDENCE_BASE" "$HOST_LOG_BASE"
+           # In volatile mode, also clean up the now-empty parent under /run/
+           if [[ "$STAGING_VOLATILE" == "1" ]]; then
+               rmdir --ignore-fail-on-non-empty "$(dirname "$HOST_EVIDENCE_BASE")" 2>/dev/null || true
+           fi
     fi
 
     _ok "Container deleted."

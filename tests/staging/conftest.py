@@ -15,7 +15,7 @@ Environment variables consumed by fixtures:
   STAGING_CONF          config path inside container (default: /etc/nightfall/photo-ingress.conf)
   STAGING_ACCOUNT       account name for live poll tests (default: staging)
   STAGING_EVIDENCE_BASE host-side evidence directory
-                        (default: /var/lib/staging-photo-ingress/evidence)
+                         (default: /mnt/ssd/staging/photo-ingress/evidence)
 """
 
 from __future__ import annotations
