@@ -1,6 +1,6 @@
 [core]
 config_version = 1
-poll_interval_minutes = 15
+poll_interval_minutes = 720
 process_accounts_in_config_order = true
 staging_path = /mnt/ssd/photo-ingress/staging
 accepted_path = /nightfall/media/photo-ingress/accepted

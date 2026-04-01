@@ -45,7 +45,7 @@ iOS Camera Roll
       ▼
   OneDrive (personal Microsoft account)
       │
-      │  Microsoft Graph API — delta poll every 15 min
+     │  Microsoft Graph API — delta poll on operational cadence (8-24h in production)
       ▼
 ┌─────────────────────────────────────────┐
 │           nightfall server              │
@@ -176,7 +176,7 @@ CREATE TABLE accepted_records (
 
 ## 6. Pipeline Behavior
 
-### 6.1 Poll Cycle (every 15 min via systemd timer)
+### 6.1 Poll Cycle (8-24h production cadence via systemd timer)
 
 1. Acquire OAuth2 token silently (MSAL refresh token flow).
 2. Call Graph API delta endpoint for the configured OneDrive folder.

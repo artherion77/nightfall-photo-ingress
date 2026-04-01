@@ -38,7 +38,7 @@ Example structure:
 ```ini
 [core]
 config_version = 1
-poll_interval_minutes = 15
+poll_interval_minutes = 720
 process_accounts_in_config_order = true
 staging_path = /mnt/ssd/photo-ingress/staging
 accepted_path = /nightfall/media/photo-ingress/accepted
@@ -91,7 +91,7 @@ console_format = json
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | `config_version` | int | 1 | Config schema version. Must match supported value. |
-| `poll_interval_minutes` | int | 15 | Poll interval used by timer cadence. |
+| `poll_interval_minutes` | int | 720 | Poll interval used by timer cadence. Production recommendation: 8-24h (`480-1440`). |
 | `staging_path` | path | none | SSD-backed staging directory. |
 | `accepted_path` | path | none | Ingress-visible accepted queue. Operator later moves files manually to permanent library. |
 | `trash_path` | path | none | Directory watched by systemd .path unit for reject workflow. |
