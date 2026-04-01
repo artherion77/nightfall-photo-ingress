@@ -187,14 +187,11 @@ cmd_create() {
 cmd_install() {
     local wheel_path="${1:-}"
 
-    # Auto-discover the newest wheel in dist/ if not provided
+    # Build a fresh wheel by default so staging validates the current tree.
     if [[ -z "$wheel_path" ]]; then
-        wheel_path="$(ls -t "$PROJECT_ROOT/dist/"*.whl 2>/dev/null | head -1 || true)"
-        if [[ -z "$wheel_path" ]]; then
-            _info "No wheel found. Building now ..."
-            (cd "$PROJECT_ROOT" && python3 -m build --wheel --outdir dist/)
-            wheel_path="$(ls -t "$PROJECT_ROOT/dist/"*.whl | head -1)"
-        fi
+        _info "Building fresh wheel ..."
+        (cd "$PROJECT_ROOT" && python3 -m build --wheel --outdir dist/)
+        wheel_path="$(ls -t "$PROJECT_ROOT/dist/"*.whl | head -1)"
     fi
 
     [[ -f "$wheel_path" ]] || _fail "Wheel not found: $wheel_path"
