@@ -4,6 +4,11 @@
 **Date:** 2026-03-31  
 **Author:** ops/copilot design session
 
+## Related Documents
+
+- [Web Control Plane Architecture Extension](web-control-plane-architecture-extension.md)
+- [Web Control Plane Implementation Roadmap](../planning/web-control-plane-implementation-roadmap.md)
+
 ---
 
 ## 1. Overview

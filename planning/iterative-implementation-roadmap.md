@@ -4,6 +4,9 @@ Status: Drift-corrected to audited implementation state
 Date: 2026-04-01
 Owner: Systems Engineering
 
+Related roadmap:
+- [Web Control Plane Implementation Roadmap](web-control-plane-implementation-roadmap.md)
+
 ## Audited reality snapshot (2026-04-01)
 
 This section corrects documentation drift between the original sequential plan and
