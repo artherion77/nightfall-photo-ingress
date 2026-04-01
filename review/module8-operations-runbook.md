@@ -77,6 +77,81 @@ Remove the installed files and units:
 sudo ./install/uninstall.sh
 ```
 
+## How To: Register Entra App for Graph (Operator Manual)
+
+This service uses delegated Microsoft Graph access with device-code authentication. No client secret is required for the V1 flow.
+
+### Prerequisites
+
+- You can sign in to Microsoft Entra admin center for the tenant that will own the app registration.
+- Your account has rights to register applications (for example Application Developer).
+- You know whether your source account is a personal Microsoft account or a work/school account.
+
+### Register the app
+
+1. Open Microsoft Entra admin center: `https://entra.microsoft.com`.
+2. Go to Entra ID -> App registrations -> New registration.
+3. Name: choose a clear operator name such as `nightfall-photo-ingress`.
+4. Supported account types:
+	- For personal OneDrive (`authority = https://login.microsoftonline.com/consumers`): select `Personal Microsoft accounts only`.
+	- For work/school tenant usage: select the tenant option matching your policy and set `authority` accordingly in config.
+5. Redirect URI is not required for device-code flow in this project.
+6. Select Register.
+7. Copy and store Application (client) ID.
+
+### Configure Graph delegated permissions
+
+1. Open the app registration -> API permissions.
+2. Add a permission -> Microsoft Graph -> Delegated permissions.
+3. Add `Files.Read`.
+4. Keep least privilege; do not add broader file scopes unless required by an approved change.
+5. `offline_access` is requested by the runtime and should be available for delegated consent flows.
+6. If your tenant policy requires admin consent, complete admin consent in API permissions.
+
+### Apply to photo-ingress config
+
+1. Edit `/etc/nightfall/photo-ingress.conf`.
+2. In `[account.<name>]`, set:
+	- `provider = onedrive`
+	- `authority = https://login.microsoftonline.com/consumers` (or tenant authority for org usage)
+	- `client_id = <Application (client) ID>`
+3. Save and run:
+
+```bash
+nightfall-photo-ingress config-check --path /etc/nightfall/photo-ingress.conf
+```
+
+### Bootstrap token cache (device code)
+
+Run one-time auth setup for each account section:
+
+```bash
+nightfall-photo-ingress auth-setup --account <account-name> --path /etc/nightfall/photo-ingress.conf
+```
+
+The command prints a verification URL and code. Complete sign-in in a browser, then return to the terminal.
+
+Expected result:
+
+- Account-scoped token cache file is created at configured `token_cache`.
+- File mode is hardened to `0600` by the auth client.
+
+### Verify Graph access
+
+Run a bounded poll cycle:
+
+```bash
+nightfall-photo-ingress --log-mode json poll --account <account-name> --path /etc/nightfall/photo-ingress.conf
+```
+
+If auth and permissions are correct, the run should proceed without authentication errors and update the account cursor file.
+
+### References
+
+- App registration quickstart: `https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-register-app`
+- Graph permissions reference: `https://learn.microsoft.com/en-us/graph/permissions-reference`
+- OIDC/offline_access behavior: `https://learn.microsoft.com/en-us/entra/identity-platform/scopes-oidc`
+
 ## Failure handling
 
 If the timer or path unit is not active:

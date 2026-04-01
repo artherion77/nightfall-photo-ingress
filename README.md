@@ -54,7 +54,7 @@ The installed console entry point is compatible with `systemd` units:
 nightfall-photo-ingress poll --path /etc/nightfall/photo-ingress.conf
 ```
 
-Packaged operational assets live under `systemd/` and `install/`. The current operator runbook is `review/module8-operations-runbook.md`.
+Packaged operational assets live under `systemd/` and `install/`. The current operator runbook is `review/module8-operations-runbook.md`, including a manual how-to for Microsoft Entra app registration and Graph token bootstrap.
 
 ## Robustness regression suite (Chunk 10)
 
