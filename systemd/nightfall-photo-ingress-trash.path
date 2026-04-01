@@ -1,0 +1,9 @@
+[Unit]
+Description=Nightfall Photo Ingress trash watcher
+
+[Path]
+PathChanged=/nightfall/media/photo-ingress/trash
+Unit=nightfall-photo-ingress-trash.service
+
+[Install]
+WantedBy=multi-user.target

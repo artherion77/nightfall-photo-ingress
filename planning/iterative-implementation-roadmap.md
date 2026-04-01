@@ -484,16 +484,19 @@ Provide production operability: structured logs, status file export, systemd uni
 - install/uninstall scripts
 
 ### Implementation steps
-- [ ] Implement status snapshot writer (atomic write/rename).
+- [x] Implement status snapshot writer (atomic write/rename).
 - [ ] Implement per-account and global counters in logs/status.
-- [ ] Add systemd files:
+- [x] Add systemd files:
   - poll service/timer
   - trash path/service
-- [ ] Add install scripts for `/etc/nightfall` config and service enablement.
+- [x] Add install scripts for `/etc/nightfall` config and service enablement.
 - [ ] Add operator runbook and failure playbooks.
 
+Current implementation note:
+- Status snapshots are now emitted on poll, reject, process-trash, sync-import, and config-check command paths using atomic write+rename semantics. Initial systemd units and install/uninstall scripts are present in-repo, but systemd smoke validation and runbook hardening remain open.
+
 ### Unit tests
-- [ ] Status file schema and atomic write tests.
+- [x] Status file schema and atomic write tests.
 - [ ] Logging field completeness tests.
 
 ### Integration tests

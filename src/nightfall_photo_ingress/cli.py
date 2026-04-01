@@ -10,14 +10,30 @@ import argparse
 import logging
 from typing import Sequence
 
+from . import __version__
 from .config import AppConfig, load_config, validate_config_file
 from .logging_bootstrap import configure_logging
 from .adapters.onedrive.auth import AuthError, OneDriveAuthClient
 from .adapters.onedrive.client import GraphError, poll_accounts
 from .reject import RejectFlowError, process_trash, reject_sha256
+from .status import write_status_snapshot
 from .sync_import import SyncImportError, run_sync_import
 
 LOGGER = logging.getLogger(__name__)
+
+
+def _emit_status_snapshot(*, state: str, command: str, success: bool, details: dict[str, object]) -> None:
+    """Best-effort status export that must never break the CLI."""
+
+    try:
+        write_status_snapshot(
+            state=state,
+            command=command,
+            success=success,
+            details=details,
+        )
+    except OSError as exc:
+        LOGGER.warning("status snapshot write failed", extra={"error": str(exc), "command": command})
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -29,6 +45,11 @@ def _build_parser() -> argparse.ArgumentParser:
         choices=["json", "human"],
         default="human",
         help="Select output logging format.",
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
     )
 
     subparsers = parser.add_subparsers(dest="command")
@@ -97,9 +118,25 @@ def _cmd_poll(args: argparse.Namespace) -> int:
                     "downloaded": len(result.downloaded_paths),
                 },
             )
+        _emit_status_snapshot(
+            state="healthy",
+            command="poll",
+            success=True,
+            details={
+                "accounts": [result.account_name for result in results],
+                "candidate_count": sum(result.candidate_count for result in results),
+                "downloaded_count": sum(len(result.downloaded_paths) for result in results),
+            },
+        )
         return 0
     except (GraphError, AuthError, ValueError) as exc:
         LOGGER.error(str(exc))
+        _emit_status_snapshot(
+            state="ingest_error",
+            command="poll",
+            success=False,
+            details={"error": str(exc)},
+        )
         return 2
 
 
@@ -122,9 +159,21 @@ def _cmd_reject(args: argparse.Namespace) -> int:
                 "removed_paths": list(result.removed_paths),
             },
         )
+        _emit_status_snapshot(
+            state="healthy",
+            command="reject",
+            success=True,
+            details={"sha256": result.sha256, "action": result.action},
+        )
         return 0
     except (RejectFlowError, ValueError) as exc:
         LOGGER.error(str(exc))
+        _emit_status_snapshot(
+            state="ingest_error",
+            command="reject",
+            success=False,
+            details={"error": str(exc)},
+        )
         return 2
 
 
@@ -144,9 +193,26 @@ def _cmd_process_trash(args: argparse.Namespace) -> int:
                 "removed_paths": list(result.removed_paths),
             },
         )
+        _emit_status_snapshot(
+            state="healthy",
+            command="process-trash",
+            success=True,
+            details={
+                "processed_files": result.processed_files,
+                "rejected_files": result.rejected_files,
+                "noop_files": result.noop_files,
+                "unknown_files": result.unknown_files,
+            },
+        )
         return 0
     except (RejectFlowError, ValueError) as exc:
         LOGGER.error(str(exc))
+        _emit_status_snapshot(
+            state="ingest_error",
+            command="process-trash",
+            success=False,
+            details={"error": str(exc)},
+        )
         return 2
 
 
@@ -168,9 +234,29 @@ def _cmd_sync_import(args: argparse.Namespace) -> int:
                 "invalid_lines": summary.invalid_lines,
             },
         )
+        _emit_status_snapshot(
+            state="healthy",
+            command="sync-import",
+            success=True,
+            details={
+                "dry_run": summary.dry_run,
+                "directories_scanned": summary.directories_scanned,
+                "cache_files_used": summary.cache_files_used,
+                "directories_rehashed": summary.directories_rehashed,
+                "imported_rows": summary.imported_rows,
+                "skipped_rows": summary.skipped_rows,
+                "invalid_lines": summary.invalid_lines,
+            },
+        )
         return 0
     except (SyncImportError, ValueError) as exc:
         LOGGER.error(str(exc))
+        _emit_status_snapshot(
+            state="ingest_error",
+            command="sync-import",
+            success=False,
+            details={"error": str(exc)},
+        )
         return 2
 
 
@@ -180,11 +266,23 @@ def _cmd_config_check(args: argparse.Namespace) -> int:
     errors = validate_config_file(args.path)
     if not errors:
         LOGGER.info("config file validation successful", extra={"path": args.path})
+        _emit_status_snapshot(
+            state="healthy",
+            command="config-check",
+            success=True,
+            details={"path": args.path},
+        )
         return 0
 
     LOGGER.error("config file validation failed", extra={"path": args.path})
     for err in errors:
         print(f"ERROR: {err}")
+    _emit_status_snapshot(
+        state="degraded",
+        command="config-check",
+        success=False,
+        details={"path": args.path, "errors": errors},
+    )
     return 2
 
 
@@ -211,7 +309,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     """Execute the CLI and return an exit code."""
 
     parser = _build_parser()
-    args = parser.parse_args(argv)
+    try:
+        args = parser.parse_args(argv)
+    except SystemExit as exc:
+        return int(exc.code)
 
     configure_logging(args.log_mode)
 

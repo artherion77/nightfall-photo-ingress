@@ -1,0 +1,11 @@
+[Unit]
+Description=Nightfall Photo Ingress periodic poll trigger
+Requires=nightfall-photo-ingress.service
+
+[Timer]
+OnCalendar=*-*-* 03:00:00
+RandomizedDelaySec=900
+Persistent=true
+
+[Install]
+WantedBy=timers.target
