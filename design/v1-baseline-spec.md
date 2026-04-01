@@ -228,6 +228,7 @@ Pre-seed accepted hashes from permanent library to avoid unnecessary OneDrive do
 - Expected format:
   - First line: `DIRECTORY_HASH <value>`
   - Following lines: `<sha1> <filepath>` style hash rows.
+- If a cache file is missing, stale, or invalid, importer re-hashes the directory contents for import only and does not rewrite any hash files in the library.
 
 ### 10.3 Import behavior
 - CLI command: `photo-ingress sync-import [--path ...] [--dry-run]`

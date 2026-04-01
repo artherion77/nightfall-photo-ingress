@@ -386,24 +386,27 @@ Implement operator-triggered sync import from read-only `/nightfall/media/pictur
 - import reporter
 
 ### Implementation steps
-- [ ] Implement parser for per-directory `.hashes.sha1` files.
-- [ ] Validate and normalize imported hash entries.
-- [ ] Map imported entries into accepted-history/pre-filter structures.
-- [ ] Add `sync-import` CLI command with dry-run mode.
+- [x] Implement parser for per-directory `.hashes.sha1` files.
+- [x] Validate and normalize imported hash entries.
+- [x] Map imported entries into advisory external hash cache structures.
+- [x] Add `sync-import` CLI command with dry-run mode.
 - [ ] Apply `verify_sha256_on_first_download` behavior:
   - when `true` (default), advisory SHA1 match triggers one verification download for canonical SHA-256
   - when `false`, advisory SHA1 match may skip download
-- [ ] Add import summary output (new, skipped, invalid lines).
+- [x] Add import summary output (new, skipped, invalid lines).
+
+Current implementation note:
+- Missing, stale, or invalid `.hashes.sha1` files fall back to read-only directory re-hash for import only; importer never rewrites library cache files.
 
 ### Unit tests
-- [ ] Parser compatibility test with known hash file fixtures.
-- [ ] Invalid line/error handling tests.
-- [ ] Idempotent re-import test.
+- [x] Parser compatibility test with known hash file fixtures.
+- [x] Invalid line/error handling tests.
+- [x] Idempotent re-import test.
 - [ ] `verify_sha256_on_first_download=true` path test (one-time verification download).
 - [ ] `verify_sha256_on_first_download=false` path test (metadata-only skip).
 
 ### Integration tests
-- [ ] Simulated read-only library import flow with nested directories.
+- [x] Simulated read-only library import flow with nested directories.
 - [ ] Poll-after-import test showing reduced downloads.
 
 ### Expected artifacts

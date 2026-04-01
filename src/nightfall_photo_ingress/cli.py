@@ -14,6 +14,7 @@ from .config import AppConfig, load_config, validate_config_file
 from .logging_bootstrap import configure_logging
 from .adapters.onedrive.auth import AuthError, OneDriveAuthClient
 from .adapters.onedrive.client import GraphError, poll_accounts
+from .sync_import import SyncImportError, run_sync_import
 
 LOGGER = logging.getLogger(__name__)
 
@@ -52,6 +53,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "sync-import",
         help="Import advisory hashes from a library share.",
     )
+    sync_import.add_argument("--path", default="/etc/nightfall/photo-ingress.conf")
     sync_import.add_argument("--dry-run", action="store_true", help="Show what would be imported.")
     sync_import.set_defaults(handler=_cmd_sync_import)
 
@@ -113,10 +115,27 @@ def _cmd_process_trash(args: argparse.Namespace) -> int:
 
 
 def _cmd_sync_import(args: argparse.Namespace) -> int:
-    """Stub command for Module 0."""
+    """Import advisory permanent-library hashes into the registry cache."""
 
-    LOGGER.info("sync-import is not implemented in Module 0", extra={"dry_run": args.dry_run})
-    return 0
+    try:
+        app_config = load_config(args.path)
+        summary = run_sync_import(app_config, dry_run=args.dry_run)
+        LOGGER.info(
+            "sync-import completed",
+            extra={
+                "dry_run": summary.dry_run,
+                "directories_scanned": summary.directories_scanned,
+                "cache_files_used": summary.cache_files_used,
+                "directories_rehashed": summary.directories_rehashed,
+                "imported_rows": summary.imported_rows,
+                "skipped_rows": summary.skipped_rows,
+                "invalid_lines": summary.invalid_lines,
+            },
+        )
+        return 0
+    except (SyncImportError, ValueError) as exc:
+        LOGGER.error(str(exc))
+        return 2
 
 
 def _cmd_config_check(args: argparse.Namespace) -> int:
