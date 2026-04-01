@@ -1,8 +1,35 @@
 # photo-ingress Iterative Implementation Roadmap
 
-Status: Module 2 completed, awaiting review
-Date: 2026-03-31
+Status: Drift-corrected to audited implementation state
+Date: 2026-04-01
 Owner: Systems Engineering
+
+## Audited reality snapshot (2026-04-01)
+
+This section corrects documentation drift between the original sequential plan and
+the implemented repository state.
+
+| Area | Original roadmap status | Audited repository status |
+|---|---|---|
+| Module 0 | Completed | Completed |
+| Module 1 | Completed | Completed |
+| Module 2 | Completed | Completed |
+| Module 3 | Not started | Implemented + hardening delivered (Chunk 1-10 and V2-1..V2-10) |
+| Module 4 | Not started | Implemented + hardening delivered (H1-H9 coverage present) |
+| Integration M3+M4 | Planned | Implemented with documented compliance gaps to close |
+| Module 5-8 | Planned | Still planned (not yet implemented) |
+
+Evidence base:
+- `review/module3-hardening-chunk-plan.md`
+- `review/module3-hardening-plan-v2.md`
+- `review/module3-module4-integration-suite-compliance-audit-final.md`
+- `tests/unit/` and `tests/integration/` current tree
+- `src/nightfall_photo_ingress/` current module tree
+
+Note:
+- The original STOP gates were not followed strictly in execution order.
+- This roadmap remains the planning artifact; implementation truth is recorded by
+  source, tests, and review artifacts above.
 
 ## How to use this plan
 
@@ -199,28 +226,34 @@ Implement OneDrive adapter with account-scoped token cache, delta cursor handlin
 - downloader with retry/backoff and throttling support
 
 ### Implementation steps
-- [ ] Implement account-scoped token cache handling with file mode enforcement.
-- [ ] Implement `auth-setup --account` flow.
-- [ ] Implement delta fetch and pagination parser.
-- [ ] Implement cursor persistence and recovery strategy.
-- [ ] Implement resilient download with `Retry-After` handling.
+- [x] Implement account-scoped token cache handling with file mode enforcement.
+- [x] Implement `auth-setup --account` flow.
+- [x] Implement delta fetch and pagination parser.
+- [x] Implement cursor persistence and recovery strategy.
+- [x] Implement resilient download with `Retry-After` handling.
+- [x] Deliver hardening set Chunk 1-10.
+- [x] Deliver hardening set V2-1..V2-10.
 
 ### Unit tests
-- [ ] Token cache file permission enforcement test.
-- [ ] Delta parser test with create/rename/delete payloads.
-- [ ] Cursor recovery fallback test.
-- [ ] Retry policy tests for 429/503.
+- [x] Token cache file permission enforcement test.
+- [x] Delta parser test with create/rename/delete payloads.
+- [x] Cursor recovery fallback test.
+- [x] Retry policy tests for 429/503.
 
 ### Integration tests
-- [ ] Mocked Graph API end-to-end poll cycle for one account.
-- [ ] Multi-account polling sequence with independent cursors.
-- [ ] Multi-account poll ordering test: enabled accounts execute in config declaration order.
+- [x] Mocked Graph API end-to-end poll cycle for one account.
+- [x] Multi-account polling sequence with independent cursors.
+- [x] Multi-account poll ordering test: enabled accounts execute in config declaration order.
 
 ### Expected artifacts
-- `nightfall_photo_ingress/onedrive/auth.py`
-- `nightfall_photo_ingress/onedrive/client.py`
-- `tests/test_onedrive_auth.py`
-- `tests/test_onedrive_delta.py`
+- `src/nightfall_photo_ingress/adapters/onedrive/auth.py`
+- `src/nightfall_photo_ingress/adapters/onedrive/client.py`
+- `tests/unit/test_onedrive_auth.py`
+- `tests/unit/test_onedrive_delta.py`
+
+### Follow-up status after audit
+- Open: integration boundary fidelity corrections for Module 3 -> Module 4 handoff.
+- Open: operator semantics and audit coherence assertions in integration suite.
 
 === STOP: Awaiting user feedback before proceeding ===
 
@@ -247,29 +280,34 @@ Apply metadata prefiltering, compute authoritative SHA-256, consult registry, an
 - file mover/copy-verifier for cross-pool behavior
 
 ### Implementation steps
-- [ ] Implement metadata prefilter (`metadata_index`) to skip obvious known items.
-- [ ] Implement staged hashing pipeline.
-- [ ] Implement decision matrix:
+- [x] Implement metadata prefilter (`metadata_index`) to skip obvious known items.
+- [x] Implement staged hashing pipeline.
+- [x] Implement decision matrix:
   - unknown => queue to accepted + record acceptance
   - accepted/rejected/purged => discard staging + audit
-- [ ] Implement collision-safe accepted naming via storage template.
-- [ ] Implement cleanup of temp/incomplete staging files.
+- [x] Implement collision-safe accepted naming via storage template.
+- [x] Implement cleanup of temp/incomplete staging files.
+- [x] Deliver hardening set H1-H9.
 
 ### Unit tests
-- [ ] SHA-256 hashing correctness test.
-- [ ] Decision matrix branch coverage test.
-- [ ] Name collision handling test.
-- [ ] Cross-pool copy-verify-unlink behavior test.
+- [x] SHA-256 hashing correctness test.
+- [x] Decision matrix branch coverage test.
+- [x] Name collision handling test.
+- [x] Cross-pool copy-verify-unlink behavior test.
 
 ### Integration tests
-- [ ] Synthetic ingest run with mixed known/unknown/rejected files.
-- [ ] Restart recovery test with leftover `.tmp` files.
+- [x] Synthetic ingest run with mixed known/unknown/rejected files.
+- [x] Restart recovery test with leftover `.tmp` files.
 
 ### Expected artifacts
-- `nightfall_photo_ingress/pipeline/ingest.py`
-- `nightfall_photo_ingress/storage.py`
-- `tests/test_ingest_decisions.py`
-- `tests/test_staging_recovery.py`
+- `src/nightfall_photo_ingress/domain/ingest.py`
+- `src/nightfall_photo_ingress/domain/storage.py`
+- `tests/unit/test_ingest_decisions.py`
+- `tests/unit/test_staging_recovery.py`
+
+### Follow-up status after audit
+- Open: complete lifecycle-level crash injection seams in integration harness.
+- Open: strengthen invariant assertions around accepted queue vs. registry/journal states.
 
 === STOP: Awaiting user feedback before proceeding ===
 
@@ -476,6 +514,14 @@ Apply this protocol after every module and before starting the next:
 - [ ] Record decision/rationale in `design/decisions.md`.
 - [ ] Re-estimate next module scope if complexity changed.
 - [ ] Obtain explicit user approval to continue.
+
+## Immediate post-audit execution order (next)
+
+1. Boundary fidelity correction for Module 3 -> Module 4 integration harness.
+2. Operator semantics and audit-coherence integration assertions.
+3. Containerized staging environment for real-account smoke integration path.
+4. Module 5 implementation (Live Photo V1 scope) after gates 1-3 are green.
+5. Optional hardening idea: add deterministic time-control fixture for stale/replay tests.
 
 ## Definition of done per module
 
