@@ -31,6 +31,10 @@ STAGING_VOLATILE="${STAGING_VOLATILE:-0}"
 VENV_ROOT="/opt/ingress"
 CONF_DEST="/etc/nightfall/photo-ingress.conf"
 SERVICE_NAME="nightfall-photo-ingress"
+TRASH_PATH_NAME="nightfall-photo-ingress-trash.path"
+TRASH_SERVICE_NAME="nightfall-photo-ingress-trash.service"
+SYSTEMD_SOURCE_DIR="$PROJECT_ROOT/systemd"
+STAGING_SYSTEMD_DIR="$SCRIPT_DIR/systemd"
 
 if [[ "$STAGING_VOLATILE" == "1" ]]; then
     # Volatile mode: host /run is tmpfs, so evidence/logs are ephemeral.
@@ -146,11 +150,28 @@ cmd_create() {
     lxc config device add "$CONTAINER" logs disk \
         source="$HOST_LOG_BASE" path="$CT_LOG_DIR"
 
-    _info "Installing systemd units ..."
-    lxc file push "$SCRIPT_DIR/systemd/$SERVICE_NAME.service" \
+    _info "Installing canonical product systemd units with staging overrides ..."
+    lxc file push "$SYSTEMD_SOURCE_DIR/$SERVICE_NAME.service" \
         "$CONTAINER/etc/systemd/system/$SERVICE_NAME.service"
-    lxc file push "$SCRIPT_DIR/systemd/$SERVICE_NAME.timer" \
+    lxc file push "$SYSTEMD_SOURCE_DIR/$SERVICE_NAME.timer" \
         "$CONTAINER/etc/systemd/system/$SERVICE_NAME.timer"
+    lxc file push "$SYSTEMD_SOURCE_DIR/$TRASH_PATH_NAME" \
+        "$CONTAINER/etc/systemd/system/$TRASH_PATH_NAME"
+    lxc file push "$SYSTEMD_SOURCE_DIR/$TRASH_SERVICE_NAME" \
+        "$CONTAINER/etc/systemd/system/$TRASH_SERVICE_NAME"
+    lxc exec "$CONTAINER" -- mkdir -p \
+        "/etc/systemd/system/$SERVICE_NAME.service.d" \
+        "/etc/systemd/system/$SERVICE_NAME.timer.d" \
+        "/etc/systemd/system/$TRASH_SERVICE_NAME.d" \
+        "/etc/systemd/system/$TRASH_PATH_NAME.d"
+    lxc file push "$STAGING_SYSTEMD_DIR/$SERVICE_NAME.service.d/override.conf" \
+        "$CONTAINER/etc/systemd/system/$SERVICE_NAME.service.d/override.conf"
+    lxc file push "$STAGING_SYSTEMD_DIR/$SERVICE_NAME.timer.d/override.conf" \
+        "$CONTAINER/etc/systemd/system/$SERVICE_NAME.timer.d/override.conf"
+    lxc file push "$STAGING_SYSTEMD_DIR/$TRASH_SERVICE_NAME.d/override.conf" \
+        "$CONTAINER/etc/systemd/system/$TRASH_SERVICE_NAME.d/override.conf"
+    lxc file push "$STAGING_SYSTEMD_DIR/$TRASH_PATH_NAME.d/override.conf" \
+        "$CONTAINER/etc/systemd/system/$TRASH_PATH_NAME.d/override.conf"
     lxc exec "$CONTAINER" -- systemctl daemon-reload
 
     _info "Taking LXD snapshot '$SNAPSHOT_CLEAN' ..."
@@ -212,10 +233,11 @@ cmd_install() {
             "$CONTAINER/var/lib/ingress/tokens/staging.json"
     fi
 
-    _info "Enabling systemd timer ..."
+    _info "Enabling systemd timer and trash path watcher ..."
     lxc exec "$CONTAINER" -- systemctl enable "$SERVICE_NAME.timer"
+    lxc exec "$CONTAINER" -- systemctl enable "$TRASH_PATH_NAME"
 
-    _ok "Installed $whl_name. Timer enabled."
+    _ok "Installed $whl_name. Timer and trash path enabled."
     _info "Run 'stagingctl smoke' to verify or 'stagingctl reset' to roll back."
 }
 
@@ -296,7 +318,7 @@ cmd_smoke() {
     local rc=0
 
     # ── 1. cli check ─────────────────────────────────────────────────────────
-    _info "Step 1/4: cli-help"
+    _info "Step 1/5: cli-help"
     lxc exec "$CONTAINER" -- \
         "$VENV_ROOT/bin/nightfall-photo-ingress" -h 2>&1 \
         | tee "$evidence_dir/cli-help.log" \
@@ -304,18 +326,30 @@ cmd_smoke() {
         || { _assert_fail "$evidence_dir/assertions.jsonl" "cli_help_check" "non-zero exit"; rc=1; }
 
     # ── 2. config-check ──────────────────────────────────────────────────────
-    _info "Step 2/4: config-check"
+    _info "Step 2/5: config-check + status export"
     lxc exec "$CONTAINER" -- \
-        "$VENV_ROOT/bin/nightfall-photo-ingress" \
-        --log-mode json config-check --path "$CONF_DEST" 2>&1 \
+        bash -lc "rm -f /run/nightfall-status.d/photo-ingress.json && \
+        '$VENV_ROOT/bin/nightfall-photo-ingress' --log-mode json config-check --path '$CONF_DEST'" 2>&1 \
         | tee "$evidence_dir/config-check.log" \
         && _assert_ok "$evidence_dir/assertions.jsonl" "config_check" "valid config" \
         || { _assert_fail "$evidence_dir/assertions.jsonl" "config_check" "config invalid"; rc=1; }
+    lxc exec "$CONTAINER" -- \
+        python3 -c "import json, pathlib; payload=json.loads(pathlib.Path('/run/nightfall-status.d/photo-ingress.json').read_text()); assert payload['schema_version'] == 1; assert payload['service'] == 'photo-ingress'; assert payload['command'] == 'config-check'" \
+        && _assert_ok "$evidence_dir/assertions.jsonl" "status_file_written" "config-check wrote status snapshot" \
+        || { _assert_fail "$evidence_dir/assertions.jsonl" "status_file_written" "status snapshot missing or invalid"; rc=1; }
 
-    # ── 3. optional live poll ─────────────────────────────────────────────────
+    # ── 3. trash processor smoke ──────────────────────────────────────────────
+    _info "Step 3/5: trash processor"
+    lxc exec "$CONTAINER" -- \
+        systemctl start "$TRASH_SERVICE_NAME" 2>&1 \
+        | tee "$evidence_dir/trash-service.log" \
+        && _assert_ok "$evidence_dir/assertions.jsonl" "trash_service_start" "trash service completed" \
+        || { _assert_fail "$evidence_dir/assertions.jsonl" "trash_service_start" "trash service failed"; rc=1; }
+
+    # ── 4. optional live poll ─────────────────────────────────────────────────
     local account="${STAGING_ACCOUNT:-staging}"
     if [[ -n "${STAGING_CLIENT_ID:-}" ]]; then
-        _info "Step 3/4: poll (account=$account)"
+        _info "Step 4/5: poll (account=$account)"
         lxc exec "$CONTAINER" -- \
             "$VENV_ROOT/bin/nightfall-photo-ingress" \
             --log-mode json poll --account "$account" --path "$CONF_DEST" 2>&1 \
@@ -323,13 +357,13 @@ cmd_smoke() {
             && _assert_ok "$evidence_dir/assertions.jsonl" "poll_exit_0" "poll completed" \
             || { _assert_fail "$evidence_dir/assertions.jsonl" "poll_exit_0" "poll failed"; rc=1; }
     else
-        _warn "Step 3/4: poll SKIPPED (STAGING_CLIENT_ID not set)."
+        _warn "Step 4/5: poll SKIPPED (STAGING_CLIENT_ID not set)."
         printf '{"assertion":"poll_skipped","reason":"STAGING_CLIENT_ID_not_set","ts":"%s"}\n' \
             "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$evidence_dir/assertions.jsonl"
     fi
 
-    # ── 4. secret scan ───────────────────────────────────────────────────────
-    _info "Step 4/4: secret scan"
+    # ── 5. secret scan ───────────────────────────────────────────────────────
+    _info "Step 5/5: secret scan"
     lxc file push "$SCRIPT_DIR/evidence/secret_scan.py" \
         "$CONTAINER/tmp/staging_secret_scan.py"
     lxc exec "$CONTAINER" -- \

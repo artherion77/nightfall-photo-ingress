@@ -3,6 +3,8 @@
 This directory contains the policy-compliant staging subsystem for
 `nightfall-photo-ingress`.
 
+Staging does not own the product unit definitions. Canonical deployable units live in `../systemd/`; this directory only carries container-specific systemd drop-in overrides so staging validates the same unit names and base contracts that production installs.
+
 The subsystem is intentionally minimal and non-invasive:
 
 - uses one LXC container (`staging-photo-ingress`)
@@ -69,7 +71,7 @@ These mounts are recreated by `create` and naturally reset by snapshot restore.
   and creates snapshot `clean`
 - `stagingctl install [wheel]`
   pushes wheel and config into container, installs in `/opt/ingress` venv,
-  enables timer unit
+  enables timer and trash path units
 - `stagingctl reset`
   restores snapshot `clean` and restarts container
 - `stagingctl uninstall`
@@ -111,8 +113,14 @@ staging/
     setup.sh
     photo-ingress.conf
   systemd/
-    nightfall-photo-ingress.service
-    nightfall-photo-ingress.timer
+    nightfall-photo-ingress.service.d/
+      override.conf
+    nightfall-photo-ingress.timer.d/
+      override.conf
+    nightfall-photo-ingress-trash.path.d/
+      override.conf
+    nightfall-photo-ingress-trash.service.d/
+      override.conf
   evidence/
     capture.py
     secret_scan.py

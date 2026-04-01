@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from nightfall_photo_ingress import __version__
 from nightfall_photo_ingress.status import write_status_snapshot
 
 
@@ -24,7 +25,10 @@ def test_status_snapshot_writer_creates_atomic_json(tmp_path: Path) -> None:
     assert not status_path.with_suffix(".json.tmp").exists()
 
     payload = json.loads(status_path.read_text(encoding="utf-8"))
+    assert payload["schema_version"] == 1
     assert payload["service"] == "photo-ingress"
+    assert payload["version"] == __version__
+    assert payload["host"]
     assert payload["state"] == "healthy"
     assert payload["command"] == "poll"
     assert payload["success"] is True
@@ -44,6 +48,7 @@ def test_status_snapshot_writer_replaces_existing_file(tmp_path: Path) -> None:
     )
 
     payload = json.loads(status_path.read_text(encoding="utf-8"))
+    assert payload["schema_version"] == 1
     assert payload["state"] == "degraded"
     assert payload["command"] == "config-check"
     assert payload["success"] is False

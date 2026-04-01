@@ -490,17 +490,17 @@ Provide production operability: structured logs, status file export, systemd uni
   - poll service/timer
   - trash path/service
 - [x] Add install scripts for `/etc/nightfall` config and service enablement.
-- [ ] Add operator runbook and failure playbooks.
+- [x] Add operator runbook and failure playbooks.
 
 Current implementation note:
-- Status snapshots are now emitted on poll, reject, process-trash, sync-import, and config-check command paths using atomic write+rename semantics. Initial systemd units and install/uninstall scripts are present in-repo, but systemd smoke validation and runbook hardening remain open.
+- Status snapshots now include schema/version/host metadata and are emitted on poll, reject, process-trash, sync-import, and config-check command paths using atomic write+rename semantics. Initial systemd units, install/uninstall scripts, and the Module 8 runbook are present in-repo. Controlled-environment smoke coverage now targets the staging container for poll/trash unit visibility and live status-file validation. Logging counters and end-to-end health-consumer compatibility remain open.
 
 ### Unit tests
 - [x] Status file schema and atomic write tests.
 - [ ] Logging field completeness tests.
 
 ### Integration tests
-- [ ] systemd smoke tests in controlled environment.
+- [x] systemd smoke tests in controlled environment.
 - [ ] End-to-end poll to status export to health consumer compatibility test.
 
 ### Expected artifacts

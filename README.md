@@ -54,6 +54,8 @@ The installed console entry point is compatible with `systemd` units:
 nightfall-photo-ingress poll --path /etc/nightfall/photo-ingress.conf
 ```
 
+Packaged operational assets live under `systemd/` and `install/`. The current operator runbook is `review/module8-operations-runbook.md`.
+
 ## Robustness regression suite (Chunk 10)
 
 Run only resilience scenarios:
@@ -68,7 +70,7 @@ Run all tests except resilience scenarios:
 pytest -m "not robustness"
 ```
 
-## CLI stubs available in Module 0
+## CLI commands
 
 ```bash
 nightfall-photo-ingress auth-setup --help

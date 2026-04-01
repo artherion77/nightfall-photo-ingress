@@ -31,6 +31,20 @@ def _assert(run, name: str, condition: bool, detail: str = "") -> None:
     assert condition, f"Assertion '{name}' failed: {detail}"
 
 
+def _read_status_payload(container):
+    proc = container.exec(
+        [
+            "python3",
+            "-c",
+            (
+                "import json, pathlib; "
+                "print(json.dumps(json.loads(pathlib.Path('/run/nightfall-status.d/photo-ingress.json').read_text())))"
+            ),
+        ]
+    )
+    return proc, json.loads(proc.stdout) if proc.returncode == 0 else None
+
+
 # ── tests ─────────────────────────────────────────────────────────────────────
 
 class TestBinaryPresence:
@@ -112,6 +126,7 @@ class TestDirectoryLayout:
         "/var/lib/ingress/tokens",
         "/var/lib/ingress/cursors",
         "/var/log/nightfall",
+        "/run/nightfall-status.d",
     ])
     def test_directory_is_writable(self, container, evidence_run, path):
         probe = f"{path}/.stagingctl_probe"
@@ -149,6 +164,28 @@ class TestSystemdUnit:
             f"exit={proc.returncode}",
         )
 
+    def test_trash_path_unit_is_known(self, container, evidence_run):
+        proc = container.exec(
+            ["systemctl", "cat", "nightfall-photo-ingress-trash.path"],
+        )
+        _assert(
+            evidence_run,
+            "trash_path_unit_known",
+            proc.returncode == 0,
+            f"exit={proc.returncode}",
+        )
+
+    def test_trash_service_unit_is_known(self, container, evidence_run):
+        proc = container.exec(
+            ["systemctl", "cat", "nightfall-photo-ingress-trash.service"],
+        )
+        _assert(
+            evidence_run,
+            "trash_service_unit_known",
+            proc.returncode == 0,
+            f"exit={proc.returncode}",
+        )
+
     def test_service_unit_file_has_exec_start(self, container, evidence_run):
         proc = container.exec(
             ["systemctl", "cat", "nightfall-photo-ingress.service"],
@@ -158,6 +195,65 @@ class TestSystemdUnit:
             "service_has_ExecStart",
             "ExecStart" in proc.stdout,
             f"unit content excerpt: {proc.stdout[:300]!r}",
+        )
+
+    def test_trash_service_can_start(self, container, evidence_run):
+        proc = container.exec(
+            ["systemctl", "start", "nightfall-photo-ingress-trash.service"],
+        )
+        _assert(
+            evidence_run,
+            "trash_service_startable",
+            proc.returncode == 0,
+            f"exit={proc.returncode} stderr={proc.stderr.strip()!r}",
+        )
+
+
+class TestStatusExport:
+    """Operational commands emit a parseable status snapshot in staging."""
+
+    def test_config_check_writes_status_file(self, container, evidence_run):
+        from tests.staging.conftest import CONF_PATH
+
+        container.exec(["rm", "-f", "/run/nightfall-status.d/photo-ingress.json"])
+        proc = container.app("--log-mode", "json", "config-check", "--path", CONF_PATH)
+        _assert(
+            evidence_run,
+            "config_check_status_exit_0",
+            proc.returncode == 0,
+            f"exit={proc.returncode} stderr={proc.stderr.strip()[:200]!r}",
+        )
+
+        status_proc, payload = _read_status_payload(container)
+        _assert(
+            evidence_run,
+            "status_payload_readable",
+            status_proc.returncode == 0,
+            f"exit={status_proc.returncode} stderr={status_proc.stderr.strip()!r}",
+        )
+        _assert(
+            evidence_run,
+            "status_payload_schema_version",
+            payload["schema_version"] == 1,
+            f"payload={payload}",
+        )
+        _assert(
+            evidence_run,
+            "status_payload_command",
+            payload["command"] == "config-check",
+            f"payload={payload}",
+        )
+        _assert(
+            evidence_run,
+            "status_payload_success",
+            payload["success"] is True,
+            f"payload={payload}",
+        )
+        _assert(
+            evidence_run,
+            "status_payload_host",
+            bool(payload["host"]),
+            f"payload={payload}",
         )
 
 

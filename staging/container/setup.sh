@@ -18,6 +18,7 @@ mkdir -p /etc/nightfall
 mkdir -p /var/lib/ingress/{staging,accepted,trash,evidence,tokens,cursors}
 mkdir -p /var/log/nightfall
 mkdir -p /var/cache/nightfall-photo-ingress
+mkdir -p /run/nightfall-status.d
 
 if [[ "$STAGING_VOLATILE" == "1" ]]; then
     echo "[setup] Preparing volatile runtime directories under /run/staging-photo-ingress ..."
