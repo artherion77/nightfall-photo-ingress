@@ -6,7 +6,8 @@ import pytest
 
 from nightfall_photo_ingress.adapters.onedrive.errors import DownloadError
 from nightfall_photo_ingress.domain.ingest import StagedCandidate
-from nightfall_photo_ingress.domain.storage import sha256_file
+from nightfall_photo_ingress.domain import storage as storage_module
+from nightfall_photo_ingress.domain.storage import StorageError, sha256_file
 
 
 def test_size_mismatch_between_metadata_and_staged_file_rejected_before_accept(
@@ -113,6 +114,67 @@ def test_zero_byte_policy_is_enforced_consistently(
     assert result.ingest_result.outcomes[0].action == "quarantine_zero_byte"
 
 
+def test_zero_byte_allow_accepts_with_terminal_accept_outcome(
+    poll_and_ingest_fixture,
+) -> None:
+    result = poll_and_ingest_fixture(
+        pages=[
+            {
+                "value": [
+                    {
+                        "id": "zero-allow-1",
+                        "name": "ZERO_ALLOW.HEIC",
+                        "file": {},
+                        "size": 0,
+                        "lastModifiedDateTime": "2026-04-01T10:11:12Z",
+                        "parentReference": {"path": "/drive/root:/Camera Roll/2026"},
+                        "@microsoft.graph.downloadUrl": "https://download/zero-allow-1",
+                    }
+                ]
+            }
+        ],
+        downloads={"https://download/zero-allow-1": {"content": b""}},
+        zero_byte_policy="allow",
+    )
+
+    assert result.ingest_result is not None
+    assert result.ingest_result.accepted_count == 1
+    assert result.ingest_result.zero_byte_reject_count == 0
+    assert result.ingest_result.zero_byte_quarantine_count == 0
+    assert result.ingest_result.outcomes[0].action == "accepted"
+
+
+def test_zero_byte_reject_blocks_accept_and_emits_reject_terminal_outcome(
+    poll_and_ingest_fixture,
+) -> None:
+    result = poll_and_ingest_fixture(
+        pages=[
+            {
+                "value": [
+                    {
+                        "id": "zero-reject-1",
+                        "name": "ZERO_REJECT.HEIC",
+                        "file": {},
+                        "size": 0,
+                        "lastModifiedDateTime": "2026-04-01T10:11:12Z",
+                        "parentReference": {"path": "/drive/root:/Camera Roll/2026"},
+                        "@microsoft.graph.downloadUrl": "https://download/zero-reject-1",
+                    }
+                ]
+            }
+        ],
+        downloads={"https://download/zero-reject-1": {"content": b""}},
+        zero_byte_policy="reject",
+    )
+
+    assert result.ingest_result is not None
+    assert result.ingest_result.accepted_count == 0
+    assert result.ingest_result.zero_byte_reject_count == 1
+    assert result.ingest_result.zero_byte_quarantine_count == 0
+    assert result.ingest_result.outcomes[0].action == "reject_zero_byte"
+    assert result.registry_harness.accepted_rows() == []
+
+
 def test_same_pool_atomic_rename_is_single_commit_visibility(
     poll_and_ingest_fixture,
 ) -> None:
@@ -144,7 +206,7 @@ def test_cross_pool_copy_verify_unlink_rejects_on_hash_mismatch(
     app_config_fixture,
     poll_and_ingest_fixture,
     ingest_engine_fixture,
-    crash_injection_fixture,
+    monkeypatch,
 ) -> None:
     config = app_config_fixture(core_overrides={"staging_on_same_pool": False})
     polled = poll_and_ingest_fixture(
@@ -168,8 +230,19 @@ def test_cross_pool_copy_verify_unlink_rejects_on_hash_mismatch(
         run_ingest=False,
     )
     engine = ingest_engine_fixture()
-    crash_injection_fixture.during_cross_pool_copy()
-    try:
+    original_sha256 = storage_module.sha256_file
+    call_count = 0
+
+    def _mismatch_second_hash(path):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 2:
+            return "f" * 64
+        return original_sha256(path)
+
+    monkeypatch.setattr(storage_module, "sha256_file", _mismatch_second_hash)
+
+    with pytest.raises(StorageError, match="Cross-pool copy hash mismatch"):
         engine.process_batch(
             candidates=list(polled.staged_candidates),
             accepted_root=config.core.accepted_path,
@@ -177,8 +250,6 @@ def test_cross_pool_copy_verify_unlink_rejects_on_hash_mismatch(
             staging_on_same_pool=False,
             quarantine_dir=polled.quarantine_root,
         )
-    except RuntimeError:
-        pass
 
     assert polled.registry_harness.accepted_rows() == []
 

@@ -49,6 +49,12 @@ def test_three_poll_cycles_new_then_replay_then_noop_are_idempotent(
     assert cycle2.ingest_result.accepted_count == 0
     assert cycle3.poll_result.candidate_count == 0
     assert len([item for item in fs_snapshot_fixture(cycle3.accepted_root) if not item.endswith("/")]) == 1
+    accepted_rows = cycle3.registry_harness.accepted_rows()
+    assert len(accepted_rows) == 1
+    terminal_events = cycle3.registry_harness.terminal_events()
+    accepted_terminal = [row for row in terminal_events if row["action"] == "accepted"]
+    assert len(accepted_terminal) == 1
+    assert len({row["sha256"] for row in accepted_terminal}) == 1
 
 
 def test_recovery_cycle_after_interrupted_commit_then_replay_is_idempotent(

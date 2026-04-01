@@ -1,6 +1,6 @@
 # Module 3 And Module 4 Integration Suite Hardening Plan
 
-Status: In progress (Chunk execution started)
+Status: In progress (Chunk 2 completed)
 Date: 2026-04-01
 Scope: Priority-ordered hardening work to bring the implemented Module 3 and Module 4 integration suite into closer compliance with the approved specification
 
@@ -30,10 +30,10 @@ Review gate:
 
 ### Chunk 2 (P1): Named case gaps
 
-- [ ] Expand case 8 missing `item_id` and invalid schema version.
-- [ ] Expand case 17 zero-byte allow/reject.
-- [ ] Rewrite case 19 cross-pool verification mismatch scenario.
-- [ ] Strengthen case 23 and 26 deterministic finalization assertions.
+- [x] Expand case 8 missing `item_id` and invalid schema version.
+- [x] Expand case 17 zero-byte allow/reject.
+- [x] Rewrite case 19 cross-pool verification mismatch scenario.
+- [x] Strengthen case 23 and 26 deterministic finalization assertions.
 
 Review gate:
 === STOP: Awaiting user feedback before proceeding ===
@@ -61,19 +61,19 @@ Review gate:
 
 ## P0 Critical Boundary Fidelity
 
-- [ ] Replace the synthetic boundary reconstruction in [tests/integration/conftest.py]((root)/tests/integration/conftest.py) with a single explicit production-owned handoff artifact or boundary adapter.
-- [ ] Remove the positional zip coupling between reduced candidates and `poll_result.downloaded_paths`.
-- [ ] Add a dedicated regression test proving that candidate ordering mismatches cannot silently bind the wrong staged file to the wrong ingest candidate.
+- [x] Replace the synthetic boundary reconstruction in [tests/integration/conftest.py]((root)/tests/integration/conftest.py) with a single explicit production-owned handoff artifact or boundary adapter.
+- [x] Remove the positional zip coupling between reduced candidates and `poll_result.downloaded_paths`.
+- [x] Add a dedicated regression test proving that candidate ordering mismatches cannot silently bind the wrong staged file to the wrong ingest candidate.
 
 ## P1 Required Spec Gaps In Named Cases
 
-- [ ] Expand case 8 to cover missing `item_id`.
-- [ ] Expand case 8 to cover invalid schema version.
-- [ ] Expand case 17 to cover zero-byte `allow`.
-- [ ] Expand case 17 to cover zero-byte `reject`.
-- [ ] Rewrite case 19 to simulate true cross-pool verification mismatch after copy, not crash during copy.
-- [ ] Strengthen case 23 to assert registry state, storage state, audit events, and operator-visible summary content together.
-- [ ] Strengthen case 26 so deterministic final state is required: one accepted file, one accepted registry finalization path, and no duplicate terminal finalization.
+- [x] Expand case 8 to cover missing `item_id`.
+- [x] Expand case 8 to cover invalid schema version.
+- [x] Expand case 17 to cover zero-byte `allow`.
+- [x] Expand case 17 to cover zero-byte `reject`.
+- [x] Rewrite case 19 to simulate true cross-pool verification mismatch after copy, not crash during copy.
+- [x] Strengthen case 23 to assert registry state, storage state, audit events, and operator-visible summary content together.
+- [x] Strengthen case 26 so deterministic final state is required: one accepted file, one accepted registry finalization path, and no duplicate terminal finalization.
 
 ## P2 Missing Integration Scenarios From Strategy And Category Intent
 

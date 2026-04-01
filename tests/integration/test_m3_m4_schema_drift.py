@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import pytest
+
+from nightfall_photo_ingress.domain.ingest import IngestError
+
 def test_missing_required_fields_rejected_at_boundary_before_ingest(
     poll_and_ingest_fixture,
 ) -> None:
@@ -27,6 +31,67 @@ def test_missing_required_fields_rejected_at_boundary_before_ingest(
     assert result.poll_result.delta_anomaly_count >= 1
     assert result.registry_harness.metadata_rows() == []
     assert result.registry_harness.terminal_events() == []
+
+
+def test_missing_item_id_rejected_at_boundary_before_ingest(
+    poll_and_ingest_fixture,
+) -> None:
+    result = poll_and_ingest_fixture(
+        pages=[
+            {
+                "value": [
+                    {
+                        "name": "BROKEN_NO_ID.HEIC",
+                        "file": {},
+                        "size": 5,
+                        "lastModifiedDateTime": "2026-04-01T10:11:12Z",
+                        "parentReference": {"path": "/drive/root:/Camera Roll/2026"},
+                        "@microsoft.graph.downloadUrl": "https://download/no-id",
+                    }
+                ]
+            }
+        ],
+        downloads={},
+        run_ingest=False,
+    )
+
+    assert result.poll_result.candidate_count == 0
+    assert result.poll_result.delta_anomaly_count >= 1
+    assert result.registry_harness.metadata_rows() == []
+    assert result.registry_harness.terminal_events() == []
+
+
+def test_invalid_schema_version_is_rejected_before_ingest_processing(
+    poll_and_ingest_fixture,
+) -> None:
+    polled = poll_and_ingest_fixture(
+        pages=[
+            {
+                "value": [
+                    {
+                        "id": "schema-version-1",
+                        "name": "SCHEMA.HEIC",
+                        "file": {},
+                        "size": 5,
+                        "lastModifiedDateTime": "2026-04-01T10:11:12Z",
+                        "parentReference": {"path": "/drive/root:/Camera Roll/2026"},
+                        "@microsoft.graph.downloadUrl": "https://download/schema-version-1",
+                    }
+                ]
+            }
+        ],
+        downloads={"https://download/schema-version-1": {"content": b"12345"}},
+        run_ingest=False,
+    )
+
+    with pytest.raises(IngestError, match="Incompatible ingest input schema version"):
+        poll_and_ingest_fixture(
+            app_config=polled.app_config,
+            pages=[{"value": []}],
+            downloads={},
+            run_ingest=True,
+            input_schema_version=999,
+        )
 
 
 def test_malformed_size_and_timestamp_produce_drift_classification_not_silent_accept(
