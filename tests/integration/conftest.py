@@ -11,7 +11,10 @@ from typing import Any, Callable
 import pytest
 
 from nightfall_photo_ingress.config import AccountConfig, AppConfig, CoreConfig, LoggingConfig
-from nightfall_photo_ingress.adapters.onedrive.client import RemoteCandidate, parse_delta_items, poll_accounts
+from nightfall_photo_ingress.adapters.onedrive.client import (
+    load_boundary_handoff_candidates,
+    poll_accounts,
+)
 from nightfall_photo_ingress.domain.ingest import (
     INGEST_INPUT_SCHEMA_VERSION,
     IngestBatchResult,
@@ -130,7 +133,6 @@ class IntegrationCycleResult:
     poll_result: Any
     ingest_result: IngestBatchResult | None
     staged_candidates: tuple[StagedCandidate, ...]
-    reduced_candidates: tuple[RemoteCandidate, ...]
     replay_summary: dict[str, int] | None
     registry_harness: RegistryHarness
     accepted_root: Path
@@ -231,30 +233,6 @@ class FakeGraphFixture:
         """Build a fake client for poll calls."""
 
         return FakeGraphClient(self._mapping)
-
-    def reduced_candidates(self, account_name: str) -> tuple[RemoteCandidate, ...]:
-        """Return last-event-wins reduced candidates for one account."""
-
-        pages = self._pages_by_account.get(account_name, [])
-        reduced: dict[str, tuple[int, RemoteCandidate | None]] = {}
-        sequence = 0
-        for payload in pages:
-            raw_items = payload.get("value", [])
-            for raw in raw_items:
-                if not isinstance(raw, dict):
-                    continue
-                item_id = str(raw.get("id", "")).strip()
-                if not item_id:
-                    continue
-                sequence += 1
-                if "deleted" in raw:
-                    reduced[item_id] = (sequence, None)
-                    continue
-                parsed = parse_delta_items(account_name, {"value": [raw]})
-                if parsed:
-                    reduced[item_id] = (sequence, parsed[0])
-        ordered = sorted(reduced.values(), key=lambda item: item[0])
-        return tuple(candidate for _, candidate in ordered if candidate is not None)
 
     @staticmethod
     def initial_delta_url(account: AccountConfig) -> str:
@@ -495,22 +473,24 @@ def poll_and_ingest_fixture(
             jitter_fn=lambda: 0.0,
         )[0]
 
-        reduced = fake_graph_fixture.reduced_candidates(account_name)
+        handoff_candidates = load_boundary_handoff_candidates(
+            poll_result.payload.handoff_manifest_path
+        )
         staged_candidates = tuple(
             StagedCandidate(
                 account_name=candidate.account_name,
-                onedrive_id=candidate.item_id,
-                original_filename=candidate.name,
+                onedrive_id=candidate.onedrive_id,
+                original_filename=candidate.original_filename,
                 relative_path=(
                     candidate.relative_path
                     if candidate.relative_path.startswith("/")
                     else f"/{candidate.relative_path}"
                 ),
-                modified_time=candidate.normalized_modified_time,
+                modified_time=candidate.modified_time,
                 size_bytes=candidate.size_bytes,
-                staging_path=staged_path,
+                staging_path=candidate.staging_path,
             )
-            for candidate, staged_path in zip(reduced, poll_result.downloaded_paths)
+            for candidate in handoff_candidates
         )
 
         journal_path = config.core.staging_path / "ingest.journal"
@@ -539,7 +519,6 @@ def poll_and_ingest_fixture(
             poll_result=poll_result,
             ingest_result=ingest_result,
             staged_candidates=staged_candidates,
-            reduced_candidates=reduced,
             replay_summary=replay_summary,
             registry_harness=registry_fixture,
             accepted_root=config.core.accepted_path,

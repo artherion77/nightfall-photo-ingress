@@ -92,7 +92,21 @@ class AccountPollPayload:
     """Payload section of poll result used by downstream ingestion."""
 
     downloaded_paths: tuple[Path, ...]
+    handoff_manifest_path: Path | None
     candidate_count: int
+
+
+@dataclass(frozen=True)
+class DownloadedHandoffCandidate:
+    """Production-owned handoff artifact from poll/download to ingest."""
+
+    account_name: str
+    onedrive_id: str
+    original_filename: str
+    relative_path: str
+    modified_time: str
+    size_bytes: int | None
+    staging_path: Path
 
 
 @dataclass(frozen=True)
@@ -281,7 +295,11 @@ def _runtime_budget_exhausted_result(account_name: str) -> AccountPollResult:
     anomaly_counts = {"scheduler_runtime_budget_exhausted": 1}
     return AccountPollResult(
         account_name=account_name,
-        payload=AccountPollPayload(downloaded_paths=tuple(), candidate_count=0),
+        payload=AccountPollPayload(
+            downloaded_paths=tuple(),
+            handoff_manifest_path=None,
+            candidate_count=0,
+        ),
         anomalies=AccountPollAnomalies(
             ghost_item_count=0,
             ghost_reason_counts=tuple(),
@@ -413,10 +431,15 @@ def _poll_single_account(
         )
 
     anomaly_counts, diagnostics = _split_anomaly_and_diagnostics(delta_anomaly_counts)
+    handoff_manifest_path = _boundary_manifest_path_for_account(
+        app_config.core.staging_path,
+        account.name,
+    )
     result = AccountPollResult(
         account_name=account.name,
         payload=AccountPollPayload(
             downloaded_paths=tuple(downloaded),
+            handoff_manifest_path=handoff_manifest_path,
             candidate_count=candidate_count,
         ),
         anomalies=AccountPollAnomalies(
@@ -877,9 +900,11 @@ def download_candidates(
     ghost_reason_counts: dict[str, int] = {}
     limit = max_downloads if max_downloads is not None else 0
     lifecycle_journal = target_root / "_lifecycle.journal.jsonl"
+    handoff_manifest = _boundary_manifest_path_for_account(staging_root, account_name)
     quarantine_root = target_root / "_quarantine"
     quarantine_root.mkdir(parents=True, exist_ok=True)
     used_basenames: set[str] = set()
+    handoff_manifest.unlink(missing_ok=True)
 
     for index, candidate in enumerate(candidates):
         if limit > 0 and index >= limit:
@@ -1002,9 +1027,70 @@ def download_candidates(
             path=final_path,
             diagnostics_counts=diagnostics_counts,
         )
+        _append_boundary_handoff_entry(
+            manifest_path=handoff_manifest,
+            candidate=candidate,
+            staging_path=final_path,
+        )
         downloaded.append(final_path)
 
     return downloaded, ghost_reason_counts
+
+
+def _boundary_manifest_path_for_account(staging_root: Path, account_name: str) -> Path:
+    """Return account-scoped boundary manifest path for Module 3 -> Module 4."""
+
+    return staging_root / account_name / "_boundary_handoff.jsonl"
+
+
+def _append_boundary_handoff_entry(
+    *,
+    manifest_path: Path,
+    candidate: RemoteCandidate,
+    staging_path: Path,
+) -> None:
+    """Append one line of handoff metadata for ingest boundary consumers."""
+
+    payload = {
+        "account_name": candidate.account_name,
+        "onedrive_id": candidate.item_id,
+        "original_filename": candidate.name,
+        "relative_path": candidate.relative_path,
+        "modified_time": candidate.normalized_modified_time,
+        "size_bytes": candidate.size_bytes,
+        "staging_path": str(staging_path),
+    }
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    with manifest_path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(payload, sort_keys=True))
+        handle.write("\n")
+
+
+def load_boundary_handoff_candidates(
+    manifest_path: Path | None,
+) -> tuple[DownloadedHandoffCandidate, ...]:
+    """Load deterministic ingest handoff records produced by poll/download."""
+
+    if manifest_path is None or not manifest_path.exists():
+        return tuple()
+
+    rows: list[DownloadedHandoffCandidate] = []
+    for raw in manifest_path.read_text(encoding="utf-8").splitlines():
+        if not raw.strip():
+            continue
+        payload = json.loads(raw)
+        rows.append(
+            DownloadedHandoffCandidate(
+                account_name=str(payload.get("account_name", "")),
+                onedrive_id=str(payload.get("onedrive_id", "")),
+                original_filename=str(payload.get("original_filename", "")),
+                relative_path=str(payload.get("relative_path", "")),
+                modified_time=str(payload.get("modified_time", "")),
+                size_bytes=payload.get("size_bytes"),
+                staging_path=Path(str(payload.get("staging_path", ""))),
+            )
+        )
+    return tuple(rows)
 
 
 def _record_ghost_reason(reason_counts: dict[str, int], reason: str, count: int = 1) -> None:

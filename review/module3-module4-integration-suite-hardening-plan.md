@@ -1,8 +1,61 @@
 # Module 3 And Module 4 Integration Suite Hardening Plan
 
-Status: Open
-Date: 2026-03-31
+Status: In progress (Chunk execution started)
+Date: 2026-04-01
 Scope: Priority-ordered hardening work to bring the implemented Module 3 and Module 4 integration suite into closer compliance with the approved specification
+
+## Alignment check for Step 1 (Boundary Fidelity)
+
+Step 1 from the post-audit plan is already represented in this hardening plan via
+P0 and is the top priority.
+
+Coverage mapping:
+- Step 1.1 production-owned handoff artifact -> P0 item 1
+- Step 1.2 remove positional zip coupling -> P0 item 2
+- Step 1.3 ordering mismatch regression test -> P0 item 3
+
+No scope extension was required. Execution format is refined below to enforce
+chunk-by-chunk STOP gates.
+
+## Chunk execution and STOP gates
+
+### Chunk 1 (P0): Boundary artifact + positional decoupling + regression
+
+- [x] Replace synthetic boundary reconstruction with production-owned handoff artifact.
+- [x] Remove positional zip coupling between reduced candidates and downloaded paths.
+- [x] Add regression test for ordering mismatch binding risk.
+
+Review gate:
+=== STOP: Awaiting user feedback before proceeding ===
+
+### Chunk 2 (P1): Named case gaps
+
+- [ ] Expand case 8 missing `item_id` and invalid schema version.
+- [ ] Expand case 17 zero-byte allow/reject.
+- [ ] Rewrite case 19 cross-pool verification mismatch scenario.
+- [ ] Strengthen case 23 and 26 deterministic finalization assertions.
+
+Review gate:
+=== STOP: Awaiting user feedback before proceeding ===
+
+### Chunk 3 (P3 + P4): Fixture capabilities + determinism
+
+- [ ] Add crash hooks for after-staging-write, after-hash-complete,
+  during-journal-append, during-journal-replay.
+- [ ] Extend audit reader helpers.
+- [ ] Introduce deterministic time control fixtures.
+
+Review gate:
+=== STOP: Awaiting user feedback before proceeding ===
+
+### Chunk 4 (P2 + P5): Strategy scenarios + operator semantics
+
+- [ ] Add rename-as-delete-plus-create, ghost-item boundary,
+  stale/resurrected-item, corrupted-body scenarios.
+- [ ] Tighten operator summary and audit-coherence assertions.
+
+Review gate:
+=== STOP: Awaiting user feedback before proceeding ===
 
 ## Priority Order
 

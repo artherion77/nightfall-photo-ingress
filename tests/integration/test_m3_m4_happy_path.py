@@ -75,6 +75,7 @@ def test_e2e_single_new_photo_cross_pool_accepts_with_copy_verify(
     assert outcome.destination_path is not None
     assert outcome.destination_path.read_bytes() == b"movbytes"
     assert fs_snapshot_fixture(config.core.staging_path / "lisa") == (
+        "_boundary_handoff.jsonl",
         "_lifecycle.journal.jsonl",
         "_quarantine/",
     )
@@ -160,3 +161,45 @@ def test_prefilter_miss_hashes_and_accepts_when_registry_unknown(
     outcome = result.ingest_result.outcomes[0]
     assert outcome.action == "accepted"
     assert result.registry_harness.registry.get_file(sha256=outcome.sha256 or "") is not None
+
+
+def test_boundary_handoff_is_not_positionally_zipped_when_one_candidate_is_skipped(
+    poll_and_ingest_fixture,
+) -> None:
+    pages = [
+        {
+            "value": [
+                {
+                    "id": "first-missing-size",
+                    "name": "IMG_A.HEIC",
+                    "file": {},
+                    "lastModifiedDateTime": "2026-04-01T10:11:12Z",
+                    "parentReference": {"path": "/drive/root:/Camera Roll/2026"},
+                    "@microsoft.graph.downloadUrl": "https://download/skip-first",
+                },
+                {
+                    "id": "second-valid",
+                    "name": "IMG_B.HEIC",
+                    "file": {},
+                    "size": 6,
+                    "lastModifiedDateTime": "2026-04-01T10:11:13Z",
+                    "parentReference": {"path": "/drive/root:/Camera Roll/2026"},
+                    "@microsoft.graph.downloadUrl": "https://download/keep-second",
+                },
+            ]
+        }
+    ]
+
+    result = poll_and_ingest_fixture(
+        pages=pages,
+        downloads={
+            "https://download/keep-second": {"content": b"second"},
+        },
+    )
+
+    assert result.poll_result.candidate_count == 2
+    assert len(result.poll_result.downloaded_paths) == 1
+    assert len(result.staged_candidates) == 1
+    assert result.staged_candidates[0].onedrive_id == "second-valid"
+    assert result.ingest_result is not None
+    assert result.ingest_result.accepted_count == 1
