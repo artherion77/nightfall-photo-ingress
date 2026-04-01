@@ -28,6 +28,7 @@ addopts = "-ra"
 testpaths = ["tests/unit", "tests/integration"]
 markers = [
   "robustness: end-to-end resilience regression scenarios for the OneDrive client",
+  "staging: staging-environment tests; require a live LXC container (run with: pytest tests/staging)",
 ]
 
 [tool.setuptools]

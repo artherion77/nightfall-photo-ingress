@@ -1,0 +1,411 @@
+#!/usr/bin/env bash
+# stagingctl — LXC staging controller for nightfall-photo-ingress
+#
+# Usage:
+#   stagingctl create            create container + take "clean" snapshot
+#   stagingctl install [wheel]   push wheel + config, enable service
+#   stagingctl uninstall         delete container
+#   stagingctl reset             restore "clean" snapshot, restart
+#   stagingctl smoke             run smoke assertions, collect evidence
+#   stagingctl evidence [run-id] list or inspect evidence runs
+#
+# Environment variables:
+#   STAGING_CLIENT_ID   real Azure client_id to substitute into config
+#   STAGING_ACCOUNT     account section name to target for live poll (default: staging)
+#   STAGING_TOKEN_JSON  path to an existing token cache to push into the container
+#   STAGING_VOLATILE    set to 1 to use /run/staging-photo-ingress/* tmpfs paths
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# ── container identity ────────────────────────────────────────────────────────
+CONTAINER="staging-photo-ingress"
+SNAPSHOT_CLEAN="clean"
+PROFILE_DEFAULT="default"
+PROFILE_STAGING="staging"
+STAGING_VOLATILE="${STAGING_VOLATILE:-0}"
+
+# ── container-internal paths ──────────────────────────────────────────────────
+VENV_ROOT="/opt/ingress"
+CONF_DEST="/etc/nightfall/photo-ingress.conf"
+SERVICE_NAME="nightfall-photo-ingress"
+
+if [[ "$STAGING_VOLATILE" == "1" ]]; then
+    # Volatile mode: host /run is tmpfs, so evidence/logs are ephemeral.
+    HOST_EVIDENCE_BASE="${STAGING_EVIDENCE_BASE:-/run/staging-photo-ingress/evidence}"
+    HOST_LOG_BASE="${STAGING_LOG_BASE:-/run/staging-photo-ingress/logs}"
+    CT_EVIDENCE_DIR="/run/staging-photo-ingress/evidence"
+    CT_LOG_DIR="/run/staging-photo-ingress/logs"
+else
+    # Persistent mode: evidence/logs stored on ssdpool mount.
+    HOST_EVIDENCE_BASE="${STAGING_EVIDENCE_BASE:-/mnt/ssd/staging/photo-ingress/evidence}"
+    HOST_LOG_BASE="${STAGING_LOG_BASE:-/mnt/ssd/staging/photo-ingress/logs}"
+    CT_EVIDENCE_DIR="/var/lib/ingress/evidence"
+    CT_LOG_DIR="/var/log/nightfall"
+fi
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Helpers
+# ─────────────────────────────────────────────────────────────────────────────
+
+_info()  { printf '\033[0;34m[stagingctl]\033[0m %s\n' "$*"; }
+_ok()    { printf '\033[0;32m[stagingctl] OK:\033[0m %s\n' "$*"; }
+_warn()  { printf '\033[0;33m[stagingctl] WARN:\033[0m %s\n' "$*" >&2; }
+_fail()  { printf '\033[0;31m[stagingctl] FAIL:\033[0m %s\n' "$*" >&2; exit 1; }
+
+_require_container_running() {
+    lxc info "$CONTAINER" 2>/dev/null | grep -q "Status: Running" \
+        || _fail "Container '$CONTAINER' is not running. Run: stagingctl create && stagingctl install"
+}
+
+_require_container_exists() {
+    lxc info "$CONTAINER" &>/dev/null \
+        || _fail "Container '$CONTAINER' does not exist. Run: stagingctl create"
+}
+
+_validate_network_policy() {
+    # Ensure container NIC is bridged to br-staging. Do not alter host networking.
+    local expanded
+    expanded="$(lxc config show "$CONTAINER" --expanded)"
+    grep -q "type: nic" <<<"$expanded" \
+        || _fail "Container NIC type is not nic (expected type: nic)."
+    grep -q "nictype: bridged" <<<"$expanded" \
+        || _fail "Container NIC is not bridged (expected nictype: bridged)."
+    grep -q "parent: br-staging" <<<"$expanded" \
+        || _fail "Container NIC is not attached to br-staging."
+}
+
+# Generate a UUIDv4-based run-id prefixed with a sortable timestamp (yyyymmddTHHMMSS).
+# Full UUIDv7 support is available in Python 3.13+; this is equivalent for staging purposes.
+_gen_run_id() {
+    local ts
+    ts="$(date -u +%Y%m%dT%H%M%S)"
+    local uuid
+    uuid="$(python3 -c 'import uuid; print(uuid.uuid4())')"
+    printf '%s-%s' "$ts" "$uuid"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# stagingctl create
+# ─────────────────────────────────────────────────────────────────────────────
+cmd_create() {
+    if lxc info "$CONTAINER" &>/dev/null; then
+        _fail "Container '$CONTAINER' already exists. Run: stagingctl uninstall first."
+    fi
+
+    _info "Preparing host evidence/log directories ($([[ "$STAGING_VOLATILE" == "1" ]] && echo volatile || echo persistent)) ..."
+    mkdir -p "$HOST_EVIDENCE_BASE" "$HOST_LOG_BASE"
+
+    _info "Launching container $CONTAINER (ubuntu:24.04, profiles: default+staging) ..."
+    lxc launch ubuntu:24.04 "$CONTAINER" -p "$PROFILE_DEFAULT" -p "$PROFILE_STAGING"
+
+    _validate_network_policy
+
+    _info "Waiting for container network ..."
+    # Poll until systemd reports running, max 40 s
+    local i=0
+    while ! lxc exec "$CONTAINER" -- systemctl is-system-running --quiet 2>/dev/null; do
+        sleep 2; i=$((i + 2))
+        [[ $i -lt 40 ]] || _fail "Container did not become ready within 40 s."
+    done
+
+    _info "Running container bootstrap ..."
+    lxc file push "$SCRIPT_DIR/container/setup.sh" "$CONTAINER/tmp/setup.sh"
+    lxc exec "$CONTAINER" -- env STAGING_VOLATILE="$STAGING_VOLATILE" bash /tmp/setup.sh
+
+    _info "Attaching tmpfs boundaries (/tmp, /var/tmp, /var/cache/nightfall-photo-ingress) ..."
+    lxc config device add "$CONTAINER" tmpfs-tmp disk source=tmpfs path=/tmp
+    lxc config device add "$CONTAINER" tmpfs-var-tmp disk source=tmpfs path=/var/tmp
+    lxc config device add "$CONTAINER" tmpfs-nightfall-cache disk source=tmpfs path=/var/cache/nightfall-photo-ingress
+
+    _info "Attaching bind-mounts ..."
+    lxc config device add "$CONTAINER" evidence disk \
+        source="$HOST_EVIDENCE_BASE" path="$CT_EVIDENCE_DIR"
+    lxc config device add "$CONTAINER" logs disk \
+        source="$HOST_LOG_BASE" path="$CT_LOG_DIR"
+
+    _info "Installing systemd units ..."
+    lxc file push "$SCRIPT_DIR/systemd/$SERVICE_NAME.service" \
+        "$CONTAINER/etc/systemd/system/$SERVICE_NAME.service"
+    lxc file push "$SCRIPT_DIR/systemd/$SERVICE_NAME.timer" \
+        "$CONTAINER/etc/systemd/system/$SERVICE_NAME.timer"
+    lxc exec "$CONTAINER" -- systemctl daemon-reload
+
+    _info "Taking LXD snapshot '$SNAPSHOT_CLEAN' ..."
+    lxc snapshot "$CONTAINER" "$SNAPSHOT_CLEAN"
+
+    _ok "Container ready. Snapshot '$SNAPSHOT_CLEAN' taken."
+    _info "Next step: stagingctl install"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# stagingctl install [wheel-path]
+# ─────────────────────────────────────────────────────────────────────────────
+cmd_install() {
+    local wheel_path="${1:-}"
+
+    # Auto-discover the newest wheel in dist/ if not provided
+    if [[ -z "$wheel_path" ]]; then
+        wheel_path="$(ls -t "$PROJECT_ROOT/dist/"*.whl 2>/dev/null | head -1 || true)"
+        if [[ -z "$wheel_path" ]]; then
+            _info "No wheel found. Building now ..."
+            (cd "$PROJECT_ROOT" && python3 -m build --wheel --outdir dist/)
+            wheel_path="$(ls -t "$PROJECT_ROOT/dist/"*.whl | head -1)"
+        fi
+    fi
+
+    [[ -f "$wheel_path" ]] || _fail "Wheel not found: $wheel_path"
+    _require_container_running
+
+    local whl_name
+    whl_name="$(basename "$wheel_path")"
+    _info "Pushing $whl_name ..."
+    lxc file push "$wheel_path" "$CONTAINER/tmp/$whl_name"
+
+    # Prepare staging config: substitute real client_id if provided
+    local conf_src="$SCRIPT_DIR/container/photo-ingress.conf"
+    local tmp_conf
+    tmp_conf="$(mktemp /tmp/photo-ingress-staging-XXXXXX.conf)"
+    trap 'rm -f "$tmp_conf"' EXIT
+    cp "$conf_src" "$tmp_conf"
+
+    if [[ -n "${STAGING_CLIENT_ID:-}" ]]; then
+        sed -i "s/STAGING_CLIENT_ID_PLACEHOLDER/$STAGING_CLIENT_ID/" "$tmp_conf"
+        _info "Substituted STAGING_CLIENT_ID."
+    else
+        _warn "STAGING_CLIENT_ID not set — config retains placeholder. Auth will fail."
+    fi
+
+    lxc exec "$CONTAINER" -- mkdir -p /etc/nightfall
+    lxc file push "$tmp_conf" "$CONTAINER$CONF_DEST"
+
+    _info "Running pip install ..."
+    lxc exec "$CONTAINER" -- \
+        "$VENV_ROOT/bin/pip" install --quiet --upgrade "/tmp/$whl_name"
+
+    # Push existing token cache if provided (for resumed smoke testing)
+    if [[ -n "${STAGING_TOKEN_JSON:-}" && -f "$STAGING_TOKEN_JSON" ]]; then
+        _info "Pushing token cache $STAGING_TOKEN_JSON ..."
+        lxc file push "$STAGING_TOKEN_JSON" \
+            "$CONTAINER/var/lib/ingress/tokens/staging.json"
+    fi
+
+    _info "Enabling systemd timer ..."
+    lxc exec "$CONTAINER" -- systemctl enable "$SERVICE_NAME.timer"
+
+    _ok "Installed $whl_name. Timer enabled."
+    _info "Run 'stagingctl smoke' to verify or 'stagingctl reset' to roll back."
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# stagingctl uninstall
+# ─────────────────────────────────────────────────────────────────────────────
+cmd_uninstall() {
+    local purge="0"
+    if [[ "${1:-}" == "--purge" ]]; then
+        purge="1"
+    elif [[ -n "${1:-}" ]]; then
+        _fail "Unknown uninstall option: ${1}. Did you mean --purge?"
+    fi
+
+    _info "Deleting container $CONTAINER ..."
+    lxc delete --force "$CONTAINER" 2>/dev/null || true
+
+    if [[ "$purge" == "1" ]]; then
+        _info "Purging host evidence/log directories ..."
+        rm -rf "$HOST_EVIDENCE_BASE" "$HOST_LOG_BASE"
+    fi
+
+    _ok "Container deleted."
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# stagingctl reset
+# ─────────────────────────────────────────────────────────────────────────────
+cmd_reset() {
+    _require_container_exists
+
+    _info "Stopping container ..."
+    lxc stop "$CONTAINER" --force 2>/dev/null || true
+
+    _info "Restoring LXD snapshot '$SNAPSHOT_CLEAN' ..."
+    lxc restore "$CONTAINER" "$SNAPSHOT_CLEAN"
+
+    _info "Starting container ..."
+    lxc start "$CONTAINER"
+
+    # Wait for readiness
+    local i=0
+    while ! lxc exec "$CONTAINER" -- systemctl is-system-running --quiet 2>/dev/null; do
+        sleep 2; i=$((i + 2))
+        [[ $i -lt 30 ]] || _warn "Container not fully ready after 30 s — continuing anyway."
+        break
+    done
+
+    _ok "Container restored to '$SNAPSHOT_CLEAN'."
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# stagingctl smoke
+# ─────────────────────────────────────────────────────────────────────────────
+cmd_smoke() {
+    _require_container_running
+
+    local run_id
+    run_id="$(_gen_run_id)"
+    local evidence_dir="$HOST_EVIDENCE_BASE/$run_id"
+    mkdir -p "$evidence_dir"
+
+    _info "Smoke run: $run_id"
+    _info "Evidence : $evidence_dir"
+
+    # ── manifest open ────────────────────────────────────────────────────────
+    local manifest="$evidence_dir/manifest.jsonl"
+    printf '{"event":"smoke_started","run_id":"%s","ts":"%s"}\n' \
+        "$run_id" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$manifest"
+
+    local rc=0
+
+    # ── 1. version check ─────────────────────────────────────────────────────
+    _info "Step 1/4: version"
+    lxc exec "$CONTAINER" -- \
+        "$VENV_ROOT/bin/nightfall-photo-ingress" --version 2>&1 \
+        | tee "$evidence_dir/version.log" \
+        && _assert_ok "$evidence_dir/assertions.jsonl" "version_check" "exit 0" \
+        || { _assert_fail "$evidence_dir/assertions.jsonl" "version_check" "non-zero exit"; rc=1; }
+
+    # ── 2. config-check ──────────────────────────────────────────────────────
+    _info "Step 2/4: config-check"
+    lxc exec "$CONTAINER" -- \
+        "$VENV_ROOT/bin/nightfall-photo-ingress" \
+        --log-mode json config-check --path "$CONF_DEST" 2>&1 \
+        | tee "$evidence_dir/config-check.log" \
+        && _assert_ok "$evidence_dir/assertions.jsonl" "config_check" "valid config" \
+        || { _assert_fail "$evidence_dir/assertions.jsonl" "config_check" "config invalid"; rc=1; }
+
+    # ── 3. optional live poll ─────────────────────────────────────────────────
+    local account="${STAGING_ACCOUNT:-staging}"
+    if [[ -n "${STAGING_CLIENT_ID:-}" ]]; then
+        _info "Step 3/4: poll (account=$account)"
+        lxc exec "$CONTAINER" -- \
+            "$VENV_ROOT/bin/nightfall-photo-ingress" \
+            --log-mode json poll --account "$account" --path "$CONF_DEST" 2>&1 \
+            | tee "$evidence_dir/poll.log" \
+            && _assert_ok "$evidence_dir/assertions.jsonl" "poll_exit_0" "poll completed" \
+            || { _assert_fail "$evidence_dir/assertions.jsonl" "poll_exit_0" "poll failed"; rc=1; }
+    else
+        _warn "Step 3/4: poll SKIPPED (STAGING_CLIENT_ID not set)."
+        printf '{"assertion":"poll_skipped","reason":"STAGING_CLIENT_ID_not_set","ts":"%s"}\n' \
+            "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$evidence_dir/assertions.jsonl"
+    fi
+
+    # ── 4. secret scan ───────────────────────────────────────────────────────
+    _info "Step 4/4: secret scan"
+    lxc file push "$SCRIPT_DIR/evidence/secret_scan.py" \
+        "$CONTAINER/tmp/staging_secret_scan.py"
+    lxc exec "$CONTAINER" -- \
+        "$VENV_ROOT/bin/python3" /tmp/staging_secret_scan.py \
+        "$CT_EVIDENCE_DIR/$run_id" 2>&1 \
+        | tee "$evidence_dir/secret-scan.log" \
+        && _assert_ok "$evidence_dir/assertions.jsonl" "secret_scan_clean" "no leaks" \
+        || { _assert_fail "$evidence_dir/assertions.jsonl" "secret_scan_clean" "potential leaks found"; rc=1; }
+
+    # ── manifest close ───────────────────────────────────────────────────────
+    printf '{"event":"smoke_finished","run_id":"%s","ts":"%s","exit_code":%d}\n' \
+        "$run_id" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$rc" >> "$manifest"
+
+    if [[ $rc -eq 0 ]]; then
+        _ok "Smoke PASSED — run_id=$run_id"
+    else
+        _fail "Smoke FAILED — run_id=$run_id  evidence: $evidence_dir"
+    fi
+}
+
+# Write a passing assertion row to a JSONL audit file.
+_assert_ok() {
+    local audit_file="$1" name="$2" detail="$3"
+    printf '{"assertion":"%s","result":"pass","detail":"%s","ts":"%s"}\n' \
+        "$name" "$detail" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$audit_file"
+}
+
+# Write a failing assertion row to a JSONL audit file.
+_assert_fail() {
+    local audit_file="$1" name="$2" detail="$3"
+    printf '{"assertion":"%s","result":"fail","detail":"%s","ts":"%s"}\n' \
+        "$name" "$detail" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$audit_file"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# stagingctl evidence [run-id]
+# ─────────────────────────────────────────────────────────────────────────────
+cmd_evidence() {
+    local run_id="${1:-}"
+
+    if [[ -z "$run_id" ]]; then
+        _info "Evidence runs in $HOST_EVIDENCE_BASE:"
+        if [[ -d "$HOST_EVIDENCE_BASE" ]]; then
+            ls -1t "$HOST_EVIDENCE_BASE"
+        else
+            _info "(none — directory does not exist)"
+        fi
+        return 0
+    fi
+
+    local src="$HOST_EVIDENCE_BASE/$run_id"
+    [[ -d "$src" ]] || _fail "No evidence directory for run: $run_id"
+
+    _info "Files for run $run_id:"
+    ls -lh "$src"
+
+    if [[ -f "$src/assertions.jsonl" ]]; then
+        _info "Assertions:"
+        cat "$src/assertions.jsonl"
+    fi
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Dispatch
+# ─────────────────────────────────────────────────────────────────────────────
+_usage() {
+    cat <<EOF
+Usage: $(basename "$0") <command> [args]
+
+Commands:
+    create            Create LXC container using profiles default+staging and take 'clean' snapshot.
+    install [wheel]   Push wheel + config, enable service. Builds if no wheel given.
+    uninstall [--purge]
+                                        Delete container. --purge also removes host evidence/log directories.
+  reset             Restore 'clean' snapshot and restart.
+  smoke             Run smoke assertions; collect evidence.
+  evidence [id]     List or inspect evidence runs.
+
+Environment variables:
+  STAGING_CLIENT_ID       Azure client_id to inject into config (required for live poll).
+  STAGING_ACCOUNT         Account section name (default: staging).
+  STAGING_TOKEN_JSON      Path to token cache file to push into container.
+    STAGING_VOLATILE        1 => use /run/staging-photo-ingress/{evidence,logs} (tmpfs).
+                                                    0 => use /mnt/ssd/staging/photo-ingress/{evidence,logs}.
+  STAGING_EVIDENCE_BASE   Override host-side evidence directory.
+  STAGING_LOG_BASE        Override host-side log directory.
+EOF
+    exit 1
+}
+
+main() {
+    local cmd="${1:-}"
+    shift || true
+
+    case "$cmd" in
+        create)    cmd_create    "$@" ;;
+        install)   cmd_install   "$@" ;;
+        uninstall) cmd_uninstall "$@" ;;
+        reset)     cmd_reset     "$@" ;;
+        smoke)     cmd_smoke     "$@" ;;
+        evidence)  cmd_evidence  "$@" ;;
+        *)         _usage ;;
+    esac
+}
+
+main "$@"
