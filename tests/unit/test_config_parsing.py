@@ -155,3 +155,41 @@ delta_cursor = /tmp/primary.cursor
     parsed = load_config(cfg)
 
     assert parsed.core.verify_sha256_on_first_download is False
+
+
+def test_storage_template_defaults_to_canonical_v1_when_omitted(tmp_path: Path) -> None:
+    """Default accepted queue layout should match canonical V1 template."""
+
+    cfg = _write_config(
+        tmp_path,
+        """
+[core]
+config_version = 1
+poll_interval_minutes = 15
+process_accounts_in_config_order = true
+staging_path = /mnt/ssd/photo-ingress/staging
+accepted_path = /nightfall/media/photo-ingress/accepted
+trash_path = /nightfall/media/photo-ingress/trash
+registry_path = /mnt/ssd/photo-ingress/registry.db
+staging_on_same_pool = false
+verify_sha256_on_first_download = true
+max_downloads_per_poll = 200
+max_poll_runtime_seconds = 300
+sync_hash_import_enabled = true
+sync_hash_import_path = /nightfall/media/pictures
+sync_hash_import_glob = .hashes.sha1
+
+[account.primary]
+enabled = true
+provider = onedrive
+authority = https://login.microsoftonline.com/consumers
+client_id = cid
+onedrive_root = /Camera Roll
+token_cache = /tmp/primary.token
+delta_cursor = /tmp/primary.cursor
+""".strip(),
+    )
+
+    parsed = load_config(cfg)
+
+    assert parsed.core.storage_template == "{yyyy}/{mm}/{original}"

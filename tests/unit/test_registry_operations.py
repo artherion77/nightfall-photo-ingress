@@ -161,3 +161,68 @@ def test_transition_missing_sha_raises_registry_error(tmp_path: Path) -> None:
             reason="missing",
             actor="test",
         )
+
+
+def test_append_audit_event_allows_sha256_none_and_details_payload(tmp_path: Path) -> None:
+    """Canonical audit_log allows optional sha256 with structured details payload."""
+
+    reg = _new_registry(tmp_path)
+    event_id = reg.append_audit_event(
+        sha256=None,
+        action="auth_failure",
+        reason="token_expired",
+        actor="poller",
+        account_name="primary",
+        details_json='{"status":401}',
+    )
+
+    conn = sqlite3.connect(reg.db_path)
+    try:
+        row = conn.execute(
+            "SELECT sha256, account_name, details_json FROM audit_log WHERE id = ?",
+            (event_id,),
+        ).fetchone()
+    finally:
+        conn.close()
+
+    assert row is not None
+    assert row[0] is None
+    assert row[1] == "primary"
+    assert row[2] == '{"status":401}'
+
+
+def test_external_hash_cache_upsert_is_idempotent(tmp_path: Path) -> None:
+    """Sync-import external hash cache rows should upsert deterministically."""
+
+    reg = _new_registry(tmp_path)
+    reg.upsert_external_hash_cache(
+        account_name="primary",
+        source_relpath="2026/04/IMG_1.HEIC",
+        hash_algo="sha1",
+        hash_value="abc",
+        verified_sha256=None,
+    )
+    reg.upsert_external_hash_cache(
+        account_name="primary",
+        source_relpath="2026/04/IMG_1.HEIC",
+        hash_algo="sha1",
+        hash_value="abc",
+        verified_sha256="f" * 64,
+    )
+
+    conn = sqlite3.connect(reg.db_path)
+    try:
+        row = conn.execute(
+            """
+            SELECT COUNT(*), MAX(verified_sha256)
+            FROM external_hash_cache
+            WHERE account_name = ? AND source_relpath = ? AND hash_algo = ? AND hash_value = ?
+            """,
+            ("primary", "2026/04/IMG_1.HEIC", "sha1", "abc"),
+        ).fetchone()
+    finally:
+        conn.close()
+
+    assert row is not None
+    assert int(row[0]) == 1
+    assert row[1] == "f" * 64

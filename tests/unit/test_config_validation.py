@@ -30,7 +30,7 @@ accepted_path = /nightfall/media/photo-ingress/accepted
 trash_path = /nightfall/media/photo-ingress/trash
 registry_path = /mnt/ssd/photo-ingress/registry.db
 staging_on_same_pool = false
-storage_template = {yyyy}/{mm}/{sha8}-{original}
+storage_template = {yyyy}/{mm}/{original}
 verify_sha256_on_first_download = true
 max_downloads_per_poll = 200
 max_poll_runtime_seconds = 300
@@ -164,3 +164,28 @@ def test_validate_config_file_returns_diagnostics(tmp_path: Path) -> None:
 
     assert errors
     assert any("config_version" in error for error in errors)
+
+
+def test_legacy_single_account_section_is_rejected(tmp_path: Path) -> None:
+    """Legacy [account] section must fail and require [account.<name>] model."""
+
+    cfg = _write_config(
+        tmp_path,
+        _base_core()
+        + "\n\n"
+        + """
+[account]
+enabled = true
+provider = onedrive
+authority = https://login.microsoftonline.com/consumers
+client_id = cid
+onedrive_root = /Camera Roll
+token_cache = /tmp/legacy.token
+delta_cursor = /tmp/legacy.cursor
+""".strip(),
+    )
+
+    with pytest.raises(ConfigError) as exc:
+        load_config(cfg)
+
+    assert "Legacy single-account section [account] is not supported" in str(exc.value)

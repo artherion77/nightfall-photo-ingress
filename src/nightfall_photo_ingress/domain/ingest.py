@@ -640,7 +640,7 @@ class IngestDecisionEngine:
                 SELECT m.sha256 AS sha256, f.status AS status
                 FROM metadata_index AS m
                 JOIN files AS f ON f.sha256 = m.sha256
-                WHERE m.account = ?
+                                WHERE m.account_name = ?
                   AND m.onedrive_id = ?
                   AND m.size_bytes = ?
                   AND m.modified_time = ?

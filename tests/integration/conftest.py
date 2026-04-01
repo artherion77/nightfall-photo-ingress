@@ -112,7 +112,7 @@ class RegistryHarness:
 
     def metadata_rows(self) -> list[dict[str, Any]]:
         return self.query_all(
-            "SELECT account, onedrive_id, size_bytes, modified_time, sha256 FROM metadata_index ORDER BY account, onedrive_id"
+            "SELECT account_name AS account, onedrive_id, size_bytes, modified_time, sha256 FROM metadata_index ORDER BY account_name, onedrive_id"
         )
 
     def accepted_rows(self) -> list[dict[str, Any]]:
@@ -398,7 +398,7 @@ def app_config_fixture(tmp_path: Path, registry_fixture: RegistryHarness):
             "trash_path": tmp_path / "trash",
             "registry_path": registry_fixture.db_path,
             "staging_on_same_pool": True,
-            "storage_template": "{yyyy}/{mm}/{sha8}-{original}",
+            "storage_template": "{yyyy}/{mm}/{original}",
             "verify_sha256_on_first_download": True,
             "max_downloads_per_poll": 100,
             "max_poll_runtime_seconds": 300,

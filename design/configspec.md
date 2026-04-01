@@ -45,7 +45,7 @@ accepted_path = /nightfall/media/photo-ingress/accepted
 trash_path = /nightfall/media/photo-ingress/trash
 registry_path = /mnt/ssd/photo-ingress/registry.db
 staging_on_same_pool = false
-storage_template = {yyyy}/{mm}/{sha8}-{original}
+storage_template = {yyyy}/{mm}/{original}
 verify_sha256_on_first_download = true
 max_downloads_per_poll = 200
 max_poll_runtime_seconds = 300
@@ -97,7 +97,7 @@ console_format = json
 | `trash_path` | path | none | Directory watched by systemd .path unit for reject workflow. |
 | `registry_path` | path | none | SQLite registry file path. |
 | `staging_on_same_pool` | bool | false | Enables rename move optimization when true. |
-| `storage_template` | string | `{yyyy}/{mm}/{sha8}-{original}` | Template for accepted queue file layout. |
+| `storage_template` | string | `{yyyy}/{mm}/{original}` | Template for accepted queue file layout. |
 | `process_accounts_in_config_order` | bool | true | Process enabled accounts serially in the order they appear in the config file. |
 | `verify_sha256_on_first_download` | bool | true | If advisory SHA1 prefilter indicates a match, still force one first-download SHA-256 verification before trusting skip behavior. |
 

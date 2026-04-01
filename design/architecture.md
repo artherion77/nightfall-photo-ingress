@@ -128,24 +128,27 @@ CREATE TABLE files (
     status          TEXT NOT NULL CHECK (status IN ('accepted', 'rejected', 'purged')),
     original_filename TEXT,
     onedrive_id     TEXT,
-    created_at      TEXT NOT NULL,   -- ISO-8601 UTC
+   first_seen_at   TEXT NOT NULL,   -- ISO-8601 UTC
     updated_at      TEXT NOT NULL    -- ISO-8601 UTC
 );
 
 CREATE TABLE metadata_index (
     -- Fast pre-filter: check if we already processed this OneDrive item
+   account_name   TEXT NOT NULL,
     onedrive_id     TEXT NOT NULL,
     size_bytes      INTEGER NOT NULL,
     modified_time   TEXT NOT NULL,
     sha256          TEXT NOT NULL,
-    PRIMARY KEY (onedrive_id)
+   PRIMARY KEY (account_name, onedrive_id)
 );
 
 CREATE TABLE audit_log (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    sha256          TEXT NOT NULL,
+   sha256          TEXT,
+   account_name    TEXT,
     action          TEXT NOT NULL,   -- 'accepted', 'rejected', 'purged', 'duplicate_skipped', etc.
     reason          TEXT,
+   details_json    TEXT,
     actor           TEXT NOT NULL,   -- 'pipeline', 'cli', 'trash_watch'
     ts              TEXT NOT NULL    -- ISO-8601 UTC
 );
@@ -178,7 +181,7 @@ CREATE TABLE accepted_records (
 1. Acquire OAuth2 token silently (MSAL refresh token flow).
 2. Call Graph API delta endpoint for the configured OneDrive folder.
 3. For each changed `file` item:
-   a. **Metadata pre-filter**: look up `metadata_index` by `(onedrive_id, size, modified_time)`. If hit and SHA-256 is in `files`, skip — no download needed.
+   a. **Metadata pre-filter**: look up `metadata_index` by `(account_name, onedrive_id, size, modified_time)`. If hit and SHA-256 is in `files`, skip — no download needed.
    b. **Download** file to `/mnt/ssd/photo-ingress/staging/{onedrive_id}.tmp` (streaming, chunked).
    c. Rename `.tmp` → `{onedrive_id}.{ext}` on success.
    d. **Compute SHA-256** (streaming 64 KB chunks; never loads full file into memory).
@@ -240,7 +243,7 @@ photo-ingress reject <sha256> [--reason "..."]
 | Name collision in accepted/ | Two different files with same name same month → `{sha256[:8]}-{original_filename}` suffix |
 | Delta cursor loss | Fall back to `?token=latest` (last 30 days) or full folder scan; registry idempotency prevents re-ingesting known files |
 | Cross-pool atomic move | If staging (SSD) and accepted (HDD) are different ZFS pools: `shutil.copy2` → verify SHA-256 → `unlink` staging; controlled by `STAGING_SAME_POOL` config flag |
-| Concurrent poll runs | systemd `Type=oneshot` prevents overlap; SQLite `BEGIN EXCLUSIVE` as secondary guard |
+| Concurrent poll runs | Explicit global process lock serializes full poll runs across CLI and timer paths; `Type=oneshot` is a secondary defense |
 | Auth token expiry | MSAL handles refresh transparently; alert email after ≥3 consecutive auth failures |
 | Operator manually moves accepted files away | `accepted_records` table preserves acceptance truth independent of current file location |
 | Immich DB purge or upgrade | Pipeline is Immich-independent; permanent library remains the viewer source of truth |

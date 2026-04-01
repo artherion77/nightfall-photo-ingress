@@ -28,7 +28,7 @@ class FileRecord:
     status: str
     original_filename: str | None
     current_path: str | None
-    created_at: str
+    first_seen_at: str
     updated_at: str
 
 
@@ -37,9 +37,11 @@ class AuditRecord:
     """Typed view over one row in the audit log."""
 
     id: int
-    sha256: str
+    sha256: str | None
+    account_name: str | None
     action: str
     reason: str | None
+    details_json: str | None
     actor: str
     ts: str
 
@@ -103,7 +105,7 @@ class Registry:
                     status,
                     original_filename,
                     current_path,
-                    created_at,
+                    first_seen_at,
                     updated_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(sha256) DO UPDATE SET
@@ -135,7 +137,7 @@ class Registry:
             conn.execute(
                 """
                 INSERT INTO metadata_index (
-                    account,
+                    account_name,
                     onedrive_id,
                     size_bytes,
                     modified_time,
@@ -143,7 +145,7 @@ class Registry:
                     created_at,
                     updated_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(account, onedrive_id) DO UPDATE SET
+                ON CONFLICT(account_name, onedrive_id) DO UPDATE SET
                     size_bytes = excluded.size_bytes,
                     modified_time = excluded.modified_time,
                     sha256 = excluded.sha256,
@@ -240,7 +242,7 @@ class Registry:
                     status,
                     original_filename,
                     current_path,
-                    created_at,
+                    first_seen_at,
                     updated_at
                 ) VALUES (?, ?, 'accepted', ?, ?, ?, ?)
                 ON CONFLICT(sha256) DO UPDATE SET
@@ -276,7 +278,7 @@ class Registry:
             conn.execute(
                 """
                 INSERT INTO metadata_index (
-                    account,
+                    account_name,
                     onedrive_id,
                     size_bytes,
                     modified_time,
@@ -284,7 +286,7 @@ class Registry:
                     created_at,
                     updated_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(account, onedrive_id) DO UPDATE SET
+                ON CONFLICT(account_name, onedrive_id) DO UPDATE SET
                     size_bytes = excluded.size_bytes,
                     modified_time = excluded.modified_time,
                     sha256 = excluded.sha256,
@@ -320,8 +322,11 @@ class Registry:
 
             step = 5
             conn.execute(
-                "INSERT INTO audit_log (sha256, action, reason, actor, ts) VALUES (?, 'accepted', 'unknown_hash', ?, ?)",
-                (sha256, actor, now),
+                """
+                INSERT INTO audit_log (sha256, account_name, action, reason, details_json, actor, ts)
+                VALUES (?, ?, 'accepted', 'unknown_hash', NULL, ?, ?)
+                """,
+                (sha256, account, actor, now),
             )
             if fail_after_step == step:
                 conn.rollback()
@@ -353,7 +358,7 @@ class Registry:
             conn.execute(
                 """
                 INSERT INTO metadata_index (
-                    account,
+                    account_name,
                     onedrive_id,
                     size_bytes,
                     modified_time,
@@ -361,7 +366,7 @@ class Registry:
                     created_at,
                     updated_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(account, onedrive_id) DO UPDATE SET
+                ON CONFLICT(account_name, onedrive_id) DO UPDATE SET
                     size_bytes = excluded.size_bytes,
                     modified_time = excluded.modified_time,
                     sha256 = excluded.sha256,
@@ -387,8 +392,11 @@ class Registry:
                 (account, onedrive_id, sha256, source_path, now, now),
             )
             conn.execute(
-                "INSERT INTO audit_log (sha256, action, reason, actor, ts) VALUES (?, ?, 'known_hash', ?, ?)",
-                (sha256, f"discard_{known_status}", actor, now),
+                """
+                INSERT INTO audit_log (sha256, account_name, action, reason, details_json, actor, ts)
+                VALUES (?, ?, ?, 'known_hash', NULL, ?, ?)
+                """,
+                (sha256, account, f"discard_{known_status}", actor, now),
             )
             conn.commit()
 
@@ -430,7 +438,10 @@ class Registry:
                 (new_status, now, sha256),
             )
             conn.execute(
-                "INSERT INTO audit_log (sha256, action, reason, actor, ts) VALUES (?, ?, ?, ?, ?)",
+                """
+                INSERT INTO audit_log (sha256, account_name, action, reason, details_json, actor, ts)
+                VALUES (?, NULL, ?, ?, NULL, ?, ?)
+                """,
                 (sha256, new_status, reason, actor, now),
             )
             conn.commit()
@@ -438,10 +449,12 @@ class Registry:
     def append_audit_event(
         self,
         *,
-        sha256: str,
+        sha256: str | None,
         action: str,
         reason: str | None,
         actor: str,
+        account_name: str | None = None,
+        details_json: str | None = None,
     ) -> int:
         """Append one immutable event row and return its primary key."""
 
@@ -450,8 +463,11 @@ class Registry:
             _set_pragmas(conn)
             conn.execute("BEGIN IMMEDIATE")
             cursor = conn.execute(
-                "INSERT INTO audit_log (sha256, action, reason, actor, ts) VALUES (?, ?, ?, ?, ?)",
-                (sha256, action, reason, actor, now),
+                """
+                INSERT INTO audit_log (sha256, account_name, action, reason, details_json, actor, ts)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (sha256, account_name, action, reason, details_json, actor, now),
             )
             conn.commit()
             return int(cursor.lastrowid)
@@ -510,7 +526,7 @@ class Registry:
             _set_pragmas(conn)
             row = conn.execute(
                 """
-                SELECT sha256, size_bytes, status, original_filename, current_path, created_at, updated_at
+                SELECT sha256, size_bytes, status, original_filename, current_path, first_seen_at, updated_at
                 FROM files
                 WHERE sha256 = ?
                 """,
@@ -525,7 +541,7 @@ class Registry:
             status=row["status"],
             original_filename=row["original_filename"],
             current_path=row["current_path"],
-            created_at=row["created_at"],
+            first_seen_at=row["first_seen_at"],
             updated_at=row["updated_at"],
         )
 
@@ -535,7 +551,12 @@ class Registry:
         with self._connect() as conn:
             _set_pragmas(conn)
             rows = conn.execute(
-                "SELECT id, sha256, action, reason, actor, ts FROM audit_log WHERE sha256 = ? ORDER BY id ASC",
+                """
+                SELECT id, sha256, account_name, action, reason, details_json, actor, ts
+                FROM audit_log
+                WHERE sha256 = ?
+                ORDER BY id ASC
+                """,
                 (sha256,),
             ).fetchall()
 
@@ -543,13 +564,49 @@ class Registry:
             AuditRecord(
                 id=row["id"],
                 sha256=row["sha256"],
+                account_name=row["account_name"],
                 action=row["action"],
                 reason=row["reason"],
+                details_json=row["details_json"],
                 actor=row["actor"],
                 ts=row["ts"],
             )
             for row in rows
         ]
+
+    def upsert_external_hash_cache(
+        self,
+        *,
+        account_name: str,
+        source_relpath: str,
+        hash_algo: str,
+        hash_value: str,
+        verified_sha256: str | None = None,
+    ) -> None:
+        """Insert or update external hash cache rows used by sync-import mode."""
+
+        now = _utc_now()
+        with self._connect() as conn:
+            _set_pragmas(conn)
+            conn.execute("BEGIN IMMEDIATE")
+            conn.execute(
+                """
+                INSERT INTO external_hash_cache (
+                    account_name,
+                    source_relpath,
+                    hash_algo,
+                    hash_value,
+                    verified_sha256,
+                    first_seen_at,
+                    updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(account_name, source_relpath, hash_algo, hash_value) DO UPDATE SET
+                    verified_sha256 = COALESCE(excluded.verified_sha256, external_hash_cache.verified_sha256),
+                    updated_at = excluded.updated_at
+                """,
+                (account_name, source_relpath, hash_algo, hash_value, verified_sha256, now, now),
+            )
+            conn.commit()
 
     def acceptance_count(self, *, sha256: str) -> int:
         """Return number of acceptance history entries for one SHA-256."""
@@ -753,19 +810,6 @@ CREATE TABLE IF NOT EXISTS ingest_terminal_audit (
     actor TEXT NOT NULL,
     ts TEXT NOT NULL
 );
-
-CREATE TABLE IF NOT EXISTS live_photo_pairs (
-    pair_id TEXT PRIMARY KEY,
-    account TEXT NOT NULL,
-    stem TEXT NOT NULL,
-    photo_sha256 TEXT NOT NULL,
-    video_sha256 TEXT NOT NULL,
-    status TEXT NOT NULL CHECK (status IN ('paired', 'accepted', 'rejected', 'purged')),
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    FOREIGN KEY (photo_sha256) REFERENCES files(sha256),
-    FOREIGN KEY (video_sha256) REFERENCES files(sha256)
-);
         """
     )
     conn.commit()
@@ -781,19 +825,19 @@ CREATE TABLE IF NOT EXISTS files (
     status TEXT NOT NULL CHECK (status IN ('accepted', 'rejected', 'purged')),
     original_filename TEXT,
     current_path TEXT,
-    created_at TEXT NOT NULL,
+    first_seen_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS metadata_index (
-    account TEXT NOT NULL,
+    account_name TEXT NOT NULL,
     onedrive_id TEXT NOT NULL,
     size_bytes INTEGER NOT NULL,
     modified_time TEXT NOT NULL,
     sha256 TEXT NOT NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
-    PRIMARY KEY (account, onedrive_id)
+    PRIMARY KEY (account_name, onedrive_id)
 );
 
 CREATE TABLE IF NOT EXISTS accepted_records (
@@ -818,12 +862,37 @@ CREATE TABLE IF NOT EXISTS file_origins (
 
 CREATE TABLE IF NOT EXISTS audit_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    sha256 TEXT NOT NULL,
+    sha256 TEXT,
+    account_name TEXT,
     action TEXT NOT NULL,
     reason TEXT,
+    details_json TEXT,
     actor TEXT NOT NULL,
-    ts TEXT NOT NULL,
-    FOREIGN KEY (sha256) REFERENCES files(sha256)
+    ts TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS live_photo_pairs (
+    pair_id TEXT PRIMARY KEY,
+    account TEXT NOT NULL,
+    stem TEXT NOT NULL,
+    photo_sha256 TEXT NOT NULL,
+    video_sha256 TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('paired', 'accepted', 'rejected', 'purged')),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (photo_sha256) REFERENCES files(sha256),
+    FOREIGN KEY (video_sha256) REFERENCES files(sha256)
+);
+
+CREATE TABLE IF NOT EXISTS external_hash_cache (
+    account_name TEXT NOT NULL,
+    source_relpath TEXT NOT NULL,
+    hash_algo TEXT NOT NULL,
+    hash_value TEXT NOT NULL,
+    verified_sha256 TEXT,
+    first_seen_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (account_name, source_relpath, hash_algo, hash_value)
 );
 
 CREATE TRIGGER IF NOT EXISTS trg_audit_log_no_update

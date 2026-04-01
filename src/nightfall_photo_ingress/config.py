@@ -151,6 +151,7 @@ def load_config(path: Path | str) -> AppConfig:
     core = _parse_core(parser, errors)
     logging_cfg = _parse_logging(parser, errors)
     accounts = _parse_accounts(parser, core.max_downloads_per_poll, errors)
+    _validate_section_model(parser, errors)
 
     _validate_accounts(accounts, errors)
     _validate_core(core, errors)
@@ -194,7 +195,7 @@ def _parse_core(parser: configparser.ConfigParser, errors: list[str]) -> CoreCon
             core,
             "storage_template",
             errors,
-            default="{yyyy}/{mm}/{sha8}-{original}",
+            default="{yyyy}/{mm}/{original}",
         ),
         verify_sha256_on_first_download=_get_bool(
             core,
@@ -323,7 +324,7 @@ def _default_core() -> CoreConfig:
         trash_path=Path("/tmp/trash"),
         registry_path=Path("/tmp/registry.db"),
         staging_on_same_pool=False,
-        storage_template="{yyyy}/{mm}/{sha8}-{original}",
+        storage_template="{yyyy}/{mm}/{original}",
         verify_sha256_on_first_download=True,
         max_downloads_per_poll=200,
         max_poll_runtime_seconds=300,
@@ -543,6 +544,25 @@ def _validate_accounts(accounts: list[AccountConfig], errors: list[str]) -> None
             errors.append(
                 f"[account.{account.name}] max_downloads must be > 0 when set"
             )
+
+
+def _validate_section_model(parser: configparser.ConfigParser, errors: list[str]) -> None:
+    """Reject legacy or unsupported section names for canonical V1 model."""
+
+    for section_name in parser.sections():
+        if section_name in {"core", "logging"}:
+            continue
+        if section_name.startswith("account."):
+            continue
+        if section_name == "account":
+            errors.append(
+                "Legacy single-account section [account] is not supported; "
+                "use [account.<name>] sections"
+            )
+            continue
+        errors.append(
+            f"Unsupported section [{section_name}] for V1 config model"
+        )
 
 
 def _get_str(

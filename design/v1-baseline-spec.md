@@ -160,7 +160,7 @@ For each delta file candidate:
    - unknown: write to accepted queue, mark accepted in `files` + `accepted_records`, insert/update `metadata_index`, audit accepted.
 
 ### 7.3 Accepted queue semantics
-- Write target uses configurable template, default `{yyyy}/{mm}/{sha8}-{original}`.
+- Write target uses configurable template, default `{yyyy}/{mm}/{original}`.
 - Accepted queue is expected to be drained manually by operator.
 - Registry acceptance history remains valid even if queue files disappear later.
 

@@ -30,6 +30,7 @@ from uuid import uuid4
 import httpx
 
 from nightfall_photo_ingress.config import AccountConfig, AppConfig
+from nightfall_photo_ingress.runtime.process_lock import global_process_lock
 from .auth import AuthError, OneDriveAuthClient
 from .cache_lock import SingletonLockBusyError, account_singleton_lock
 from .errors import DownloadError, GraphError, GraphResyncRequired, redact_url  # noqa: F401
@@ -202,6 +203,7 @@ def poll_accounts(
     policy: RetryPolicy = DEFAULT_POLICY,
     sleeper: Callable[[float], None] = time.sleep,
     jitter_fn: Callable[[], float] | None = None,
+    process_lock_path: Path | None = None,
 ) -> tuple[AccountPollResult, ...]:
     """Poll enabled accounts in configured deterministic order.
 
@@ -226,67 +228,70 @@ def poll_accounts(
                 operation="poll_accounts",
             )
 
-    auth = auth_client or OneDriveAuthClient()
-    results_by_index: dict[int, AccountPollResult] = {}
-    deadline = monotonic() + app_config.core.max_poll_runtime_seconds
+    lock_path = process_lock_path or app_config.core.registry_path.with_suffix(".poll.lock")
 
-    poll_run_id = str(uuid4())
-    _trace_event(
-        "poll_accounts_start",
-        poll_run_id=poll_run_id,
-        account_count=len(selected),
-    )
+    with global_process_lock(lock_path):
+        auth = auth_client or OneDriveAuthClient()
+        results_by_index: dict[int, AccountPollResult] = {}
+        deadline = monotonic() + app_config.core.max_poll_runtime_seconds
 
-    worker_count = max(1, min(app_config.core.account_worker_count, len(selected)))
+        poll_run_id = str(uuid4())
+        _trace_event(
+            "poll_accounts_start",
+            poll_run_id=poll_run_id,
+            account_count=len(selected),
+        )
 
-    if worker_count == 1:
-        for index, account in enumerate(selected):
-            results_by_index[index] = _poll_single_account(
-                account=account,
-                app_config=app_config,
-                auth=auth,
-                http_client_factory=http_client_factory,
-                poll_run_id=poll_run_id,
-                deadline=deadline,
-                policy=policy,
-                sleeper=sleeper,
-                jitter_fn=jitter_fn,
-            )
-    else:
-        futures: dict[Future[AccountPollResult], int] = {}
-        with ThreadPoolExecutor(max_workers=worker_count) as pool:
+        worker_count = max(1, min(app_config.core.account_worker_count, len(selected)))
+
+        if worker_count == 1:
             for index, account in enumerate(selected):
-                remaining = deadline - monotonic()
-                if remaining <= 0:
-                    results_by_index[index] = _runtime_budget_exhausted_result(account.name)
-                    continue
-                future = pool.submit(
-                    _poll_single_account,
-                    account,
-                    app_config,
-                    auth,
-                    http_client_factory,
-                    poll_run_id,
-                    deadline,
-                    policy,
-                    sleeper,
-                    jitter_fn,
+                results_by_index[index] = _poll_single_account(
+                    account=account,
+                    app_config=app_config,
+                    auth=auth,
+                    http_client_factory=http_client_factory,
+                    poll_run_id=poll_run_id,
+                    deadline=deadline,
+                    policy=policy,
+                    sleeper=sleeper,
+                    jitter_fn=jitter_fn,
                 )
-                futures[future] = index
+        else:
+            futures: dict[Future[AccountPollResult], int] = {}
+            with ThreadPoolExecutor(max_workers=worker_count) as pool:
+                for index, account in enumerate(selected):
+                    remaining = deadline - monotonic()
+                    if remaining <= 0:
+                        results_by_index[index] = _runtime_budget_exhausted_result(account.name)
+                        continue
+                    future = pool.submit(
+                        _poll_single_account,
+                        account,
+                        app_config,
+                        auth,
+                        http_client_factory,
+                        poll_run_id,
+                        deadline,
+                        policy,
+                        sleeper,
+                        jitter_fn,
+                    )
+                    futures[future] = index
 
-            for future in as_completed(futures):
-                index = futures[future]
-                results_by_index[index] = future.result()
+                for future in as_completed(futures):
+                    index = futures[future]
+                    results_by_index[index] = future.result()
 
-    results = tuple(results_by_index[idx] for idx in sorted(results_by_index))
+        results = tuple(results_by_index[idx] for idx in sorted(results_by_index))
 
-    _trace_event(
-        "poll_accounts_end",
-        poll_run_id=poll_run_id,
-        result_count=len(results),
-    )
+        _trace_event(
+            "poll_accounts_end",
+            poll_run_id=poll_run_id,
+            result_count=len(results),
+        )
 
-    return results
+        return results
 
 
 def _runtime_budget_exhausted_result(account_name: str) -> AccountPollResult:

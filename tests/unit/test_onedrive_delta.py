@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -259,6 +260,44 @@ def test_poll_accounts_runs_enabled_accounts_in_config_order(tmp_path: Path) -> 
     assert [res.delta_anomaly_count for res in results] == [0, 0]
     assert first.delta_cursor.read_text(encoding="utf-8") == "https://delta/zzz"
     assert second.delta_cursor.read_text(encoding="utf-8") == "https://delta/aaa"
+
+
+def test_poll_accounts_uses_global_process_lock(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Poll orchestration must acquire a global lock shared by timer and CLI paths."""
+
+    account = _make_account(tmp_path, "alice", "/Camera Roll")
+    app_config = _make_app_config(tmp_path, (account,))
+    seen: list[Path] = []
+
+    @contextmanager
+    def _fake_global_lock(lock_path: Path):
+        seen.append(lock_path)
+        yield
+
+    monkeypatch.setattr(
+        "nightfall_photo_ingress.adapters.onedrive.client.global_process_lock",
+        _fake_global_lock,
+    )
+
+    def factory() -> _FakeClient:
+        return _FakeClient(
+            {
+                "https://graph.microsoft.com/v1.0/me/drive/root:/Camera%20Roll:/delta": [
+                    _FakeResponse(
+                        status_code=200,
+                        text='{"value":[],"@odata.deltaLink":"https://delta/alice"}',
+                    )
+                ]
+            }
+        )
+
+    poll_accounts(
+        app_config,
+        auth_client=_FakeAuthClient(),
+        http_client_factory=factory,
+    )
+
+    assert seen == [app_config.core.registry_path.with_suffix(".poll.lock")]
 
 
 def test_poll_account_once_errors_when_delta_link_missing(tmp_path: Path) -> None:

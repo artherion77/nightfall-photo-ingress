@@ -41,7 +41,7 @@ This document synthesizes all refinement requirements derived from the architect
 - Add an account-to-file mapping table for auditability.
 
 ### A3 — Configurable Storage Template
-- Default template: `{yyyy}/{mm}/{sha8}-{original}`
+- Default template: `{yyyy}/{mm}/{original}`
 - Template engine must support:
   - `{yyyy}`, `{mm}`, `{dd}`
   - `{sha256}`, `{sha8}`
