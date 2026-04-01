@@ -30,7 +30,14 @@ def test_initialize_fresh_database_creates_expected_schema(tmp_path: Path) -> No
     registry.initialize()
 
     tables = _table_names(db_path)
-    assert {"files", "metadata_index", "accepted_records", "file_origins", "audit_log"}.issubset(tables)
+    assert {
+        "files",
+        "metadata_index",
+        "accepted_records",
+        "file_origins",
+        "audit_log",
+        "live_photo_pairs",
+    }.issubset(tables)
     assert registry.schema_version() == LATEST_SCHEMA_VERSION
 
 

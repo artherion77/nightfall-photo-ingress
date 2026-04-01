@@ -44,6 +44,20 @@ class AuditRecord:
     ts: str
 
 
+@dataclass(frozen=True)
+class LivePhotoPairRecord:
+    """Typed view over one row in the live_photo_pairs table."""
+
+    pair_id: str
+    account: str
+    stem: str
+    photo_sha256: str
+    video_sha256: str
+    status: str
+    created_at: str
+    updated_at: str
+
+
 class Registry:
     """High-level API for schema migration and state transitions."""
 
@@ -548,6 +562,131 @@ class Registry:
             ).fetchone()
         return int(row["n"]) if row is not None else 0
 
+    def upsert_live_photo_pair(
+        self,
+        *,
+        pair_id: str,
+        account: str,
+        stem: str,
+        photo_sha256: str,
+        video_sha256: str,
+        status: str = "paired",
+    ) -> None:
+        """Insert or update a live photo pair mapping."""
+
+        if status not in {"paired", "accepted", "rejected", "purged"}:
+            raise RegistryError(f"Invalid live photo pair status: {status}")
+
+        now = _utc_now()
+        with self._connect() as conn:
+            _set_pragmas(conn)
+            conn.execute("BEGIN IMMEDIATE")
+            conn.execute(
+                """
+                INSERT INTO live_photo_pairs (
+                    pair_id,
+                    account,
+                    stem,
+                    photo_sha256,
+                    video_sha256,
+                    status,
+                    created_at,
+                    updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(pair_id) DO UPDATE SET
+                    account = excluded.account,
+                    stem = excluded.stem,
+                    photo_sha256 = excluded.photo_sha256,
+                    video_sha256 = excluded.video_sha256,
+                    status = excluded.status,
+                    updated_at = excluded.updated_at
+                """,
+                (
+                    pair_id,
+                    account,
+                    stem,
+                    photo_sha256,
+                    video_sha256,
+                    status,
+                    now,
+                    now,
+                ),
+            )
+            conn.commit()
+
+    def get_live_photo_pair(self, *, pair_id: str) -> LivePhotoPairRecord | None:
+        """Return one live photo pair row or None when missing."""
+
+        with self._connect() as conn:
+            _set_pragmas(conn)
+            row = conn.execute(
+                """
+                SELECT pair_id, account, stem, photo_sha256, video_sha256, status, created_at, updated_at
+                FROM live_photo_pairs
+                WHERE pair_id = ?
+                """,
+                (pair_id,),
+            ).fetchone()
+
+        if row is None:
+            return None
+        return LivePhotoPairRecord(
+            pair_id=row["pair_id"],
+            account=row["account"],
+            stem=row["stem"],
+            photo_sha256=row["photo_sha256"],
+            video_sha256=row["video_sha256"],
+            status=row["status"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+        )
+
+    def apply_live_photo_pair_status(
+        self,
+        *,
+        pair_id: str,
+        new_status: str,
+        reason: str,
+        actor: str,
+    ) -> None:
+        """Apply one status transition consistently to both pair members."""
+
+        if new_status not in {"accepted", "rejected", "purged"}:
+            raise RegistryError(
+                f"Invalid live photo propagated status: {new_status}"
+            )
+
+        pair = self.get_live_photo_pair(pair_id=pair_id)
+        if pair is None:
+            raise RegistryError(f"Missing live photo pair: {pair_id}")
+
+        self.transition_status(
+            sha256=pair.photo_sha256,
+            new_status=new_status,
+            reason=reason,
+            actor=actor,
+        )
+        self.transition_status(
+            sha256=pair.video_sha256,
+            new_status=new_status,
+            reason=reason,
+            actor=actor,
+        )
+
+        now = _utc_now()
+        with self._connect() as conn:
+            _set_pragmas(conn)
+            conn.execute("BEGIN IMMEDIATE")
+            conn.execute(
+                """
+                UPDATE live_photo_pairs
+                SET status = ?, updated_at = ?
+                WHERE pair_id = ?
+                """,
+                (new_status, now, pair_id),
+            )
+            conn.commit()
+
     def schema_version(self) -> int:
         """Return current SQLite user_version schema integer."""
 
@@ -613,6 +752,19 @@ CREATE TABLE IF NOT EXISTS ingest_terminal_audit (
     reason TEXT,
     actor TEXT NOT NULL,
     ts TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS live_photo_pairs (
+    pair_id TEXT PRIMARY KEY,
+    account TEXT NOT NULL,
+    stem TEXT NOT NULL,
+    photo_sha256 TEXT NOT NULL,
+    video_sha256 TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('paired', 'accepted', 'rejected', 'purged')),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (photo_sha256) REFERENCES files(sha256),
+    FOREIGN KEY (video_sha256) REFERENCES files(sha256)
 );
         """
     )

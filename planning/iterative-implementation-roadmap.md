@@ -338,18 +338,18 @@ Support iPhone Live Photos as a first-class V1 feature by pairing image/video co
   - `live_photo_stem_mode = exact_stem`
   - `live_photo_component_order = photo_first`
   - `live_photo_conflict_policy = nearest_capture_time`
-- [ ] Enforce V1 support policy: runtime accepts only default enum values while preserving parameterized configuration surface.
-- [ ] Introduce `live_photo_pairs` registry table with component references.
-- [ ] Implement deferred pairing logic when counterpart arrives later.
-- [ ] Ensure reject/accept actions are applied consistently to pair members.
-- [ ] Add operator diagnostics for unresolved pair candidates.
+- [x] Enforce V1 support policy: runtime accepts only default enum values while preserving parameterized configuration surface.
+- [x] Introduce `live_photo_pairs` registry table with component references.
+- [x] Implement deferred pairing logic when counterpart arrives later.
+- [x] Ensure reject/accept actions are applied consistently to pair members.
+- [x] Add operator diagnostics for unresolved pair candidates.
 
 ### Unit tests
-- [ ] Pair detection by stem/time rules using configured defaults.
-- [ ] Late-arrival pairing test.
-- [ ] Rejection propagation across pair members test.
-- [ ] Unresolved candidate aging test.
-- [ ] Unsupported non-default heuristic value rejection test (V1 policy).
+- [x] Pair detection by stem/time rules using configured defaults.
+- [x] Late-arrival pairing test.
+- [x] Rejection propagation across pair members test.
+- [x] Unresolved candidate aging test.
+- [x] Unsupported non-default heuristic value rejection test (V1 policy).
 
 ### Integration tests
 - [ ] Ingest mixed burst containing HEIC+MOV pairs and standalone assets.
