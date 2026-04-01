@@ -7,6 +7,7 @@ accepted queue storage without touching the permanent library.
 
 from __future__ import annotations
 
+import hashlib
 import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -14,6 +15,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
+from ..live_photo import DeferredPairQueue, LivePhotoCandidate, LivePhotoHeuristics
 from .registry import Registry
 from .storage import (
     commit_staging_to_accepted,
@@ -119,6 +121,7 @@ class IngestDecisionEngine:
         worker_count: int = 1,
         size_aware_scheduling: bool = True,
         collision_max_attempts: int = 10_000,
+        live_photo_heuristics: LivePhotoHeuristics | None = None,
     ) -> IngestBatchResult:
         """Process staged candidates and return batch summary."""
 
@@ -145,6 +148,8 @@ class IngestDecisionEngine:
         outcomes: list[IngestOutcome] = []
         batch_run_id = uuid4().hex
         sequence_no = 0
+        pair_queue = DeferredPairQueue(live_photo_heuristics) if live_photo_heuristics is not None else None
+        sha_by_onedrive_id: dict[str, str] = {}
 
         indexed_candidates = list(enumerate(candidates))
         if size_aware_scheduling:
@@ -196,6 +201,36 @@ class IngestDecisionEngine:
 
         for _index, candidate, outcome in ordered_results:
             outcomes.append(outcome)
+            if outcome.sha256 is not None:
+                sha_by_onedrive_id[candidate.onedrive_id] = outcome.sha256
+
+            if pair_queue is not None:
+                pair = pair_queue.ingest(
+                    LivePhotoCandidate(
+                        account=candidate.account_name,
+                        onedrive_id=candidate.onedrive_id,
+                        filename=candidate.original_filename,
+                        captured_at=candidate.modified_time,
+                    )
+                )
+                if pair is not None:
+                    photo_sha = sha_by_onedrive_id.get(pair.photo_onedrive_id)
+                    video_sha = sha_by_onedrive_id.get(pair.video_onedrive_id)
+                    if photo_sha is not None and video_sha is not None:
+                        self._registry.upsert_live_photo_pair(
+                            pair_id=_live_photo_pair_id(
+                                account=pair.account,
+                                stem=pair.stem,
+                                photo_sha256=photo_sha,
+                                video_sha256=video_sha,
+                            ),
+                            account=pair.account,
+                            stem=pair.stem,
+                            photo_sha256=photo_sha,
+                            video_sha256=video_sha,
+                            status="paired",
+                        )
+
             sequence_no += 1
             self._registry.append_ingest_terminal_event(
                 batch_run_id=batch_run_id,
@@ -710,3 +745,16 @@ class IngestDecisionEngine:
         if target.exists():
             target = target.with_name(f"{target.stem}-{int(datetime.now(UTC).timestamp())}{target.suffix}")
         path.replace(target)
+
+
+def _live_photo_pair_id(
+    *,
+    account: str,
+    stem: str,
+    photo_sha256: str,
+    video_sha256: str,
+) -> str:
+    """Build deterministic pair ID stable across ingest replays."""
+
+    raw = f"{account}|{stem}|{photo_sha256}|{video_sha256}"
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:32]

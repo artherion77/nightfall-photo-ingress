@@ -333,7 +333,7 @@ Support iPhone Live Photos as a first-class V1 feature by pairing image/video co
 - timeout/deferred pairing queue
 
 ### Implementation steps
-- [ ] Wire pairing heuristics to config parameters with V1 defaults:
+- [x] Wire pairing heuristics to config parameters with V1 defaults:
   - `live_photo_capture_tolerance_seconds = 3`
   - `live_photo_stem_mode = exact_stem`
   - `live_photo_component_order = photo_first`
@@ -352,14 +352,14 @@ Support iPhone Live Photos as a first-class V1 feature by pairing image/video co
 - [x] Unsupported non-default heuristic value rejection test (V1 policy).
 
 ### Integration tests
-- [ ] Ingest mixed burst containing HEIC+MOV pairs and standalone assets.
-- [ ] Re-upload of previously rejected pair blocked correctly.
+- [x] Ingest mixed burst containing HEIC+MOV pairs and standalone assets.
+- [x] Re-upload of previously rejected pair blocked correctly.
 
 ### Expected artifacts
 - `nightfall_photo_ingress/live_photo.py`
 - registry migration for `live_photo_pairs`
 - `tests/test_live_photo_pairing.py`
-- `tests/test_live_photo_integration.py`
+- `tests/integration/test_live_photo_integration.py`
 
 === STOP: Awaiting user feedback before proceeding ===
 

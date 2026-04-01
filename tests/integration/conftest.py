@@ -23,6 +23,7 @@ from nightfall_photo_ingress.domain.ingest import (
     StagedCandidate,
 )
 from nightfall_photo_ingress.domain.registry import Registry
+from nightfall_photo_ingress.live_photo import LivePhotoHeuristics
 
 
 @dataclass
@@ -619,6 +620,12 @@ def poll_and_ingest_fixture(
                 zero_byte_policy=zero_byte_policy,
                 quarantine_dir=config.core.staging_path / account.name / "_quarantine",
                 worker_count=worker_count,
+                live_photo_heuristics=LivePhotoHeuristics(
+                    capture_tolerance_seconds=config.core.live_photo_capture_tolerance_seconds,
+                    stem_mode=config.core.live_photo_stem_mode,
+                    component_order=config.core.live_photo_component_order,
+                    conflict_policy=config.core.live_photo_conflict_policy,
+                ),
             )
 
         replay_summary = None
