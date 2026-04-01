@@ -84,9 +84,9 @@ class TestUninstallPurge:
 
 class TestTmpfsBoundaries:
     def test_tmpfs_devices_added_in_create(self, stagingctl_text: str) -> None:
-           assert 'source=none path=/tmp' in stagingctl_text
-           assert 'source=none path=/var/tmp' in stagingctl_text
-           assert 'source=none path=/var/cache/nightfall-photo-ingress' in stagingctl_text
+        assert 'tmpfs-tmp disk source="$tmpfs_host_base/tmp" path=/tmp' in stagingctl_text
+        assert 'tmpfs-var-tmp disk source="$tmpfs_host_base/var-tmp" path=/var/tmp' in stagingctl_text
+        assert 'tmpfs-nightfall-cache disk source="$tmpfs_host_base/nightfall-cache" path=/var/cache/nightfall-photo-ingress' in stagingctl_text
 
     def test_setup_prepares_cache_directory(self, setup_text: str) -> None:
         assert 'mkdir -p /var/cache/nightfall-photo-ingress' in setup_text
