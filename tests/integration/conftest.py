@@ -134,7 +134,7 @@ class IntegrationCycleResult:
     poll_result: Any
     ingest_result: IngestBatchResult | None
     staged_candidates: tuple[StagedCandidate, ...]
-    replay_summary: dict[str, int] | None
+    replay_summary: dict[str, Any] | None
     registry_harness: RegistryHarness
     accepted_root: Path
     quarantine_root: Path

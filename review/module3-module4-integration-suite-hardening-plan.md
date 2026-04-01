@@ -1,6 +1,6 @@
 # Module 3 And Module 4 Integration Suite Hardening Plan
 
-Status: In progress (Chunk 3 completed)
+Status: Completed (Chunk 4 completed)
 Date: 2026-04-01
 Scope: Priority-ordered hardening work to bring the implemented Module 3 and Module 4 integration suite into closer compliance with the approved specification
 
@@ -50,9 +50,9 @@ Review gate:
 
 ### Chunk 4 (P2 + P5): Strategy scenarios + operator semantics
 
-- [ ] Add rename-as-delete-plus-create, ghost-item boundary,
+- [x] Add rename-as-delete-plus-create, ghost-item boundary,
   stale/resurrected-item, corrupted-body scenarios.
-- [ ] Tighten operator summary and audit-coherence assertions.
+- [x] Tighten operator summary and audit-coherence assertions.
 
 Review gate:
 === STOP: Awaiting user feedback before proceeding ===
@@ -77,10 +77,10 @@ Review gate:
 
 ## P2 Missing Integration Scenarios From Strategy And Category Intent
 
-- [ ] Add rename-as-delete-plus-create integration coverage.
-- [ ] Add explicit ghost-item boundary coverage.
-- [ ] Add stale-page or resurrected-item integration coverage.
-- [ ] Add corrupted-download-body coverage distinct from truncated download coverage.
+- [x] Add rename-as-delete-plus-create integration coverage.
+- [x] Add explicit ghost-item boundary coverage.
+- [x] Add stale-page or resurrected-item integration coverage.
+- [x] Add corrupted-download-body coverage distinct from truncated download coverage.
 
 ## P3 Fixture Capability Expansion
 
@@ -97,10 +97,10 @@ Review gate:
 
 ## P5 Operator-Facing Semantics Tightening
 
-- [ ] Add assertions that operators can distinguish accepted, rejected, quarantined, duplicate-skipped, and replay-recovered outcomes.
-- [ ] Add assertions for actor correctness on terminal audit rows.
-- [ ] Add assertions for recovery summaries containing unresolved operation identifiers where applicable.
-- [ ] Add assertions that per-run summaries reconcile with registry, storage, and audit state.
+- [x] Add assertions that operators can distinguish accepted, rejected, quarantined, duplicate-skipped, and replay-recovered outcomes.
+- [x] Add assertions for actor correctness on terminal audit rows.
+- [x] Add assertions for recovery summaries containing unresolved operation identifiers where applicable.
+- [x] Add assertions that per-run summaries reconcile with registry, storage, and audit state.
 
 ## Already Completed Baseline Items
 

@@ -341,7 +341,7 @@ class IngestDecisionEngine:
             warnings=tuple(warnings),
         )
 
-    def replay_interrupted_operations(self) -> dict[str, int]:
+    def replay_interrupted_operations(self) -> dict[str, object]:
         """Reconcile interrupted ingest operations recorded in lifecycle journal."""
 
         if self._journal is None:
@@ -349,6 +349,7 @@ class IngestDecisionEngine:
                 "interrupted_total": 0,
                 "quarantined_destinations": 0,
                 "removed_staging": 0,
+                "unresolved_op_ids": tuple(),
             }
 
         records = self._journal.read_all()
@@ -359,6 +360,7 @@ class IngestDecisionEngine:
         interrupted_total = 0
         quarantined_destinations = 0
         removed_staging = 0
+        unresolved_op_ids: list[str] = []
 
         for op_id, op_records in by_op.items():
             phases = {item.phase for item in op_records}
@@ -366,6 +368,7 @@ class IngestDecisionEngine:
                 continue
 
             interrupted_total += 1
+            unresolved_op_ids.append(op_id)
             latest = op_records[-1]
             staging_path = Path(latest.staging_path)
             destination_path = Path(latest.destination_path) if latest.destination_path else None
@@ -392,6 +395,7 @@ class IngestDecisionEngine:
             "interrupted_total": interrupted_total,
             "quarantined_destinations": quarantined_destinations,
             "removed_staging": removed_staging,
+            "unresolved_op_ids": tuple(unresolved_op_ids),
         }
 
     def _process_one(
