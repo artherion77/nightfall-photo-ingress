@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
@@ -283,6 +284,70 @@ class CrashInjectionHelper:
 
         self._monkeypatch.setattr(storage_module.shutil, "copy2", _crash_copy)
 
+    def after_staging_write(self) -> None:
+        """Crash after staged file write is finalized by Module 3."""
+
+        from nightfall_photo_ingress.adapters.onedrive import client as client_module
+
+        original_append = client_module._append_lifecycle_event
+        triggered = False
+
+        def _raise_after_staging_write(*args: Any, **kwargs: Any) -> None:
+            nonlocal triggered
+            original_append(*args, **kwargs)
+            if triggered:
+                return
+            if kwargs.get("event_type") == "ready_for_hash":
+                triggered = True
+                raise RuntimeError("injected crash after staging write")
+
+        self._monkeypatch.setattr(client_module, "_append_lifecycle_event", _raise_after_staging_write)
+
+    def after_hash_complete(self, engine: IngestDecisionEngine) -> None:
+        """Crash after hash completion is journaled in Module 4."""
+
+        original_append = engine._journal_append
+        triggered = False
+
+        def _raise_after_hash(*args: Any, **kwargs: Any) -> None:
+            nonlocal triggered
+            original_append(*args, **kwargs)
+            if triggered:
+                return
+            if kwargs.get("phase") == "hash_completed":
+                triggered = True
+                raise RuntimeError("injected crash after hash complete")
+
+        self._monkeypatch.setattr(engine, "_journal_append", _raise_after_hash)
+
+    def during_journal_append(self, engine: IngestDecisionEngine) -> None:
+        """Crash when journal append is attempted during ingest."""
+
+        if engine._journal is None:
+            raise AssertionError("journal is required for this crash hook")
+        original_append = engine._journal.append
+        triggered = False
+
+        def _raise_append(*args: Any, **kwargs: Any) -> None:
+            nonlocal triggered
+            if not triggered:
+                triggered = True
+                raise RuntimeError("injected crash during journal append")
+            return original_append(*args, **kwargs)
+
+        self._monkeypatch.setattr(engine._journal, "append", _raise_append)
+
+    def during_journal_replay(self, engine: IngestDecisionEngine) -> None:
+        """Crash while replay reads journal records."""
+
+        if engine._journal is None:
+            raise AssertionError("journal is required for this crash hook")
+
+        def _raise_read_all() -> list[Any]:
+            raise RuntimeError("injected crash during journal replay")
+
+        self._monkeypatch.setattr(engine._journal, "read_all", _raise_read_all)
+
 
 @pytest.fixture
 def registry_fixture(tmp_path: Path) -> RegistryHarness:
@@ -419,6 +484,35 @@ def fs_snapshot_fixture():
 
 
 @pytest.fixture
+def deterministic_time_fixture(monkeypatch: pytest.MonkeyPatch):
+    """Freeze ingest/journal wall-clock calls for deterministic assertions."""
+
+    class _FrozenDateTime:
+        _frozen: datetime = datetime(2026, 4, 1, 12, 0, 0, tzinfo=UTC)
+
+        @classmethod
+        def now(cls, tz=None):
+            if tz is None:
+                return cls._frozen
+            return cls._frozen.astimezone(tz)
+
+        @classmethod
+        def fromisoformat(cls, value: str):
+            return datetime.fromisoformat(value)
+
+    from nightfall_photo_ingress.domain import ingest as ingest_module
+    from nightfall_photo_ingress.domain import journal as journal_module
+
+    monkeypatch.setattr(ingest_module, "datetime", _FrozenDateTime)
+    monkeypatch.setattr(journal_module, "datetime", _FrozenDateTime)
+
+    def _set(iso_value: str) -> None:
+        _FrozenDateTime._frozen = datetime.fromisoformat(iso_value.replace("Z", "+00:00"))
+
+    return _set
+
+
+@pytest.fixture
 def audit_reader_fixture(registry_fixture: RegistryHarness):
     """Expose typed audit and terminal event readers for assertions."""
 
@@ -426,8 +520,26 @@ def audit_reader_fixture(registry_fixture: RegistryHarness):
         def audit_actions(self, sha256: str) -> tuple[str, ...]:
             return tuple(event.action for event in registry_fixture.registry.list_audit_events(sha256=sha256))
 
+        def audit_reasons(self, sha256: str) -> tuple[str, ...]:
+            return tuple(event.reason for event in registry_fixture.registry.list_audit_events(sha256=sha256))
+
+        def audit_actors(self, sha256: str) -> tuple[str, ...]:
+            return tuple(event.actor for event in registry_fixture.registry.list_audit_events(sha256=sha256))
+
         def terminal_actions(self) -> tuple[str, ...]:
             return tuple(row["action"] for row in registry_fixture.terminal_events())
+
+        def terminal_reasons(self) -> tuple[str, ...]:
+            return tuple(row["reason"] for row in registry_fixture.terminal_events())
+
+        def terminal_actors(self) -> tuple[str, ...]:
+            return tuple(row["actor"] for row in registry_fixture.terminal_events())
+
+        def batch_run_ids(self) -> tuple[str, ...]:
+            return tuple(row["batch_run_id"] for row in registry_fixture.terminal_events())
+
+        def sequence_numbers(self) -> tuple[int, ...]:
+            return tuple(int(row["sequence_no"]) for row in registry_fixture.terminal_events())
 
         def terminal_events(self) -> list[dict[str, Any]]:
             return registry_fixture.terminal_events()

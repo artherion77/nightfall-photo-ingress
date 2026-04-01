@@ -1,6 +1,6 @@
 # Module 3 And Module 4 Integration Suite Hardening Plan
 
-Status: In progress (Chunk 2 completed)
+Status: In progress (Chunk 3 completed)
 Date: 2026-04-01
 Scope: Priority-ordered hardening work to bring the implemented Module 3 and Module 4 integration suite into closer compliance with the approved specification
 
@@ -40,10 +40,10 @@ Review gate:
 
 ### Chunk 3 (P3 + P4): Fixture capabilities + determinism
 
-- [ ] Add crash hooks for after-staging-write, after-hash-complete,
+- [x] Add crash hooks for after-staging-write, after-hash-complete,
   during-journal-append, during-journal-replay.
-- [ ] Extend audit reader helpers.
-- [ ] Introduce deterministic time control fixtures.
+- [x] Extend audit reader helpers.
+- [x] Introduce deterministic time control fixtures.
 
 Review gate:
 === STOP: Awaiting user feedback before proceeding ===
@@ -84,16 +84,16 @@ Review gate:
 
 ## P3 Fixture Capability Expansion
 
-- [ ] Extend `crash_injection_fixture` with after-staging-write interruption.
-- [ ] Extend `crash_injection_fixture` with after-hash-complete interruption.
-- [ ] Extend `crash_injection_fixture` with during-journal-append interruption.
-- [ ] Extend `crash_injection_fixture` with during-journal-replay interruption.
-- [ ] Extend `audit_reader_fixture` to expose actor, reason, `batch_run_id`, and sequence-oriented helpers.
+- [x] Extend `crash_injection_fixture` with after-staging-write interruption.
+- [x] Extend `crash_injection_fixture` with after-hash-complete interruption.
+- [x] Extend `crash_injection_fixture` with during-journal-append interruption.
+- [x] Extend `crash_injection_fixture` with during-journal-replay interruption.
+- [x] Extend `audit_reader_fixture` to expose actor, reason, `batch_run_id`, and sequence-oriented helpers.
 
 ## P4 Determinism And Time Control
 
-- [ ] Introduce deterministic time control for replay, drift, and stale/orphan classification scenarios.
-- [ ] Remove implicit reliance on current-time production behavior in integration assertions.
+- [x] Introduce deterministic time control for replay, drift, and stale/orphan classification scenarios.
+- [x] Remove implicit reliance on current-time production behavior in integration assertions.
 
 ## P5 Operator-Facing Semantics Tightening
 
