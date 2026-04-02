@@ -1,4 +1,4 @@
-"""Tests for camera-roll auto-discovery and path resolution."""
+"""Tests for OneDrive onboarding locale detection and path auto-discovery."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from nightfall_photo_ingress.adapters.onedrive.client import (
+    detect_account_locale,
     resolve_camera_roll_path_for_onboarding,
 )
 from nightfall_photo_ingress.config import AccountConfig
@@ -36,7 +37,7 @@ class _FakeClient:
         return queue.pop(0)
 
 
-def _make_account(tmp_path: Path, root: str) -> AccountConfig:
+def _make_account(tmp_path: Path, root: str = "/Camera Roll") -> AccountConfig:
     return AccountConfig(
         name="alice",
         enabled=True,
@@ -49,6 +50,60 @@ def _make_account(tmp_path: Path, root: str) -> AccountConfig:
         delta_cursor=tmp_path / "cursor.txt",
         max_downloads=10,
     )
+
+
+def test_detect_account_locale_german(tmp_path: Path) -> None:
+    account = _make_account(tmp_path)
+    client = _FakeClient(
+        {
+            "https://graph.microsoft.com/v1.0/me/drive/root/children?$select=name,folder": [
+                _FakeResponse(
+                    status_code=200,
+                    text='{"value":[{"name":"Bilder","folder":{}},{"name":"Dokumente","folder":{}}]}',
+                )
+            ]
+        }
+    )
+
+    locale = detect_account_locale(account=account, access_token="token", http_client=client)
+
+    assert locale == "de"
+
+
+def test_detect_account_locale_english(tmp_path: Path) -> None:
+    account = _make_account(tmp_path)
+    client = _FakeClient(
+        {
+            "https://graph.microsoft.com/v1.0/me/drive/root/children?$select=name,folder": [
+                _FakeResponse(
+                    status_code=200,
+                    text='{"value":[{"name":"Pictures","folder":{}},{"name":"Documents","folder":{}}]}',
+                )
+            ]
+        }
+    )
+
+    locale = detect_account_locale(account=account, access_token="token", http_client=client)
+
+    assert locale == "en"
+
+
+def test_detect_account_locale_none_when_unrecognized(tmp_path: Path) -> None:
+    account = _make_account(tmp_path)
+    client = _FakeClient(
+        {
+            "https://graph.microsoft.com/v1.0/me/drive/root/children?$select=name,folder": [
+                _FakeResponse(
+                    status_code=200,
+                    text='{"value":[{"name":"Dokumente","folder":{}},{"name":"Desktop","folder":{}}]}',
+                )
+            ]
+        }
+    )
+
+    locale = detect_account_locale(account=account, access_token="token", http_client=client)
+
+    assert locale is None
 
 
 def test_resolution_keeps_configured_path_when_valid(tmp_path: Path) -> None:

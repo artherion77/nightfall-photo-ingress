@@ -145,6 +145,7 @@ cmd_create() {
     done
 
     _info "Running container bootstrap ..."
+    lxc exec "$CONTAINER" -- mkdir -p "$CT_TMP_DIR"
     lxc file push "$SCRIPT_DIR/container/setup.sh" "$CONTAINER$CT_TMP_DIR/setup.sh"
     lxc exec "$CONTAINER" -- env STAGING_VOLATILE="$STAGING_VOLATILE" bash "$CT_TMP_DIR/setup.sh"
 

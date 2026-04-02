@@ -3,14 +3,14 @@
 This directory contains the end-to-end production flow test for
 `nightfall-photo-ingress`. It exercises the complete operator surface — every
 CLI command a real operator would run — including interactive commands that
-require human input (device-code browser authentication).
+require human input (device-code browser onboarding).
 
 ## What it tests
 
 | Phase | Kind | What is verified |
 |-------|------|------------------|
 | P1 | Automated | Container running, CLI `--help`, `auth-setup` discoverable, `config-check`, status file schema, directory layout, systemd units enabled |
-| P2 | **Interactive** | `stagingctl auth-setup` device-code flow; token cache written; file mode 0600; identity sidecar |
+| P2 | **Interactive** | `stagingctl auth-setup` user onboarding flow; token cache written; file mode 0600; identity sidecar; onboarding sidecar |
 | P3 | Semi-automated | `stagingctl smoke-live` (live poll + secret scan); status file reflects `poll` command |
 | P4 | Automated | `stagingctl reset` restores clean snapshot; token cache absent; `config-check` still passes |
 
@@ -37,7 +37,7 @@ checks against a known-good installed container).
    export STAGING_CLIENT_ID=<your-app-registration-client-id>
    ```
 
-3. For P2 (auth), the operator needs access to a browser and a staging OneDrive
+3. For P2 (onboarding), the operator needs access to a browser and a staging OneDrive
    account that the Entra app registration is authorized for.
 
 ## Running
@@ -75,7 +75,7 @@ Each `flowctl run` writes a timestamped evidence directory:
 $FLOW_EVIDENCE_BASE/flow-<run_id>/
     manifest.jsonl          # flow start/finish events with exit code
     p1/                     # pre-flight logs
-    p2/                     # auth step logs
+   p2/                     # onboarding step logs
     p3/                     # live poll logs
     p4/                     # reset verification logs
 ```
@@ -88,5 +88,5 @@ $FLOW_EVIDENCE_BASE/flow-<run_id>/
 | Variable | Default | Purpose |
 |---|---|---|
 | `CONTAINER` | `staging-photo-ingress` | LXC container name |
-| `STAGING_ACCOUNT` | `staging` | Account name used for auth and poll |
+| `STAGING_ACCOUNT` | `staging` | Account name used for onboarding and poll |
 | `FLOW_EVIDENCE_BASE` | `/mnt/ssd/staging/photo-ingress/evidence` | Evidence output directory |

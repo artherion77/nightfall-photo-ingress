@@ -64,7 +64,7 @@ class TestInteractiveGating:
 
     def test_p2_skips_when_non_interactive(self, flowctl_text: str) -> None:
         assert "SKIP_INTERACTIVE" in flowctl_text
-        assert "P2:interactive_auth" in flowctl_text
+        assert "P2:user_onboarding" in flowctl_text
 
     def test_p3_skips_when_non_interactive(self, flowctl_text: str) -> None:
         assert "P3:live_poll" in flowctl_text
@@ -78,7 +78,7 @@ class TestStepLabels:
             assert step in flowctl_text, f"Step label {step} not found in flowctl"
 
     def test_p2_step_labels(self, flowctl_text: str) -> None:
-        for step in ("P2.1", "P2.2", "P2.3", "P2.4"):
+        for step in ("P2.1", "P2.2", "P2.3", "P2.4", "P2.5"):
             assert step in flowctl_text, f"Step label {step} not found in flowctl"
 
     def test_p3_step_labels(self, flowctl_text: str) -> None:
@@ -127,6 +127,10 @@ class TestStagingctlIntegration:
         # auth-setup must not be piped — a pipe breaks TTY pass-through for device-code
         # flow. The comment in the script explains why.
         assert "TTY" in flowctl_text or "tty" in flowctl_text.lower()
+
+    def test_p2_onboarding_sidecar_check_present(self, flowctl_text: str) -> None:
+        assert ".onboarding.json" in flowctl_text
+        assert "P2.5:onboarding_sidecar" in flowctl_text
 
 
 class TestDocumentationCoverage:

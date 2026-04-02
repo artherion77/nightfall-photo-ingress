@@ -12,7 +12,7 @@
 #
 # Phases:
 #   p1  Pre-flight: container, CLI surface, config-check, dir layout, units
-#   p2  Interactive authentication: device-code flow via stagingctl auth-setup
+#   p2  User onboarding: device-code flow via stagingctl auth-setup
 #   p3  Live integration: authenticated poll, status export
 #   p4  Snapshot isolation: reset, verify token cleared, config survives
 #
@@ -178,19 +178,19 @@ print('schema_version=%s command=%s' % (d['schema_version'], d['command']))
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# P2 — Interactive authentication: device-code flow via stagingctl auth-setup
+# P2 — User onboarding: device-code flow via stagingctl auth-setup
 # ─────────────────────────────────────────────────────────────────────────────
 phase_p2() {
-    _hdr "── P2  Interactive authentication  [OPERATOR ACTION REQUIRED] ───────"
+    _hdr "── P2  User onboarding  [OPERATOR ACTION REQUIRED] ──────────────────"
 
     if [[ "$SKIP_INTERACTIVE" == "1" ]]; then
-        _pskip "P2:interactive_auth" "--skip-interactive set; authentication phase skipped"
+        _pskip "P2:user_onboarding" "--skip-interactive set; onboarding phase skipped"
         return 0
     fi
 
     cat <<EOF
 
-  This phase authenticates the staging account against Microsoft Entra using
+    This phase onboards the staging account against Microsoft Entra using
   the device-code flow. A device-code URL and one-time code will appear; open
   the URL in a browser and complete sign-in with your staging OneDrive account.
 
@@ -233,12 +233,20 @@ EOF
         _pfail "P2.3:token_cache_permissions" "token file mode $perms (expected 0600)"; return 1
     fi
 
-    # P2.4 identity sidecar — written by auth layer; note if absent (written on first poll)
+    # P2.4 identity sidecar — written by onboarding/auth layer
     local sidecar_path="/var/lib/ingress/tokens/${STAGING_ACCOUNT}.identity.json"
     if lxc exec "$CONTAINER" -- test -f "$sidecar_path" 2>/dev/null; then
         _pass "P2.4:identity_sidecar" "$sidecar_path present"
     else
-        _pskip "P2.4:identity_sidecar" "$sidecar_path not yet written (will be written on first poll)"
+        _pfail "P2.4:identity_sidecar" "$sidecar_path missing after onboarding"; return 1
+    fi
+
+    # P2.5 onboarding sidecar path metadata persisted
+    local onboarding_sidecar="/var/lib/ingress/tokens/${STAGING_ACCOUNT}.onboarding.json"
+    if lxc exec "$CONTAINER" -- test -f "$onboarding_sidecar" 2>/dev/null; then
+        _pass "P2.5:onboarding_sidecar" "$onboarding_sidecar present"
+    else
+        _pfail "P2.5:onboarding_sidecar" "$onboarding_sidecar missing after onboarding"; return 1
     fi
 
     return 0
@@ -292,7 +300,7 @@ print('command=%s state=%s' % (d['command'], d.get('state', '?')))
 # P4 — Snapshot isolation: reset clears install state, config survives
 # ─────────────────────────────────────────────────────────────────────────────
 phase_p4() {
-    _hdr "── P4  Snapshot isolation: reset clears auth state ──────────────────"
+    _hdr "── P4  Snapshot isolation: reset clears onboarding state ────────────"
 
     local log_dir="$FLOW_EVIDENCE_DIR/p4"
     mkdir -p "$log_dir"
@@ -393,7 +401,7 @@ Options for 'run':
 
 Phases:
   p1  Pre-flight: container, CLI surface, config-check, dir layout, systemd units
-  p2  Interactive authentication: device-code flow via stagingctl auth-setup     [OPERATOR]
+    p2  User onboarding: device-code flow via stagingctl auth-setup                [OPERATOR]
   p3  Live integration: authenticated poll, status export verification           [OPERATOR]
   p4  Snapshot isolation: reset, verify token cleared, config-check survives
 
