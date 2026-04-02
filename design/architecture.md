@@ -26,7 +26,7 @@ A fully automated, server-side OneDrive-based photo ingest pipeline that feeds i
 | Python package | `nightfall_photo_ingress` | Keeps namespace alignment with existing nightfall Python projects |
 | CLI command | `photo-ingress` | Main operational command |
 | Config file | `/etc/nightfall/photo-ingress.conf` | Single versioned INI file |
-| systemd units | `photo-ingress-poll.*`, `photo-ingress-trash.*` | Host-level systemd runtime |
+| systemd units | `photo-ingress-poll.*`, `photo-ingress-trash.*` | systemd-managed runtime inside the `photo-ingress` LXC container |
 | SSD ZFS dataset (container) | `ssdpool/photo-ingress` | Always-on staging, cursors, token caches, registry |
 | SSD mountpoint | `/mnt/ssd/photo-ingress` | Working set for low-latency operations |
 | HDD ZFS dataset (container) | `nightfall/media/photo-ingress` | Queue/trash boundary on nightfall pool |
@@ -184,6 +184,7 @@ CREATE TABLE accepted_records (
    a. **Metadata pre-filter**: look up `metadata_index` by `(account_name, onedrive_id, size, modified_time)`. If hit and SHA-256 is in `files`, skip — no download needed.
    b. **Download** file to `/mnt/ssd/photo-ingress/staging/{onedrive_id}.tmp` (streaming, chunked).
    c. Rename `.tmp` → `{onedrive_id}.{ext}` on success.
+   c1. Build poll-to-ingest handoff records from downloaded files and process them immediately in the same poll run.
    d. **Compute SHA-256** (streaming 64 KB chunks; never loads full file into memory).
    e. **Registry lookup**:
       - `rejected` → delete from staging; append `rejected_duplicate` to `audit_log`.
@@ -262,7 +263,7 @@ photo-ingress reject <sha256> [--reason "..."]
 | Registry | `sqlite3` (stdlib) | ACID transactions; no extra deps; auditable via SQL; portable |
 | Schema types | `TypedDict` (stdlib) | Matches nightfall-mcp style — no Pydantic dependency |
 | Logging | `logging` + JSON formatter | Structured English logs; feeds journald via stdout |
-| Process model | host-level systemd timer + `.path` unit | Matches existing nightfall patterns exactly; no container for V1 |
+| Process model | systemd timer + `.path` unit inside `photo-ingress` LXC | Matches current production/staging deployment model |
 
 **Runtime dependencies:** `httpx`, `msal`  
 **Dev dependencies:** `pytest`, `pytest-mock`

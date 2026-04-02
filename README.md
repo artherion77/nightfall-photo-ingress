@@ -55,6 +55,8 @@ The installed console entry point is compatible with `systemd` units:
 nightfall-photo-ingress poll --path /etc/nightfall/photo-ingress.conf
 ```
 
+`poll` executes both the OneDrive download stage and the ingest decision stage in one run (downloaded handoff candidates are processed into accept/discard outcomes before command exit).
+
 Packaged operational assets live under `systemd/`, `install/`, and `docs/`. The operator runbook is `docs/operations-runbook.md`. The production install workflow targets an LXC container named `photo-ingress` by default and deploys a copy of the runbook under `/opt/nightfall-photo-ingress/share/doc/nightfall-photo-ingress/` inside that container.
 
 ## Robustness regression suite (Chunk 10)
@@ -62,7 +64,7 @@ Packaged operational assets live under `systemd/`, `install/`, and `docs/`. The 
 Run only resilience scenarios:
 
 ```bash
-pytest -m robustness tests/test_onedrive_robustness_regression.py
+pytest -m robustness tests/unit/test_onedrive_robustness_regression.py
 ```
 
 Run all tests except resilience scenarios:

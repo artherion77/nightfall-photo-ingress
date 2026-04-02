@@ -8,7 +8,7 @@ Date: 2026-03-31
 ## 1. V1 Scope and Non-Goals
 
 ### In Scope
-- Host-level Python service managed by systemd (no container in V1).
+- Python service running in the `photo-ingress` LXC container with systemd-managed execution.
 - OneDrive ingest for one or more personal Microsoft accounts.
 - Polling via Microsoft Graph delta API.
 - SSD staging download area and authoritative global SQLite registry.
@@ -21,7 +21,6 @@ Date: 2026-03-31
 ### Explicit Non-Goals for V1
 - Auto-copy from accepted queue to permanent library.
 - Any write access from ingress into `/nightfall/media/pictures`.
-- Container packaging of the ingest service.
 - Live Photo merge/export transformations.
 
 ---
