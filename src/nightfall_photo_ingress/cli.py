@@ -22,9 +22,9 @@ from .config import AccountConfig, AppConfig, load_config, validate_config_file
 from .logging_bootstrap import configure_logging
 from .adapters.onedrive.auth import AuthError, OneDriveAuthClient
 from .adapters.onedrive.client import (
+    DownloadedHandoffCandidate,
     GraphError,
     detect_account_locale,
-    load_boundary_handoff_candidates,
     poll_accounts,
     resolve_camera_roll_path_for_onboarding,
 )
@@ -264,7 +264,6 @@ def _cmd_poll(args: argparse.Namespace) -> int:
 
     try:
         app_config = load_config(args.path)
-        results = poll_accounts(app_config, account_name=args.account)
         registry = Registry(app_config.core.registry_path)
         registry.initialize()
         ingest_engine = IngestDecisionEngine(registry)
@@ -273,9 +272,17 @@ def _cmd_poll(args: argparse.Namespace) -> int:
         ingest_outcome_count = 0
         ingest_accepted_count = 0
         ingest_discarded_count = 0
+        ingest_summary_by_account: dict[str, dict[str, int]] = {}
 
-        for result in results:
-            handoff_candidates = load_boundary_handoff_candidates(result.payload.handoff_manifest_path)
+        def _process_page_handoff(
+            account_name: str,
+            rows: tuple[DownloadedHandoffCandidate, ...],
+        ) -> None:
+            nonlocal ingest_candidate_count
+            nonlocal ingest_outcome_count
+            nonlocal ingest_accepted_count
+            nonlocal ingest_discarded_count
+
             ingest_candidates = [
                 StagedCandidate(
                     account_name=row.account_name,
@@ -286,10 +293,12 @@ def _cmd_poll(args: argparse.Namespace) -> int:
                     size_bytes=row.size_bytes,
                     staging_path=row.staging_path,
                 )
-                for row in handoff_candidates
+                for row in rows
             ]
-            ingest_candidate_count += len(ingest_candidates)
+            if not ingest_candidates:
+                return
 
+            ingest_candidate_count += len(ingest_candidates)
             ingest_result = ingest_engine.process_batch(
                 candidates=ingest_candidates,
                 accepted_root=app_config.core.accepted_path,
@@ -300,15 +309,43 @@ def _cmd_poll(args: argparse.Namespace) -> int:
             ingest_accepted_count += ingest_result.accepted_count
             ingest_discarded_count += ingest_result.discarded_count
 
+            account_summary = ingest_summary_by_account.setdefault(
+                account_name,
+                {
+                    "ingest_candidates": 0,
+                    "ingest_accepted": 0,
+                    "ingest_discarded": 0,
+                },
+            )
+            account_summary["ingest_candidates"] += len(ingest_candidates)
+            account_summary["ingest_accepted"] += ingest_result.accepted_count
+            account_summary["ingest_discarded"] += ingest_result.discarded_count
+
+        results = poll_accounts(
+            app_config,
+            account_name=args.account,
+            page_handoff_processor=_process_page_handoff,
+        )
+
+        for result in results:
+            account_ingest = ingest_summary_by_account.get(
+                result.account_name,
+                {
+                    "ingest_candidates": 0,
+                    "ingest_accepted": 0,
+                    "ingest_discarded": 0,
+                },
+            )
+
             LOGGER.info(
                 "poll completed",
                 extra={
                     "account": result.account_name,
                     "candidates": result.candidate_count,
                     "downloaded": len(result.downloaded_paths),
-                    "ingest_candidates": len(ingest_candidates),
-                    "ingest_accepted": ingest_result.accepted_count,
-                    "ingest_discarded": ingest_result.discarded_count,
+                    "ingest_candidates": account_ingest["ingest_candidates"],
+                    "ingest_accepted": account_ingest["ingest_accepted"],
+                    "ingest_discarded": account_ingest["ingest_discarded"],
                 },
             )
         _emit_status_snapshot(

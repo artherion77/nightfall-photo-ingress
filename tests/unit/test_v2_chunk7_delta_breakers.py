@@ -191,6 +191,7 @@ def test_v2_chunk7_arms_stale_breaker_on_replay_threshold(tmp_path: Path) -> Non
                     ),
                 )
             ],
+            "https://download/dup1": [_FakeResponse(status_code=200, content=b"one")],
             "https://download/dup1b": [_FakeResponse(status_code=200, content=b"twoo")],
         }
     )
@@ -204,7 +205,7 @@ def test_v2_chunk7_arms_stale_breaker_on_replay_threshold(tmp_path: Path) -> Non
         delta_breaker_cooldown_seconds=300,
     )
 
-    assert len(downloaded) == 1
+    assert len(downloaded) == 2
     assert candidate_count == 1
     assert ghost_counts == {}
     assert anomaly_counts.get("delta_replayed_item_id") == 1

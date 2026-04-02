@@ -97,6 +97,7 @@ This document synthesizes all refinement requirements derived from the architect
 
 ### D1 — Delta Cursor Robustness
 - Maintain one delta cursor per account.
+- Authoritative model: streaming page commit. Polling must process one page at a time, commit ingest side effects, then advance cursor.
 - On cursor loss:
   - Try delta recovery with latest link bootstrap
   - Then optional bounded backfill (for example 30-day scope)

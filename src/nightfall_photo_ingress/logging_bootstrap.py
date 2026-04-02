@@ -155,7 +155,7 @@ class HumanFormatter(logging.Formatter):
 
         if event == "delta_chain_completed_cursor_reset":
             return (
-                f"{prefix}chain complete, cursor reset to initial "
+                f"{prefix}chain complete, cursor committed to delta link "
                 f"pages={getattr(record, 'pages_walked', 0)}"
             )
 

@@ -303,15 +303,16 @@ Expected logs/operator summaries:
 
 ### Category E: Duplicate And Replayed Delta Items
 
-10. Test name: `test_duplicate_delta_items_reduce_to_single_ingest_effect`
+10. Test name: `test_duplicate_delta_items_remain_idempotent_under_streaming_page_commit`
 Purpose:
-Validate in-run reducer consistency across OneDrive client and ingest pipeline.
+Validate streaming page-commit behavior remains idempotent for duplicate item events.
 Preconditions:
 - Delta feed returns repeated same item.
 Input data:
 - Same item twice in same delta sequence.
 Expected behavior:
-- Only one staged file and one ingest outcome.
+- At most one accepted terminal outcome for the hash.
+- Duplicate events do not create duplicate accepted state.
 Expected registry state:
 - Single accepted row.
 Expected storage state:
@@ -320,6 +321,7 @@ Expected audit events:
 - No duplicate terminal accepted.
 Expected logs/operator summaries:
 - Duplicate/reducer anomaly counters visible.
+- Cursor advancement remains commit-gated to processed pages.
 
 11. Test name: `test_replayed_delta_page_on_next_poll_does_not_duplicate_accepted_content`
 Purpose:

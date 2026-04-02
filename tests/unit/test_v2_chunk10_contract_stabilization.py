@@ -210,7 +210,7 @@ def test_v2_chunk10_collision_suffixing_is_deterministic(tmp_path: Path) -> None
         }
     )
 
-    downloaded, ghost_counts = download_candidates(
+    downloaded, ghost_counts, handoff_rows = download_candidates(
         candidates=candidates,
         staging_root=tmp_path / "staging",
         account_name="alice",
@@ -219,6 +219,7 @@ def test_v2_chunk10_collision_suffixing_is_deterministic(tmp_path: Path) -> None
     )
 
     assert ghost_counts == {}
+    assert len(handoff_rows) == 2
     names = sorted(path.name for path in downloaded)
     assert any(name == "abc_def.heic" for name in names)
     assert any(name.startswith("abc_def-") and name.endswith(".heic") for name in names)

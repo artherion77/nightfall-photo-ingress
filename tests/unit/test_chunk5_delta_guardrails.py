@@ -220,15 +220,12 @@ def test_successful_poll_clears_existing_resync_marker(tmp_path: Path) -> None:
     assert candidate_count == 0
     assert ghost_counts == {}
     assert anomaly_counts == {}
-    assert (
-        account.delta_cursor.read_text(encoding="utf-8")
-        == "https://graph.microsoft.com/v1.0/me/drive/root:/Camera%20Roll:/delta"
-    )
+    assert account.delta_cursor.read_text(encoding="utf-8") == "https://delta/final"
     assert not marker.exists()
 
 
 def test_replayed_item_ids_are_counted_as_delta_anomaly(tmp_path: Path) -> None:
-    """Repeated item IDs across pages should be surfaced and reduced deterministically."""
+    """Repeated item IDs across pages should surface anomaly counters under streaming commits."""
 
     account = _make_account(tmp_path, "alice", "/Camera Roll")
     client = _FakeClient(
@@ -266,7 +263,7 @@ def test_replayed_item_ids_are_counted_as_delta_anomaly(tmp_path: Path) -> None:
     )
 
     assert candidate_count == 1
-    assert len(downloaded) == 1
+    assert len(downloaded) == 2
     assert ghost_counts == {}
     assert anomaly_counts == {
         "delta_replayed_item_id": 1,

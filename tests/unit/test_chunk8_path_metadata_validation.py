@@ -138,7 +138,7 @@ def test_download_candidates_sanitizes_staging_paths(tmp_path: Path) -> None:
         download_url="https://download/1",
     )
 
-    downloaded, reasons = download_candidates(
+    downloaded, reasons, handoff_rows = download_candidates(
         candidates=[candidate],
         staging_root=tmp_path / "staging",
         account_name="alice",
@@ -147,6 +147,7 @@ def test_download_candidates_sanitizes_staging_paths(tmp_path: Path) -> None:
     )
 
     assert reasons == {}
+    assert len(handoff_rows) == 1
     assert len(downloaded) == 1
     assert downloaded[0].parent == tmp_path / "staging" / "alice"
     assert downloaded[0].name.endswith(".heic")

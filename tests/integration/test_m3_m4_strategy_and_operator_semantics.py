@@ -80,7 +80,7 @@ def test_explicit_ghost_item_boundary_is_counted_without_ingest_side_effects(
     assert registry_fixture.accepted_rows() == []
 
 
-def test_stale_or_resurrected_item_anomaly_is_visible_and_last_event_wins(
+def test_stale_or_resurrected_item_anomaly_is_visible_under_streaming_page_commit(
     poll_and_ingest_fixture,
 ) -> None:
     result = poll_and_ingest_fixture(
@@ -112,14 +112,18 @@ def test_stale_or_resurrected_item_anomaly_is_visible_and_last_event_wins(
                 ]
             },
         ],
-        downloads={"https://download/resurrect-new": {"content": b"newest"}},
+        downloads={
+            "https://download/resurrect-old": {"content": b"oldr"},
+            "https://download/resurrect-new": {"content": b"newest"},
+        },
     )
 
     anomaly_reasons = dict(result.poll_result.delta_anomaly_reason_counts)
     assert result.poll_result.candidate_count == 1
     assert anomaly_reasons.get("delta_replayed_item_id", 0) >= 1
     assert result.ingest_result is not None
-    assert result.ingest_result.outcomes[0].action == "accepted"
+    actions = [outcome.action for outcome in result.ingest_result.outcomes]
+    assert "accepted" in actions
 
 
 def test_corrupted_download_stream_is_distinct_from_truncated_size_mismatch(

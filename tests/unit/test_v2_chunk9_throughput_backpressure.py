@@ -210,6 +210,7 @@ def test_v2_chunk9_single_account_budget_exhaustion_short_circuits(tmp_path: Pat
         app_config=app_config,
         auth=_FakeAuthClient(),
         http_client_factory=lambda: _FakeClient({}),
+        page_handoff_processor=None,
         poll_run_id="run-1",
         deadline=0.0,
         policy=DEFAULT_POLICY,

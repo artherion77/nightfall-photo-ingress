@@ -253,6 +253,7 @@ def poll_accounts(
     account_name: str | None = None,
     auth_client: OneDriveAuthClient | None = None,
     http_client_factory: Callable[[], httpx.Client] | None = None,
+    page_handoff_processor: Callable[[str, tuple[DownloadedHandoffCandidate, ...]], None] | None = None,
     policy: RetryPolicy = DEFAULT_POLICY,
     sleeper: Callable[[float], None] = time.sleep,
     jitter_fn: Callable[[], float] | None = None,
@@ -304,6 +305,7 @@ def poll_accounts(
                     app_config=app_config,
                     auth=auth,
                     http_client_factory=http_client_factory,
+                    page_handoff_processor=page_handoff_processor,
                     poll_run_id=poll_run_id,
                     deadline=deadline,
                     policy=policy,
@@ -324,6 +326,7 @@ def poll_accounts(
                         app_config,
                         auth,
                         http_client_factory,
+                        page_handoff_processor,
                         poll_run_id,
                         deadline,
                         policy,
@@ -378,6 +381,7 @@ def _poll_single_account(
     app_config: AppConfig,
     auth: OneDriveAuthClient,
     http_client_factory: Callable[[], httpx.Client] | None,
+    page_handoff_processor: Callable[[str, tuple[DownloadedHandoffCandidate, ...]], None] | None,
     poll_run_id: str,
     deadline: float,
     policy: RetryPolicy,
@@ -430,6 +434,7 @@ def _poll_single_account(
                     staging_root=app_config.core.staging_path,
                     access_token=current_access_token,
                     refresh_access_token=refresh_access_token,
+                    page_handoff_processor=page_handoff_processor,
                     http_client=client,
                     max_runtime_seconds=min(
                         app_config.core.max_poll_runtime_seconds,
@@ -589,6 +594,7 @@ def poll_account_once(
     access_token: str,
     http_client: httpx.Client,
     refresh_access_token: Callable[[], str] | None = None,
+    page_handoff_processor: Callable[[str, tuple[DownloadedHandoffCandidate, ...]], None] | None = None,
     poll_run_id: str | None = None,
     max_delta_pages: int = DEFAULT_MAX_DELTA_PAGES,
     max_runtime_seconds: int = 300,
@@ -620,6 +626,11 @@ def poll_account_once(
     start_monotonic = monotonic()
     page_items_total = 0
     page_file_items_total = 0
+    downloaded_paths: list[Path] = []
+    download_ghost_reason_counts: dict[str, int] = {}
+    halted_due_download_budget = False
+    handoff_manifest = _boundary_manifest_path_for_account(staging_root, account.name)
+    handoff_manifest.unlink(missing_ok=True)
 
     account_staging_root = staging_root / account.name
     incident_state = _load_incident_state(account.delta_cursor)
@@ -644,6 +655,18 @@ def poll_account_once(
     )
 
     while next_url:
+        if account.max_downloads > 0 and len(downloaded_paths) >= account.max_downloads:
+            _trace_event(
+                "delta_download_budget_reached",
+                poll_run_id=poll_run_id,
+                account_name=account.name,
+                operation="delta_page",
+                max_downloads=account.max_downloads,
+                downloaded_count=len(downloaded_paths),
+            )
+            halted_due_download_budget = True
+            break
+
         _trace_event(
             "delta_page_start",
             poll_run_id=poll_run_id,
@@ -750,6 +773,38 @@ def poll_account_once(
         page_items_total += len(page_items)
         page_file_items_total += file_items
 
+        page_candidates = _reduce_delta_page_candidates(account.name, payload)
+
+        remaining_download_budget: int | None
+        if account.max_downloads > 0:
+            remaining_download_budget = max(account.max_downloads - len(downloaded_paths), 0)
+        else:
+            remaining_download_budget = None
+
+        if page_candidates and (remaining_download_budget is None or remaining_download_budget > 0):
+            page_downloaded_paths, page_ghost_reasons, page_handoff_candidates = download_candidates(
+                candidates=page_candidates,
+                staging_root=staging_root,
+                account_name=account.name,
+                access_token=access_token,
+                http_client=http_client,
+                max_downloads=remaining_download_budget,
+                integrity_mode=integrity_mode,
+                refresh_access_token=refresh_access_token,
+                poll_run_id=poll_run_id,
+                diagnostics_counts=diagnostics_counts,
+                policy=policy,
+                sleeper=sleeper,
+                jitter_fn=jitter_fn,
+                reset_manifest=False,
+            )
+            downloaded_paths.extend(page_downloaded_paths)
+            for reason, count in page_ghost_reasons.items():
+                _record_ghost_reason(download_ghost_reason_counts, reason, count=count)
+
+            if page_handoff_processor is not None and page_handoff_candidates:
+                page_handoff_processor(account.name, tuple(page_handoff_candidates))
+
         if next_url is not None:
             _save_cursor(account.delta_cursor, next_url)
             _clear_resync_marker(account.delta_cursor)
@@ -783,7 +838,7 @@ def poll_account_once(
             has_delta_link=bool(delta_link),
         )
 
-    if delta_link is None:
+    if delta_link is None and not halted_due_download_budget:
         raise GraphError(
             f"No delta link returned for account '{account.name}'",
             code="missing_delta_link",
@@ -796,16 +851,17 @@ def poll_account_once(
     avg_items_per_page = page_items_total / page_count if page_count > 0 else 0.0
     avg_files_per_page = page_file_items_total / page_count if page_count > 0 else 0.0
 
-    reset_cursor = _build_initial_delta_url(account)
-    _save_cursor(account.delta_cursor, reset_cursor)
-    _clear_resync_marker(account.delta_cursor)
-    _trace_event(
-        "delta_chain_completed_cursor_reset",
-        poll_run_id=poll_run_id,
-        account_name=account.name,
-        operation="delta_cursor",
-        pages_walked=page_count,
-    )
+    if delta_link is not None:
+        _save_cursor(account.delta_cursor, delta_link)
+        _clear_resync_marker(account.delta_cursor)
+        _trace_event(
+            "delta_chain_completed_cursor_reset",
+            poll_run_id=poll_run_id,
+            account_name=account.name,
+            operation="delta_cursor",
+            pages_walked=page_count,
+            checkpoint_kind="delta_link",
+        )
     _trace_event(
         "delta_traversal_summary",
         poll_run_id=poll_run_id,
@@ -820,23 +876,6 @@ def poll_account_once(
         page_eval_seconds=round(page_eval_seconds, 3),
     )
 
-    candidates = _materialize_reduced_candidates(reducer)
-    downloaded_paths, ghost_reason_counts = download_candidates(
-        candidates=candidates,
-        staging_root=staging_root,
-        account_name=account.name,
-        access_token=access_token,
-        http_client=http_client,
-        max_downloads=account.max_downloads,
-        integrity_mode=integrity_mode,
-        refresh_access_token=refresh_access_token,
-        poll_run_id=poll_run_id,
-        diagnostics_counts=diagnostics_counts,
-        policy=policy,
-        sleeper=sleeper,
-        jitter_fn=jitter_fn,
-    )
-
     # Fold diagnostics into anomaly map under explicit "diag_" keys so
     # callers can consume one counter dictionary without interface churn.
     for key, value in diagnostics_counts.items():
@@ -844,7 +883,7 @@ def poll_account_once(
             _record_ghost_reason(delta_anomaly_counts, f"diag_{key}", count=value)
 
     stale_count = delta_anomaly_counts.get("delta_replayed_item_id", 0)
-    ghost_total = sum(ghost_reason_counts.values())
+    ghost_total = sum(download_ghost_reason_counts.values())
     if stale_count >= delta_breaker_stale_page_threshold:
         _record_ghost_reason(delta_anomaly_counts, "delta_breaker_armed_stale_page")
         _arm_breaker_cooldown(account.delta_cursor, delta_breaker_cooldown_seconds)
@@ -858,12 +897,13 @@ def poll_account_once(
             {
             "account": account.name,
             "diagnostic_counts": dict(sorted(diagnostics_counts.items())),
-            "ghost_reason_counts": dict(sorted(ghost_reason_counts.items())),
+                "ghost_reason_counts": dict(sorted(download_ghost_reason_counts.items())),
             "delta_anomaly_counts": dict(sorted(delta_anomaly_counts.items())),
             }
         ),
     )
-    return downloaded_paths, len(candidates), ghost_reason_counts, delta_anomaly_counts
+    candidate_count_total = len(_materialize_reduced_candidates(reducer))
+    return downloaded_paths, candidate_count_total, download_ghost_reason_counts, delta_anomaly_counts
 
 
 def _incident_state_path(cursor_path: Path) -> Path:
@@ -1036,6 +1076,23 @@ def parse_delta_items(
     return tuple(parsed)
 
 
+def _reduce_delta_page_candidates(
+    account_name: str,
+    payload: dict[str, object],
+) -> tuple[RemoteCandidate, ...]:
+    """Return last-event-wins candidates for one page without mutating global counters."""
+
+    reducer: dict[str, _ReducerEntry] = {}
+    _apply_delta_page_to_reducer(
+        account_name=account_name,
+        payload=payload,
+        reducer=reducer,
+        start_sequence=0,
+        anomaly_counts={},
+    )
+    return tuple(_materialize_reduced_candidates(reducer))
+
+
 def download_candidates(
     candidates: Iterable[RemoteCandidate],
     staging_root: Path,
@@ -1050,7 +1107,8 @@ def download_candidates(
     policy: RetryPolicy = DEFAULT_POLICY,
     sleeper: Callable[[float], None] = time.sleep,
     jitter_fn: Callable[[], float] | None = None,
-) -> tuple[list[Path], dict[str, int]]:
+    reset_manifest: bool = True,
+) -> tuple[list[Path], dict[str, int], list[DownloadedHandoffCandidate]]:
     """Download candidates into account-scoped staging folder."""
 
     target_root = staging_root / account_name
@@ -1064,7 +1122,9 @@ def download_candidates(
     quarantine_root = target_root / "_quarantine"
     quarantine_root.mkdir(parents=True, exist_ok=True)
     used_basenames: set[str] = set()
-    handoff_manifest.unlink(missing_ok=True)
+    handoff_rows: list[DownloadedHandoffCandidate] = []
+    if reset_manifest:
+        handoff_manifest.unlink(missing_ok=True)
 
     for index, candidate in enumerate(candidates):
         if limit > 0 and index >= limit:
@@ -1192,9 +1252,20 @@ def download_candidates(
             candidate=candidate,
             staging_path=final_path,
         )
+        handoff_rows.append(
+            DownloadedHandoffCandidate(
+                account_name=candidate.account_name,
+                onedrive_id=candidate.item_id,
+                original_filename=candidate.name,
+                relative_path=candidate.relative_path,
+                modified_time=candidate.normalized_modified_time,
+                size_bytes=candidate.size_bytes,
+                staging_path=final_path,
+            )
+        )
         downloaded.append(final_path)
 
-    return downloaded, ghost_reason_counts
+    return downloaded, ghost_reason_counts, handoff_rows
 
 
 def _boundary_manifest_path_for_account(staging_root: Path, account_name: str) -> Path:

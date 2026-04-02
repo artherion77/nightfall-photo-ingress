@@ -181,9 +181,10 @@ On invalid/lost cursor:
 Safety depends on registry idempotency.
 
 ### 7.7 Delta cursor checkpoint semantics
-- During an active delta traversal, persist `@odata.nextLink` checkpoints per page to support interruption-safe resume.
-- Treat cursor state as traversal progress, not a permanent terminal pointer.
-- When a chain reaches `@odata.deltaLink` completion, reset cursor state to the initial configured delta URL for the next cycle.
+- During an active delta traversal, process each page in commit order: page fetch -> ingest filter/decision -> durable registry/storage writes -> cursor advance.
+- Persist `@odata.nextLink` only after page side effects are committed.
+- Treat cursor state as committed work progress.
+- When a chain reaches `@odata.deltaLink` completion, persist `@odata.deltaLink` as the committed cursor.
 
 ---
 

@@ -207,10 +207,7 @@ def test_poll_account_once_paginates_downloads_and_persists_cursor(tmp_path: Pat
     assert ghost_reason_counts == {}
     assert delta_anomaly_counts == {}
     assert len(downloaded) == 2
-    assert (
-        account.delta_cursor.read_text(encoding="utf-8")
-        == "https://graph.microsoft.com/v1.0/me/drive/root:/Camera%20Roll:/delta"
-    )
+    assert account.delta_cursor.read_text(encoding="utf-8") == "https://delta/final"
 
 
 def test_poll_account_once_persists_nextlink_checkpoint_before_failure(tmp_path: Path) -> None:
@@ -294,14 +291,8 @@ def test_poll_accounts_runs_enabled_accounts_in_config_order(tmp_path: Path) -> 
     assert [res.account_name for res in results] == ["zzz", "aaa"]
     assert [res.ghost_item_count for res in results] == [0, 0]
     assert [res.delta_anomaly_count for res in results] == [0, 0]
-    assert (
-        first.delta_cursor.read_text(encoding="utf-8")
-        == "https://graph.microsoft.com/v1.0/me/drive/root:/CameraA:/delta"
-    )
-    assert (
-        second.delta_cursor.read_text(encoding="utf-8")
-        == "https://graph.microsoft.com/v1.0/me/drive/root:/CameraB:/delta"
-    )
+    assert first.delta_cursor.read_text(encoding="utf-8") == "https://delta/zzz"
+    assert second.delta_cursor.read_text(encoding="utf-8") == "https://delta/aaa"
 
 
 def test_poll_accounts_uses_global_process_lock(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

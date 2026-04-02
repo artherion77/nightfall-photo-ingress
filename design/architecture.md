@@ -190,8 +190,20 @@ CREATE TABLE accepted_records (
       - `rejected` → delete from staging; append `rejected_duplicate` to `audit_log`.
       - `accepted` → delete from staging; append `duplicate_skipped` to `audit_log`.
       - `unknown` → move to `accepted/YYYY/MM/{filename}`; insert `files` row as `accepted`; insert `accepted_records`; insert `metadata_index` row; append `accepted` to `audit_log`.
-4. Persist per-page `nextLink` checkpoints during traversal.
-5. On chain completion (`deltaLink` reached), reset cursor to the initial configured delta URL for next cycle.
+4. Persist cursor checkpoints with a commit-gated streaming sequence per page:
+   - fetch one page,
+   - evaluate prefilter and ingest outcomes for that page,
+   - commit registry/storage side effects,
+   - then persist `nextLink` cursor for the next page.
+5. On chain completion (`deltaLink` reached), persist the `deltaLink` as the committed cursor.
+
+### 6.1.1 Authoritative Cursor Commit Rule
+
+The streaming page-commit model is authoritative. Cursor advancement is a commit acknowledgement, not a fetch acknowledgement.
+
+- Never advance cursor before page ingest side effects are durable.
+- If a poll run is interrupted before cursor advance, replaying the same page must be safe via registry idempotency.
+- If interrupted after cursor advance, the next run resumes from the next page without missing committed work.
 
 Account execution rule:
 - Enabled accounts are processed serially in declaration order from the configuration file.
