@@ -79,10 +79,17 @@ class OneDriveAuthClient:
 
             flow = app.initiate_device_flow(scopes=self._scopes)
             if "user_code" not in flow or "verification_uri" not in flow:
+                # Log full MSAL response to diagnose configuration issues
+                error_msg = flow.get("error", "unknown") if isinstance(flow, dict) else "unknown"
+                error_desc = flow.get("error_description", "") if isinstance(flow, dict) else ""
+                hint = f"MSAL error={error_msg}"
+                if error_desc:
+                    hint += f", desc={error_desc[:100]}"
                 raise AuthError(
                     "Device-code flow did not return verification details",
                     account=account.name,
                     operation="device_code_initiate",
+                    safe_hint=hint,
                 )
 
             print(
@@ -114,7 +121,7 @@ class OneDriveAuthClient:
             expected_identity = self._load_expected_identity(account)
             selected_account = self._select_account(accounts, expected_identity, account)
 
-            result = app.acquire_token_silently(self._scopes, account=selected_account)
+            result = app.acquire_token_silent(self._scopes, account=selected_account)
             token = self._extract_token(result, account=account.name)
             self._save_cache(account.token_cache, cache)
             self._persist_account_identity(account, accounts)

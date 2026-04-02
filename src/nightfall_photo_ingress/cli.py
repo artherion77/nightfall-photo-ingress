@@ -104,7 +104,11 @@ def _cmd_auth_setup(args: argparse.Namespace) -> int:
         OneDriveAuthClient().auth_setup(account)
         LOGGER.info("auth setup completed", extra={"account": account.name})
         return 0
-    except (AuthError, ValueError) as exc:
+    except AuthError as exc:
+        # Log full error details including safe_hint for debugging
+        LOGGER.error(str(exc), extra=exc.as_log_dict())
+        return 2
+    except ValueError as exc:
         LOGGER.error(str(exc))
         return 2
 
