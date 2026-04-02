@@ -12,7 +12,7 @@ require human input (device-code browser onboarding).
 | P1 | Automated | Container running, CLI `--help`, `auth-setup` discoverable, `config-check`, status file schema, directory layout, systemd units enabled |
 | P2 | **Interactive** | Detect existing cache; show cached identity (`user` + `auth_id`); confirm whether to skip re-auth (`Y/n`); if not skipped run `stagingctl auth-setup`; then verify token cache, mode 0600, identity sidecar |
 | P3 | **Interactive** | `stagingctl discover-paths` auto-discovers OneDrive paths using cached token (no new login); persists onboarding sidecar metadata; writeback to config |
-| P4 | Semi-automated | `stagingctl smoke-live` (live poll + secret scan); interactive terminals show human-mode per-page poll progress while evidence logs are still captured; status file reflects `poll` command |
+| P4 | Semi-automated | `stagingctl smoke-live` (live poll + secret scan); interactive terminals show human-mode per-page poll progress while evidence logs are still captured; emits traversal metrics summary (pages, elapsed time, page evaluation speed, average items/files per page); status file reflects `poll` command |
 | P5 | Automated | `stagingctl reset` restores clean snapshot; token cache absent; `config-check` still passes |
 
 P2, P3, and P4 are skipped when `--skip-interactive` is passed (e.g. for CI pre-flight

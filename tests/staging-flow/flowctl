@@ -464,6 +464,15 @@ phase_p4() {
             || { _pfail "P4.1:smoke_live" "stagingctl smoke-live failed — see $log_dir/smoke-live.log"; rc=1; }
     fi
 
+    # P4.3 traversal metrics summary from poll-live output
+    local traversal_summary=""
+    traversal_summary="$(rg -n "traversal pages=" "$log_dir/smoke-live.log" | tail -n 1 | sed 's/^.*:trace /trace /' || true)"
+    if [[ -n "$traversal_summary" ]]; then
+        _pass "P4.3:traversal_metrics" "$traversal_summary"
+    else
+        _pskip "P4.3:traversal_metrics" "no traversal summary found in smoke-live log"
+    fi
+
     # P4.2 status file updated to reflect the poll command
     lxc exec "$CONTAINER" -- \
         python3 -c "

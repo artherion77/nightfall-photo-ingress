@@ -529,6 +529,12 @@ cmd_smoke_live() {
             || { _assert_fail "$evidence_dir/assertions.jsonl" "live_poll_exit_0" "poll failed"; rc=1; }
     fi
 
+    local traversal_summary=""
+    traversal_summary="$(rg -n "traversal pages=" "$poll_log" | tail -n 1 | sed 's/^.*:trace /trace /' || true)"
+    if [[ -n "$traversal_summary" ]]; then
+        _info "Poll traversal summary: $traversal_summary"
+    fi
+
     # ── 3. secret scan ────────────────────────────────────────────────────────
     _info "Step 3/3: secret scan"
     lxc file push "$SCRIPT_DIR/evidence/secret_scan.py" \

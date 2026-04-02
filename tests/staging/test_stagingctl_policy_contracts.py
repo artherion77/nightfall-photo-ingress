@@ -164,6 +164,10 @@ class TestSmokeLive:
         assert "script -qefc" in stagingctl_text
         assert "--log-mode human poll --verbose" in stagingctl_text
 
+    def test_smoke_live_emits_traversal_summary_line(self, stagingctl_text: str) -> None:
+        assert "Poll traversal summary:" in stagingctl_text
+        assert "traversal pages=" in stagingctl_text
+
     def test_smoke_live_runs_secret_scan(self, stagingctl_text: str) -> None:
         assert "secret_scan_clean" in stagingctl_text
 

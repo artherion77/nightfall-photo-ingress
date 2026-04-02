@@ -582,6 +582,7 @@ def poll_account_once(
 
     cursor = _load_cursor(account.delta_cursor)
     delta_url = cursor or _build_initial_delta_url(account)
+    cursor_source = "checkpoint" if cursor else "initial"
 
     reducer: dict[str, _ReducerEntry] = {}
     reducer_sequence = 0
@@ -593,6 +594,8 @@ def poll_account_once(
     diagnostics_counts: dict[str, int] = {}
     page_count = 0
     start_monotonic = monotonic()
+    page_items_total = 0
+    page_file_items_total = 0
 
     account_staging_root = staging_root / account.name
     incident_state = _load_incident_state(account.delta_cursor)
@@ -604,6 +607,16 @@ def poll_account_once(
         staging_dir=account_staging_root,
         ttl_minutes=tmp_ttl_minutes,
         diagnostics_counts=diagnostics_counts,
+    )
+
+    _trace_event(
+        "delta_cursor_start",
+        poll_run_id=poll_run_id,
+        account_name=account.name,
+        operation="delta_cursor",
+        cursor_source=cursor_source,
+        cursor_has_token=bool(cursor and "token=" in cursor),
+        delta_url=redact_url(delta_url),
     )
 
     while next_url:
@@ -710,9 +723,11 @@ def poll_account_once(
             if "deleted" in raw:
                 deleted_items += 1
 
-        checkpoint_cursor = next_url or delta_link
-        if checkpoint_cursor is not None:
-            _save_cursor(account.delta_cursor, checkpoint_cursor)
+        page_items_total += len(page_items)
+        page_file_items_total += file_items
+
+        if next_url is not None:
+            _save_cursor(account.delta_cursor, next_url)
             _clear_resync_marker(account.delta_cursor)
             _trace_event(
                 "delta_cursor_checkpoint_saved",
@@ -720,7 +735,7 @@ def poll_account_once(
                 account_name=account.name,
                 operation="delta_cursor",
                 page_index=page_count,
-                checkpoint_kind="next_link" if next_url else "delta_link",
+                checkpoint_kind="next_link",
             )
 
         _trace_event(
@@ -751,6 +766,35 @@ def poll_account_once(
             account=account.name,
             operation="poll_account_once",
         )
+
+    traversal_seconds = monotonic() - start_monotonic
+    page_eval_seconds = traversal_seconds / page_count if page_count > 0 else 0.0
+    avg_items_per_page = page_items_total / page_count if page_count > 0 else 0.0
+    avg_files_per_page = page_file_items_total / page_count if page_count > 0 else 0.0
+
+    reset_cursor = _build_initial_delta_url(account)
+    _save_cursor(account.delta_cursor, reset_cursor)
+    _clear_resync_marker(account.delta_cursor)
+    _trace_event(
+        "delta_chain_completed_cursor_reset",
+        poll_run_id=poll_run_id,
+        account_name=account.name,
+        operation="delta_cursor",
+        pages_walked=page_count,
+    )
+    _trace_event(
+        "delta_traversal_summary",
+        poll_run_id=poll_run_id,
+        account_name=account.name,
+        operation="delta_page",
+        pages_walked=page_count,
+        page_items_total=page_items_total,
+        page_file_items_total=page_file_items_total,
+        avg_items_per_page=round(avg_items_per_page, 2),
+        avg_files_per_page=round(avg_files_per_page, 2),
+        traversal_seconds=round(traversal_seconds, 2),
+        page_eval_seconds=round(page_eval_seconds, 3),
+    )
 
     candidates = _materialize_reduced_candidates(reducer)
     downloaded_paths, ghost_reason_counts = download_candidates(

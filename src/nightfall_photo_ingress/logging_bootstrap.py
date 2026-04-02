@@ -128,6 +128,13 @@ class HumanFormatter(logging.Formatter):
                 f"kind={getattr(record, 'checkpoint_kind', '?')}"
             )
 
+        if event == "delta_cursor_start":
+            token_state = "yes" if getattr(record, "cursor_has_token", False) else "no"
+            return (
+                f"{prefix}cursor start source={getattr(record, 'cursor_source', '?')} "
+                f"has_token={token_state}"
+            )
+
         if event == "delta_page_progress":
             return (
                 f"{prefix}page={getattr(record, 'page_index', '?')} "
@@ -135,6 +142,21 @@ class HumanFormatter(logging.Formatter):
                 f"files={getattr(record, 'file_items', 0)} "
                 f"deleted={getattr(record, 'deleted_items', 0)} "
                 f"next={'yes' if getattr(record, 'has_next', False) else 'no'}"
+            )
+
+        if event == "delta_traversal_summary":
+            return (
+                f"{prefix}traversal pages={getattr(record, 'pages_walked', 0)} "
+                f"elapsed={getattr(record, 'traversal_seconds', 0)}s "
+                f"page_eval={getattr(record, 'page_eval_seconds', 0)}s "
+                f"avg_files_per_page={getattr(record, 'avg_files_per_page', 0)} "
+                f"avg_items_per_page={getattr(record, 'avg_items_per_page', 0)}"
+            )
+
+        if event == "delta_chain_completed_cursor_reset":
+            return (
+                f"{prefix}chain complete, cursor reset to initial "
+                f"pages={getattr(record, 'pages_walked', 0)}"
             )
 
         if event == "account_poll_start":

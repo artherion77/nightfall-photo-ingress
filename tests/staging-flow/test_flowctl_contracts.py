@@ -93,7 +93,7 @@ class TestStepLabels:
             assert step in flowctl_text, f"Step label {step} not found in flowctl"
 
     def test_p4_step_labels(self, flowctl_text: str) -> None:
-        for step in ("P4.1", "P4.2"):
+        for step in ("P4.1", "P4.2", "P4.3"):
             assert step in flowctl_text, f"Step label {step} not found in flowctl"
 
     def test_p5_step_labels(self, flowctl_text: str) -> None:

@@ -208,14 +208,21 @@ def test_delta_page_transitions_emit_trace_events(caplog, tmp_path: Path) -> Non
     records = _trace_records(caplog)
     events = [getattr(record, "event", "") for record in records]
 
+    assert "delta_cursor_start" in events
     assert "delta_page_start" in events
     assert "delta_page_progress" in events
-    assert "delta_cursor_checkpoint_saved" in events
+    assert "delta_chain_completed_cursor_reset" in events
+    assert "delta_traversal_summary" in events
     assert "delta_page_end" in events
 
+    cursor_start = next(record for record in records if getattr(record, "event", "") == "delta_cursor_start")
     start = next(record for record in records if getattr(record, "event", "") == "delta_page_start")
     end = next(record for record in records if getattr(record, "event", "") == "delta_page_end")
 
+    assert getattr(cursor_start, "poll_run_id", None) == "poll-1"
+    assert getattr(cursor_start, "account_name", None) == "alice"
+    assert getattr(cursor_start, "cursor_source", None) == "initial"
+    assert getattr(cursor_start, "cursor_has_token", None) is False
     assert getattr(start, "poll_run_id", None) == "poll-1"
     assert getattr(start, "account_name", None) == "alice"
     assert getattr(end, "poll_run_id", None) == "poll-1"
