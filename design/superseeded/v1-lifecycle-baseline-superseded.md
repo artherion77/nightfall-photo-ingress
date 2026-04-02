@@ -1,11 +1,12 @@
 # photo-ingress V1 Baseline Specification
 
-Status: archived historical reference
+Status: superseded
 Date: 2026-03-31
 
-Archived note:
+Superseded note:
 - This document describes the pre-v2 accepted-first lifecycle and is no longer authoritative for the runtime.
-- The current contract is the v2 pending-first design in `design/architecture.md` and `design/configspec.md`.
+- Superseded by the V2 pending-first lifecycle design in `design/domain-architecture-overview.md` and
+  `design/cli-config-specification.md`. Retained as historical reference only.
 
 ---
 

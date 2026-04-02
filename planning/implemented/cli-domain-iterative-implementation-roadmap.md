@@ -1,11 +1,16 @@
 # photo-ingress Iterative Implementation Roadmap
 
-Status: Drift-corrected to audited implementation state
+Status: Partially implemented — Modules 0–4 complete; Modules 5–8 planned
 Date: 2026-04-01
 Owner: Systems Engineering
 
-Related roadmap:
-- [Web Control Plane Implementation Roadmap](web-control-plane-implementation-roadmap.md)
+Implementation status:
+- Modules 0–4: Implemented and drift-corrected as of 2026-04-01. See audited snapshot below.
+- Modules 5–8: Still planned. See `planning/planned/cli-domain-post-audit-next-steps.md` for the
+  immediate next steps before beginning Module 5.
+
+Related roadmap (renamed):
+- [Web Control Plane Integration Plan](../planned/web-control-plane-integration-plan.md)
 
 ## Audited reality snapshot (2026-04-01)
 

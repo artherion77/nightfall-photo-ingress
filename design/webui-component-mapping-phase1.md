@@ -292,7 +292,7 @@ predictable, and requires no scroll event or IntersectionObserver logic.
 **Scrolling (Phase 2):** `LoadMoreButton` is replaced with an IntersectionObserver
 sentinel. When the sentinel enters the viewport (within 200px of the bottom of the
 list), the next cursor page is fetched and appended automatically. See
-`design/phase2-architecture.md` §14 for the migration plan.
+`design/web-control-plane-architecture-phase2.md` §14 for the migration plan.
 
 **Event row interaction:** Clicking an event row expands it inline to show the full
 audit entry (actor, action, item ID, timestamp, correlation ID). Keyboard: `Enter`

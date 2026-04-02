@@ -3,8 +3,9 @@
 Status: Proposed
 Date: 2026-04-03
 Owner: Systems Engineering
-Depends on: design/phase2-architecture.md, planning/phase1-re-evaluation.md,
-            planning/web-api-ui-integration-plan.md
+Depends on: design/web-control-plane-architecture-phase2.md,
+            planning/planned/web-control-plane-phase1-scope.md,
+            planning/planned/web-control-plane-integration-plan.md
 
 ---
 
@@ -72,7 +73,7 @@ the system to the LAN. Optional chunks may be adopted after LAN exposure.
 
 ### P2-A: Reverse Proxy + TLS (Mandatory)
 
-**Reference:** phase2-architecture.md §3
+**Reference:** web-control-plane-architecture-phase2.md §3
 
 **Goal:** Introduce Caddy as a reverse proxy in front of Uvicorn, terminating TLS,
 serving static UI assets, and providing access logging. This chunk is the gate before
@@ -103,7 +104,7 @@ any LAN exposure.
 - RapiDoc accessible at `https://photo-ingress.lan/api/docs`.
 
 **Acceptance criteria:**
-- All items in phase2-architecture.md §3.6 (proxy checklist) are verified.
+- All items in web-control-plane-architecture-phase2.md §3.6 (proxy checklist) are verified.
 - Caddy access log contains structured JSON entries for API calls.
 
 **Rollback:**
@@ -115,7 +116,7 @@ any LAN exposure.
 
 ### P2-B: Build Artifact Versioning (Mandatory)
 
-**Reference:** phase2-architecture.md §4
+**Reference:** web-control-plane-architecture-phase2.md §4
 
 **Goal:** Switch from overwrite deployment to versioned release directories with
 symlink-based rollback. This chunk is independent of P2-A and can be done in parallel.
@@ -157,7 +158,7 @@ symlink-based rollback. This chunk is independent of P2-A and can be done in par
 
 ### P2-C: API Versioning Policy (Mandatory)
 
-**Reference:** phase2-architecture.md §5
+**Reference:** web-control-plane-architecture-phase2.md §5
 
 **Goal:** Document and operationalise the API versioning policy before any endpoint
 leaves experimental status or a breaking change is needed.
@@ -170,7 +171,7 @@ leaves experimental status or a breaking change is needed.
 2. Add a response header utility in `api/middleware.py` to emit `Deprecation` and
    `Sunset` headers on deprecated routes.
 3. Write a brief internal guide in `docs/api/versioning-guide.md` summarising the
-   policy from phase2-architecture.md §5.2 (breaking vs non-breaking classification,
+   policy from web-control-plane-architecture-phase2.md §5.2 (breaking vs non-breaking classification,
    deprecation timeline, v2 triggers).
 
 **Testing:**
@@ -188,7 +189,7 @@ leaves experimental status or a breaking change is needed.
 
 ### P2-D: Rate Limiting Migration to Proxy (Mandatory)
 
-**Reference:** phase2-architecture.md §11
+**Reference:** web-control-plane-architecture-phase2.md §11
 
 **Goal:** Move rate limiting from the in-process FastAPI dependency (Phase 1) to
 Caddy-level rate limiting. Remove the in-process dependency once the proxy limits
@@ -199,7 +200,7 @@ are verified.
 **Tasks:**
 1. Install the `caddy-ratelimit` plugin or equivalent Caddy rate limiting module.
 2. Add rate limit directives to the Caddyfile per the policy in
-   phase2-architecture.md §11.3.
+   web-control-plane-architecture-phase2.md §11.3.
 3. Reload Caddy with the updated config.
 4. Verify rate limits fire at the proxy layer (test at 31 POST req/min → 429).
 5. Remove the Phase 1 FastAPI rate limiting decorator/dependency from all API routers.
@@ -222,7 +223,7 @@ are verified.
 
 ### P2-E: API Client Retry and Backoff (Mandatory)
 
-**Reference:** phase2-architecture.md §6
+**Reference:** web-control-plane-architecture-phase2.md §6
 
 **Goal:** Add retry with exponential backoff to read-only API client calls in the SPA.
 Mutating endpoints remain fail-fast.
@@ -259,7 +260,7 @@ are more realistic for testing on LAN).
 
 ### P2-F: Filter Sidebar (Mandatory)
 
-**Reference:** phase2-architecture.md §13
+**Reference:** web-control-plane-architecture-phase2.md §13
 
 **Goal:** Add the `FilterSidebar` component to the Dashboard, enabling file-type
 filtering of KPI counts and the audit preview.
@@ -302,7 +303,7 @@ cleaner baseline for UI testing).
 
 ### P2-G: Pagination → Infinite Scroll (Mandatory)
 
-**Reference:** phase2-architecture.md §14
+**Reference:** web-control-plane-architecture-phase2.md §14
 
 **Goal:** Replace the explicit `LoadMoreButton` in the Audit Timeline with an
 IntersectionObserver-based automatic scroll trigger.
@@ -340,7 +341,7 @@ IntersectionObserver-based automatic scroll trigger.
 
 ### P2-H: KPI Threshold Configuration UI (Mandatory)
 
-**Reference:** phase2-architecture.md §15
+**Reference:** web-control-plane-architecture-phase2.md §15
 
 **Goal:** Add a Settings page section for editing KPI thresholds in-browser. Operator
 no longer needs SSH to change thresholds.
@@ -387,9 +388,9 @@ preferred (Settings page accessed over HTTPS).
 
 ### P2-OPT-1: SQLite → Postgres Migration (Optional)
 
-**Reference:** phase2-architecture.md §8
+**Reference:** web-control-plane-architecture-phase2.md §8
 
-**Trigger conditions:** See phase2-architecture.md §8.2 (write contention, multi-user,
+**Trigger conditions:** See web-control-plane-architecture-phase2.md §8.2 (write contention, multi-user,
 or background worker write throughput).
 
 **Tasks:**
@@ -411,7 +412,7 @@ or background worker write throughput).
 
 ### P2-OPT-2: Background Worker (Optional)
 
-**Reference:** phase2-architecture.md §9
+**Reference:** web-control-plane-architecture-phase2.md §9
 
 **Trigger conditions:** Sidecar/XMP metadata fetching or thumbnail generation demand
 arises in operator use.
@@ -434,7 +435,7 @@ SQLite acceptable for low job rates.
 
 ### P2-OPT-3: OIDC/OAuth Authentication (Optional)
 
-**Reference:** phase2-architecture.md §10
+**Reference:** web-control-plane-architecture-phase2.md §10
 
 **Trigger conditions:** Multiple human operators, MFA requirement, or WAN exposure.
 
@@ -459,7 +460,7 @@ operator's infrastructure.
 
 ### P2-OPT-4: SSR Migration (Optional)
 
-**Reference:** phase2-architecture.md §7
+**Reference:** web-control-plane-architecture-phase2.md §7
 
 **Trigger conditions:** FCP > 3s on nominal LAN connection, multi-user requirement, or
 OIDC adoption requiring server-side cookie handling.
@@ -489,7 +490,7 @@ migration.
 
 ### P2-OPT-5: CDN / Advanced Asset Caching (Optional)
 
-**Reference:** phase2-architecture.md §12
+**Reference:** web-control-plane-architecture-phase2.md §12
 
 **Trigger conditions:** WAN access, static asset load time is a measured pain point,
 or multi-site deployment.
@@ -557,7 +558,7 @@ Phase 2 mandatory chunks are deployed in the following order to minimise risk:
 ### 5.2 LAN Exposure Gate
 
 LAN exposure is not enabled until every item in the Phase 2 mandatory checklist
-(phase2-architecture.md §3.6) is signed off by the operator. This checklist is
+(web-control-plane-architecture-phase2.md §3.6) is signed off by the operator. This checklist is
 reproduced here as a gate:
 
 - [ ] Caddy running as a systemd service.

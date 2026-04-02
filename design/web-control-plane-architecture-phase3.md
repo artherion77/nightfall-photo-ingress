@@ -3,9 +3,9 @@
 Status: Proposed
 Date: 2026-04-03
 Owner: Systems Engineering
-Depends on: planning/phase1-re-evaluation.md,
-            design/phase2-architecture.md,
-            planning/web-control-plane-phase2-implementation-roadmap.md
+Depends on: planning/planned/web-control-plane-phase1-scope.md,
+            design/web-control-plane-architecture-phase2.md,
+            planning/proposed/web-control-plane-phase2-implementation-roadmap.md
 
 ---
 
@@ -75,7 +75,7 @@ or REJECT. Justification is provided for all three outcomes.
 **Proposal:** Introduce a persistent background worker process for asynchronous jobs.
 
 **Evaluation:** This vector is already accepted as Phase 2 optional
-(phase2-architecture.md §9). Phase 3 does not re-evaluate that decision — it graduates
+(web-control-plane-architecture-phase2.md §9). Phase 3 does not re-evaluate that decision — it graduates
 the worker from optional to the mandatory foundation on which Phase 3.1 (Sidecar
 Pipeline) and Phase 3.2 (Policy Engine) depend.
 
@@ -442,7 +442,7 @@ scale.
 
 **Proposal:** Complete the SQLite → Postgres migration path.
 
-**Evaluation:** The migration path is fully specified in phase2-architecture.md §8.
+**Evaluation:** The migration path is fully specified in web-control-plane-architecture-phase2.md §8.
 Phase 3 is not the right document to re-specify it. The migration decision is
 trigger-driven; if the triggers have not fired by end of Phase 2, Phase 3 does not
 cause them to fire. However, the Phase 3 sidecar pipeline adds a new potential trigger:
@@ -450,7 +450,7 @@ sustained write throughput from worker job completions.
 
 **Decision: NOT A NEW PHASE 3 ITEM. Stays Phase 2 optional.**
 
-Phase 3 adds one new trigger condition to phase2-architecture.md §8.2 (via amendment
+Phase 3 adds one new trigger condition to web-control-plane-architecture-phase2.md §8.2 (via amendment
 note, not a new section):
 
 > If the Phase 3 sidecar pipeline worker produces sustained write throughput exceeding
@@ -460,7 +460,7 @@ note, not a new section):
 **Justification for not re-specifying:** Creating a Phase 3 section for Postgres
 migration would implicitly promote it from optional to Phase 3 scope, creating planning
 pressure to include it in Phase 3 delivery. Its optionality must be preserved. The
-existing trigger conditions in phase2-architecture.md §8.2 remain authoritative.
+existing trigger conditions in web-control-plane-architecture-phase2.md §8.2 remain authoritative.
 
 ---
 
@@ -625,7 +625,7 @@ to Phase 3.0 mandatory foundation. Extensions to the Phase 2 design:
 All schema changes are applied via numbered migration files in
 `nightfall_photo_ingress/migrations/`. All changes are additive only: new tables or
 new nullable/defaulted columns. No Phase 1 or Phase 2 table is altered in a breaking
-way, consistent with the compatibility guarantee in phase2-architecture.md §18.
+way, consistent with the compatibility guarantee in web-control-plane-architecture-phase2.md §18.
 
 **New and extended tables:**
 
@@ -851,7 +851,7 @@ All Phase 3 additions maintain the following constraints from Phase 1 and Phase 
   running, they are not buffered (the worker will process the `pending` item on its
   next queue scan regardless).
 - **Schema migration discipline:** All schema changes are additive only, consistent with
-  the Phase 2 compatibility guarantee (phase2-architecture.md §18).
+  the Phase 2 compatibility guarantee (web-control-plane-architecture-phase2.md §18).
 - **Worker optional fallback:** If `photo-ingress-worker.service` is stopped, the API
   and CLI continue to function. Items accumulate without sidecar processing. The API
   returns 404 for thumbnail requests and empty arrays for duplicate and metadata
@@ -1067,7 +1067,7 @@ acknowledging and overturning the rejection recorded in §3.9.
 ## 8. Phase 3 Compatibility Summary
 
 All Phase 3 additions maintain the Phase 1 → Phase 2 compatibility guarantees defined
-in phase2-architecture.md §18. The following table documents Phase 3-specific
+in web-control-plane-architecture-phase2.md §18. The following table documents Phase 3-specific
 additions to that guarantee:
 
 | Constraint | How maintained in Phase 3 |

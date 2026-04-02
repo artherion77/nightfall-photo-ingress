@@ -1,5 +1,18 @@
-# Refinement List for photo-ingress
-This document synthesizes all refinement requirements derived from the architectural plan, user constraints, and structural analysis. Claude Code should use this list to refine the architecture, validate assumptions, and guide implementation decisions.
+# Refinement Requirements — Domain and CLI Layer
+
+Status: Implemented (used as guide for Modules 0–4)
+Date: 2026-03-31
+Owner: Systems Engineering
+
+Implementation status:
+- This document was the implementation guide for CLI/domain Modules 0–4.
+- Items A–F (configuration, registry, pipeline, observability, CLI, security) are reflected
+  in the current codebase under `src/nightfall_photo_ingress/`.
+- Web control plane refinements (API, UI) are addressed by `design/webui-architecture-phase1.md`,
+  `design/web-control-plane-architecture-phase2.md`, and `design/web-control-plane-architecture-phase3.md`.
+- This document is retained as the authoritative requirements record for the implemented domain layer.
+
+---
 
 ---
 

@@ -3,7 +3,9 @@
 Status: Proposed
 Date: 2026-04-03
 Owner: Systems Engineering
-Depends on: phase1-re-evaluation.md, integration-plan.md, techstack-decision.md
+Depends on: planning/planned/web-control-plane-phase1-scope.md,
+            planning/planned/web-control-plane-integration-plan.md,
+            planning/planned/web-control-plane-techstack-decision.md
 
 ---
 
@@ -558,7 +560,7 @@ The Phase 1 full-width main content grid gains a sidebar column:
 └──────────┴──────────────────────────────────────────────┘
 ```
 
-Responsive behaviour is as originally specified in ui-mapping.md §6.2 and §6.3
+Responsive behaviour is as originally specified in webui-component-mapping-phase1.md §6.2 and §6.3
 (slide-out drawer on tablet, modal sheet on mobile).
 
 ### 13.6 Phase 1 Compatibility

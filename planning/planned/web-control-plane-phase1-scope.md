@@ -3,8 +3,10 @@
 Status: Decided
 Date: 2026-04-03 (rev 2: 2026-04-03)
 Owner: Systems Engineering
-Supersedes: Relevant sections of integration-plan.md (Phase 7), webui-architecture.md (§2, §3.2, §6),
-            design-tokens.md (§11), ui-mapping.md (§3.1, §4.1, §6.1, §7.1, §7.3)
+Supersedes: Relevant sections of planning/planned/web-control-plane-integration-plan.md (Phase 7),
+            design/webui-architecture-phase1.md (§2, §3.2, §6),
+            design/webui-design-tokens-phase1.md (§11),
+            design/webui-component-mapping-phase1.md (§3.1, §4.1, §6.1, §7.1, §7.3)
 
 ---
 
@@ -42,7 +44,7 @@ documents are amended separately where noted.
 
 ### C1 — SSR: Deferral, Not Rejection
 
-**Original decision:** webui-architecture.md §2 states SSR is disabled and gives four
+**Original decision:** webui-architecture-phase1.md §2 states SSR is disabled and gives four
 reasons for the choice. The original framing implies a permanent rejection.
 
 **Critique:** The critique correctly observes that permanently rejecting SSR forecloses
@@ -50,7 +52,7 @@ a useful future capability (faster perceived load, better error boundaries, pote
 server-side auth guard simplification). It should be deferred, not excluded.
 
 **Amendment:** The Phase 1 design is unchanged — `@sveltejs/adapter-static` and
-`ssr = false` remain correct for Phase 1. The language in webui-architecture.md §2 is
+`ssr = false` remain correct for Phase 1. The language in webui-architecture-phase1.md §2 is
 updated to state "deferred" rather than "disabled/rejected". The conditions under which
 SSR becomes worth revisiting are:
 - Operator count grows beyond a single LAN user (requires real auth session management).
@@ -58,9 +60,9 @@ SSR becomes worth revisiting are:
 - Page load time on low-bandwidth LAN connections becomes a reported pain point.
 
 Until one of these conditions is met, the adapter-static SPA approach is optimal.
-The SSR upgrade path is documented in phase2-architecture.md.
+The SSR upgrade path is documented in web-control-plane-architecture-phase2.md.
 
-**Documents affected:** webui-architecture.md §2.
+**Documents affected:** webui-architecture-phase1.md §2.
 
 ---
 
@@ -79,7 +81,7 @@ Phase 2 is not reached until the reverse proxy is in place.
 
 The integration-plan.md phase table is not amended directly; this document
 supersedes phase 7's classification. Phase 2 architecture is defined in
-phase2-architecture.md.
+web-control-plane-architecture-phase2.md.
 
 **Phase 1 unchanged:** Phase 1 binds Uvicorn to localhost. LAN exposure is not
 unlocked until Phase 2 with the reverse proxy in place.
@@ -88,7 +90,7 @@ unlocked until Phase 2 with the reverse proxy in place.
 
 ### C3 — Health Polling: Moved from Layout to Store Module
 
-**Original decision:** webui-architecture.md §3.2 and §6.2 placed `setInterval` polling
+**Original decision:** webui-architecture-phase1.md §3.2 and §6.2 placed `setInterval` polling
 for health data inside `+layout.svelte`'s `onMount`. This works but is an architectural
 misplacement: layout files should be responsible only for rendering, not for data
 lifecycle management.
@@ -110,7 +112,7 @@ owns the health data, not in the component that renders it.
 This change has no user-visible impact. It produces a cleaner component/store boundary
 and makes the polling lifecycle independently testable.
 
-**Documents affected:** webui-architecture.md §3.2, §6.1, §6.2.
+**Documents affected:** webui-architecture-phase1.md §3.2, §6.1, §6.2.
 
 ---
 
@@ -126,7 +128,7 @@ prefix is already in place. What is missing is a documented policy covering:
 - How breaking vs non-breaking changes are classified.
 
 **Amendment:** No Phase 1 scope change. The versioning policy is documented formally in
-phase2-architecture.md §3 as a mandatory Phase 2 deliverable, to be written before any
+web-control-plane-architecture-phase2.md §3 as a mandatory Phase 2 deliverable, to be written before any
 mutating endpoint leaves experimental status. Since Phase 1 endpoints are read-only and
 internal, the risk of versioning drift is low in Phase 1.
 
@@ -143,7 +145,7 @@ acceptable.
 
 **Decision: Phase 2.** Artifact versioning is introduced as part of Phase 2 hardening,
 alongside the reverse proxy. The reverse proxy can serve from a versioned directory,
-making rollback atomic (symlink swap). This is documented in phase2-architecture.md §4.
+making rollback atomic (symlink swap). This is documented in web-control-plane-architecture-phase2.md §4.
 
 **Phase 1 unchanged:** `rsync` overwrite of `webui/build/` is acceptable for
 localhost-only Phase 1 deployment.
@@ -159,7 +161,7 @@ concurrent reads. Phase 1 stays SQLite.
 low-concurrency operator use, but a migration path should be anticipated.
 
 **Decision:** Phase 1 unchanged. The migration path from SQLite to Postgres is
-documented in phase2-architecture.md §6 as a Phase 2 optional feature. It will not
+documented in web-control-plane-architecture-phase2.md §6 as a Phase 2 optional feature. It will not
 be actioned unless one of these triggers is met:
 - Concurrent write contention causes measurable latency (> 100ms on triage actions).
 - The operator count grows to require multi-user concurrent sessions.
@@ -169,7 +171,7 @@ be actioned unless one of these triggers is met:
 
 ### C7 — Retry/Backoff: Phase 2
 
-**Original decision:** webui-architecture.md §7 documents the API client error handling
+**Original decision:** webui-architecture-phase1.md §7 documents the API client error handling
 strategy as fail-fast: non-2xx responses throw a typed `ApiError`; the component
 renders an `ErrorBanner`. No retries are performed.
 
@@ -185,7 +187,7 @@ renders an `ErrorBanner`. No retries are performed.
 Phase 2 introduces selective retry with backoff on read-only endpoints (health, KPIs)
 where transient errors are expected and silent retry is safe. Mutating endpoints remain
 fail-fast with idempotency key replay as the retry mechanism. This is documented in
-phase2-architecture.md §5.
+web-control-plane-architecture-phase2.md §5.
 
 ---
 
@@ -207,7 +209,7 @@ concerns moves to Phase 2. Phase 1 scope contracts to:
 
 ### C9 — Filter Sidebar: Phase 2 Mandatory
 
-**Original design:** ui-mapping.md §4.1 listed `FilterSidebar` as a Phase 1 Dashboard
+**Original design:** webui-component-mapping-phase1.md §4.1 listed `FilterSidebar` as a Phase 1 Dashboard
 component providing file-type filtering (`All Files`, `Images`, `Videos`, `Documents`).
 
 **Critique:** The sidebar is browsing ergonomics, not core operator workflow. The
@@ -224,20 +226,20 @@ Phase 1.
   already supports a `type` query parameter per the integration plan.
 
 **Phase 1 change:** Phase 1 Dashboard uses a full-width main content area (no sidebar
-column). The `FilterSidebar` component is not built. The layout diagram in ui-mapping.md
+column). The `FilterSidebar` component is not built. The layout diagram in webui-component-mapping-phase1.md
 §3.1 is annotated with a deferral note.
 
-**Phase 2 scope:** Filter Sidebar introduction is documented in phase2-architecture.md
+**Phase 2 scope:** Filter Sidebar introduction is documented in web-control-plane-architecture-phase2.md
 §13.
 
-**Documents affected:** ui-mapping.md §3.1 (annotation), §4.1 (deferral note), §6.1
+**Documents affected:** webui-component-mapping-phase1.md §3.1 (annotation), §4.1 (deferral note), §6.1
 (note).
 
 ---
 
 ### C10 — Infinite Scroll: Phase 1 Uses LoadMoreButton Pagination
 
-**Original design:** ui-mapping.md §7.3 specified automatic infinite scroll for the
+**Original design:** webui-component-mapping-phase1.md §7.3 specified automatic infinite scroll for the
 Audit Timeline: "On scroll near the bottom of the list, the next page is loaded
 automatically (infinite scroll with a load threshold of 80% of container height)."
 
@@ -246,7 +248,7 @@ Audit Timeline will contain tens to low hundreds of events in normal Phase 1 use
 
 **Decision: Modified Phase 1.** Phase 1 uses cursor-based pagination via an explicit
 `LoadMoreButton` component (already listed as `Load-more / pagination → LoadMoreButton`
-in ui-mapping.md §4.3). The automatic IntersectionObserver scroll trigger is removed
+in webui-component-mapping-phase1.md §4.3). The automatic IntersectionObserver scroll trigger is removed
 from Phase 1. Operators click "Load more" to fetch the next cursor page.
 
 **Phase 1 behaviour:**
@@ -256,15 +258,15 @@ from Phase 1. Operators click "Load more" to fetch the next cursor page.
 - Changing the action-type filter resets cursor and reloads from page one.
 
 **Phase 2 scope:** Replacing `LoadMoreButton` with IntersectionObserver-based automatic
-scroll loading is documented in phase2-architecture.md §14.
+scroll loading is documented in web-control-plane-architecture-phase2.md §14.
 
-**Documents affected:** ui-mapping.md §7.3 (scrolling description).
+**Documents affected:** webui-component-mapping-phase1.md §7.3 (scrolling description).
 
 ---
 
 ### C11 — KPI Thresholds: From API Config, Not Hard-Coded
 
-**Original design:** design-tokens.md §11 defined a hard-coded threshold table per KPI
+**Original design:** webui-design-tokens-phase1.md §11 defined a hard-coded threshold table per KPI
 metric (e.g., Pending in Staging: green 0–50, amber 51–200, red >200). These values
 would have been static constants baked into the SPA build.
 
@@ -279,7 +281,7 @@ returns a `kpi_thresholds` object with per-metric warning and error boundaries. 
 from the parent page/store; no hardcoded values remain in the SPA.
 
 **What changes for Phase 1:**
-- design-tokens.md §11: Hard-coded threshold table removed. Replaced with a design
+- webui-design-tokens-phase1.md §11: Hard-coded threshold table removed. Replaced with a design
   note explaining that thresholds are runtime configuration values from the config API.
 - KpiCard props: `thresholds: { warning: number, error: number }` (passed in).
 - The config endpoint's `kpi_thresholds` field is specified in the API integration
@@ -287,35 +289,35 @@ from the parent page/store; no hardcoded values remain in the SPA.
   (operator configures by editing the config file in Phase 1).
 
 **Phase 2 scope:** A settings UI allowing in-place threshold editing via
-`PATCH /api/v1/config/thresholds` is documented in phase2-architecture.md §15.
+`PATCH /api/v1/config/thresholds` is documented in web-control-plane-architecture-phase2.md §15.
 
-**Documents affected:** design-tokens.md §11 (remove threshold table; add config-API
-note); web-api-ui-integration-plan.md config endpoint response shape (noted change,
+**Documents affected:** webui-design-tokens-phase1.md §11 (remove threshold table; add config-API
+note); web-control-plane-integration-plan.md config endpoint response shape (noted change,
 no new file required).
 
 ---
 
 ### C12 — Photo-Wheel Blur Tokenization
 
-**Original design:** ui-mapping.md §7.1 specified raw pixel values in the visual
+**Original design:** webui-component-mapping-phase1.md §7.1 specified raw pixel values in the visual
 transform rules table: `4px` for ±1 offset cards, `8px` for ±2 offset cards.
 
-**Critique:** design-tokens.md §1 explicitly states that "no raw values appear in
+**Critique:** webui-design-tokens-phase1.md §1 explicitly states that "no raw values appear in
 component styles". Using raw `4px` and `8px` in the interaction spec contradicts the
 token-first principle already established for the project.
 
 **Decision: Modified Phase 1.** This is a quality correction, not a feature change.
-Three tokens are added to design-tokens.md in a new §13:
+Three tokens are added to webui-design-tokens-phase1.md in a new §13:
 
 - `--wheel-blur-center` = `0px` (center card, fully sharp)
 - `--wheel-blur-near` = `4px` (cards at ±1 offset)
 - `--wheel-blur-far` = `8px` (cards at ±2 offset)
 
-The visual transform rules table in ui-mapping.md §7.1 references these tokens.
+The visual transform rules table in webui-component-mapping-phase1.md §7.1 references these tokens.
 No visual change to the user.
 
-**Documents affected:** design-tokens.md (new §13: Photo Wheel Visual Transform Tokens);
-ui-mapping.md §7.1 (Blur column).
+**Documents affected:** webui-design-tokens-phase1.md (new §13: Photo Wheel Visual Transform Tokens);
+webui-component-mapping-phase1.md §7.1 (Blur column).
 
 ---
 
@@ -345,7 +347,7 @@ The following table defines what is and is not in Phase 1 after the re-evaluatio
 | Input validation on all route parameters | Via Pydantic models at API routers |
 | CORS allowlist to configured UI origin | Default: `http://localhost:8000` |
 | Security headers (X-Content-Type-Options etc.) | Via FastAPI middleware |
-| Photo-Wheel blur levels tokenized | `--wheel-blur-near` / `--wheel-blur-far` tokens in design-tokens.md (C12) |
+| Photo-Wheel blur levels tokenized | `--wheel-blur-near` / `--wheel-blur-far` tokens in webui-design-tokens-phase1.md (C12) |
 | KPI thresholds from `GET /api/v1/config` | `kpi_thresholds` object; no hardcoded values in SPA (C11) |
 | Audit Timeline: `LoadMoreButton` cursor pagination | Explicit click to load next page; no infinite scroll (C10) |
 
@@ -377,7 +379,7 @@ The following table defines what is and is not in Phase 1 after the re-evaluatio
 
 | Document | Sections affected | Nature of change |
 |----------|------------------|-----------------|
-| `design/webui-architecture.md` | §2, §3.2, §6.1, §6.2 | SSR framing (C1); health polling ownership (C3) |
-| `planning/integration-plan.md` | Phase table, Phase 7 | Phase 7 reclassified via this document; no direct edit required |
-| `design/design-tokens.md` | §11, new §13 | KPI threshold table removed, config-API note added (C11); Photo-Wheel blur tokens added (C12) |
-| `design/ui-mapping.md` | §3.1, §4.1, §6.1, §7.1, §7.3 | Filter Sidebar deferred to Phase 2 (C9); blur tokenization (C12); LoadMoreButton pagination (C10) |
+| `design/webui-architecture-phase1.md` | §2, §3.2, §6.1, §6.2 | SSR framing (C1); health polling ownership (C3) |
+| `planning/planned/web-control-plane-integration-plan.md` | Phase table, Phase 7 | Phase 7 reclassified via this document; no direct edit required |
+| `design/webui-design-tokens-phase1.md` | §11, new §13 | KPI threshold table removed, config-API note added (C11); Photo-Wheel blur tokens added (C12) |
+| `design/webui-component-mapping-phase1.md` | §3.1, §4.1, §6.1, §7.1, §7.3 | Filter Sidebar deferred to Phase 2 (C9); blur tokenization (C12); LoadMoreButton pagination (C10) |

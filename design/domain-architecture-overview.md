@@ -6,8 +6,8 @@
 
 ## Related Documents
 
-- [Web Control Plane Architecture Extension](web-control-plane-architecture-extension.md)
-- [Web Control Plane Implementation Roadmap](../planning/web-control-plane-implementation-roadmap.md)
+- [Web Control Plane Architecture Phase 1](webui-architecture-phase1.md)
+- [Web Control Plane Integration Plan](../planning/planned/web-control-plane-integration-plan.md)
 
 ---
 

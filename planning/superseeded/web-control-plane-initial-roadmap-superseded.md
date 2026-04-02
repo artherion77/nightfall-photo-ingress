@@ -1,8 +1,15 @@
 # Web Control Plane Implementation Roadmap
 
-Status: Proposed
+Status: Superseded
 Date: 2026-04-01
 Owner: Systems Engineering
+
+Superseded note:
+- This is the original 5-phase Web Control Plane roadmap (Phases 1–5, 2026-04-01).
+- Superseded by `planning/planned/web-control-plane-integration-plan.md`, which provides a more
+  detailed 8-phase integration plan (Phases 0–7) for the same scope, and by
+  `planning/proposed/web-control-plane-phase2-implementation-roadmap.md` for the Phase 2 chunked
+  roadmap. Retained as the original planning record.
 
 ## 1. Scope
 

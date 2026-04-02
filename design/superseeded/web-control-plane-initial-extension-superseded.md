@@ -1,8 +1,14 @@
 # photo-ingress Web Control Plane Architecture Extension
 
-Status: Proposed
+Status: Superseded
 Date: 2026-04-01
 Owner: Systems Engineering
+
+Superseded note:
+- This document is the original scoping sketch for the Web Control Plane extension.
+- Superseded by `design/webui-architecture-phase1.md` (Phase 1 SvelteKit architecture) and
+  `design/web-control-plane-architecture-phase2.md` (Phase 2 architecture), which expand on all
+  sections with greater specificity. Retained as the original scoping record.
 
 ## 1. Intent
 

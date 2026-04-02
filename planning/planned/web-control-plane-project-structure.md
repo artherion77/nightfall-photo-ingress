@@ -86,16 +86,16 @@ nightfall-photo-ingress/
 ├── design/                         # EXISTING + EXTENDED: architecture and UI specs
 │   ├── architecture.md
 │   ├── web-control-plane-architecture-extension.md
-│   ├── webui-architecture.md       # NEW
-│   ├── design-tokens.md            # NEW
-│   ├── ui-mapping.md               # NEW
+│   ├── webui-architecture-phase1.md       # NEW
+│   ├── webui-design-tokens-phase1.md            # NEW
+│   ├── webui-component-mapping-phase1.md               # NEW
 │   └── ui-mocks/
 │       ├── Astronaut photo review interface.png
 │       └── Photo-ingress dashboard with KPIs and audit.png
 │
 ├── planning/                       # EXISTING + EXTENDED
 │   ├── iterative-implementation-roadmap.md
-│   ├── web-control-plane-implementation-roadmap.md
+│   ├── web-control-plane-integration-plan.md
 │   ├── techstack-decision.md       # NEW
 │   ├── project-structure.md        # NEW (this document)
 │   └── integration-plan.md         # NEW
@@ -153,9 +153,9 @@ directory as a static files mount at `/`. The SvelteKit build target is
 New design documents are added alongside existing architecture documents. No existing
 documents are modified. New files are:
 
-- `webui-architecture.md` — SvelteKit structure, stores, API layer, layout system.
-- `design-tokens.md` — Dark-mode design token catalogue.
-- `ui-mapping.md` — Mockup analysis, component mapping, interaction logic.
+- `webui-architecture-phase1.md` — SvelteKit structure, stores, API layer, layout system.
+- `webui-design-tokens-phase1.md` — Dark-mode design token catalogue.
+- `webui-component-mapping-phase1.md` — Mockup analysis, component mapping, interaction logic.
 
 ### 3.4 `planning/` Extensions
 
