@@ -157,7 +157,16 @@ class TestSmokeLive:
 
     def test_smoke_live_runs_live_poll(self, stagingctl_text: str) -> None:
         assert "live_poll_exit_0" in stagingctl_text
+        assert "live_poll_warning" in stagingctl_text
         assert "poll-live.log" in stagingctl_text
+
+    def test_smoke_live_classifies_runtime_and_drift_as_warnings(self, stagingctl_text: str) -> None:
+        assert "polling took longer than configured staging timeout" in stagingctl_text
+        assert "schema drift threshold reached" in stagingctl_text
+        assert "Live smoke completed with warnings" in stagingctl_text
+
+    def test_smoke_live_records_warning_count_in_manifest(self, stagingctl_text: str) -> None:
+        assert "warning_count" in stagingctl_text
 
     def test_smoke_live_uses_human_mode_when_interactive(self, stagingctl_text: str) -> None:
         assert "Interactive terminal detected; using human-mode poll progress renderer." in stagingctl_text

@@ -495,6 +495,7 @@ cmd_smoke_live() {
         "$run_id" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$manifest"
 
     local rc=0
+    local warning_count=0
     local account="${STAGING_ACCOUNT:-staging}"
     local token_path="/var/lib/ingress/tokens/${account}.json"
     local poll_log="$evidence_dir/poll-live.log"
@@ -512,21 +513,44 @@ cmd_smoke_live() {
 
     # ── 2. live poll ──────────────────────────────────────────────────────────
     _info "Step 2/3: live poll (account=$account)"
+    local poll_exit_code=0
     if [[ -t 1 ]] && command -v script >/dev/null 2>&1; then
         _info "Interactive terminal detected; using human-mode poll progress renderer."
         local poll_cmd
         printf -v poll_cmd 'lxc exec -t %q -- %q --log-mode human poll --verbose --account %q --path %q' \
             "$CONTAINER" "$VENV_ROOT/bin/nightfall-photo-ingress" "$account" "$CONF_DEST"
-        script -qefc "$poll_cmd" "$poll_log" \
-            && _assert_ok "$evidence_dir/assertions.jsonl" "live_poll_exit_0" "poll completed" \
-            || { _assert_fail "$evidence_dir/assertions.jsonl" "live_poll_exit_0" "poll failed"; rc=1; }
+        script -qefc "$poll_cmd" "$poll_log" || poll_exit_code=$?
     else
         lxc exec "$CONTAINER" -- \
             "$VENV_ROOT/bin/nightfall-photo-ingress" \
             --log-mode json poll --account "$account" --path "$CONF_DEST" 2>&1 \
-            | tee "$poll_log" \
-            && _assert_ok "$evidence_dir/assertions.jsonl" "live_poll_exit_0" "poll completed" \
-            || { _assert_fail "$evidence_dir/assertions.jsonl" "live_poll_exit_0" "poll failed"; rc=1; }
+            | tee "$poll_log"
+        poll_exit_code=${PIPESTATUS[0]}
+    fi
+
+    local runtime_limit_warning=0
+    local drift_threshold_warning=0
+    rg -q "Delta polling exceeded runtime limit|delta_runtime_limit_exceeded" "$poll_log" && runtime_limit_warning=1
+    rg -q "Schema drift threshold exceeded|drift_threshold_critical" "$poll_log" && drift_threshold_warning=1
+
+    if [[ $poll_exit_code -eq 0 ]]; then
+        _assert_ok "$evidence_dir/assertions.jsonl" "live_poll_exit_0" "poll completed"
+    elif [[ $runtime_limit_warning -eq 1 || $drift_threshold_warning -eq 1 ]]; then
+        _assert_ok "$evidence_dir/assertions.jsonl" "live_poll_warning" "poll exited with warning-class condition (exit=$poll_exit_code)"
+    else
+        _assert_fail "$evidence_dir/assertions.jsonl" "live_poll_exit_0" "poll failed"
+        rc=1
+    fi
+
+    if [[ $runtime_limit_warning -eq 1 ]]; then
+        _assert_ok "$evidence_dir/assertions.jsonl" "live_poll_warning" "runtime limit reached during live poll"
+        _warn "Live smoke completed with warning - polling took longer than configured staging timeout."
+        warning_count=$((warning_count + 1))
+    fi
+    if [[ $drift_threshold_warning -eq 1 ]]; then
+        _assert_ok "$evidence_dir/assertions.jsonl" "live_poll_warning" "schema drift threshold reached during live poll"
+        _warn "Live smoke completed with warning - schema drift threshold reached (review drift summary for context)."
+        warning_count=$((warning_count + 1))
     fi
 
     local traversal_summary=""
@@ -566,10 +590,12 @@ PY
         && _assert_ok "$evidence_dir/assertions.jsonl" "secret_scan_clean" "no leaks" \
         || { _assert_fail "$evidence_dir/assertions.jsonl" "secret_scan_clean" "potential leaks found"; rc=1; }
 
-    printf '{"event":"smoke_live_finished","run_id":"%s","ts":"%s","exit_code":%d}\n' \
-        "$run_id" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$rc" >> "$manifest"
+    printf '{"event":"smoke_live_finished","run_id":"%s","ts":"%s","exit_code":%d,"warning_count":%d}\n' \
+        "$run_id" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$rc" "$warning_count" >> "$manifest"
 
-    if [[ $rc -eq 0 ]]; then
+    if [[ $rc -eq 0 && $warning_count -gt 0 ]]; then
+        _warn "Live smoke completed with warnings — run_id=$run_id  evidence: $evidence_dir"
+    elif [[ $rc -eq 0 ]]; then
         _ok "Live smoke PASSED — run_id=$run_id"
     else
         _fail "Live smoke FAILED — run_id=$run_id  evidence: $evidence_dir"

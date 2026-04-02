@@ -98,7 +98,7 @@ ssdpool/photo-ingress  →  /mnt/ssd/photo-ingress/
   staging/               — files downloaded from OneDrive, pending hash + decision
   registry.db            — SQLite hash registry (the system of record)
   token_cache.json       — MSAL OAuth2 token cache (chmod 600)
-  delta_cursor           — last Graph API delta link (plain text)
+   delta_cursor           — per-account delta traversal checkpoint (plain text)
 
 nightfall/media/photo-ingress  →  /nightfall/media/photo-ingress/
    accepted/              — committed files; ingress queue only
@@ -190,7 +190,8 @@ CREATE TABLE accepted_records (
       - `rejected` → delete from staging; append `rejected_duplicate` to `audit_log`.
       - `accepted` → delete from staging; append `duplicate_skipped` to `audit_log`.
       - `unknown` → move to `accepted/YYYY/MM/{filename}`; insert `files` row as `accepted`; insert `accepted_records`; insert `metadata_index` row; append `accepted` to `audit_log`.
-4. Persist updated delta cursor.
+4. Persist per-page `nextLink` checkpoints during traversal.
+5. On chain completion (`deltaLink` reached), reset cursor to the initial configured delta URL for next cycle.
 
 Account execution rule:
 - Enabled accounts are processed serially in declaration order from the configuration file.

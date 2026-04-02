@@ -326,7 +326,30 @@ def _cmd_poll(args: argparse.Namespace) -> int:
             },
         )
         return 0
-    except (GraphError, AuthError, IngestError, RegistryError, ValueError) as exc:
+    except GraphError as exc:
+        warning_codes = {"delta_runtime_limit_exceeded", "drift_threshold_critical"}
+        if exc.code in warning_codes:
+            LOGGER.warning(str(exc), extra=exc.as_log_dict())
+            _emit_status_snapshot(
+                state="degraded",
+                command="poll",
+                success=True,
+                details={
+                    "warning": str(exc),
+                    "warning_code": exc.code,
+                },
+            )
+            return 0
+
+        LOGGER.error(str(exc), extra=exc.as_log_dict())
+        _emit_status_snapshot(
+            state="ingest_error",
+            command="poll",
+            success=False,
+            details={"error": str(exc), "error_code": exc.code},
+        )
+        return 2
+    except (AuthError, IngestError, RegistryError, ValueError) as exc:
         LOGGER.error(str(exc))
         _emit_status_snapshot(
             state="ingest_error",

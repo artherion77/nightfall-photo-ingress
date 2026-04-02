@@ -64,6 +64,41 @@ _skip() { printf '\033[0;33m[flowctl] SKIP\033[0m  %s\n' "$*"; }
 _err()  { printf '\033[0;31m[flowctl] FAIL\033[0m  %s\n' "$*" >&2; }
 _die()  { _err "$*"; exit 1; }
 
+FLOWCTL_BOX_WIDTH=66
+FLOWCTL_BOX_INNER_WIDTH=64
+
+_box_border_top() { printf '┌%*s┐\n' "$FLOWCTL_BOX_INNER_WIDTH" '' | tr ' ' '─'; }
+_box_border_mid() { printf '├%*s┤\n' "$FLOWCTL_BOX_INNER_WIDTH" '' | tr ' ' '─'; }
+_box_border_bottom() { printf '└%*s┘\n' "$FLOWCTL_BOX_INNER_WIDTH" '' | tr ' ' '─'; }
+
+_box_line() {
+    local text="$1"
+    printf '│%-*s│\n' "$FLOWCTL_BOX_INNER_WIDTH" "$text"
+}
+
+_box_field() {
+    local label="$1"
+    local value="$2"
+    local prefix="  ${label}: "
+    local continuation="    "
+    local first_width=$((FLOWCTL_BOX_INNER_WIDTH - ${#prefix}))
+    local continuation_width=$((FLOWCTL_BOX_INNER_WIDTH - ${#continuation}))
+    local remaining="$value"
+
+    if (( ${#remaining} <= first_width )); then
+        _box_line "${prefix}${remaining}"
+        return
+    fi
+
+    _box_line "${prefix}${remaining:0:first_width}"
+    remaining="${remaining:first_width}"
+
+    while [[ -n "$remaining" ]]; do
+        _box_line "${continuation}${remaining:0:continuation_width}"
+        remaining="${remaining:continuation_width}"
+    done
+}
+
 # ── evidence helpers ──────────────────────────────────────────────────────────
 _record() {
     local step="$1" result="$2" detail="${3:-}"
@@ -550,14 +585,15 @@ cmd_run() {
 
     _init_run
 
-    printf '┌──────────────────────────────────────────────────────────────────┐\n'
-    printf '│   nightfall-photo-ingress  staging production flow test         │\n'
-    printf '├──────────────────────────────────────────────────────────────────┤\n'
-    printf '│  Run ID  : %s\n' "$FLOW_RUN_ID"
-    printf '│  Evidence: %s\n' "$FLOW_EVIDENCE_DIR"
-    printf '│  Skip interactive: %s\n' "$([[ "$SKIP_INTERACTIVE" == "1" ]] && echo yes || echo no)"
-    printf '│  Prompt policy: %s\n' "$PROMPT_POLICY"
-    printf '└──────────────────────────────────────────────────────────────────┘\n'
+    _box_border_top
+    _box_line "   nightfall-photo-ingress"
+    _box_line "   staging production flow test"
+    _box_border_mid
+    _box_field "Run ID" "$FLOW_RUN_ID"
+    _box_field "Evidence" "$FLOW_EVIDENCE_DIR"
+    _box_field "Skip interactive" "$([[ "$SKIP_INTERACTIVE" == "1" ]] && echo yes || echo no)"
+    _box_field "Prompt policy" "$PROMPT_POLICY"
+    _box_border_bottom
 
     printf '{"event":"flow_started","run_id":"%s","ts":"%s","skip_interactive":%s}\n' \
         "$FLOW_RUN_ID" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \

@@ -91,6 +91,11 @@ This list contains items explicitly deferred from the V1 baseline. V1-first stab
 ### 7.2 Administrative API
 - Optional local admin API for controlled automation.
 
+### 7.3 Identity provider abstraction
+- Split authentication concerns out of the `onedrive` adapter into a provider-agnostic identity layer.
+- Introduce an identity abstraction (for example: `IdentityProvider`) so adapters consume established tokens without owning auth flow details.
+- Reframe current OneDrive auth implementation as a dedicated Microsoft consumer account identity provider (live.com / Microsoft account flow).
+
 ---
 
 ## 9. Security and Compliance

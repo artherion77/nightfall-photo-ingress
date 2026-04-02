@@ -122,6 +122,11 @@ class TestEvidenceContract:
         for phase in ("p1", "p2", "p3", "p4", "p5"):
             assert f'"$FLOW_EVIDENCE_DIR/{phase}"' in flowctl_text
 
+    def test_run_header_uses_box_helpers_for_wrapping(self, flowctl_text: str) -> None:
+        assert "FLOWCTL_BOX_INNER_WIDTH" in flowctl_text
+        assert "_box_field()" in flowctl_text
+        assert '_box_field "Evidence" "$FLOW_EVIDENCE_DIR"' in flowctl_text
+
 
 class TestStagingctlIntegration:
     def test_references_stagingctl(self, flowctl_text: str) -> None:
