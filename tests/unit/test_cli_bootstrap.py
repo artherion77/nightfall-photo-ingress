@@ -35,6 +35,16 @@ def test_main_help_exit_code_zero() -> None:
     assert cli.main([]) == 0
 
 
+def test_global_debug_httpx_transport_flag_is_parsed() -> None:
+    """Top-level debug transport flag should parse before subcommands."""
+
+    parser = cli._build_parser()
+    args = parser.parse_args(["--debug-httpx-transport", "poll"])
+
+    assert args.debug_httpx_transport is True
+    assert args.command == "poll"
+
+
 def test_confirm_config_writeback_respects_assume_yes(monkeypatch, capsys) -> None:
     monkeypatch.setenv("NIGHTFALL_PROMPT_POLICY", "assume-yes")
 

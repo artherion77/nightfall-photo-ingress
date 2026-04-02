@@ -8,15 +8,21 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 
+from .adapters.onedrive.errors import redact_url
+
 LogMode = Literal["json", "human"]
 
 
 _SPINNER_FRAMES = ("|", "/", "-", "\\")
+_HTTP_TRANSPORT_LOGGERS = ("httpx", "httpcore")
+_QUIET_LIBRARY_LOGGERS = ("urllib3", "msal")
+_URL_RE = re.compile(r"https?://[^\s\"')]+", re.IGNORECASE)
 
 
 class JsonFormatter(logging.Formatter):
@@ -143,6 +149,14 @@ class HumanFormatter(logging.Formatter):
         return f"{prefix}{event}"
 
 
+class _RedactingFormatter(logging.Formatter):
+    """Formatter that redacts raw URLs from transport-library log lines."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        rendered = super().format(record)
+        return _URL_RE.sub(lambda match: redact_url(match.group(0)), rendered)
+
+
 class _InteractiveTraceHandler(logging.StreamHandler):
     """Render compact progress updates for trace events in interactive terminals."""
 
@@ -199,10 +213,70 @@ class _InteractiveTraceHandler(logging.StreamHandler):
         self._last_progress_width = 0
 
 
+def _reset_transport_loggers() -> None:
+    """Remove previously installed Nightfall transport handlers."""
+
+    for logger_name in _HTTP_TRANSPORT_LOGGERS:
+        logger = logging.getLogger(logger_name)
+        for handler in list(logger.handlers):
+            if getattr(handler, "_nightfall_transport_handler", False):
+                logger.removeHandler(handler)
+                try:
+                    handler.close()
+                except OSError:
+                    pass
+
+
+def _configure_transport_loggers(
+    *,
+    debug_httpx_transport: bool,
+    httpx_transport_log_path: Path | None,
+) -> None:
+    """Keep transport-library logs off the console unless explicitly requested."""
+
+    _reset_transport_loggers()
+
+    for logger_name in _HTTP_TRANSPORT_LOGGERS:
+        logger = logging.getLogger(logger_name)
+        logger.propagate = False
+
+        if debug_httpx_transport and httpx_transport_log_path is not None:
+            handler = logging.FileHandler(httpx_transport_log_path, mode="a", encoding="utf-8")
+            handler._nightfall_transport_handler = True  # type: ignore[attr-defined]
+            handler.setLevel(logging.DEBUG)
+            handler.setFormatter(
+                _RedactingFormatter(
+                    "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+                    datefmt="%Y-%m-%dT%H:%M:%S",
+                )
+            )
+            logger.handlers.clear()
+            logger.addHandler(handler)
+            logger.setLevel(logging.DEBUG)
+            continue
+
+        logger.handlers.clear()
+        null_handler = logging.NullHandler()
+        null_handler._nightfall_transport_handler = True  # type: ignore[attr-defined]
+        logger.addHandler(null_handler)
+        logger.setLevel(logging.WARNING)
+
+    for logger_name in _QUIET_LIBRARY_LOGGERS:
+        logger = logging.getLogger(logger_name)
+        logger.propagate = False
+        logger.handlers.clear()
+        null_handler = logging.NullHandler()
+        null_handler._nightfall_transport_handler = True  # type: ignore[attr-defined]
+        logger.addHandler(null_handler)
+        logger.setLevel(logging.WARNING)
+
+
 def configure_logging(
     mode: LogMode,
     verbose: bool = False,
     log_file_path: Path | None = None,
+    debug_httpx_transport: bool = False,
+    httpx_transport_log_path: Path | None = None,
 ) -> None:
     """Configure root logging for CLI execution.
 
@@ -211,11 +285,17 @@ def configure_logging(
         verbose: If True, set console handler to DEBUG level to show all details.
                 If False, set to INFO level but suppress specific noisy loggers.
         log_file_path: Optional path to write all log details to a file.
+        debug_httpx_transport: If True, enable dedicated redacted httpx/httpcore transport logs.
+        httpx_transport_log_path: Optional file sink for redacted transport diagnostics.
     """
 
     root = logging.getLogger()
     root.handlers.clear()
     root.setLevel(logging.DEBUG if verbose else logging.INFO)
+    _configure_transport_loggers(
+        debug_httpx_transport=debug_httpx_transport,
+        httpx_transport_log_path=httpx_transport_log_path,
+    )
 
     # Console handler: verbose shows all, non-verbose hides noisy Graph/httpx details
     interactive_human = mode == "human" and hasattr(sys.stderr, "isatty") and sys.stderr.isatty()
@@ -227,8 +307,6 @@ def configure_logging(
         handler.setLevel(logging.DEBUG)
     else:
         handler.setLevel(logging.INFO)
-        # Suppress verbose debug logging from external libraries in non-verbose mode
-        logging.getLogger("httpx").setLevel(logging.WARNING)
 
     if mode == "json":
         handler.setFormatter(JsonFormatter())

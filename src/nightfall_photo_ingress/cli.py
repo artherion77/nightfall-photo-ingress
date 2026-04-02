@@ -66,6 +66,11 @@ def _build_parser() -> argparse.ArgumentParser:
         action="version",
         version=f"%(prog)s {__version__}",
     )
+    parser.add_argument(
+        "--debug-httpx-transport",
+        action="store_true",
+        help="Write redacted httpx/httpcore transport diagnostics to a dedicated file instead of console output.",
+    )
 
     subparsers = parser.add_subparsers(dest="command")
 
@@ -556,6 +561,27 @@ def _write_account_onedrive_root(config_path: str, account_name: str, discovered
     return True
 
 
+def _build_debug_httpx_transport_log_path(command: str | None) -> Path | None:
+    """Return a writable file path for opt-in redacted transport diagnostics."""
+
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    safe_command = command or "command"
+    candidate_dirs = (
+        Path("/var/log/nightfall"),
+        Path("/var/lib/ingress/logs"),
+        Path.cwd(),
+    )
+
+    for directory in candidate_dirs:
+        try:
+            directory.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            continue
+        return directory / f"{safe_command}-httpx-transport-{timestamp}.log"
+
+    return None
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Execute the CLI and return an exit code."""
 
@@ -567,6 +593,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     # Determine if verbose mode is requested (for auth-setup command)
     verbose = getattr(args, "verbose", False)
+    debug_httpx_transport = getattr(args, "debug_httpx_transport", False)
 
     # Set up file logging for auth-setup operations
     log_file_path = None
@@ -575,7 +602,26 @@ def main(argv: Sequence[str] | None = None) -> int:
         log_dir.mkdir(parents=True, exist_ok=True)
         log_file_path = log_dir / f"auth-setup-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.log"
 
-    configure_logging(args.log_mode, verbose=verbose, log_file_path=log_file_path)
+    httpx_transport_log_path = None
+    if debug_httpx_transport:
+        httpx_transport_log_path = _build_debug_httpx_transport_log_path(args.command)
+
+    configure_logging(
+        args.log_mode,
+        verbose=verbose,
+        log_file_path=log_file_path,
+        debug_httpx_transport=debug_httpx_transport,
+        httpx_transport_log_path=httpx_transport_log_path,
+    )
+
+    if debug_httpx_transport:
+        if httpx_transport_log_path is not None:
+            LOGGER.info(
+                "redacted httpx/httpcore transport diagnostics enabled",
+                extra={"path": str(httpx_transport_log_path)},
+            )
+        else:
+            LOGGER.warning("unable to create redacted httpx/httpcore transport log file")
 
     handler = getattr(args, "handler", None)
     if handler is None:
