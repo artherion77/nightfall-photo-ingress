@@ -30,7 +30,13 @@ from .adapters.onedrive.client import (
 )
 from .domain.ingest import IngestDecisionEngine, IngestError, StagedCandidate
 from .domain.registry import Registry, RegistryError
-from .reject import RejectFlowError, process_trash, reject_sha256
+from .reject import (
+    RejectFlowError,
+    accept_sha256,
+    process_trash,
+    purge_sha256,
+    reject_sha256,
+)
 from .status import write_status_snapshot
 from .sync_import import SyncImportError, run_sync_import
 
@@ -98,6 +104,18 @@ def _build_parser() -> argparse.ArgumentParser:
     reject.add_argument("--reason", default=None)
     reject.add_argument("--path", default="/etc/nightfall/photo-ingress.conf")
     reject.set_defaults(handler=_cmd_reject)
+
+    accept = subparsers.add_parser("accept", help="Accept a pending hash.")
+    accept.add_argument("sha256", nargs="?", help="SHA-256 to accept.")
+    accept.add_argument("--reason", default=None)
+    accept.add_argument("--path", default="/etc/nightfall/photo-ingress.conf")
+    accept.set_defaults(handler=_cmd_accept)
+
+    purge = subparsers.add_parser("purge", help="Purge a rejected hash from disk.")
+    purge.add_argument("sha256", nargs="?", help="SHA-256 to purge.")
+    purge.add_argument("--reason", default=None)
+    purge.add_argument("--path", default="/etc/nightfall/photo-ingress.conf")
+    purge.set_defaults(handler=_cmd_purge)
 
     process_trash = subparsers.add_parser("process-trash", help="Process trash directory.")
     process_trash.add_argument("--path", default="/etc/nightfall/photo-ingress.conf")
@@ -270,7 +288,7 @@ def _cmd_poll(args: argparse.Namespace) -> int:
 
         ingest_candidate_count = 0
         ingest_outcome_count = 0
-        ingest_accepted_count = 0
+        ingest_pending_count = 0
         ingest_discarded_count = 0
         ingest_summary_by_account: dict[str, dict[str, int]] = {}
 
@@ -280,7 +298,7 @@ def _cmd_poll(args: argparse.Namespace) -> int:
         ) -> None:
             nonlocal ingest_candidate_count
             nonlocal ingest_outcome_count
-            nonlocal ingest_accepted_count
+            nonlocal ingest_pending_count
             nonlocal ingest_discarded_count
 
             ingest_candidates = [
@@ -301,24 +319,24 @@ def _cmd_poll(args: argparse.Namespace) -> int:
             ingest_candidate_count += len(ingest_candidates)
             ingest_result = ingest_engine.process_batch(
                 candidates=ingest_candidates,
-                accepted_root=app_config.core.accepted_path,
+                pending_root=app_config.core.pending_path,
                 storage_template=app_config.core.storage_template,
                 staging_on_same_pool=app_config.core.staging_on_same_pool,
             )
             ingest_outcome_count += len(ingest_result.outcomes)
-            ingest_accepted_count += ingest_result.accepted_count
+            ingest_pending_count += ingest_result.pending_count
             ingest_discarded_count += ingest_result.discarded_count
 
             account_summary = ingest_summary_by_account.setdefault(
                 account_name,
                 {
                     "ingest_candidates": 0,
-                    "ingest_accepted": 0,
+                    "ingest_pending": 0,
                     "ingest_discarded": 0,
                 },
             )
             account_summary["ingest_candidates"] += len(ingest_candidates)
-            account_summary["ingest_accepted"] += ingest_result.accepted_count
+            account_summary["ingest_pending"] += ingest_result.pending_count
             account_summary["ingest_discarded"] += ingest_result.discarded_count
 
         results = poll_accounts(
@@ -332,7 +350,7 @@ def _cmd_poll(args: argparse.Namespace) -> int:
                 result.account_name,
                 {
                     "ingest_candidates": 0,
-                    "ingest_accepted": 0,
+                    "ingest_pending": 0,
                     "ingest_discarded": 0,
                 },
             )
@@ -344,7 +362,7 @@ def _cmd_poll(args: argparse.Namespace) -> int:
                     "candidates": result.candidate_count,
                     "downloaded": len(result.downloaded_paths),
                     "ingest_candidates": account_ingest["ingest_candidates"],
-                    "ingest_accepted": account_ingest["ingest_accepted"],
+                    "ingest_pending": account_ingest["ingest_pending"],
                     "ingest_discarded": account_ingest["ingest_discarded"],
                 },
             )
@@ -358,7 +376,7 @@ def _cmd_poll(args: argparse.Namespace) -> int:
                 "downloaded_count": sum(len(result.downloaded_paths) for result in results),
                 "ingest_candidate_count": ingest_candidate_count,
                 "ingest_outcome_count": ingest_outcome_count,
-                "ingest_accepted_count": ingest_accepted_count,
+                "ingest_pending_count": ingest_pending_count,
                 "ingest_discarded_count": ingest_discarded_count,
             },
         )
@@ -428,6 +446,80 @@ def _cmd_reject(args: argparse.Namespace) -> int:
         _emit_status_snapshot(
             state="ingest_error",
             command="reject",
+            success=False,
+            details={"error": str(exc)},
+        )
+        return 2
+
+
+def _cmd_accept(args: argparse.Namespace) -> int:
+    """Accept one pending file hash and move it to accepted storage."""
+
+    try:
+        app_config = load_config(args.path)
+        result = accept_sha256(
+            app_config,
+            sha256=args.sha256 or "",
+            reason=args.reason,
+            actor="cli",
+        )
+        LOGGER.info(
+            "accept completed",
+            extra={
+                "sha256": result.sha256,
+                "action": result.action,
+                "destination_path": result.destination_path,
+            },
+        )
+        _emit_status_snapshot(
+            state="healthy",
+            command="accept",
+            success=True,
+            details={"sha256": result.sha256, "action": result.action},
+        )
+        return 0
+    except (RejectFlowError, ValueError) as exc:
+        LOGGER.error(str(exc))
+        _emit_status_snapshot(
+            state="ingest_error",
+            command="accept",
+            success=False,
+            details={"error": str(exc)},
+        )
+        return 2
+
+
+def _cmd_purge(args: argparse.Namespace) -> int:
+    """Purge one rejected file hash from disk and mark it purged."""
+
+    try:
+        app_config = load_config(args.path)
+        result = purge_sha256(
+            app_config,
+            sha256=args.sha256 or "",
+            reason=args.reason,
+            actor="cli",
+        )
+        LOGGER.info(
+            "purge completed",
+            extra={
+                "sha256": result.sha256,
+                "action": result.action,
+                "purged_path": result.purged_path,
+            },
+        )
+        _emit_status_snapshot(
+            state="healthy",
+            command="purge",
+            success=True,
+            details={"sha256": result.sha256, "action": result.action},
+        )
+        return 0
+    except (RejectFlowError, ValueError) as exc:
+        LOGGER.error(str(exc))
+        _emit_status_snapshot(
+            state="ingest_error",
+            command="purge",
             success=False,
             details={"error": str(exc)},
         )

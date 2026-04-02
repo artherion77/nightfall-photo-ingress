@@ -67,18 +67,12 @@ def test_operator_summary_matches_registry_storage_and_audit_counts(
     )
 
     second_actions = [outcome.action for outcome in second.ingest_result.outcomes]
-    assert second.ingest_result.accepted_count == 0
+    assert second.ingest_result.pending_count == 0
     assert second.ingest_result.discarded_count >= 1
     assert second.ingest_result.zero_byte_quarantine_count == 1
     assert "discard_rejected" in second_actions
     assert "quarantine_zero_byte" in second_actions
-    assert second.registry_harness.accepted_rows() == [
-        {
-            "sha256": accepted_hash,
-            "account": "lisa",
-            "source_path": "/Camera Roll/2026",
-        }
-    ]
+    assert second.registry_harness.accepted_rows() == []
     terminal_events = second.registry_harness.terminal_events()
     assert len(terminal_events) == 3
     batch_ids = {
@@ -89,12 +83,12 @@ def test_operator_summary_matches_registry_storage_and_audit_counts(
     assert len(batch_ids) == 1
     assert all(row["actor"] == "ingest_pipeline" for row in terminal_events)
     assert {row["action"] for row in terminal_events} >= {
-        "accepted",
+        "pending",
         "discard_rejected",
         "quarantine_zero_byte",
     }
     assert any(path for path in second.quarantine_root.rglob("*") if path.is_file())
-    assert len([p for p in second.accepted_root.rglob("*") if p.is_file()]) == 1
+    assert len([p for p in second.pending_root.rglob("*") if p.is_file()]) == 1
     assert any(record.msg == "onedrive_trace" for record in caplog.records)
 
 

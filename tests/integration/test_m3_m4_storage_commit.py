@@ -48,14 +48,14 @@ def test_size_mismatch_between_metadata_and_staged_file_rejected_before_accept(
     engine = ingest_engine_fixture()
     result = engine.process_batch(
         candidates=[mismatched_candidate],
-        accepted_root=polled.accepted_root,
+        pending_root=polled.pending_root,
         storage_template=polled.app_config.core.storage_template,
         staging_on_same_pool=polled.app_config.core.staging_on_same_pool,
         quarantine_dir=polled.quarantine_root,
     )
 
     assert result.size_mismatch_count == 1
-    assert fs_snapshot_fixture(polled.accepted_root) == tuple()
+    assert fs_snapshot_fixture(polled.pending_root) == tuple()
     assert any("size_mismatch" in path for path in fs_snapshot_fixture(polled.quarantine_root))
 
 
@@ -138,10 +138,10 @@ def test_zero_byte_allow_accepts_with_terminal_accept_outcome(
     )
 
     assert result.ingest_result is not None
-    assert result.ingest_result.accepted_count == 1
+    assert result.ingest_result.pending_count == 1
     assert result.ingest_result.zero_byte_reject_count == 0
     assert result.ingest_result.zero_byte_quarantine_count == 0
-    assert result.ingest_result.outcomes[0].action == "accepted"
+    assert result.ingest_result.outcomes[0].action == "pending"
 
 
 def test_zero_byte_reject_blocks_accept_and_emits_reject_terminal_outcome(
@@ -168,7 +168,7 @@ def test_zero_byte_reject_blocks_accept_and_emits_reject_terminal_outcome(
     )
 
     assert result.ingest_result is not None
-    assert result.ingest_result.accepted_count == 0
+    assert result.ingest_result.pending_count == 0
     assert result.ingest_result.zero_byte_reject_count == 1
     assert result.ingest_result.zero_byte_quarantine_count == 0
     assert result.ingest_result.outcomes[0].action == "reject_zero_byte"
@@ -199,7 +199,7 @@ def test_same_pool_atomic_rename_is_single_commit_visibility(
 
     outcome = result.ingest_result.outcomes[0]
     assert outcome.destination_path is not None and outcome.destination_path.exists()
-    assert not any(path.suffix == ".tmp" for path in result.accepted_root.rglob("*"))
+    assert not any(path.suffix == ".tmp" for path in result.pending_root.rglob("*"))
 
 
 def test_cross_pool_copy_verify_unlink_rejects_on_hash_mismatch(
@@ -245,7 +245,7 @@ def test_cross_pool_copy_verify_unlink_rejects_on_hash_mismatch(
     with pytest.raises(StorageError, match="Cross-pool copy hash mismatch"):
         engine.process_batch(
             candidates=list(polled.staged_candidates),
-            accepted_root=config.core.accepted_path,
+            pending_root=config.core.pending_path,
             storage_template=config.core.storage_template,
             staging_on_same_pool=False,
             quarantine_dir=polled.quarantine_root,

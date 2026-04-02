@@ -36,7 +36,7 @@ def test_rename_as_delete_plus_create_keeps_only_created_candidate(
 
     assert result.poll_result.candidate_count == 1
     assert result.ingest_result is not None
-    assert result.ingest_result.accepted_count == 1
+    assert result.ingest_result.pending_count == 1
     origins = result.registry_harness.file_origins()
     assert len(origins) == 1
     assert origins[0]["onedrive_id"] == "new-item"
@@ -123,7 +123,7 @@ def test_stale_or_resurrected_item_anomaly_is_visible_under_streaming_page_commi
     assert anomaly_reasons.get("delta_replayed_item_id", 0) >= 1
     assert result.ingest_result is not None
     actions = [outcome.action for outcome in result.ingest_result.outcomes]
-    assert "accepted" in actions
+    assert "pending" in actions
 
 
 def test_corrupted_download_stream_is_distinct_from_truncated_size_mismatch(
@@ -296,7 +296,7 @@ def test_operator_outcomes_are_distinguishable_and_recovery_summary_reconciles(
     with pytest.raises(RuntimeError, match="after storage commit"):
         engine.process_batch(
             candidates=list(polled.staged_candidates),
-            accepted_root=polled.app_config.core.accepted_path,
+            pending_root=polled.app_config.core.pending_path,
             storage_template=polled.app_config.core.storage_template,
             staging_on_same_pool=polled.app_config.core.staging_on_same_pool,
             quarantine_dir=polled.quarantine_root,
@@ -304,7 +304,7 @@ def test_operator_outcomes_are_distinguishable_and_recovery_summary_reconciles(
     replay_summary = engine.replay_interrupted_operations()
 
     actions = set(audit_reader_fixture.terminal_actions())
-    assert {"accepted", "discard_accepted", "discard_rejected", "quarantine_zero_byte"}.issubset(actions)
+    assert {"pending", "discard_pending", "discard_rejected", "quarantine_zero_byte"}.issubset(actions)
     assert all(actor == "ingest_pipeline" for actor in audit_reader_fixture.terminal_actors())
 
     mixed_events = mixed.registry_harness.terminal_events()
@@ -316,4 +316,4 @@ def test_operator_outcomes_are_distinguishable_and_recovery_summary_reconciles(
     assert replay_summary["interrupted_total"] >= 1
     assert len(replay_summary["unresolved_op_ids"]) == replay_summary["interrupted_total"]
     assert replay_summary["quarantined_destinations"] >= 1
-    assert duplicate.ingest_result.outcomes[0].action == "discard_accepted"
+    assert duplicate.ingest_result.outcomes[0].action == "discard_pending"

@@ -16,7 +16,7 @@ Location: /etc/nightfall/photo-ingress.conf (recommended)
 | SSD dataset | `ssdpool/photo-ingress` | Working set and state |
 | SSD mountpoint | `/mnt/ssd/photo-ingress` | Staging, registry, token cache, cursors |
 | HDD dataset | `nightfall/media/photo-ingress` | Ingress queue and trash boundary |
-| HDD mountpoint | `/nightfall/media/photo-ingress` | `accepted/` and `trash/` |
+| HDD mountpoint | `/nightfall/media/photo-ingress` | `pending/`, `accepted/`, `rejected/`, and `trash/` |
 | Permanent library | `/nightfall/media/pictures` | Read-only from ingress perspective |
 | Status file | `/run/nightfall-status.d/photo-ingress.json` | Health state export path |
 
@@ -41,7 +41,10 @@ config_version = 1
 poll_interval_minutes = 720
 process_accounts_in_config_order = true
 staging_path = /mnt/ssd/photo-ingress/staging
+pending_path = /nightfall/media/photo-ingress/pending
 accepted_path = /nightfall/media/photo-ingress/accepted
+accepted_storage_template = {yyyy}/{mm}/{original}
+rejected_path = /nightfall/media/photo-ingress/rejected
 trash_path = /nightfall/media/photo-ingress/trash
 registry_path = /mnt/ssd/photo-ingress/registry.db
 staging_on_same_pool = false
@@ -93,11 +96,14 @@ console_format = json
 | `config_version` | int | 1 | Config schema version. Must match supported value. |
 | `poll_interval_minutes` | int | 720 | Poll interval used by timer cadence. Production recommendation: 8-24h (`480-1440`). |
 | `staging_path` | path | none | SSD-backed staging directory. |
-| `accepted_path` | path | none | Ingress-visible accepted queue. Operator later moves files manually to permanent library. |
+| `pending_path` | path | `accepted_path` fallback | Ingest-visible pending queue for newly discovered files. |
+| `accepted_path` | path | none | Operator-accepted destination path. |
+| `accepted_storage_template` | string | `{yyyy}/{mm}/{original}` | Template for accepted destination layout. |
+| `rejected_path` | path | `trash_path` fallback | Rejected retention folder (trash-like) until purge. |
 | `trash_path` | path | none | Directory watched by systemd .path unit for reject workflow. |
 | `registry_path` | path | none | SQLite registry file path. |
 | `staging_on_same_pool` | bool | false | Enables rename move optimization when true. |
-| `storage_template` | string | `{yyyy}/{mm}/{original}` | Template for accepted queue file layout. |
+| `storage_template` | string | `{yyyy}/{mm}/{original}` | Template for pending queue file layout. |
 | `process_accounts_in_config_order` | bool | true | Process enabled accounts serially in the order they appear in the config file. |
 | `verify_sha256_on_first_download` | bool | true | If advisory SHA1 prefilter indicates a match, still force one first-download SHA-256 verification before trusting skip behavior. |
 
@@ -172,6 +178,7 @@ The storage template supports the following variables:
 - `token_cache` files must be mode 0600 and parent directory mode 0700.
 - `delta_cursor` paths must be writable.
 - `storage_template` must include at least `{original}` or `{sha8}`.
+- `accepted_storage_template` must include at least `{original}` or `{sha8}`.
 - `sync_hash_import_path` must be readable when sync import is enabled.
 - `token_cache` and `delta_cursor` paths must not be reused by multiple accounts.
 - `live_photo_stem_mode`, `live_photo_component_order`, and `live_photo_conflict_policy` must be validated against allowed enumerations.
@@ -180,9 +187,10 @@ The storage template supports the following variables:
 
 ## 6. Operational Notes
 
-- `accepted_path` is not the permanent archive. It is the ingress queue destination.
-- The operator periodically moves accepted files into `/nightfall/media/pictures/...` manually, outside ingress visibility.
-- The registry remains the source of truth for prior acceptance. Files moved out of `accepted_path` must still remain blocked from re-download.
+- `pending_path` is the automatic ingest destination. New files land in `pending` first.
+- Operators explicitly move files from `pending` to `accepted` with the `accept` command.
+- Rejected files are moved into `rejected_path` and retained until `purge` or manual deletion.
+- The registry remains the source of truth for prior acceptance/rejection. Files moved out of queue paths remain blocked from re-download.
 - In sync mode, the CLI imports hashes from permanent library hash caches (`.hashes.sha1`) to pre-seed accepted records and reduce re-hashing cost.
 - With `verify_sha256_on_first_download=true` (default), imported/advisory SHA1 matches are not trusted as canonical identity until one server-side SHA-256 confirmation occurs.
 

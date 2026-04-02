@@ -23,7 +23,7 @@ def _count(conn, table: str) -> int:
 def test_finalize_unknown_ingest_rollback_on_injected_failure(tmp_path: Path) -> None:
     registry = _init_registry(tmp_path)
 
-    for fail_step in (1, 2, 3, 4, 5):
+    for fail_step in (1, 2, 3, 4):
         try:
             registry.finalize_unknown_ingest(
                 sha256=f"{'a'*63}{fail_step}",
@@ -68,7 +68,7 @@ def test_finalize_unknown_ingest_writes_all_tables(tmp_path: Path) -> None:
 
     with registry._connect() as conn:  # noqa: SLF001 - test-only internal check
         assert _count(conn, "files") == 1
-        assert _count(conn, "accepted_records") == 1
+        assert _count(conn, "accepted_records") == 0
         assert _count(conn, "metadata_index") == 1
         assert _count(conn, "file_origins") == 1
         assert _count(conn, "audit_log") == 1
@@ -110,7 +110,7 @@ def test_idempotent_replay_after_simulated_failure(tmp_path: Path) -> None:
 
     with registry._connect() as conn:  # noqa: SLF001 - test-only internal check
         assert _count(conn, "files") == 1
-        assert _count(conn, "accepted_records") == 1
+        assert _count(conn, "accepted_records") == 0
         assert _count(conn, "metadata_index") == 1
         assert _count(conn, "file_origins") == 1
         assert _count(conn, "audit_log") == 1

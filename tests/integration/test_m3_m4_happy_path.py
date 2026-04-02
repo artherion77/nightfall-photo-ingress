@@ -31,15 +31,15 @@ def test_e2e_single_new_photo_same_pool_accepts_cleanly(
 
     assert result.poll_result.candidate_count == 1
     assert result.ingest_result is not None
-    assert result.ingest_result.accepted_count == 1
+    assert result.ingest_result.pending_count == 1
     outcome = result.ingest_result.outcomes[0]
-    assert outcome.action == "accepted"
+    assert outcome.action == "pending"
     assert outcome.destination_path is not None and outcome.destination_path.exists()
     assert result.registry_harness.registry.get_file(sha256=outcome.sha256 or "") is not None
     assert len(result.registry_harness.metadata_rows()) == 1
     assert len(result.registry_harness.file_origins()) == 1
-    assert len(result.registry_harness.accepted_rows()) == 1
-    assert audit_reader_fixture.terminal_actions() == ("accepted",)
+    assert len(result.registry_harness.accepted_rows()) == 0
+    assert audit_reader_fixture.terminal_actions() == ("pending",)
 
 
 def test_e2e_single_new_photo_cross_pool_accepts_with_copy_verify(
@@ -71,7 +71,7 @@ def test_e2e_single_new_photo_cross_pool_accepts_with_copy_verify(
 
     assert result.ingest_result is not None
     outcome = result.ingest_result.outcomes[0]
-    assert outcome.action == "accepted"
+    assert outcome.action == "pending"
     assert outcome.destination_path is not None
     assert outcome.destination_path.read_bytes() == b"movbytes"
     assert fs_snapshot_fixture(config.core.staging_path / "lisa") == (
@@ -128,9 +128,9 @@ def test_prefilter_hit_skips_hashing_for_known_metadata_match(
 
     assert second.ingest_result is not None
     assert second.ingest_result.prefilter_hit_count == 1
-    assert second.ingest_result.outcomes[0].action == "discard_accepted"
+    assert second.ingest_result.outcomes[0].action == "discard_pending"
     assert second.ingest_result.outcomes[0].prefilter_hit is True
-    assert second.registry_harness.registry.acceptance_count(sha256=accepted_hash or "") == 1
+    assert second.registry_harness.registry.acceptance_count(sha256=accepted_hash or "") == 0
 
 
 def test_prefilter_miss_hashes_and_accepts_when_registry_unknown(
@@ -159,7 +159,7 @@ def test_prefilter_miss_hashes_and_accepts_when_registry_unknown(
     assert result.ingest_result.prefilter_hit_count == 0
     assert result.ingest_result.prefilter_miss_count == 1
     outcome = result.ingest_result.outcomes[0]
-    assert outcome.action == "accepted"
+    assert outcome.action == "pending"
     assert result.registry_harness.registry.get_file(sha256=outcome.sha256 or "") is not None
 
 
@@ -202,4 +202,4 @@ def test_boundary_handoff_is_not_positionally_zipped_when_one_candidate_is_skipp
     assert len(result.staged_candidates) == 1
     assert result.staged_candidates[0].onedrive_id == "second-valid"
     assert result.ingest_result is not None
-    assert result.ingest_result.accepted_count == 1
+    assert result.ingest_result.pending_count == 1

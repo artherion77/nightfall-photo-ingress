@@ -20,7 +20,10 @@ config_version = 1
 poll_interval_minutes = 720
 process_accounts_in_config_order = true
 staging_path = {tmp_path / 'staging'}
+pending_path = {tmp_path / 'pending'}
 accepted_path = {tmp_path / 'accepted'}
+accepted_storage_template = {{yyyy}}/{{mm}}/{{original}}
+rejected_path = {tmp_path / 'rejected'}
 trash_path = {tmp_path / 'trash'}
 registry_path = {tmp_path / 'registry.db'}
 staging_on_same_pool = false
@@ -84,7 +87,9 @@ def test_cli_reject_is_idempotent_and_preserves_acceptance_history(tmp_path: Pat
     row = registry.get_file(sha256=sha)
     assert row is not None
     assert row.status == "rejected"
-    assert row.current_path is None
+    assert row.current_path is not None
+    assert Path(row.current_path).exists()
+    assert str(Path(row.current_path).parent).startswith(str(tmp_path / "rejected"))
     assert registry.acceptance_count(sha256=sha) == 1
     actions = [event.action for event in registry.list_audit_events(sha256=sha)]
     assert actions == ["rejected", "reject_noop_already_rejected"]
@@ -120,6 +125,8 @@ def test_process_trash_rejects_known_and_unknown_files(tmp_path: Path) -> None:
     known_row = registry.get_file(sha256=known_sha)
     assert known_row is not None
     assert known_row.status == "rejected"
+    assert known_row.current_path is not None
+    assert Path(known_row.current_path).exists()
 
     with sqlite3.connect(registry.db_path) as conn:
         rows = conn.execute("SELECT status FROM files").fetchall()

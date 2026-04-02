@@ -23,6 +23,8 @@ def test_cli_commands_are_registered() -> None:
         "discover-paths",
         "poll",
         "reject",
+        "accept",
+        "purge",
         "process-trash",
         "sync-import",
         "config-check",

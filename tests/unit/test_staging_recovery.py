@@ -86,14 +86,14 @@ def test_synthetic_ingest_mixed_known_unknown_rejected(tmp_path: Path) -> None:
                 staging_path=known_accepted_path,
             ),
         ],
-        accepted_root=accepted_root,
+        pending_root=accepted_root,
         storage_template="{yyyy}/{mm}/{sha8}-{original}",
         staging_on_same_pool=False,
     )
 
-    assert batch.accepted_count == 1
+    assert batch.pending_count == 1
     actions = sorted(item.action for item in batch.outcomes)
-    assert actions == ["accepted", "discard_accepted", "discard_rejected"]
+    assert actions == ["discard_accepted", "discard_rejected", "pending"]
 
 
 def test_restart_recovery_removes_old_tmp_and_keeps_recent_tmp(tmp_path: Path) -> None:
@@ -134,10 +134,10 @@ def test_missing_staged_file_is_reported_not_failed(tmp_path: Path) -> None:
                 staging_path=missing,
             )
         ],
-        accepted_root=tmp_path / "accepted",
+        pending_root=tmp_path / "accepted",
         storage_template="{yyyy}/{mm}/{sha8}-{original}",
         staging_on_same_pool=False,
     )
 
-    assert batch.accepted_count == 0
+    assert batch.pending_count == 0
     assert batch.outcomes[0].action == "missing_staged"

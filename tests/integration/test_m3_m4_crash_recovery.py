@@ -41,14 +41,14 @@ def test_crash_after_download_before_ingest_leaves_recoverable_staging_state(
     engine = ingest_engine_fixture()
     replayed = engine.process_batch(
         candidates=list(polled.staged_candidates),
-        accepted_root=polled.app_config.core.accepted_path,
+        pending_root=polled.app_config.core.pending_path,
         storage_template=polled.app_config.core.storage_template,
         staging_on_same_pool=polled.app_config.core.staging_on_same_pool,
         quarantine_dir=polled.quarantine_root,
     )
 
-    assert replayed.accepted_count == 1
-    assert fs_snapshot_fixture(polled.accepted_root)
+    assert replayed.pending_count == 1
+    assert fs_snapshot_fixture(polled.pending_root)
 
 
 def test_crash_after_storage_commit_before_registry_finalize_replays_or_completes_safely(
@@ -83,7 +83,7 @@ def test_crash_after_storage_commit_before_registry_finalize_replays_or_complete
     with pytest.raises(RuntimeError, match="after storage commit"):
         engine.process_batch(
             candidates=list(polled.staged_candidates),
-            accepted_root=polled.app_config.core.accepted_path,
+            pending_root=polled.app_config.core.pending_path,
             storage_template=polled.app_config.core.storage_template,
             staging_on_same_pool=polled.app_config.core.staging_on_same_pool,
             quarantine_dir=polled.quarantine_root,
@@ -93,7 +93,7 @@ def test_crash_after_storage_commit_before_registry_finalize_replays_or_complete
     assert replay["interrupted_total"] == 1
     assert replay["quarantined_destinations"] == 1
     assert replay["removed_staging"] in {0, 1}
-    assert any(path.suffix == ".orphaned" for path in polled.accepted_root.rglob("*"))
+    assert any(path.suffix == ".orphaned" for path in polled.pending_root.rglob("*"))
 
 
 def test_crash_during_cross_pool_copy_never_leaves_false_accepted_state(
@@ -130,7 +130,7 @@ def test_crash_during_cross_pool_copy_never_leaves_false_accepted_state(
     with pytest.raises(RuntimeError, match="cross-pool copy"):
         engine.process_batch(
             candidates=list(polled.staged_candidates),
-            accepted_root=config.core.accepted_path,
+            pending_root=config.core.pending_path,
             storage_template=config.core.storage_template,
             staging_on_same_pool=False,
             quarantine_dir=polled.quarantine_root,

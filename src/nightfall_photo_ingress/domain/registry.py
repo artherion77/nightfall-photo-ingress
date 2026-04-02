@@ -11,8 +11,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-LATEST_SCHEMA_VERSION = 1
-ALLOWED_FILE_STATUSES = {"accepted", "rejected", "purged"}
+LATEST_SCHEMA_VERSION = 2
+ALLOWED_FILE_STATUSES = {"pending", "accepted", "rejected", "purged"}
 
 
 class RegistryError(RuntimeError):
@@ -224,8 +224,8 @@ class Registry:
     ) -> None:
         """Persist unknown-hash ingest state in one atomic transaction.
 
-        This updates all related tables as one unit: files, accepted_records,
-        metadata_index, file_origins, and audit_log.
+        Files land in 'pending' status awaiting human review. This updates
+        files, metadata_index, file_origins, and audit_log as one unit.
         """
 
         now = _utc_now()
@@ -244,10 +244,10 @@ class Registry:
                     current_path,
                     first_seen_at,
                     updated_at
-                ) VALUES (?, ?, 'accepted', ?, ?, ?, ?)
+                ) VALUES (?, ?, 'pending', ?, ?, ?, ?)
                 ON CONFLICT(sha256) DO UPDATE SET
                     size_bytes = excluded.size_bytes,
-                    status = 'accepted',
+                    status = 'pending',
                     original_filename = COALESCE(excluded.original_filename, files.original_filename),
                     current_path = excluded.current_path,
                     updated_at = excluded.updated_at
@@ -259,22 +259,6 @@ class Registry:
                 raise RegistryError("Injected failure after files write")
 
             step = 2
-            conn.execute(
-                """
-                INSERT INTO accepted_records (
-                    sha256,
-                    account,
-                    source_path,
-                    accepted_at
-                ) VALUES (?, ?, ?, ?)
-                """,
-                (sha256, account, source_path, now),
-            )
-            if fail_after_step == step:
-                conn.rollback()
-                raise RegistryError("Injected failure after accepted_records write")
-
-            step = 3
             conn.execute(
                 """
                 INSERT INTO metadata_index (
@@ -298,7 +282,7 @@ class Registry:
                 conn.rollback()
                 raise RegistryError("Injected failure after metadata_index write")
 
-            step = 4
+            step = 3
             conn.execute(
                 """
                 INSERT INTO file_origins (
@@ -320,11 +304,11 @@ class Registry:
                 conn.rollback()
                 raise RegistryError("Injected failure after file_origins write")
 
-            step = 5
+            step = 4
             conn.execute(
                 """
                 INSERT INTO audit_log (sha256, account_name, action, reason, details_json, actor, ts)
-                VALUES (?, ?, 'accepted', 'unknown_hash', NULL, ?, ?)
+                VALUES (?, ?, 'pending', 'unknown_hash', NULL, ?, ?)
                 """,
                 (sha256, account, actor, now),
             )
@@ -332,6 +316,56 @@ class Registry:
                 conn.rollback()
                 raise RegistryError("Injected failure after audit_log write")
 
+            conn.commit()
+
+    def finalize_accept_from_pending(
+        self,
+        *,
+        sha256: str,
+        new_path: str,
+        account: str,
+        source_path: str,
+        actor: str,
+    ) -> None:
+        """Persist operator acceptance of a pending file in one atomic transaction.
+
+        Transitions pending→accepted, writes to accepted_records, updates
+        current_path, and appends an audit event.
+        """
+
+        now = _utc_now()
+        with self._connect() as conn:
+            _set_pragmas(conn)
+            conn.execute("BEGIN IMMEDIATE")
+            cursor = conn.execute("SELECT status FROM files WHERE sha256 = ?", (sha256,))
+            row = cursor.fetchone()
+            if row is None:
+                conn.rollback()
+                raise RegistryError(f"Cannot accept missing sha256: {sha256}")
+            if row["status"] != "pending":
+                conn.rollback()
+                raise RegistryError(
+                    f"Cannot accept file with status '{row['status']}': expected 'pending'"
+                )
+
+            conn.execute(
+                "UPDATE files SET status = 'accepted', current_path = ?, updated_at = ? WHERE sha256 = ?",
+                (new_path, now, sha256),
+            )
+            conn.execute(
+                """
+                INSERT INTO accepted_records (sha256, account, source_path, accepted_at)
+                VALUES (?, ?, ?, ?)
+                """,
+                (sha256, account, source_path, now),
+            )
+            conn.execute(
+                """
+                INSERT INTO audit_log (sha256, account_name, action, reason, details_json, actor, ts)
+                VALUES (?, ?, 'accepted', 'operator_accept', NULL, ?, ?)
+                """,
+                (sha256, account, actor, now),
+            )
             conn.commit()
 
     def finalize_known_ingest(
@@ -410,6 +444,60 @@ class Registry:
             conn.execute(
                 "UPDATE files SET current_path = NULL, updated_at = ? WHERE sha256 = ?",
                 (now, sha256),
+            )
+            conn.commit()
+
+    def update_current_path(self, *, sha256: str, new_path: str) -> None:
+        """Update the stored current_path after an operator moves a file."""
+
+        now = _utc_now()
+        with self._connect() as conn:
+            _set_pragmas(conn)
+            conn.execute("BEGIN IMMEDIATE")
+            conn.execute(
+                "UPDATE files SET current_path = ?, updated_at = ? WHERE sha256 = ?",
+                (new_path, now, sha256),
+            )
+            conn.commit()
+
+    def finalize_purge_from_rejected(
+        self,
+        *,
+        sha256: str,
+        reason: str,
+        actor: str,
+    ) -> None:
+        """Atomically transition rejected→purged and clear current_path.
+
+        Raises RegistryError when the record is missing or not in rejected state.
+        """
+
+        now = _utc_now()
+        with self._connect() as conn:
+            _set_pragmas(conn)
+            conn.execute("BEGIN IMMEDIATE")
+            cursor = conn.execute(
+                "SELECT status FROM files WHERE sha256 = ?", (sha256,)
+            )
+            row = cursor.fetchone()
+            if row is None:
+                conn.rollback()
+                raise RegistryError(f"Cannot purge missing sha256: {sha256}")
+            if row[0] != "rejected":
+                conn.rollback()
+                raise RegistryError(
+                    f"Cannot purge sha256 with status '{row[0]}': expected 'rejected'"
+                )
+            conn.execute(
+                "UPDATE files SET status = 'purged', current_path = NULL, updated_at = ? WHERE sha256 = ?",
+                (now, sha256),
+            )
+            conn.execute(
+                """
+                INSERT INTO audit_log (sha256, account_name, action, reason, details_json, actor, ts)
+                VALUES (?, NULL, 'purged', ?, NULL, ?, ?)
+                """,
+                (sha256, reason, actor, now),
             )
             conn.commit()
 
@@ -631,7 +719,7 @@ class Registry:
     ) -> None:
         """Insert or update a live photo pair mapping."""
 
-        if status not in {"paired", "accepted", "rejected", "purged"}:
+        if status not in {"paired", "pending", "accepted", "rejected", "purged"}:
             raise RegistryError(f"Invalid live photo pair status: {status}")
 
         now = _utc_now()
@@ -736,7 +824,7 @@ class Registry:
     ) -> None:
         """Apply one status transition consistently to both pair members."""
 
-        if new_status not in {"accepted", "rejected", "purged"}:
+        if new_status not in {"pending", "accepted", "rejected", "purged"}:
             raise RegistryError(
                 f"Invalid live photo propagated status: {new_status}"
             )
@@ -820,6 +908,11 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
         conn.execute(f"PRAGMA user_version = {LATEST_SCHEMA_VERSION}")
         conn.commit()
 
+    elif current == 1:
+        conn.executescript(_migration_v1_to_v2_sql())
+        conn.execute(f"PRAGMA user_version = {LATEST_SCHEMA_VERSION}")
+        conn.commit()
+
 
 def _ensure_optional_tables(conn: sqlite3.Connection) -> None:
     """Create additive optional tables used by newer runtime features."""
@@ -843,14 +936,55 @@ CREATE TABLE IF NOT EXISTS ingest_terminal_audit (
     conn.commit()
 
 
+def _migration_v1_to_v2_sql() -> str:
+    """Return SQL script for schema migration from version 1 to 2.
+
+    Adds 'pending' to the status CHECK constraints in files and live_photo_pairs.
+    """
+
+    return """
+PRAGMA foreign_keys = OFF;
+BEGIN;
+CREATE TABLE files_new (
+    sha256 TEXT PRIMARY KEY,
+    size_bytes INTEGER NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('pending', 'accepted', 'rejected', 'purged')),
+    original_filename TEXT,
+    current_path TEXT,
+    first_seen_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+INSERT INTO files_new SELECT * FROM files;
+DROP TABLE files;
+ALTER TABLE files_new RENAME TO files;
+CREATE TABLE live_photo_pairs_new (
+    pair_id TEXT PRIMARY KEY,
+    account TEXT NOT NULL,
+    stem TEXT NOT NULL,
+    photo_sha256 TEXT NOT NULL,
+    video_sha256 TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('paired', 'pending', 'accepted', 'rejected', 'purged')),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (photo_sha256) REFERENCES files(sha256),
+    FOREIGN KEY (video_sha256) REFERENCES files(sha256)
+);
+INSERT INTO live_photo_pairs_new SELECT * FROM live_photo_pairs;
+DROP TABLE live_photo_pairs;
+ALTER TABLE live_photo_pairs_new RENAME TO live_photo_pairs;
+COMMIT;
+PRAGMA foreign_keys = ON;
+"""
+
+
 def _migration_v1_sql() -> str:
-    """Return SQL script for schema version 1."""
+    """Return SQL script for schema version 1 (fresh install reaches v2 directly)."""
 
     return """
 CREATE TABLE IF NOT EXISTS files (
     sha256 TEXT PRIMARY KEY,
     size_bytes INTEGER NOT NULL,
-    status TEXT NOT NULL CHECK (status IN ('accepted', 'rejected', 'purged')),
+    status TEXT NOT NULL CHECK (status IN ('pending', 'accepted', 'rejected', 'purged')),
     original_filename TEXT,
     current_path TEXT,
     first_seen_at TEXT NOT NULL,
@@ -905,7 +1039,7 @@ CREATE TABLE IF NOT EXISTS live_photo_pairs (
     stem TEXT NOT NULL,
     photo_sha256 TEXT NOT NULL,
     video_sha256 TEXT NOT NULL,
-    status TEXT NOT NULL CHECK (status IN ('paired', 'accepted', 'rejected', 'purged')),
+    status TEXT NOT NULL CHECK (status IN ('paired', 'pending', 'accepted', 'rejected', 'purged')),
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     FOREIGN KEY (photo_sha256) REFERENCES files(sha256),

@@ -64,7 +64,7 @@ class IngestBatchResult:
     """Summary of one ingest batch run."""
 
     outcomes: tuple[IngestOutcome, ...]
-    accepted_count: int
+    pending_count: int
     discarded_count: int
     prefilter_discard_count: int
     prefilter_hit_count: int
@@ -111,7 +111,7 @@ class IngestDecisionEngine:
         self,
         *,
         candidates: list[StagedCandidate],
-        accepted_root: Path,
+        pending_root: Path | None = None,
         storage_template: str,
         staging_on_same_pool: bool,
         input_schema_version: int = INGEST_INPUT_SCHEMA_VERSION,
@@ -122,8 +122,14 @@ class IngestDecisionEngine:
         size_aware_scheduling: bool = True,
         collision_max_attempts: int = 10_000,
         live_photo_heuristics: LivePhotoHeuristics | None = None,
+        accepted_root: Path | None = None,  # deprecated: use pending_root instead
     ) -> IngestBatchResult:
         """Process staged candidates and return batch summary."""
+
+        # Support legacy accepted_root kwarg as alias for pending_root
+        _pending_root = pending_root if pending_root is not None else accepted_root
+        if _pending_root is None:
+            raise IngestError("pending_root is required")
 
         self._validate_batch_contract(
             candidates=candidates,
@@ -165,7 +171,7 @@ class IngestDecisionEngine:
                     candidate,
                     self._process_one(
                         candidate=candidate,
-                        accepted_root=accepted_root,
+                        pending_root=_pending_root,
                         storage_template=storage_template,
                         staging_on_same_pool=staging_on_same_pool,
                         pre_hash_size_verify=pre_hash_size_verify,
@@ -182,7 +188,7 @@ class IngestDecisionEngine:
                     executor.submit(
                         self._process_one,
                         candidate=candidate,
-                        accepted_root=accepted_root,
+                        pending_root=_pending_root,
                         storage_template=storage_template,
                         staging_on_same_pool=staging_on_same_pool,
                         pre_hash_size_verify=pre_hash_size_verify,
@@ -243,11 +249,11 @@ class IngestDecisionEngine:
                 actor="ingest_pipeline",
             )
 
-        accepted_count = sum(1 for item in outcomes if item.action == "accepted")
+        pending_count = sum(1 for item in outcomes if item.action == "pending")
         discarded_count = sum(
             1
             for item in outcomes
-            if item.action in {"discard_accepted", "discard_rejected", "discard_purged", "missing_staged"}
+            if item.action in {"discard_accepted", "discard_rejected", "discard_purged", "discard_pending", "missing_staged"}
         )
         prefilter_discard_count = sum(1 for item in outcomes if item.prefilter_hit)
         prefilter_hit_count = sum(1 for item in outcomes if item.prefilter_hit)
@@ -258,7 +264,7 @@ class IngestDecisionEngine:
 
         return IngestBatchResult(
             outcomes=tuple(outcomes),
-            accepted_count=accepted_count,
+            pending_count=pending_count,
             discarded_count=discarded_count,
             prefilter_discard_count=prefilter_discard_count,
             prefilter_hit_count=prefilter_hit_count,
@@ -437,7 +443,7 @@ class IngestDecisionEngine:
         self,
         *,
         candidate: StagedCandidate,
-        accepted_root: Path,
+        pending_root: Path,
         storage_template: str,
         staging_on_same_pool: bool,
         pre_hash_size_verify: bool,
@@ -554,14 +560,14 @@ class IngestDecisionEngine:
                 modified_time_iso=candidate.modified_time,
             )
             destination = choose_collision_safe_destination_with_threshold(
-                base_path=accepted_root / relative,
+                base_path=pending_root / relative,
                 max_attempts=collision_max_attempts,
             )
             commit_staging_to_accepted(
                 source_path=path,
                 destination_path=destination,
                 staging_on_same_pool=staging_on_same_pool,
-                destination_root=accepted_root,
+                destination_root=pending_root,
             )
             self._journal_append(
                 op_id=op_id,
@@ -593,7 +599,7 @@ class IngestDecisionEngine:
             return IngestOutcome(
                 account_name=candidate.account_name,
                 onedrive_id=candidate.onedrive_id,
-                action="accepted",
+                action="pending",
                 sha256=file_hash,
                 destination_path=destination,
                 prefilter_hit=False,
@@ -659,7 +665,7 @@ class IngestDecisionEngine:
 
         status = str(row["status"])
         sha256 = str(row["sha256"])
-        if status not in {"accepted", "rejected", "purged"}:
+        if status not in {"pending", "accepted", "rejected", "purged"}:
             return None
         return status, sha256
 
@@ -724,7 +730,7 @@ class IngestDecisionEngine:
 
         if outcome.prefilter_hit:
             return "metadata_prefilter"
-        if outcome.action == "accepted":
+        if outcome.action == "pending":
             return "unknown_hash"
         if outcome.action.startswith("discard_"):
             return "known_hash"

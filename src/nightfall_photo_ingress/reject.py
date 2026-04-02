@@ -7,8 +7,12 @@ from pathlib import Path
 
 from .config import AppConfig
 from .domain.registry import Registry, RegistryError
-from .domain.storage import sha256_file
-
+from .domain.storage import (
+    choose_collision_safe_destination,
+    commit_pending_to_accepted,
+    render_storage_relative_path,
+    sha256_file,
+)
 
 class RejectFlowError(RuntimeError):
     """Raised when operator rejection workflows fail."""
@@ -34,6 +38,23 @@ class TrashProcessResult:
     removed_paths: tuple[str, ...]
 
 
+@dataclass(frozen=True)
+class AcceptResult:
+    """Result for a single explicit accept action."""
+
+    sha256: str
+    action: str
+    destination_path: str
+
+
+@dataclass(frozen=True)
+class PurgeResult:
+    """Result for a single explicit purge action."""
+
+    sha256: str
+    action: str
+    purged_path: str | None
+
 def reject_sha256(
     app_config: AppConfig,
     *,
@@ -56,6 +77,109 @@ def reject_sha256(
         actor=actor,
         fallback_original_filename=None,
         fallback_size_bytes=0,
+        rejected_root=app_config.core.rejected_path,
+    )
+
+
+def accept_sha256(
+    app_config: AppConfig,
+    *,
+    sha256: str,
+    reason: str | None,
+    actor: str,
+) -> AcceptResult:
+    """Move a pending file to accepted and update registry."""
+
+    normalized_sha = sha256.strip().lower()
+    if len(normalized_sha) != 64 or any(char not in "0123456789abcdef" for char in normalized_sha):
+        raise RejectFlowError(f"Invalid SHA-256: {sha256}")
+
+    registry = Registry(app_config.core.registry_path)
+    registry.initialize()
+
+    record = registry.get_file(sha256=normalized_sha)
+    if record is None:
+        raise RejectFlowError(f"Unknown SHA-256: {sha256}")
+    if record.status != "pending":
+        raise RejectFlowError(
+            f"Cannot accept sha256 with status '{record.status}': expected 'pending'"
+        )
+    if record.current_path is None:
+        raise RejectFlowError(f"No current_path for pending sha256: {sha256}")
+
+    source_path = Path(record.current_path)
+    relative = render_storage_relative_path(
+        storage_template=app_config.core.accepted_storage_template,
+        sha256=normalized_sha,
+        original_filename=record.original_filename or normalized_sha,
+        modified_time_iso="1970-01-01T00:00:00+00:00",
+    )
+    destination = choose_collision_safe_destination(
+        app_config.core.accepted_path / relative
+    )
+    commit_pending_to_accepted(
+        source_path=source_path,
+        destination_path=destination,
+        same_pool=app_config.core.staging_on_same_pool,
+        destination_root=app_config.core.accepted_path,
+    )
+    registry.finalize_accept_from_pending(
+        sha256=normalized_sha,
+        current_path=str(destination),
+        reason=reason or "operator_accept",
+        actor=actor,
+    )
+    return AcceptResult(
+        sha256=normalized_sha,
+        action="accepted",
+        destination_path=str(destination),
+    )
+
+
+def purge_sha256(
+    app_config: AppConfig,
+    *,
+    sha256: str,
+    reason: str | None,
+    actor: str,
+) -> PurgeResult:
+    """Delete a rejected file and transition registry to purged."""
+
+    normalized_sha = sha256.strip().lower()
+    if len(normalized_sha) != 64 or any(char not in "0123456789abcdef" for char in normalized_sha):
+        raise RejectFlowError(f"Invalid SHA-256: {sha256}")
+
+    registry = Registry(app_config.core.registry_path)
+    registry.initialize()
+
+    record = registry.get_file(sha256=normalized_sha)
+    if record is None:
+        raise RejectFlowError(f"Unknown SHA-256: {sha256}")
+    if record.status != "rejected":
+        raise RejectFlowError(
+            f"Cannot purge sha256 with status '{record.status}': expected 'rejected'"
+        )
+
+    purged_path: str | None = None
+    if record.current_path is not None:
+        current = Path(record.current_path)
+        if current.exists():
+            current.unlink(missing_ok=True)
+            purged_path = str(current)
+
+    try:
+        registry.finalize_purge_from_rejected(
+            sha256=normalized_sha,
+            reason=reason or "cli_purge",
+            actor=actor,
+        )
+    except RegistryError as exc:
+        raise RejectFlowError(str(exc)) from exc
+
+    return PurgeResult(
+        sha256=normalized_sha,
+        action="purged",
+        purged_path=purged_path,
     )
 
 
@@ -84,6 +208,7 @@ def process_trash(app_config: AppConfig) -> TrashProcessResult:
             actor="trash_watch",
             fallback_original_filename=trash_file.name,
             fallback_size_bytes=trash_file.stat().st_size,
+            rejected_root=app_config.core.rejected_path,
         )
         trash_file.unlink(missing_ok=True)
         removed_paths.append(str(trash_file))
@@ -113,6 +238,7 @@ def _apply_reject(
     actor: str,
     fallback_original_filename: str | None,
     fallback_size_bytes: int,
+    rejected_root: Path,
 ) -> RejectResult:
     """Persist reject transition for known or newly discovered content."""
 
@@ -141,8 +267,8 @@ def _apply_reject(
 
     pair = registry.get_live_photo_pair_for_member(sha256=sha256)
     if pair is not None and pair.status != "rejected":
-        removed_paths.extend(_remove_current_path_if_present(registry, pair.photo_sha256))
-        removed_paths.extend(_remove_current_path_if_present(registry, pair.video_sha256))
+        removed_paths.extend(_move_to_rejected_folder(registry, pair.photo_sha256, rejected_root))
+        removed_paths.extend(_move_to_rejected_folder(registry, pair.video_sha256, rejected_root))
         registry.apply_live_photo_pair_status(
             pair_id=pair.pair_id,
             new_status="rejected",
@@ -168,7 +294,7 @@ def _apply_reject(
             removed_paths=tuple(),
         )
 
-    removed_paths.extend(_remove_current_path_if_present(registry, sha256))
+    removed_paths.extend(_move_to_rejected_folder(registry, sha256, rejected_root))
     try:
         registry.transition_status(
             sha256=sha256,
@@ -186,15 +312,22 @@ def _apply_reject(
     )
 
 
-def _remove_current_path_if_present(registry: Registry, sha256: str) -> list[str]:
-    """Delete current queue file if it exists and clear stored path pointer."""
+def _move_to_rejected_folder(registry: Registry, sha256: str, rejected_root: Path) -> list[str]:
+    """Move current queue file to rejected folder and update stored path pointer."""
 
     record = registry.get_file(sha256=sha256)
     if record is None or record.current_path is None:
         return []
 
-    current_path = Path(record.current_path)
-    if current_path.exists():
-        current_path.unlink(missing_ok=True)
-    registry.clear_current_path(sha256=sha256)
-    return [str(current_path)]
+    source = Path(record.current_path)
+    if not source.exists():
+        registry.clear_current_path(sha256=sha256)
+        return []
+
+    original_filename = record.original_filename or sha256[:8]
+    rejected_filename = f"{sha256[:8]}-{original_filename}"
+    rejected_dest = choose_collision_safe_destination(rejected_root / rejected_filename)
+    rejected_dest.parent.mkdir(parents=True, exist_ok=True)
+    source.replace(rejected_dest)
+    registry.update_current_path(sha256=sha256, new_path=str(rejected_dest))
+    return [str(source)]

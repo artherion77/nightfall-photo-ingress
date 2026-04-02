@@ -166,3 +166,37 @@ Field notes:
   - `design/v1-baseline-spec.md`
   - `design/refinements.md`
   - `planning/iterative-implementation-roadmap.md`
+
+## DEC-20260402-01: Pending-first ingest with explicit accept and purge workflows
+- Status: accepted
+- Date (UTC): 2026-04-02 00:00:00 UTC
+- Scope: pipeline
+- Decision:
+  - Ingest no longer auto-accepts unknown files.
+  - Unknown files transition to `pending` with files written to `pending_path`.
+  - Operator `accept` transitions `pending -> accepted` and writes `accepted_records`.
+  - Operator `reject` moves files to `rejected_path` (trash-like retention).
+  - Operator `purge` transitions `rejected -> purged` and removes retained files.
+- Rationale:
+  - Makes operator intent explicit and auditable.
+  - Avoids silently promoting new data into accepted state.
+  - Adds safe retention for rejected files before irreversible deletion.
+- Alternatives Considered:
+  - Keep auto-accept as ingest default.
+  - Delete rejected files immediately on reject.
+- Consequences:
+  - Registry schema expands status model with `pending` and migration support.
+  - Ingest terminal events report `pending` for unknown hashes.
+  - Config requires/uses separate queue roots and templates for pending and accepted flows.
+- Implementation Notes:
+  - `storage_template` is used for pending placement.
+  - `accepted_storage_template` is used only by explicit accept transitions.
+  - `rejected_path` retains artifacts until explicit purge/manual deletion.
+- Supersedes:
+  - none
+- References:
+  - `src/nightfall_photo_ingress/domain/registry.py`
+  - `src/nightfall_photo_ingress/domain/ingest.py`
+  - `src/nightfall_photo_ingress/reject.py`
+  - `src/nightfall_photo_ingress/cli.py`
+  - `design/configspec.md`

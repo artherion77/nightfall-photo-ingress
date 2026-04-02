@@ -80,7 +80,7 @@ def test_ingest_rejects_unsafe_storage_template(tmp_path: Path) -> None:
     with pytest.raises(IngestError, match="Unsafe storage template"):
         engine.process_batch(
             candidates=[candidate],
-            accepted_root=tmp_path / "accepted",
+            pending_root=tmp_path / "accepted",
             storage_template="../{original}",
             staging_on_same_pool=False,
         )

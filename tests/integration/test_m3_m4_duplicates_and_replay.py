@@ -21,8 +21,8 @@ def test_duplicate_delta_items_reduce_to_single_ingest_effect(
     )
 
     assert result.poll_result.candidate_count == 1
-    assert result.ingest_result.accepted_count == 1
-    assert len(result.registry_harness.accepted_rows()) == 1
+    assert result.ingest_result.pending_count == 1
+    assert len(result.registry_harness.accepted_rows()) == 0
     assert len(result.registry_harness.terminal_events()) == 1
 
 
@@ -53,6 +53,6 @@ def test_replayed_delta_page_on_next_poll_does_not_duplicate_accepted_content(
         downloads={"https://download/replay-1-a": {"content": b"repeat"}},
     )
 
-    assert first.ingest_result.accepted_count == 1
-    assert second.ingest_result.accepted_count == 0
-    assert second.ingest_result.outcomes[0].action in {"discard_accepted", "discard_rejected", "discard_purged"}
+    assert first.ingest_result.pending_count == 1
+    assert second.ingest_result.pending_count == 0
+    assert second.ingest_result.outcomes[0].action in {"discard_pending", "discard_rejected", "discard_purged"}

@@ -67,14 +67,14 @@ def test_decision_matrix_unknown_is_accepted(tmp_path: Path) -> None:
         candidates=[
             _candidate(staging_path=staging_file, onedrive_id="item-a", size=8),
         ],
-        accepted_root=tmp_path / "accepted",
+        pending_root=tmp_path / "accepted",
         storage_template="{yyyy}/{mm}/{sha8}-{original}",
         staging_on_same_pool=False,
     )
 
-    assert result.accepted_count == 1
+    assert result.pending_count == 1
     outcome = result.outcomes[0]
-    assert outcome.action == "accepted"
+    assert outcome.action == "pending"
     assert outcome.destination_path is not None
     assert outcome.destination_path.exists()
     assert not staging_file.exists()
@@ -110,12 +110,12 @@ def test_decision_matrix_known_statuses_are_discarded(tmp_path: Path) -> None:
                     size=len(payload),
                 ),
             ],
-            accepted_root=tmp_path / "accepted",
+            pending_root=tmp_path / "accepted",
             storage_template="{yyyy}/{mm}/{sha8}-{original}",
             staging_on_same_pool=False,
         )
 
-        assert result.accepted_count == 0
+        assert result.pending_count == 0
         outcome = result.outcomes[0]
         assert outcome.action == f"discard_{status}"
         assert outcome.destination_path is None
@@ -158,7 +158,7 @@ def test_metadata_prefilter_skips_hashing_and_discards(tmp_path: Path) -> None:
                 size=len(payload),
             )
         ],
-        accepted_root=tmp_path / "accepted",
+        pending_root=tmp_path / "accepted",
         storage_template="{yyyy}/{mm}/{sha8}-{original}",
         staging_on_same_pool=False,
     )
@@ -183,7 +183,7 @@ def test_collision_safe_naming_creates_unique_destination(tmp_path: Path) -> Non
         candidates=[
             _candidate(staging_path=first_stage, onedrive_id="first", name="dup.heic", size=13),
         ],
-        accepted_root=accepted_root,
+        pending_root=accepted_root,
         storage_template="{yyyy}/{mm}/fixed-{original}",
         staging_on_same_pool=False,
     )
@@ -191,7 +191,7 @@ def test_collision_safe_naming_creates_unique_destination(tmp_path: Path) -> Non
         candidates=[
             _candidate(staging_path=second_stage, onedrive_id="second", name="dup.heic", size=14),
         ],
-        accepted_root=accepted_root,
+        pending_root=accepted_root,
         storage_template="{yyyy}/{mm}/fixed-{original}",
         staging_on_same_pool=False,
     )

@@ -50,7 +50,7 @@ def test_ingest_mixed_live_photo_and_standalone_assets_creates_pair_record(
     )
 
     assert result.ingest_result is not None
-    assert result.ingest_result.accepted_count == 3
+    assert result.ingest_result.pending_count == 3
 
     pairs = result.registry_harness.query_all(
         "SELECT account, stem, status FROM live_photo_pairs ORDER BY pair_id"
@@ -141,4 +141,4 @@ def test_reupload_of_rejected_live_photo_pair_is_blocked(
     assert second.ingest_result is not None
     actions = tuple(outcome.action for outcome in second.ingest_result.outcomes)
     assert actions == ("discard_rejected", "discard_rejected")
-    assert second.ingest_result.accepted_count == 0
+    assert second.ingest_result.pending_count == 0

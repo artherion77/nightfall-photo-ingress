@@ -67,7 +67,7 @@ def test_known_rejected_metadata_match_discards_without_accepting(
     assert result.ingest_result is not None
     assert result.ingest_result.outcomes[0].action == "discard_rejected"
     assert result.ingest_result.outcomes[0].prefilter_hit is True
-    assert result.ingest_result.accepted_count == 0
+    assert result.ingest_result.pending_count == 0
 
 
 def test_known_purged_metadata_match_discards_without_accepting(
@@ -124,7 +124,7 @@ def test_known_purged_metadata_match_discards_without_accepting(
     assert result.ingest_result is not None
     assert result.ingest_result.outcomes[0].action == "discard_purged"
     assert result.ingest_result.outcomes[0].prefilter_hit is True
-    assert result.ingest_result.accepted_count == 0
+    assert result.ingest_result.pending_count == 0
 
 
 def test_size_drift_for_same_onedrive_id_forces_prefilter_miss(
@@ -270,11 +270,11 @@ def test_acceptance_history_blocks_reingest_even_if_queue_file_is_moved(
     )
 
     assert second.ingest_result is not None
-    assert second.ingest_result.outcomes[0].action == "discard_accepted"
+    assert second.ingest_result.outcomes[0].action == "discard_pending"
     assert second.ingest_result.outcomes[0].prefilter_hit is True
     assert second.registry_harness.registry.acceptance_count(
         sha256=first_outcome.sha256 or ""
-    ) == 1
+    ) == 0
 
 
 def test_advisory_sha1_cache_is_non_canonical_without_verified_sha256(
@@ -310,7 +310,7 @@ def test_advisory_sha1_cache_is_non_canonical_without_verified_sha256(
     )
 
     assert result.ingest_result is not None
-    assert result.ingest_result.outcomes[0].action == "accepted"
+    assert result.ingest_result.outcomes[0].action == "pending"
     assert result.ingest_result.prefilter_hit_count == 0
 
     conn = sqlite3.connect(result.registry_harness.db_path)

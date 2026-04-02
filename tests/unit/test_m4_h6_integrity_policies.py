@@ -35,7 +35,7 @@ def test_pre_hash_size_verification_detects_mismatch(tmp_path: Path) -> None:
 
     result = engine.process_batch(
         candidates=[_candidate(staged, size=10)],
-        accepted_root=tmp_path / "accepted",
+        pending_root=tmp_path / "accepted",
         storage_template="{yyyy}/{mm}/{sha8}-{original}",
         staging_on_same_pool=False,
         pre_hash_size_verify=True,
@@ -56,13 +56,13 @@ def test_missing_size_does_not_fail_verification(tmp_path: Path) -> None:
 
     result = engine.process_batch(
         candidates=[_candidate(staged, size=None)],
-        accepted_root=tmp_path / "accepted",
+        pending_root=tmp_path / "accepted",
         storage_template="{yyyy}/{mm}/{sha8}-{original}",
         staging_on_same_pool=False,
         pre_hash_size_verify=True,
     )
 
-    assert result.accepted_count == 1
+    assert result.pending_count == 1
     assert result.size_mismatch_count == 0
 
 
@@ -75,7 +75,7 @@ def test_zero_byte_policy_reject(tmp_path: Path) -> None:
 
     result = engine.process_batch(
         candidates=[_candidate(staged, size=0)],
-        accepted_root=tmp_path / "accepted",
+        pending_root=tmp_path / "accepted",
         storage_template="{yyyy}/{mm}/{sha8}-{original}",
         staging_on_same_pool=False,
         zero_byte_policy="reject",
@@ -95,7 +95,7 @@ def test_zero_byte_policy_quarantine(tmp_path: Path) -> None:
 
     result = engine.process_batch(
         candidates=[_candidate(staged, size=0)],
-        accepted_root=tmp_path / "accepted",
+        pending_root=tmp_path / "accepted",
         storage_template="{yyyy}/{mm}/{sha8}-{original}",
         staging_on_same_pool=False,
         zero_byte_policy="quarantine",

@@ -33,7 +33,10 @@ class CoreConfig:
     poll_interval_minutes: int
     process_accounts_in_config_order: bool
     staging_path: Path
+    pending_path: Path
     accepted_path: Path
+    accepted_storage_template: str
+    rejected_path: Path
     trash_path: Path
     registry_path: Path
     staging_on_same_pool: bool
@@ -185,6 +188,11 @@ def _parse_core(parser: configparser.ConfigParser, errors: list[str]) -> CoreCon
 
     core = parser[section]
 
+    accepted_path = _get_path(core, "accepted_path", errors, required=True)
+    trash_path = _get_path(core, "trash_path", errors, required=True)
+    pending_path = _get_path(core, "pending_path", errors, default=accepted_path)
+    rejected_path = _get_path(core, "rejected_path", errors, default=trash_path)
+
     return CoreConfig(
         config_version=_get_int(core, "config_version", errors, required=True),
         poll_interval_minutes=_get_int(core, "poll_interval_minutes", errors, default=15),
@@ -195,8 +203,16 @@ def _parse_core(parser: configparser.ConfigParser, errors: list[str]) -> CoreCon
             default=True,
         ),
         staging_path=_get_path(core, "staging_path", errors, required=True),
-        accepted_path=_get_path(core, "accepted_path", errors, required=True),
-        trash_path=_get_path(core, "trash_path", errors, required=True),
+        pending_path=pending_path,
+        accepted_path=accepted_path,
+        accepted_storage_template=_get_str(
+            core,
+            "accepted_storage_template",
+            errors,
+            default="{yyyy}/{mm}/{original}",
+        ),
+        rejected_path=rejected_path,
+        trash_path=trash_path,
         registry_path=_get_path(core, "registry_path", errors, required=True),
         staging_on_same_pool=_get_bool(core, "staging_on_same_pool", errors, default=False),
         storage_template=_get_str(
@@ -328,7 +344,10 @@ def _default_core() -> CoreConfig:
         poll_interval_minutes=15,
         process_accounts_in_config_order=True,
         staging_path=Path("/tmp/staging"),
+        pending_path=Path("/tmp/pending"),
         accepted_path=Path("/tmp/accepted"),
+        accepted_storage_template="{yyyy}/{mm}/{original}",
+        rejected_path=Path("/tmp/rejected"),
         trash_path=Path("/tmp/trash"),
         registry_path=Path("/tmp/registry.db"),
         staging_on_same_pool=False,
@@ -506,6 +525,9 @@ def _validate_core(core: CoreConfig, errors: list[str]) -> None:
 
     if "{original}" not in core.storage_template and "{sha8}" not in core.storage_template:
         errors.append("[core] storage_template must include at least {original} or {sha8}")
+
+    if "{original}" not in core.accepted_storage_template and "{sha8}" not in core.accepted_storage_template:
+        errors.append("[core] accepted_storage_template must include at least {original} or {sha8}")
 
 
 def _validate_accounts(accounts: list[AccountConfig], errors: list[str]) -> None:

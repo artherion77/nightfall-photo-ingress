@@ -61,7 +61,7 @@ def test_crash_hook_after_hash_complete_interrupts_ingest(
     with pytest.raises(RuntimeError, match="after hash complete"):
         engine.process_batch(
             candidates=list(polled.staged_candidates),
-            accepted_root=polled.app_config.core.accepted_path,
+            pending_root=polled.app_config.core.pending_path,
             storage_template=polled.app_config.core.storage_template,
             staging_on_same_pool=polled.app_config.core.staging_on_same_pool,
             quarantine_dir=polled.quarantine_root,
@@ -90,7 +90,7 @@ def test_crash_hook_during_journal_append_interrupts_ingest(
     with pytest.raises(RuntimeError, match="during journal append"):
         engine.process_batch(
             candidates=list(polled.staged_candidates),
-            accepted_root=polled.app_config.core.accepted_path,
+            pending_root=polled.app_config.core.pending_path,
             storage_template=polled.app_config.core.storage_template,
             staging_on_same_pool=polled.app_config.core.staging_on_same_pool,
             quarantine_dir=polled.quarantine_root,
@@ -118,7 +118,7 @@ def test_crash_hook_during_journal_replay_interrupts_recovery(
     with pytest.raises(RuntimeError, match="after storage commit"):
         engine.process_batch(
             candidates=list(polled.staged_candidates),
-            accepted_root=polled.app_config.core.accepted_path,
+            pending_root=polled.app_config.core.pending_path,
             storage_template=polled.app_config.core.storage_template,
             staging_on_same_pool=polled.app_config.core.staging_on_same_pool,
             quarantine_dir=polled.quarantine_root,
@@ -140,7 +140,7 @@ def test_audit_reader_extended_helpers_expose_reasons_actors_and_sequences(
 
     assert result.ingest_result is not None
     sha = result.ingest_result.outcomes[0].sha256 or ""
-    assert "accepted" in audit_reader_fixture.terminal_actions()
+    assert "pending" in audit_reader_fixture.terminal_actions()
     assert "unknown_hash" in audit_reader_fixture.terminal_reasons()
     assert "ingest_pipeline" in audit_reader_fixture.terminal_actors()
     assert all(batch_id for batch_id in audit_reader_fixture.batch_run_ids())
@@ -195,14 +195,14 @@ def test_deterministic_time_fixture_controls_journal_and_drift_classification(
     )
     batch = engine.process_batch(
         candidates=[candidate],
-        accepted_root=tmp_path / "accepted",
+        pending_root=tmp_path / "accepted",
         storage_template="{yyyy}/{mm}/{sha8}-{original}",
         staging_on_same_pool=True,
         quarantine_dir=quarantine_root,
     )
-    assert batch.accepted_count == 1
+    assert batch.pending_count == 1
 
     journal_lines = (tmp_path / "ingest.journal").read_text(encoding="utf-8").splitlines()
     payloads = [json.loads(line) for line in journal_lines if line.strip()]
     assert all(entry["ts"].startswith("2026-04-01T12:00:00") for entry in payloads)
-    assert registry_fixture.accepted_rows() != []
+    assert registry_fixture.accepted_rows() == []

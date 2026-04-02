@@ -137,7 +137,7 @@ class IntegrationCycleResult:
     staged_candidates: tuple[StagedCandidate, ...]
     replay_summary: dict[str, Any] | None
     registry_harness: RegistryHarness
-    accepted_root: Path
+    pending_root: Path
     quarantine_root: Path
     journal_path: Path
 
@@ -394,7 +394,10 @@ def app_config_fixture(tmp_path: Path, registry_fixture: RegistryHarness):
             "poll_interval_minutes": 15,
             "process_accounts_in_config_order": True,
             "staging_path": tmp_path / "staging",
+            "pending_path": tmp_path / "pending",
             "accepted_path": tmp_path / "accepted",
+            "accepted_storage_template": "{yyyy}/{mm}/{original}",
+            "rejected_path": tmp_path / "rejected",
             "trash_path": tmp_path / "trash",
             "registry_path": registry_fixture.db_path,
             "staging_on_same_pool": True,
@@ -612,7 +615,7 @@ def poll_and_ingest_fixture(
         if run_ingest:
             ingest_result = engine.process_batch(
                 candidates=list(staged_candidates),
-                accepted_root=config.core.accepted_path,
+                pending_root=config.core.pending_path,
                 storage_template=storage_template or config.core.storage_template,
                 staging_on_same_pool=config.core.staging_on_same_pool,
                 input_schema_version=input_schema_version,
@@ -640,7 +643,7 @@ def poll_and_ingest_fixture(
             staged_candidates=staged_candidates,
             replay_summary=replay_summary,
             registry_harness=registry_fixture,
-            accepted_root=config.core.accepted_path,
+            pending_root=config.core.pending_path,
             quarantine_root=config.core.staging_path / account.name / "_quarantine",
             journal_path=journal_path,
         )

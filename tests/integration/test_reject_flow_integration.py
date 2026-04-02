@@ -94,7 +94,7 @@ def test_batch_trash_processing_rejects_multiple_queue_files(
         },
     )
 
-    accepted_files = sorted(path for path in initial.accepted_root.rglob("*") if path.is_file())
+    accepted_files = sorted(path for path in initial.pending_root.rglob("*") if path.is_file())
     assert len(accepted_files) == 2
     trash_root = initial.app_config.core.trash_path
     trash_root.mkdir(parents=True, exist_ok=True)
@@ -105,5 +105,5 @@ def test_batch_trash_processing_rejects_multiple_queue_files(
 
     assert summary.processed_files == 2
     assert summary.rejected_files == 2
-    assert not any(path for path in initial.accepted_root.rglob("*") if path.is_file())
+    assert not any(path for path in initial.pending_root.rglob("*") if path.is_file())
     assert not any(path for path in trash_root.rglob("*") if path.is_file())

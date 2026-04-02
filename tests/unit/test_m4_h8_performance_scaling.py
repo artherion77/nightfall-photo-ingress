@@ -57,7 +57,7 @@ def test_size_aware_scheduling_prioritizes_larger_candidates(tmp_path: Path, mon
 
     engine.process_batch(
         candidates=candidates,
-        accepted_root=tmp_path / "accepted",
+        pending_root=tmp_path / "accepted",
         storage_template="{yyyy}/{mm}/{sha8}-{original}",
         staging_on_same_pool=False,
         worker_count=1,
@@ -79,7 +79,7 @@ def test_worker_pool_keeps_terminal_audit_sequence_stable(tmp_path: Path) -> Non
 
     batch = engine.process_batch(
         candidates=candidates,
-        accepted_root=tmp_path / "accepted",
+        pending_root=tmp_path / "accepted",
         storage_template="{yyyy}/{mm}/{sha8}-{original}",
         staging_on_same_pool=False,
         worker_count=3,
@@ -120,7 +120,7 @@ def test_prefilter_hit_and_miss_diagnostics(tmp_path: Path) -> None:
 
     batch = engine.process_batch(
         candidates=[hit, miss],
-        accepted_root=tmp_path / "accepted",
+        pending_root=tmp_path / "accepted",
         storage_template="{yyyy}/{mm}/{sha8}-{original}",
         staging_on_same_pool=False,
         worker_count=1,

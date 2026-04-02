@@ -127,12 +127,12 @@ def test_batch_emits_lifecycle_entries(tmp_path: Path) -> None:
 
     batch = engine.process_batch(
         candidates=[_candidate(staged)],
-        accepted_root=tmp_path / "accepted",
+        pending_root=tmp_path / "accepted",
         storage_template="{yyyy}/{mm}/{sha8}-{original}",
         staging_on_same_pool=False,
     )
 
-    assert batch.accepted_count == 1
+    assert batch.pending_count == 1
 
     records = IngestOperationJournal(path=journal_path).read_all()
     phases = [record.phase for record in records]

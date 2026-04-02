@@ -54,7 +54,7 @@ def test_terminal_audit_completeness_and_ordering(tmp_path: Path) -> None:
             _candidate(accepted, "accepted", 8),
             _candidate(known, "known", 5),
         ],
-        accepted_root=tmp_path / "accepted-root",
+        pending_root=tmp_path / "accepted-root",
         storage_template="{yyyy}/{mm}/{sha8}-{original}",
         staging_on_same_pool=False,
     )
@@ -75,6 +75,6 @@ def test_terminal_audit_completeness_and_ordering(tmp_path: Path) -> None:
     assert [int(row["sequence_no"]) for row in rows] == [1, 2, 3]
     assert [row["action"] for row in rows] == [
         "missing_staged",
-        "accepted",
+        "pending",
         "discard_rejected",
     ]

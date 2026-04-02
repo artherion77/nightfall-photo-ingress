@@ -179,6 +179,29 @@ def commit_staging_to_accepted(
     )
 
 
+def commit_pending_to_accepted(
+    *,
+    source_path: Path,
+    destination_path: Path,
+    same_pool: bool,
+    destination_root: Path | None = None,
+    file_mode: int = 0o640,
+    dir_mode: int = 0o750,
+) -> CommitResult:
+    """Move one pending file to accepted storage safely.
+
+    Delegates to commit_staging_to_accepted with the same pool-awareness logic.
+    """
+    return commit_staging_to_accepted(
+        source_path=source_path,
+        destination_path=destination_path,
+        staging_on_same_pool=same_pool,
+        destination_root=destination_root,
+        file_mode=file_mode,
+        dir_mode=dir_mode,
+    )
+
+
 def _parse_timestamp(value: str) -> datetime:
     """Parse ISO timestamp values with safe UTC fallback."""
 

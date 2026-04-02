@@ -45,12 +45,12 @@ iOS Camera Roll
       ▼
   OneDrive (personal Microsoft account)
       │
-     │  Microsoft Graph API — delta poll on operational cadence (8-24h in production)
+      │  Microsoft Graph API — delta poll on operational cadence (8-24h in production)
       ▼
 ┌─────────────────────────────────────────┐
 │           nightfall server              │
 │                                         │
-│  /mnt/ssd/photo-ingress/staging/      │  ← SSD; temp download area
+│  /mnt/ssd/photo-ingress/staging/        │  ← SSD; temp download area
 │       │                                 │
 │       │  SHA-256 hash                   │
 │       │  registry lookup                │
@@ -62,9 +62,10 @@ iOS Camera Roll
 │       └─ unknown  → move to accepted/   │
 │                    + insert registry    │
 │                                         │
-│  /nightfall/media/photo-ingress/      │  ← HDD pool
-│    accepted/   ← ingress queue           │
-│    trash/      ← rejection trigger       │
+│  /nightfall/media/photo-ingress/        │  ← HDD pool
+│    pending/    ← ingress queue          │    
+|    accepted/   ← acceptance trigger (*) │  (*) by operator in various forms: on disk, CLI, Web UI
+│    trash/      ← rejection trigger  (*) │
 └─────────────────────────────────────────┘
       │
      │  manual operator move/copy
