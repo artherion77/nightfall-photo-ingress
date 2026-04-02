@@ -14,7 +14,13 @@ from . import __version__
 from .config import AppConfig, load_config, validate_config_file
 from .logging_bootstrap import configure_logging
 from .adapters.onedrive.auth import AuthError, OneDriveAuthClient
-from .adapters.onedrive.client import GraphError, poll_accounts
+from .adapters.onedrive.client import (
+    GraphError,
+    load_boundary_handoff_candidates,
+    poll_accounts,
+)
+from .domain.ingest import IngestDecisionEngine, IngestError, StagedCandidate
+from .domain.registry import Registry, RegistryError
 from .reject import RejectFlowError, process_trash, reject_sha256
 from .status import write_status_snapshot
 from .sync_import import SyncImportError, run_sync_import
@@ -109,13 +115,50 @@ def _cmd_poll(args: argparse.Namespace) -> int:
     try:
         app_config = load_config(args.path)
         results = poll_accounts(app_config, account_name=args.account)
+        registry = Registry(app_config.core.registry_path)
+        registry.initialize()
+        ingest_engine = IngestDecisionEngine(registry)
+
+        ingest_candidate_count = 0
+        ingest_outcome_count = 0
+        ingest_accepted_count = 0
+        ingest_discarded_count = 0
+
         for result in results:
+            handoff_candidates = load_boundary_handoff_candidates(result.payload.handoff_manifest_path)
+            ingest_candidates = [
+                StagedCandidate(
+                    account_name=row.account_name,
+                    onedrive_id=row.onedrive_id,
+                    original_filename=row.original_filename,
+                    relative_path=row.relative_path,
+                    modified_time=row.modified_time,
+                    size_bytes=row.size_bytes,
+                    staging_path=row.staging_path,
+                )
+                for row in handoff_candidates
+            ]
+            ingest_candidate_count += len(ingest_candidates)
+
+            ingest_result = ingest_engine.process_batch(
+                candidates=ingest_candidates,
+                accepted_root=app_config.core.accepted_path,
+                storage_template=app_config.core.storage_template,
+                staging_on_same_pool=app_config.core.staging_on_same_pool,
+            )
+            ingest_outcome_count += len(ingest_result.outcomes)
+            ingest_accepted_count += ingest_result.accepted_count
+            ingest_discarded_count += ingest_result.discarded_count
+
             LOGGER.info(
                 "poll completed",
                 extra={
                     "account": result.account_name,
                     "candidates": result.candidate_count,
                     "downloaded": len(result.downloaded_paths),
+                    "ingest_candidates": len(ingest_candidates),
+                    "ingest_accepted": ingest_result.accepted_count,
+                    "ingest_discarded": ingest_result.discarded_count,
                 },
             )
         _emit_status_snapshot(
@@ -126,10 +169,14 @@ def _cmd_poll(args: argparse.Namespace) -> int:
                 "accounts": [result.account_name for result in results],
                 "candidate_count": sum(result.candidate_count for result in results),
                 "downloaded_count": sum(len(result.downloaded_paths) for result in results),
+                "ingest_candidate_count": ingest_candidate_count,
+                "ingest_outcome_count": ingest_outcome_count,
+                "ingest_accepted_count": ingest_accepted_count,
+                "ingest_discarded_count": ingest_discarded_count,
             },
         )
         return 0
-    except (GraphError, AuthError, ValueError) as exc:
+    except (GraphError, AuthError, IngestError, RegistryError, ValueError) as exc:
         LOGGER.error(str(exc))
         _emit_status_snapshot(
             state="ingest_error",
