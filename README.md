@@ -10,6 +10,7 @@ wheel layout:
 ```text
 nightfall-photo-ingress/
 ├── pyproject.toml
+├── docs/
 ├── src/
 │   └── nightfall_photo_ingress/
 ├── tests/
@@ -54,7 +55,7 @@ The installed console entry point is compatible with `systemd` units:
 nightfall-photo-ingress poll --path /etc/nightfall/photo-ingress.conf
 ```
 
-Packaged operational assets live under `systemd/` and `install/`. The current operator runbook is `review/module8-operations-runbook.md`, including a manual how-to for Microsoft Entra app registration and Graph token bootstrap.
+Packaged operational assets live under `systemd/`, `install/`, and `docs/`. The operator runbook is `docs/operations-runbook.md`. The production install workflow targets an LXC container named `photo-ingress` by default and deploys a copy of the runbook under `/opt/nightfall-photo-ingress/share/doc/nightfall-photo-ingress/` inside that container.
 
 ## Robustness regression suite (Chunk 10)
 

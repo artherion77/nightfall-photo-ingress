@@ -1,4 +1,4 @@
-"""Packaging artifact presence tests for Module 8."""
+"""Packaging artifact presence tests for the operations surface."""
 
 from __future__ import annotations
 
@@ -20,3 +20,9 @@ def test_install_scripts_exist() -> None:
     install_dir = PROJECT_ROOT / "install"
     assert (install_dir / "install.sh").exists()
     assert (install_dir / "uninstall.sh").exists()
+    assert (install_dir / "container" / "setup.sh").exists()
+
+
+def test_operator_runbook_exists() -> None:
+    docs_dir = PROJECT_ROOT / "docs"
+    assert (docs_dir / "operations-runbook.md").exists()
