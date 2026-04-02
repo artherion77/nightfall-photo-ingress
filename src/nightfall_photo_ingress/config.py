@@ -7,6 +7,7 @@ V1. It returns typed dataclasses so downstream modules can consume config safely
 from __future__ import annotations
 
 import configparser
+import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -88,6 +89,13 @@ class AccountConfig:
     token_cache: Path
     delta_cursor: Path
     max_downloads: int | None
+    resolved_onedrive_root: str | None = None
+
+    @property
+    def effective_onedrive_root(self) -> str:
+        """Return runtime-effective root, preferring discovered onboarding value."""
+
+        return self.resolved_onedrive_root or self.onedrive_root
 
 
 @dataclass(frozen=True)
@@ -383,6 +391,7 @@ def _parse_accounts(
 
         account_name = section_name[len("account.") :]
         section = parser[section_name]
+        token_cache_path = _get_path(section, "token_cache", errors, required=True)
 
         account = AccountConfig(
             name=account_name,
@@ -397,7 +406,7 @@ def _parse_accounts(
             ),
             client_id=_get_str(section, "client_id", errors, required=True),
             onedrive_root=_get_str(section, "onedrive_root", errors, required=True),
-            token_cache=_get_path(section, "token_cache", errors, required=True),
+            token_cache=token_cache_path,
             delta_cursor=_get_path(section, "delta_cursor", errors, required=True),
             max_downloads=_get_optional_int(
                 section,
@@ -405,6 +414,7 @@ def _parse_accounts(
                 errors,
                 default=inherited_max_downloads,
             ),
+            resolved_onedrive_root=_load_onboarding_resolved_root(token_cache_path),
         )
         accounts.append(account)
 
@@ -693,3 +703,38 @@ def _get_bool(
 
     errors.append(f"[{section.name}] key must be boolean: {key}")
     return False if default is None else default
+
+
+def _load_onboarding_resolved_root(token_cache_path: Path) -> str | None:
+    """Load resolved OneDrive root from onboarding sidecar when present."""
+
+    metadata_path = _onboarding_metadata_path(token_cache_path)
+    if not metadata_path.exists():
+        return None
+
+    try:
+        payload = json.loads(metadata_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+
+    if not isinstance(payload, dict):
+        return None
+
+    root = payload.get("resolved_onedrive_root")
+    if not isinstance(root, str):
+        return None
+
+    normalized = root.strip()
+    if not normalized:
+        return None
+    if not normalized.startswith("/"):
+        normalized = "/" + normalized
+    return normalized
+
+
+def _onboarding_metadata_path(token_cache_path: Path) -> Path:
+    """Return onboarding metadata sidecar path for a token cache path."""
+
+    if token_cache_path.suffix:
+        return token_cache_path.with_suffix(token_cache_path.suffix + ".onboarding.json")
+    return Path(str(token_cache_path) + ".onboarding.json")

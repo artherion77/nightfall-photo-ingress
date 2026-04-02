@@ -7,7 +7,9 @@ to later modules in the approved implementation roadmap.
 from __future__ import annotations
 
 import argparse
+import configparser
 import logging
+import sys
 from typing import Sequence
 
 import httpx
@@ -21,6 +23,7 @@ from .adapters.onedrive.client import (
     detect_account_locale,
     load_boundary_handoff_candidates,
     poll_accounts,
+    resolve_camera_roll_path_for_onboarding,
 )
 from .domain.ingest import IngestDecisionEngine, IngestError, StagedCandidate
 from .domain.registry import Registry, RegistryError
@@ -104,7 +107,8 @@ def _cmd_auth_setup(args: argparse.Namespace) -> int:
     try:
         app_config = load_config(args.path)
         account = _resolve_target_account(app_config, args.account)
-        token = OneDriveAuthClient().auth_setup(account)
+        auth_client = OneDriveAuthClient()
+        token = auth_client.auth_setup(account)
 
         try:
             with httpx.Client() as client:
@@ -121,6 +125,59 @@ def _cmd_auth_setup(args: argparse.Namespace) -> int:
         except GraphError as exc:
             LOGGER.warning(
                 "onedrive locale auto-detect failed",
+                extra={
+                    "account": account.name,
+                    "error_code": exc.code,
+                },
+            )
+
+        try:
+            with httpx.Client() as client:
+                path_resolution = resolve_camera_roll_path_for_onboarding(
+                    account=account,
+                    access_token=token.token,
+                    http_client=client,
+                )
+
+            if path_resolution.reason is not None:
+                LOGGER.warning(
+                    "configured onedrive_root invalid; auto-discovery used",
+                    extra={
+                        "account": account.name,
+                        "configured_path": path_resolution.configured_path,
+                        "configured_exists": path_resolution.configured_exists,
+                        "configured_media_count": path_resolution.configured_media_count,
+                        "reason": path_resolution.reason,
+                    },
+                )
+
+            if path_resolution.suggested_path is not None:
+                LOGGER.info(
+                    "auto-discovery suggested onedrive_root",
+                    extra={
+                        "account": account.name,
+                        "suggested_path": path_resolution.suggested_path,
+                        "media_count": path_resolution.suggested_media_count,
+                    },
+                )
+
+            effective_root = path_resolution.effective_path
+            auth_client.persist_onboarding_root(account, effective_root)
+
+            if path_resolution.suggested_path is not None and _confirm_config_writeback():
+                if _write_account_onedrive_root(args.path, account.name, path_resolution.suggested_path):
+                    LOGGER.info(
+                        "wrote discovered onedrive_root to config",
+                        extra={"account": account.name, "path": path_resolution.suggested_path},
+                    )
+                else:
+                    LOGGER.warning(
+                        "unable to write discovered onedrive_root to config",
+                        extra={"account": account.name, "path": path_resolution.suggested_path},
+                    )
+        except GraphError as exc:
+            LOGGER.warning(
+                "camera-roll auto-discovery failed",
                 extra={
                     "account": account.name,
                     "error_code": exc.code,
@@ -379,6 +436,42 @@ def _resolve_target_account(app_config: AppConfig, requested_name: str | None):
         return enabled[0]
 
     raise ValueError("Multiple enabled accounts found; pass --account")
+
+
+def _confirm_config_writeback() -> bool:
+    """Ask operator consent before modifying config file."""
+
+    if not sys.stdin.isatty():
+        return False
+
+    answer = input("Write discovered onedrive_root back to config file? [y/N]: ").strip().lower()
+    return answer in {"y", "yes"}
+
+
+def _write_account_onedrive_root(config_path: str, account_name: str, discovered_path: str) -> bool:
+    """Best-effort update of [account.NAME] onedrive_root in config file."""
+
+    parser = configparser.ConfigParser(interpolation=None)
+    parser.optionxform = str
+    try:
+        with open(config_path, "r", encoding="utf-8") as handle:
+            parser.read_file(handle)
+    except OSError:
+        return False
+
+    section_name = f"account.{account_name}"
+    if section_name not in parser:
+        return False
+
+    parser[section_name]["onedrive_root"] = discovered_path
+
+    try:
+        with open(config_path, "w", encoding="utf-8") as handle:
+            parser.write(handle)
+    except OSError:
+        return False
+
+    return True
 
 
 def main(argv: Sequence[str] | None = None) -> int:

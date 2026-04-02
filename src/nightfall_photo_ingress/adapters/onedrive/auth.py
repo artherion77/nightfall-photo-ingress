@@ -178,6 +178,29 @@ class OneDriveAuthClient:
         cache_path.write_text(cache.serialize(), encoding="utf-8")
         os.chmod(cache_path, 0o600)
 
+    def persist_onboarding_root(self, account: AccountConfig, resolved_onedrive_root: str) -> None:
+        """Persist resolved OneDrive root discovered during onboarding.
+
+        This metadata is loaded by config parsing and becomes the runtime
+        effective path for the account unless config is updated explicitly.
+        """
+
+        normalized = resolved_onedrive_root.strip()
+        if not normalized:
+            return
+        if not normalized.startswith("/"):
+            normalized = "/" + normalized
+
+        metadata_path = self._onboarding_path(account.token_cache)
+        metadata_path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "account": account.name,
+            "resolved_onedrive_root": normalized,
+            "updated_at": datetime.now(tz=timezone.utc).isoformat(),
+        }
+        metadata_path.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
+        os.chmod(metadata_path, 0o600)
+
     @staticmethod
     def _identity_path(cache_path: Path) -> Path:
         """Return sidecar identity path bound to this cache path."""
@@ -185,6 +208,14 @@ class OneDriveAuthClient:
         if cache_path.suffix:
             return cache_path.with_suffix(cache_path.suffix + ".identity.json")
         return Path(str(cache_path) + ".identity.json")
+
+    @staticmethod
+    def _onboarding_path(cache_path: Path) -> Path:
+        """Return onboarding metadata sidecar path bound to cache path."""
+
+        if cache_path.suffix:
+            return cache_path.with_suffix(cache_path.suffix + ".onboarding.json")
+        return Path(str(cache_path) + ".onboarding.json")
 
     def _load_expected_identity(self, account: AccountConfig) -> dict[str, str] | None:
         """Load expected identity sidecar for silent-token account binding."""

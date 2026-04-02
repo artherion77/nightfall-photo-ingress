@@ -60,6 +60,29 @@ _EXPORTED_DIAGNOSTIC_KEYS = {
 }
 _GERMAN_FOLDER_NAMES = frozenset({"bilder", "eigene aufnahmen"})
 _ENGLISH_FOLDER_NAMES = frozenset({"camera roll", "pictures", "photos"})
+_DISCOVERY_CANDIDATE_PATHS = (
+    "/Camera Roll",
+    "/Pictures",
+    "/Photos",
+    "/Bilder/Eigene Aufnahmen",
+    "/Bilder",
+)
+_MEDIA_EXTENSIONS = frozenset(
+    {
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".heic",
+        ".heif",
+        ".dng",
+        ".arw",
+        ".cr2",
+        ".cr3",
+        ".nef",
+        ".mov",
+        ".mp4",
+    }
+)
 
 
 def _trace_event(event: str, **fields: object) -> None:
@@ -191,6 +214,33 @@ class _ReducerEntry:
 
     sequence: int
     candidate: RemoteCandidate | None
+
+
+@dataclass(frozen=True)
+class PathDiscoveryCandidate:
+    """One discovered candidate path and its media file count."""
+
+    path: str
+    media_count: int
+
+
+@dataclass(frozen=True)
+class CameraRollPathResolution:
+    """Resolution result for onboarding path validation/discovery."""
+
+    configured_path: str
+    configured_exists: bool
+    configured_media_count: int
+    suggested_path: str | None
+    suggested_media_count: int
+    suggested_candidates: tuple[PathDiscoveryCandidate, ...]
+    reason: str | None
+
+    @property
+    def effective_path(self) -> str:
+        """Return runtime effective path for this onboarding session."""
+
+        return self.suggested_path or self.configured_path
 
 
 _SAFE_STAGING_BASENAME_RE = re.compile(r"[^A-Za-z0-9._-]+")
@@ -1687,9 +1737,7 @@ def _graph_get_json(
 def _build_initial_delta_url(account: AccountConfig) -> str:
     """Construct the initial folder delta URL for an account."""
 
-    root = account.onedrive_root.strip()
-    if not root.startswith("/"):
-        root = "/" + root
+    root = _normalize_root_path(account.effective_onedrive_root)
 
     # Encode each path segment explicitly to avoid Graph path addressing bugs
     # with spaces or reserved characters in user-provided roots.
@@ -1734,6 +1782,131 @@ def detect_account_locale(
     if folder_names & _ENGLISH_FOLDER_NAMES:
         return "en"
     return None
+
+
+def resolve_camera_roll_path_for_onboarding(
+    account: AccountConfig,
+    access_token: str,
+    http_client: httpx.Client,
+) -> CameraRollPathResolution:
+    """Validate configured path and auto-discover alternatives when needed."""
+
+    configured_path = _normalize_root_path(account.onedrive_root)
+    configured_exists, configured_media_count = _evaluate_media_path(
+        path=configured_path,
+        account=account,
+        access_token=access_token,
+        http_client=http_client,
+    )
+
+    if configured_exists and configured_media_count > 0:
+        return CameraRollPathResolution(
+            configured_path=configured_path,
+            configured_exists=True,
+            configured_media_count=configured_media_count,
+            suggested_path=None,
+            suggested_media_count=0,
+            suggested_candidates=tuple(),
+            reason=None,
+        )
+
+    candidates: list[PathDiscoveryCandidate] = []
+    seen_paths: set[str] = {configured_path}
+    for raw_path in _DISCOVERY_CANDIDATE_PATHS:
+        normalized = _normalize_root_path(raw_path)
+        if normalized in seen_paths:
+            continue
+        seen_paths.add(normalized)
+        exists, media_count = _evaluate_media_path(
+            path=normalized,
+            account=account,
+            access_token=access_token,
+            http_client=http_client,
+        )
+        if exists and media_count > 0:
+            candidates.append(PathDiscoveryCandidate(path=normalized, media_count=media_count))
+
+    candidates.sort(key=lambda item: item.media_count, reverse=True)
+    suggestion = candidates[0] if candidates else None
+
+    if configured_exists and configured_media_count == 0:
+        reason = "configured_path_has_no_media"
+    elif not configured_exists:
+        reason = "configured_path_not_found"
+    else:
+        reason = None
+
+    return CameraRollPathResolution(
+        configured_path=configured_path,
+        configured_exists=configured_exists,
+        configured_media_count=configured_media_count,
+        suggested_path=suggestion.path if suggestion else None,
+        suggested_media_count=suggestion.media_count if suggestion else 0,
+        suggested_candidates=tuple(candidates),
+        reason=reason,
+    )
+
+
+def _evaluate_media_path(
+    *,
+    path: str,
+    account: AccountConfig,
+    access_token: str,
+    http_client: httpx.Client,
+) -> tuple[bool, int]:
+    """Return (exists, media_count) for a given OneDrive folder path."""
+
+    normalized = _normalize_root_path(path)
+    url = _build_children_url(normalized)
+    try:
+        payload = _graph_get_json(
+            http_client=http_client,
+            url=url,
+            access_token=access_token,
+            account_name=account.name,
+        )
+    except GraphError as exc:
+        if exc.status_code == 404:
+            return False, 0
+        raise
+
+    media_count = _count_media_in_children(payload)
+    return True, media_count
+
+
+def _count_media_in_children(payload: dict[str, object]) -> int:
+    """Count media files in a Graph /children payload."""
+
+    count = 0
+    for raw in payload.get("value", []):
+        if not isinstance(raw, dict):
+            continue
+        if not isinstance(raw.get("file"), dict):
+            continue
+        name = _as_str(raw.get("name"))
+        if not name:
+            continue
+        suffix = Path(name).suffix.casefold()
+        if suffix in _MEDIA_EXTENSIONS:
+            count += 1
+    return count
+
+
+def _build_children_url(root: str) -> str:
+    """Build Graph children URL for a root path using encoded segments."""
+
+    segments = [quote(segment, safe="") for segment in root.split("/") if segment]
+    encoded_root = "/" + "/".join(segments)
+    return f"{GRAPH_BASE}/me/drive/root:{encoded_root}:/children?$select=name,file,folder"
+
+
+def _normalize_root_path(root: str) -> str:
+    """Normalize user-configured root path for Graph path addressing."""
+
+    normalized = root.strip()
+    if not normalized.startswith("/"):
+        normalized = "/" + normalized
+    return normalized
 
 
 def _load_cursor(path: Path) -> str | None:
