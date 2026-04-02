@@ -67,6 +67,7 @@ _DISCOVERY_CANDIDATE_PATHS = (
     "/Bilder/Eigene Aufnahmen",
     "/Bilder",
 )
+_SPECIAL_CAMERA_ROLL_ALIAS = "cameraroll"
 _MEDIA_EXTENSIONS = frozenset(
     {
         ".jpg",
@@ -1799,6 +1800,52 @@ def resolve_camera_roll_path_for_onboarding(
         http_client=http_client,
     )
 
+    special_camera_roll = _resolve_special_folder_path(
+        alias=_SPECIAL_CAMERA_ROLL_ALIAS,
+        account=account,
+        access_token=access_token,
+        http_client=http_client,
+    )
+    if special_camera_roll is not None:
+        exists, media_count = _evaluate_media_path(
+            path=special_camera_roll,
+            account=account,
+            access_token=access_token,
+            http_client=http_client,
+        )
+        if exists:
+            if special_camera_roll == configured_path:
+                return CameraRollPathResolution(
+                    configured_path=configured_path,
+                    configured_exists=configured_exists,
+                    configured_media_count=configured_media_count,
+                    suggested_path=None,
+                    suggested_media_count=0,
+                    suggested_candidates=tuple(),
+                    reason=None,
+                )
+
+            if configured_exists and configured_media_count > 0:
+                reason = "configured_path_not_camera_roll"
+            elif configured_exists and configured_media_count == 0:
+                reason = "configured_path_has_no_media"
+            elif not configured_exists:
+                reason = "configured_path_not_found"
+            else:
+                reason = None
+
+            return CameraRollPathResolution(
+                configured_path=configured_path,
+                configured_exists=configured_exists,
+                configured_media_count=configured_media_count,
+                suggested_path=special_camera_roll,
+                suggested_media_count=media_count,
+                suggested_candidates=(
+                    PathDiscoveryCandidate(path=special_camera_roll, media_count=media_count),
+                ),
+                reason=reason,
+            )
+
     if configured_exists and configured_media_count > 0:
         return CameraRollPathResolution(
             configured_path=configured_path,
@@ -1811,6 +1858,7 @@ def resolve_camera_roll_path_for_onboarding(
         )
 
     candidates: list[PathDiscoveryCandidate] = []
+    metadata_preferred: list[PathDiscoveryCandidate] = []
     seen_paths: set[str] = {configured_path}
     for raw_path in _DISCOVERY_CANDIDATE_PATHS:
         normalized = _normalize_root_path(raw_path)
@@ -1824,10 +1872,20 @@ def resolve_camera_roll_path_for_onboarding(
             http_client=http_client,
         )
         if exists and media_count > 0:
-            candidates.append(PathDiscoveryCandidate(path=normalized, media_count=media_count))
+            candidate = PathDiscoveryCandidate(path=normalized, media_count=media_count)
+            candidates.append(candidate)
+            if _path_has_special_folder_name(
+                path=normalized,
+                expected_name=_SPECIAL_CAMERA_ROLL_ALIAS,
+                account=account,
+                access_token=access_token,
+                http_client=http_client,
+            ):
+                metadata_preferred.append(candidate)
 
+    metadata_preferred.sort(key=lambda item: item.media_count, reverse=True)
     candidates.sort(key=lambda item: item.media_count, reverse=True)
-    suggestion = candidates[0] if candidates else None
+    suggestion = metadata_preferred[0] if metadata_preferred else (candidates[0] if candidates else None)
 
     if configured_exists and configured_media_count == 0:
         reason = "configured_path_has_no_media"
@@ -1874,6 +1932,88 @@ def _evaluate_media_path(
     return True, media_count
 
 
+def _resolve_special_folder_path(
+    *,
+    alias: str,
+    account: AccountConfig,
+    access_token: str,
+    http_client: httpx.Client,
+) -> str | None:
+    """Return normalized path for a special-folder alias, if Graph exposes one."""
+
+    url = f"{GRAPH_BASE}/me/drive/special/{quote(alias, safe='')}?$select=name,parentReference,specialFolder"
+    try:
+        payload = _graph_get_json(
+            http_client=http_client,
+            url=url,
+            access_token=access_token,
+            account_name=account.name,
+        )
+    except GraphError as exc:
+        if exc.status_code in {403, 404}:
+            return None
+        raise
+
+    special_name = _extract_special_folder_name(payload)
+    if special_name != alias.casefold():
+        return None
+    return _drive_item_path(payload)
+
+
+def _path_has_special_folder_name(
+    *,
+    path: str,
+    expected_name: str,
+    account: AccountConfig,
+    access_token: str,
+    http_client: httpx.Client,
+) -> bool:
+    """Return True when a folder path resolves to the expected specialFolder facet."""
+
+    normalized = _normalize_root_path(path)
+    url = _build_item_url(normalized)
+    try:
+        payload = _graph_get_json(
+            http_client=http_client,
+            url=url,
+            access_token=access_token,
+            account_name=account.name,
+        )
+    except GraphError as exc:
+        if exc.status_code == 404:
+            return False
+        raise
+
+    return _extract_special_folder_name(payload) == expected_name.casefold()
+
+
+def _extract_special_folder_name(payload: dict[str, object]) -> str | None:
+    """Return casefolded specialFolder facet name when present."""
+
+    special_folder = payload.get("specialFolder")
+    if not isinstance(special_folder, dict):
+        return None
+    name = _as_str(special_folder.get("name"))
+    return name.casefold() if name else None
+
+
+def _drive_item_path(payload: dict[str, object]) -> str | None:
+    """Reconstruct a normalized root-relative path from a driveItem payload."""
+
+    name = _as_str(payload.get("name"))
+    parent = payload.get("parentReference")
+    if not name or not isinstance(parent, dict):
+        return None
+
+    base = _as_str(parent.get("path")) or "/drive/root:"
+    if base == "/drive/root:":
+        return _normalize_root_path(f"/{name}")
+    prefix = "/drive/root:"
+    if base.startswith(prefix):
+        return _normalize_root_path(base[len(prefix):] + f"/{name}")
+    return None
+
+
 def _count_media_in_children(payload: dict[str, object]) -> int:
     """Count media files in a Graph /children payload."""
 
@@ -1898,6 +2038,17 @@ def _build_children_url(root: str) -> str:
     segments = [quote(segment, safe="") for segment in root.split("/") if segment]
     encoded_root = "/" + "/".join(segments)
     return f"{GRAPH_BASE}/me/drive/root:{encoded_root}:/children?$select=name,file,folder"
+
+
+def _build_item_url(root: str) -> str:
+    """Build Graph driveItem URL for a root path using encoded segments."""
+
+    segments = [quote(segment, safe="") for segment in root.split("/") if segment]
+    encoded_root = "/" + "/".join(segments)
+    return (
+        f"{GRAPH_BASE}/me/drive/root:{encoded_root}"
+        "?$select=name,parentReference,specialFolder"
+    )
 
 
 def _normalize_root_path(root: str) -> str:
