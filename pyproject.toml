@@ -29,6 +29,7 @@ testpaths = ["tests/unit", "tests/integration"]
 markers = [
   "robustness: end-to-end resilience regression scenarios for the OneDrive client",
   "staging: staging-environment tests; require a live LXC container (run with: pytest tests/staging)",
+  "staging_flow: production flow test contracts (run with: pytest tests/staging-flow)",
 ]
 
 [tool.setuptools]

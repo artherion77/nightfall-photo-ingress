@@ -1,0 +1,422 @@
+#!/usr/bin/env bash
+# flowctl — Staging production flow test controller for nightfall-photo-ingress.
+#
+# Exercises the complete operator production flow as a single auditable test run,
+# including CLI commands that require interactive user input (device-code auth).
+# Automated steps produce pass/fail evidence; interactive steps guide the operator
+# and then verify outcomes automatically.
+#
+# Usage:
+#   flowctl run [--skip-interactive] [--phase p1|p2|p3|p4]
+#   flowctl help
+#
+# Phases:
+#   p1  Pre-flight: container, CLI surface, config-check, dir layout, units
+#   p2  Interactive authentication: device-code flow via stagingctl auth-setup
+#   p3  Live integration: authenticated poll, status export
+#   p4  Snapshot isolation: reset, verify token cleared, config survives
+#
+# Evidence is written to:
+#   $FLOW_EVIDENCE_BASE/flow-<run_id>/
+#
+# Environment variables:
+#   CONTAINER           LXC container name (default: staging-photo-ingress)
+#   STAGING_ACCOUNT     Account name (default: staging)
+#   FLOW_EVIDENCE_BASE  Evidence base dir (default: /mnt/ssd/staging/photo-ingress/evidence)
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+STAGINGCTL="$PROJECT_ROOT/staging/stagingctl"
+
+# ── configuration ─────────────────────────────────────────────────────────────
+CONTAINER="${CONTAINER:-staging-photo-ingress}"
+VENV_ROOT="/opt/ingress"
+CONF_DEST="/etc/nightfall/photo-ingress.conf"
+STAGING_ACCOUNT="${STAGING_ACCOUNT:-staging}"
+FLOW_EVIDENCE_BASE="${FLOW_EVIDENCE_BASE:-/mnt/ssd/staging/photo-ingress/evidence}"
+
+# ── run-time state ────────────────────────────────────────────────────────────
+SKIP_INTERACTIVE=0
+ONLY_PHASE=""
+FLOW_RUN_ID=""
+FLOW_EVIDENCE_DIR=""
+FLOW_MANIFEST=""
+
+_init_run() {
+    local ts uuid
+    ts="$(date -u +%Y%m%dT%H%M%S)"
+    uuid="$(python3 -c 'import uuid; print(uuid.uuid4())')"
+    FLOW_RUN_ID="flow-${ts}-${uuid}"
+    FLOW_EVIDENCE_DIR="${FLOW_EVIDENCE_BASE}/${FLOW_RUN_ID}"
+    FLOW_MANIFEST="${FLOW_EVIDENCE_DIR}/manifest.jsonl"
+    mkdir -p "$FLOW_EVIDENCE_DIR"
+}
+
+# ── display ───────────────────────────────────────────────────────────────────
+_hdr()  { printf '\n\033[1;37m%s\033[0m\n' "$*"; }
+_info() { printf '\033[0;34m[flowctl]\033[0m %s\n' "$*"; }
+_ok()   { printf '\033[0;32m[flowctl] PASS\033[0m  %s\n' "$*"; }
+_skip() { printf '\033[0;33m[flowctl] SKIP\033[0m  %s\n' "$*"; }
+_err()  { printf '\033[0;31m[flowctl] FAIL\033[0m  %s\n' "$*" >&2; }
+_die()  { _err "$*"; exit 1; }
+
+# ── evidence helpers ──────────────────────────────────────────────────────────
+_record() {
+    local step="$1" result="$2" detail="${3:-}"
+    printf '{"step":"%s","result":"%s","detail":"%s","ts":"%s"}\n' \
+        "$step" "$result" "$detail" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        >> "$FLOW_MANIFEST"
+}
+
+_pass()  { local s="$1" d="${2:-}"; _record "$s" "pass" "$d"; _ok  "$s — $d"; }
+_pfail() { local s="$1" d="${2:-}"; _record "$s" "fail" "$d"; _err "$s — $d"; }
+_pskip() { local s="$1" d="${2:-}"; _record "$s" "skip" "$d"; _skip "$s — $d"; }
+
+# ── operator prompt ───────────────────────────────────────────────────────────
+_prompt() {
+    local msg="${1:-Press ENTER to continue, or CTRL+C to abort.}"
+    printf '\n  \033[1;33m>> %s\033[0m ' "$msg"
+    read -r _ < /dev/tty
+}
+
+# ── phase selector ────────────────────────────────────────────────────────────
+_should_run() {
+    [[ -z "$ONLY_PHASE" || "$ONLY_PHASE" == "$1" ]]
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# P1 — Pre-flight: container, CLI surface, config, directory layout, units
+# ─────────────────────────────────────────────────────────────────────────────
+phase_p1() {
+    _hdr "── P1  Pre-flight assertions ────────────────────────────────────────"
+
+    local log_dir="$FLOW_EVIDENCE_DIR/p1"
+    mkdir -p "$log_dir"
+    local rc=0
+
+    # S1.1 container is running
+    if lxc info "$CONTAINER" 2>/dev/null | grep -Eiq "Status:[[:space:]]+running"; then
+        _pass "S1.1:container_running" "Container '$CONTAINER' is running"
+    else
+        _pfail "S1.1:container_running" "Container '$CONTAINER' is not running — run: stagingctl create && stagingctl install"
+        _err "Cannot continue P1 without a running container."
+        return 1
+    fi
+
+    # S1.2 CLI --help exits 0
+    lxc exec "$CONTAINER" -- \
+        "$VENV_ROOT/bin/nightfall-photo-ingress" --help \
+        >"$log_dir/cli-help.log" 2>&1 \
+        && _pass "S1.2:cli_help" "nightfall-photo-ingress --help exited 0" \
+        || { _pfail "S1.2:cli_help" "help failed — see $log_dir/cli-help.log"; rc=1; }
+
+    # S1.3 auth-setup subcommand discoverable in --help output
+    if grep -q "auth-setup" "$log_dir/cli-help.log" 2>/dev/null; then
+        _pass "S1.3:cli_auth_setup_discoverable" "auth-setup subcommand visible in --help"
+    else
+        _pfail "S1.3:cli_auth_setup_discoverable" "auth-setup not found in --help output"; rc=1
+    fi
+
+    # S1.4 config-check exits 0
+    lxc exec "$CONTAINER" -- \
+        "$VENV_ROOT/bin/nightfall-photo-ingress" --log-mode json \
+        config-check --path "$CONF_DEST" \
+        >"$log_dir/config-check.log" 2>&1 \
+        && _pass "S1.4:config_check" "config-check exited 0" \
+        || { _pfail "S1.4:config_check" "config-check failed — see $log_dir/config-check.log"; rc=1; }
+
+    # S1.5 status file written with correct schema after config-check
+    lxc exec "$CONTAINER" -- \
+        python3 -c "
+import json, pathlib, sys
+p = pathlib.Path('/run/nightfall-status.d/photo-ingress.json')
+if not p.exists(): sys.exit('status file missing')
+d = json.loads(p.read_text())
+assert d.get('schema_version') == 1, 'bad schema_version: %s' % d.get('schema_version')
+assert d.get('command') == 'config-check', 'bad command: %s' % d.get('command')
+print('schema_version=%s command=%s' % (d['schema_version'], d['command']))
+" >"$log_dir/status-check.log" 2>&1 \
+        && _pass "S1.5:status_file_schema" "status file valid (schema_version=1, command=config-check)" \
+        || { _pfail "S1.5:status_file_schema" "status file missing or schema invalid — see $log_dir/status-check.log"; rc=1; }
+
+    # S1.6 required runtime directory layout present inside the container
+    local expected_dirs=(
+        /var/lib/ingress/staging
+        /var/lib/ingress/accepted
+        /var/lib/ingress/trash
+        /var/lib/ingress/tokens
+        /var/lib/ingress/cursors
+        /var/log/nightfall
+        /run/nightfall-status.d
+    )
+    local missing_dirs=()
+    for dir_entry in "${expected_dirs[@]}"; do
+        lxc exec "$CONTAINER" -- test -d "$dir_entry" 2>/dev/null || missing_dirs+=("$dir_entry")
+    done
+    if [[ ${#missing_dirs[@]} -eq 0 ]]; then
+        _pass "S1.6:directory_layout" "all expected runtime directories present"
+    else
+        _pfail "S1.6:directory_layout" "missing: ${missing_dirs[*]}"; rc=1
+    fi
+
+    # S1.7 systemd units are enabled
+    local expected_units=(nightfall-photo-ingress.timer nightfall-photo-ingress-trash.path)
+    local disabled_units=()
+    for unit in "${expected_units[@]}"; do
+        lxc exec "$CONTAINER" -- systemctl is-enabled "$unit" 2>/dev/null \
+            | grep -q "enabled" || disabled_units+=("$unit")
+    done
+    if [[ ${#disabled_units[@]} -eq 0 ]]; then
+        _pass "S1.7:units_enabled" "nightfall-photo-ingress.timer and trash.path are enabled"
+    else
+        _pfail "S1.7:units_enabled" "not enabled: ${disabled_units[*]}"; rc=1
+    fi
+
+    return $rc
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# P2 — Interactive authentication: device-code flow via stagingctl auth-setup
+# ─────────────────────────────────────────────────────────────────────────────
+phase_p2() {
+    _hdr "── P2  Interactive authentication  [OPERATOR ACTION REQUIRED] ───────"
+
+    if [[ "$SKIP_INTERACTIVE" == "1" ]]; then
+        _pskip "P2:interactive_auth" "--skip-interactive set; authentication phase skipped"
+        return 0
+    fi
+
+    cat <<EOF
+
+  This phase authenticates the staging account against Microsoft Entra using
+  the device-code flow. A device-code URL and one-time code will appear; open
+  the URL in a browser and complete sign-in with your staging OneDrive account.
+
+  Account : $STAGING_ACCOUNT
+  Config  : $CONF_DEST (inside container '$CONTAINER')
+
+EOF
+    _prompt "Press ENTER to run 'stagingctl auth-setup', or CTRL+C to abort."
+
+    local log_dir="$FLOW_EVIDENCE_DIR/p2"
+    mkdir -p "$log_dir"
+
+    echo ""
+    # Run without output redirection — device-code URL must reach the operator's
+    # terminal. lxc exec -t inside stagingctl requires the calling process to
+    # have a TTY; any pipe here would break that.
+    if "$STAGINGCTL" auth-setup; then
+        _pass "P2.1:auth_setup_exit" "stagingctl auth-setup completed (exit 0)"
+    else
+        _pfail "P2.1:auth_setup_exit" "stagingctl auth-setup exited with error"
+        return 1
+    fi
+    echo ""
+
+    # P2.2 token cache written inside the container
+    local token_path="/var/lib/ingress/tokens/${STAGING_ACCOUNT}.json"
+    if lxc exec "$CONTAINER" -- test -f "$token_path" 2>/dev/null; then
+        _pass "P2.2:token_cache_written" "$token_path present after auth-setup"
+    else
+        _pfail "P2.2:token_cache_written" "$token_path missing after auth-setup"
+        return 1
+    fi
+
+    # P2.3 token file must be mode 0600
+    local perms
+    perms="$(lxc exec "$CONTAINER" -- stat -c '%a' "$token_path" 2>/dev/null || echo 'unknown')"
+    if [[ "$perms" == "600" ]]; then
+        _pass "P2.3:token_cache_permissions" "token file mode 0600 (secure)"
+    else
+        _pfail "P2.3:token_cache_permissions" "token file mode $perms (expected 0600)"; return 1
+    fi
+
+    # P2.4 identity sidecar — written by auth layer; note if absent (written on first poll)
+    local sidecar_path="/var/lib/ingress/tokens/${STAGING_ACCOUNT}.identity.json"
+    if lxc exec "$CONTAINER" -- test -f "$sidecar_path" 2>/dev/null; then
+        _pass "P2.4:identity_sidecar" "$sidecar_path present"
+    else
+        _pskip "P2.4:identity_sidecar" "$sidecar_path not yet written (will be written on first poll)"
+    fi
+
+    return 0
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# P3 — Live integration: authenticated poll and status export
+# ─────────────────────────────────────────────────────────────────────────────
+phase_p3() {
+    _hdr "── P3  Live integration: authenticated poll ─────────────────────────"
+
+    if [[ "$SKIP_INTERACTIVE" == "1" ]]; then
+        _pskip "P3:live_poll" "--skip-interactive set; live poll phase skipped"
+        return 0
+    fi
+
+    # Gate: token cache must exist — skip gracefully if P2 was not run or failed
+    local token_path="/var/lib/ingress/tokens/${STAGING_ACCOUNT}.json"
+    if ! lxc exec "$CONTAINER" -- test -f "$token_path" 2>/dev/null; then
+        _pskip "P3:live_poll" "no token cache present — was Phase P2 skipped?"
+        return 0
+    fi
+
+    local log_dir="$FLOW_EVIDENCE_DIR/p3"
+    mkdir -p "$log_dir"
+    local rc=0
+
+    # P3.1 stagingctl smoke-live: live poll + secret scan
+    _info "Running stagingctl smoke-live ..."
+    STAGING_ACCOUNT="$STAGING_ACCOUNT" "$STAGINGCTL" smoke-live \
+        >"$log_dir/smoke-live.log" 2>&1 \
+        && _pass "P3.1:smoke_live" "stagingctl smoke-live passed" \
+        || { _pfail "P3.1:smoke_live" "stagingctl smoke-live failed — see $log_dir/smoke-live.log"; rc=1; }
+
+    # P3.2 status file updated to reflect the poll command
+    lxc exec "$CONTAINER" -- \
+        python3 -c "
+import json, pathlib, sys
+p = pathlib.Path('/run/nightfall-status.d/photo-ingress.json')
+d = json.loads(p.read_text())
+assert d.get('command') == 'poll', 'expected command=poll, got: %s' % d.get('command')
+print('command=%s state=%s' % (d['command'], d.get('state', '?')))
+" >"$log_dir/status-after-poll.log" 2>&1 \
+        && _pass "P3.2:status_after_poll" "status file reflects poll command" \
+        || { _pfail "P3.2:status_after_poll" "status file not updated after poll — see $log_dir/status-after-poll.log"; rc=1; }
+
+    return $rc
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# P4 — Snapshot isolation: reset clears install state, config survives
+# ─────────────────────────────────────────────────────────────────────────────
+phase_p4() {
+    _hdr "── P4  Snapshot isolation: reset clears auth state ──────────────────"
+
+    local log_dir="$FLOW_EVIDENCE_DIR/p4"
+    mkdir -p "$log_dir"
+    local rc=0
+
+    # P4.1 stagingctl reset
+    _info "Running stagingctl reset ..."
+    "$STAGINGCTL" reset >"$log_dir/reset.log" 2>&1 \
+        && _pass "P4.1:reset_completed" "stagingctl reset completed" \
+        || { _pfail "P4.1:reset_completed" "stagingctl reset failed — see $log_dir/reset.log"; return 1; }
+
+    # P4.2 token cache must be absent after reset
+    # The 'clean' snapshot was taken before install, so token cache should not survive.
+    local token_path="/var/lib/ingress/tokens/${STAGING_ACCOUNT}.json"
+    if lxc exec "$CONTAINER" -- test -f "$token_path" 2>/dev/null; then
+        _pfail "P4.2:token_cleared_after_reset" \
+            "token cache still present after reset — snapshot isolation breach"; rc=1
+    else
+        _pass "P4.2:token_cleared_after_reset" "token cache absent — install-time state cleared by reset"
+    fi
+
+    # P4.3 config-check still passes after reset
+    # Config was pushed before the clean snapshot; it must survive a reset.
+    lxc exec "$CONTAINER" -- \
+        "$VENV_ROOT/bin/nightfall-photo-ingress" --log-mode json \
+        config-check --path "$CONF_DEST" \
+        >"$log_dir/config-check-after-reset.log" 2>&1 \
+        && _pass "P4.3:config_check_after_reset" "config-check passes after reset" \
+        || { _pfail "P4.3:config_check_after_reset" "config-check failed after reset — see $log_dir/config-check-after-reset.log"; rc=1; }
+
+    return $rc
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# cmd_run
+# ─────────────────────────────────────────────────────────────────────────────
+cmd_run() {
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --skip-interactive) SKIP_INTERACTIVE=1 ;;
+            --phase) ONLY_PHASE="${2:?--phase requires a value: p1|p2|p3|p4}"; shift ;;
+            *) _die "Unknown option: $1" ;;
+        esac
+        shift
+    done
+
+    _init_run
+
+    printf '┌──────────────────────────────────────────────────────────────────┐\n'
+    printf '│   nightfall-photo-ingress  staging production flow test         │\n'
+    printf '├──────────────────────────────────────────────────────────────────┤\n'
+    printf '│  Run ID  : %s\n' "$FLOW_RUN_ID"
+    printf '│  Evidence: %s\n' "$FLOW_EVIDENCE_DIR"
+    printf '│  Skip interactive: %s\n' "$([[ "$SKIP_INTERACTIVE" == "1" ]] && echo yes || echo no)"
+    printf '└──────────────────────────────────────────────────────────────────┘\n'
+
+    printf '{"event":"flow_started","run_id":"%s","ts":"%s","skip_interactive":%s}\n' \
+        "$FLOW_RUN_ID" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        "$([[ "$SKIP_INTERACTIVE" == "1" ]] && echo true || echo false)" \
+        >> "$FLOW_MANIFEST"
+
+    local overall=0
+    _should_run "p1" && { phase_p1 || overall=1; }
+    _should_run "p2" && { phase_p2 || overall=1; }
+    _should_run "p3" && { phase_p3 || overall=1; }
+    _should_run "p4" && { phase_p4 || overall=1; }
+
+    printf '{"event":"flow_finished","run_id":"%s","ts":"%s","exit_code":%d}\n' \
+        "$FLOW_RUN_ID" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$overall" \
+        >> "$FLOW_MANIFEST"
+
+    echo ""
+    if [[ $overall -eq 0 ]]; then
+        printf '\033[0;32m[flowctl] All phases PASSED\033[0m — run_id=%s\n' "$FLOW_RUN_ID"
+        printf '\033[0;32m[flowctl] Evidence: %s\033[0m\n' "$FLOW_EVIDENCE_DIR"
+    else
+        printf '\033[0;31m[flowctl] One or more phases FAILED\033[0m — run_id=%s\n' "$FLOW_RUN_ID" >&2
+        printf '\033[0;31m[flowctl] Evidence: %s\033[0m\n' "$FLOW_EVIDENCE_DIR" >&2
+    fi
+
+    return $overall
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Dispatch
+# ─────────────────────────────────────────────────────────────────────────────
+_usage() {
+    cat <<EOF
+Usage: $(basename "$0") <command> [options]
+
+Commands:
+  run [options]   Run the staging production flow test.
+  help            Show this help message.
+
+Options for 'run':
+  --skip-interactive  Skip phases requiring operator input (P2, P3).
+  --phase PHASE       Run a single phase only (p1|p2|p3|p4).
+
+Phases:
+  p1  Pre-flight: container, CLI surface, config-check, dir layout, systemd units
+  p2  Interactive authentication: device-code flow via stagingctl auth-setup     [OPERATOR]
+  p3  Live integration: authenticated poll, status export verification           [OPERATOR]
+  p4  Snapshot isolation: reset, verify token cleared, config-check survives
+
+Environment variables:
+  CONTAINER           LXC container name (default: staging-photo-ingress)
+  STAGING_ACCOUNT     Account name (default: staging)
+  FLOW_EVIDENCE_BASE  Evidence base dir (default: /mnt/ssd/staging/photo-ingress/evidence)
+
+Prerequisites:
+  stagingctl create && stagingctl install
+EOF
+    exit 0
+}
+
+main() {
+    local cmd="${1:-help}"
+    shift || true
+
+    case "$cmd" in
+        run)  cmd_run "$@" ;;
+        help) _usage ;;
+        *)    _usage ;;
+    esac
+}
+
+main "$@"
