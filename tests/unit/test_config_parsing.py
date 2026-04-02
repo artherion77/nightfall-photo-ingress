@@ -22,11 +22,13 @@ def test_parse_valid_config_and_preserve_account_order(tmp_path: Path) -> None:
         tmp_path,
         """
 [core]
-config_version = 1
+config_version = 2
 poll_interval_minutes = 15
 process_accounts_in_config_order = true
 staging_path = /mnt/ssd/photo-ingress/staging
+pending_path = /nightfall/media/photo-ingress/pending
 accepted_path = /nightfall/media/photo-ingress/accepted
+rejected_path = /nightfall/media/photo-ingress/rejected
 trash_path = /nightfall/media/photo-ingress/trash
 registry_path = /mnt/ssd/photo-ingress/registry.db
 staging_on_same_pool = false
@@ -77,11 +79,13 @@ def test_process_accounts_in_config_order_false_sorts_enabled_accounts(tmp_path:
         tmp_path,
         """
 [core]
-config_version = 1
+config_version = 2
 poll_interval_minutes = 15
 process_accounts_in_config_order = false
 staging_path = /mnt/ssd/photo-ingress/staging
+pending_path = /nightfall/media/photo-ingress/pending
 accepted_path = /nightfall/media/photo-ingress/accepted
+rejected_path = /nightfall/media/photo-ingress/rejected
 trash_path = /nightfall/media/photo-ingress/trash
 registry_path = /mnt/ssd/photo-ingress/registry.db
 staging_on_same_pool = false
@@ -125,11 +129,13 @@ def test_verify_sha256_bool_parsing(tmp_path: Path) -> None:
         tmp_path,
         """
 [core]
-config_version = 1
+config_version = 2
 poll_interval_minutes = 15
 process_accounts_in_config_order = true
 staging_path = /mnt/ssd/photo-ingress/staging
+pending_path = /nightfall/media/photo-ingress/pending
 accepted_path = /nightfall/media/photo-ingress/accepted
+rejected_path = /nightfall/media/photo-ingress/rejected
 trash_path = /nightfall/media/photo-ingress/trash
 registry_path = /mnt/ssd/photo-ingress/registry.db
 staging_on_same_pool = false
@@ -157,18 +163,20 @@ delta_cursor = /tmp/primary.cursor
     assert parsed.core.verify_sha256_on_first_download is False
 
 
-def test_storage_template_defaults_to_canonical_v1_when_omitted(tmp_path: Path) -> None:
-    """Default accepted queue layout should match canonical V1 template."""
+def test_storage_template_defaults_to_canonical_v2_when_omitted(tmp_path: Path) -> None:
+    """Default pending queue layout should match canonical v2 template."""
 
     cfg = _write_config(
         tmp_path,
         """
 [core]
-config_version = 1
+config_version = 2
 poll_interval_minutes = 15
 process_accounts_in_config_order = true
 staging_path = /mnt/ssd/photo-ingress/staging
+pending_path = /nightfall/media/photo-ingress/pending
 accepted_path = /nightfall/media/photo-ingress/accepted
+rejected_path = /nightfall/media/photo-ingress/rejected
 trash_path = /nightfall/media/photo-ingress/trash
 registry_path = /mnt/ssd/photo-ingress/registry.db
 staging_on_same_pool = false

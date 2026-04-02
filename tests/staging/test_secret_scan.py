@@ -78,7 +78,7 @@ class TestPatternDetection:
     def test_placeholder_config_is_clean(self, tmp_path):
         cfg = tmp_path / "photo-ingress.conf"
         cfg.write_text(
-            "[core]\nconfig_version = 1\n"
+            "[core]\nconfig_version = 2\n"
             "[account.staging]\nclient_id = STAGING_CLIENT_ID_PLACEHOLDER\n"
         )
         findings = scan_file(cfg)

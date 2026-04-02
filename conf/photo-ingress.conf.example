@@ -1,5 +1,5 @@
 [core]
-config_version = 1
+config_version = 2
 poll_interval_minutes = 720
 process_accounts_in_config_order = true
 staging_path = /mnt/ssd/photo-ingress/staging

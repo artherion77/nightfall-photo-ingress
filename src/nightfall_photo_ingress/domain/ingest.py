@@ -2,7 +2,7 @@
 
 This module takes staged candidates from the OneDrive client, computes authoritative
 content hashes, applies registry-backed policy decisions, and persists files in
-accepted queue storage without touching the permanent library.
+pending queue storage without touching the permanent library.
 """
 
 from __future__ import annotations
@@ -89,8 +89,8 @@ class IngestDecisionEngine:
     """Apply ingest policy matrix for staged files.
 
     Decision matrix:
-    - unknown hash: persist into accepted queue and mark accepted
-    - accepted/rejected/purged known hash: discard staged file
+    - unknown hash: persist into pending queue and mark pending
+    - pending/accepted/rejected/purged known hash: discard staged file
     """
 
     def __init__(
@@ -111,7 +111,7 @@ class IngestDecisionEngine:
         self,
         *,
         candidates: list[StagedCandidate],
-        pending_root: Path | None = None,
+        pending_root: Path,
         storage_template: str,
         staging_on_same_pool: bool,
         input_schema_version: int = INGEST_INPUT_SCHEMA_VERSION,
@@ -122,14 +122,8 @@ class IngestDecisionEngine:
         size_aware_scheduling: bool = True,
         collision_max_attempts: int = 10_000,
         live_photo_heuristics: LivePhotoHeuristics | None = None,
-        accepted_root: Path | None = None,  # deprecated: use pending_root instead
     ) -> IngestBatchResult:
         """Process staged candidates and return batch summary."""
-
-        # Support legacy accepted_root kwarg as alias for pending_root
-        _pending_root = pending_root if pending_root is not None else accepted_root
-        if _pending_root is None:
-            raise IngestError("pending_root is required")
 
         self._validate_batch_contract(
             candidates=candidates,
@@ -171,7 +165,7 @@ class IngestDecisionEngine:
                     candidate,
                     self._process_one(
                         candidate=candidate,
-                        pending_root=_pending_root,
+                        pending_root=pending_root,
                         storage_template=storage_template,
                         staging_on_same_pool=staging_on_same_pool,
                         pre_hash_size_verify=pre_hash_size_verify,
@@ -188,7 +182,7 @@ class IngestDecisionEngine:
                     executor.submit(
                         self._process_one,
                         candidate=candidate,
-                        pending_root=_pending_root,
+                        pending_root=pending_root,
                         storage_template=storage_template,
                         staging_on_same_pool=staging_on_same_pool,
                         pre_hash_size_verify=pre_hash_size_verify,

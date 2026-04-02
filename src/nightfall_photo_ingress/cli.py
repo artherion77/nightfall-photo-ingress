@@ -1,7 +1,7 @@
-"""CLI entrypoint for nightfall photo ingress.
+"""CLI entrypoint for the nightfall photo ingress runtime.
 
-Module 0 exposes command stubs only. Business logic is intentionally deferred
-to later modules in the approved implementation roadmap.
+The CLI exposes the operator surface for polling, accept, reject, purge,
+configuration validation, and onboarding flows.
 """
 
 from __future__ import annotations

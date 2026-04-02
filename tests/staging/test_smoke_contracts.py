@@ -121,7 +121,9 @@ class TestDirectoryLayout:
 
     @pytest.mark.parametrize("path", [
         "/var/lib/ingress/staging",
+        "/var/lib/ingress/pending",
         "/var/lib/ingress/accepted",
+        "/var/lib/ingress/rejected",
         "/var/lib/ingress/trash",
         "/var/lib/ingress/tokens",
         "/var/lib/ingress/cursors",

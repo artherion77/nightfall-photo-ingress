@@ -60,6 +60,15 @@ class LivePhotoPairRecord:
     updated_at: str
 
 
+@dataclass(frozen=True)
+class AcceptContext:
+    """Authoritative metadata required for pending->accepted transitions."""
+
+    account: str
+    source_path: str
+    modified_time: str
+
+
 class Registry:
     """High-level API for schema migration and state transitions."""
 
@@ -189,7 +198,7 @@ class Registry:
             conn.commit()
 
     def record_acceptance(self, *, sha256: str, account: str, source_path: str) -> None:
-        """Append acceptance history for files routed through accepted queue."""
+        """Append immutable acceptance history for explicit accept transitions."""
 
         now = _utc_now()
         with self._connect() as conn:
@@ -326,6 +335,7 @@ class Registry:
         account: str,
         source_path: str,
         actor: str,
+        reason: str = "operator_accept",
     ) -> None:
         """Persist operator acceptance of a pending file in one atomic transaction.
 
@@ -362,11 +372,44 @@ class Registry:
             conn.execute(
                 """
                 INSERT INTO audit_log (sha256, account_name, action, reason, details_json, actor, ts)
-                VALUES (?, ?, 'accepted', 'operator_accept', NULL, ?, ?)
+                VALUES (?, ?, 'accepted', ?, NULL, ?, ?)
                 """,
-                (sha256, account, actor, now),
+                (sha256, account, reason, actor, now),
             )
             conn.commit()
+
+    def get_accept_context(self, *, sha256: str) -> AcceptContext | None:
+        """Return latest account/source path and modified_time for pending accept."""
+
+        with self._connect() as conn:
+            _set_pragmas(conn)
+            row = conn.execute(
+                """
+                SELECT
+                    o.account AS account,
+                    COALESCE(o.path_hint, '/') AS source_path,
+                    m.modified_time AS modified_time
+                FROM file_origins AS o
+                LEFT JOIN metadata_index AS m
+                  ON m.account_name = o.account
+                 AND m.onedrive_id = o.onedrive_id
+                 AND m.sha256 = o.sha256
+                WHERE o.sha256 = ?
+                ORDER BY o.last_seen_at DESC
+                LIMIT 1
+                """,
+                (sha256,),
+            ).fetchone()
+
+        if row is None:
+            return None
+
+        modified_time = row["modified_time"] or _utc_now()
+        return AcceptContext(
+            account=str(row["account"]),
+            source_path=str(row["source_path"]),
+            modified_time=str(modified_time),
+        )
 
     def finalize_known_ingest(
         self,
@@ -893,7 +936,7 @@ def _set_pragmas(conn: sqlite3.Connection) -> None:
 
 
 def _run_migrations(conn: sqlite3.Connection) -> None:
-    """Run schema migrations from current `user_version` to latest."""
+    """Initialize or reject registry schemas for the v2-only runtime."""
 
     row = conn.execute("PRAGMA user_version").fetchone()
     current = int(row[0]) if row is not None else 0
@@ -904,14 +947,16 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
         )
 
     if current == 0:
-        conn.executescript(_migration_v1_sql())
+        conn.executescript(_schema_v2_sql())
         conn.execute(f"PRAGMA user_version = {LATEST_SCHEMA_VERSION}")
         conn.commit()
+        return
 
-    elif current == 1:
-        conn.executescript(_migration_v1_to_v2_sql())
-        conn.execute(f"PRAGMA user_version = {LATEST_SCHEMA_VERSION}")
-        conn.commit()
+    if current != LATEST_SCHEMA_VERSION:
+        raise RegistryError(
+            "Legacy registry schema detected. v2.0 requires a freshly bootstrapped "
+            f"registry.db at schema {LATEST_SCHEMA_VERSION}; found schema {current}."
+        )
 
 
 def _ensure_optional_tables(conn: sqlite3.Connection) -> None:
@@ -936,49 +981,8 @@ CREATE TABLE IF NOT EXISTS ingest_terminal_audit (
     conn.commit()
 
 
-def _migration_v1_to_v2_sql() -> str:
-    """Return SQL script for schema migration from version 1 to 2.
-
-    Adds 'pending' to the status CHECK constraints in files and live_photo_pairs.
-    """
-
-    return """
-PRAGMA foreign_keys = OFF;
-BEGIN;
-CREATE TABLE files_new (
-    sha256 TEXT PRIMARY KEY,
-    size_bytes INTEGER NOT NULL,
-    status TEXT NOT NULL CHECK (status IN ('pending', 'accepted', 'rejected', 'purged')),
-    original_filename TEXT,
-    current_path TEXT,
-    first_seen_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-);
-INSERT INTO files_new SELECT * FROM files;
-DROP TABLE files;
-ALTER TABLE files_new RENAME TO files;
-CREATE TABLE live_photo_pairs_new (
-    pair_id TEXT PRIMARY KEY,
-    account TEXT NOT NULL,
-    stem TEXT NOT NULL,
-    photo_sha256 TEXT NOT NULL,
-    video_sha256 TEXT NOT NULL,
-    status TEXT NOT NULL CHECK (status IN ('paired', 'pending', 'accepted', 'rejected', 'purged')),
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    FOREIGN KEY (photo_sha256) REFERENCES files(sha256),
-    FOREIGN KEY (video_sha256) REFERENCES files(sha256)
-);
-INSERT INTO live_photo_pairs_new SELECT * FROM live_photo_pairs;
-DROP TABLE live_photo_pairs;
-ALTER TABLE live_photo_pairs_new RENAME TO live_photo_pairs;
-COMMIT;
-PRAGMA foreign_keys = ON;
-"""
-
-
-def _migration_v1_sql() -> str:
-    """Return SQL script for schema version 1 (fresh install reaches v2 directly)."""
+def _schema_v2_sql() -> str:
+    """Return SQL script for a fresh v2 registry bootstrap."""
 
     return """
 CREATE TABLE IF NOT EXISTS files (

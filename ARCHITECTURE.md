@@ -44,7 +44,7 @@ src/nightfall_photo_ingress/
 
 #### **domain/** — Core Extensibility Layer
 - **Registry**: ACID-safe system of record for ingested files, audit logs, metadata pre-filters
-- **Storage**: Path templating, cross-pool resilience, durable staging-to-accepted workflows
+- **Storage**: Path templating, cross-pool resilience, durable queue-transition workflows
 - **IngestDecisionEngine**: Hash-based policy matrix (unknown → pending, known → discard)
 - **Journal**: Append-only lifecycle log for crash recovery and idempotency
 
@@ -155,11 +155,11 @@ from nightfall_photo_ingress.adapters import onedrive, google_photos
 
 ---
 
-### Backward Compatibility
+### Version Boundary
 
-- **CLI surface expanded:** adds `accept` and `purge` commands for human state transitions
-- **Package imports:** code using `from nightfall_photo_ingress.domain.registry import Registry` continues to work
-- **State machine update:** ingest now writes `pending`; only explicit operator accept writes `accepted_records`
+- **CLI surface:** includes `accept` and `purge` as first-class human state transitions
+- **State machine:** ingest writes `pending`; only explicit operator accept writes `accepted_records`
+- **Compatibility policy:** v2.0 drops accepted-first config and legacy registry upgrade paths; bootstrap a fresh config and registry for deployment
 
 ---
 

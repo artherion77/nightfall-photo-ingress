@@ -15,7 +15,7 @@ apt-get install -y --no-install-recommends \
 
 echo "[setup] Creating application directories ..."
 mkdir -p /etc/nightfall
-mkdir -p /var/lib/ingress/{staging,accepted,trash,evidence,tokens,cursors}
+mkdir -p /var/lib/ingress/{staging,pending,accepted,rejected,trash,evidence,tokens,cursors}
 mkdir -p /var/log/nightfall
 mkdir -p /var/cache/nightfall-photo-ingress
 mkdir -p /run/nightfall-status.d

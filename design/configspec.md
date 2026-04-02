@@ -6,7 +6,7 @@ Location: /etc/nightfall/photo-ingress.conf (recommended)
 
 ---
 
-## 0. Naming Matrix (Canonical V1)
+## 0. Naming Matrix (Canonical V2)
 
 | Scope | Canonical Name | Notes |
 |---|---|---|
@@ -37,7 +37,7 @@ Example structure:
 
 ```ini
 [core]
-config_version = 1
+config_version = 2
 poll_interval_minutes = 720
 process_accounts_in_config_order = true
 staging_path = /mnt/ssd/photo-ingress/staging
@@ -93,13 +93,13 @@ console_format = json
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `config_version` | int | 1 | Config schema version. Must match supported value. |
+| `config_version` | int | 2 | Config schema version. Must match supported value. |
 | `poll_interval_minutes` | int | 720 | Poll interval used by timer cadence. Production recommendation: 8-24h (`480-1440`). |
 | `staging_path` | path | none | SSD-backed staging directory. |
-| `pending_path` | path | `accepted_path` fallback | Ingest-visible pending queue for newly discovered files. |
+| `pending_path` | path | none | Ingest-visible pending queue for newly discovered files. |
 | `accepted_path` | path | none | Operator-accepted destination path. |
 | `accepted_storage_template` | string | `{yyyy}/{mm}/{original}` | Template for accepted destination layout. |
-| `rejected_path` | path | `trash_path` fallback | Rejected retention folder (trash-like) until purge. |
+| `rejected_path` | path | none | Rejected retention folder (trash-like) until purge. |
 | `trash_path` | path | none | Directory watched by systemd .path unit for reject workflow. |
 | `registry_path` | path | none | SQLite registry file path. |
 | `staging_on_same_pool` | bool | false | Enables rename move optimization when true. |
@@ -169,7 +169,8 @@ The storage template supports the following variables:
 
 ## 5. Validation Rules
 
-- `config_version` must match the implementation-supported version.
+- `config_version` must be `2`.
+- `pending_path`, `accepted_path`, `rejected_path`, and `trash_path` are all required and must be distinct.
 - At least one account must be enabled.
 - When `process_accounts_in_config_order=true`, enabled accounts are processed serially in declaration order from the INI file.
 - Account names must be unique and match `^[a-z0-9_-]+$`.
@@ -198,4 +199,4 @@ The storage template supports the following variables:
 
 ## 7. Summary
 
-This specification defines a strict and migration-ready configuration model with multi-account support, resilient state tracking, and an explicit boundary between ingress queue storage and the permanent photo library.
+This specification defines the v2.0 configuration model with strict queue-boundary separation, explicit operator transitions, and no accepted-first compatibility fallbacks.

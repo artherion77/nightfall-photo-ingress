@@ -1,7 +1,7 @@
-"""Configuration model and validation for Module 1.
+"""Configuration model and validation for the v2 pending-first runtime.
 
-This module parses the INI configuration file and validates supported keys for
-V1. It returns typed dataclasses so downstream modules can consume config safely.
+This module parses the INI configuration file and validates the canonical v2
+schema with explicit pending, accepted, rejected, and trash boundaries.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-SUPPORTED_CONFIG_VERSION = 1
+SUPPORTED_CONFIG_VERSION = 2
 ACCOUNT_NAME_PATTERN = re.compile(r"^[a-z0-9_-]+$")
 SUPPORTED_PROVIDER = "onedrive"
 SUPPORTED_STEM_MODE = {"exact_stem"}
@@ -188,10 +188,10 @@ def _parse_core(parser: configparser.ConfigParser, errors: list[str]) -> CoreCon
 
     core = parser[section]
 
+    pending_path = _get_path(core, "pending_path", errors, required=True)
     accepted_path = _get_path(core, "accepted_path", errors, required=True)
+    rejected_path = _get_path(core, "rejected_path", errors, required=True)
     trash_path = _get_path(core, "trash_path", errors, required=True)
-    pending_path = _get_path(core, "pending_path", errors, default=accepted_path)
-    rejected_path = _get_path(core, "rejected_path", errors, default=trash_path)
 
     return CoreConfig(
         config_version=_get_int(core, "config_version", errors, required=True),
@@ -529,6 +529,22 @@ def _validate_core(core: CoreConfig, errors: list[str]) -> None:
     if "{original}" not in core.accepted_storage_template and "{sha8}" not in core.accepted_storage_template:
         errors.append("[core] accepted_storage_template must include at least {original} or {sha8}")
 
+    queue_roots = {
+        "pending_path": core.pending_path.resolve(strict=False),
+        "accepted_path": core.accepted_path.resolve(strict=False),
+        "rejected_path": core.rejected_path.resolve(strict=False),
+        "trash_path": core.trash_path.resolve(strict=False),
+    }
+    seen_paths: dict[Path, str] = {}
+    for name, path in queue_roots.items():
+        duplicate = seen_paths.get(path)
+        if duplicate is not None:
+            errors.append(
+                f"[core] {name} must not equal {duplicate}; lifecycle roots must remain distinct"
+            )
+            continue
+        seen_paths[path] = name
+
 
 def _validate_accounts(accounts: list[AccountConfig], errors: list[str]) -> None:
     """Validate account sections and uniqueness constraints."""
@@ -579,7 +595,7 @@ def _validate_accounts(accounts: list[AccountConfig], errors: list[str]) -> None
 
 
 def _validate_section_model(parser: configparser.ConfigParser, errors: list[str]) -> None:
-    """Reject legacy or unsupported section names for canonical V1 model."""
+    """Reject legacy or unsupported section names for canonical v2 config."""
 
     for section_name in parser.sections():
         if section_name in {"core", "logging"}:
@@ -593,7 +609,7 @@ def _validate_section_model(parser: configparser.ConfigParser, errors: list[str]
             )
             continue
         errors.append(
-            f"Unsupported section [{section_name}] for V1 config model"
+            f"Unsupported section [{section_name}] for v2 config model"
         )
 
 

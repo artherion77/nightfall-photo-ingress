@@ -134,7 +134,7 @@ def test_missing_inline_download_url_is_resolved_just_in_time(tmp_path: Path) ->
     assert len(downloaded) == 1
     assert downloaded[0].read_bytes() == b"one"
     assert ghost_reason_counts == {"delta_file_missing_download_url": 1}
-    assert delta_anomaly_counts == {"delta_file_missing_download_url": 1}
+    assert delta_anomaly_counts == {}
 
 
 def test_missing_download_url_after_refresh_is_classified_as_ghost(tmp_path: Path) -> None:

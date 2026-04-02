@@ -20,11 +20,13 @@ def _valid_config_body() -> str:
 
     return """
 [core]
-config_version = 1
+config_version = 2
 poll_interval_minutes = 15
 process_accounts_in_config_order = true
 staging_path = /mnt/ssd/photo-ingress/staging
+pending_path = /nightfall/media/photo-ingress/pending
 accepted_path = /nightfall/media/photo-ingress/accepted
+rejected_path = /nightfall/media/photo-ingress/rejected
 trash_path = /nightfall/media/photo-ingress/trash
 registry_path = /mnt/ssd/photo-ingress/registry.db
 staging_on_same_pool = false

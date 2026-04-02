@@ -22,11 +22,13 @@ def _base_core() -> str:
 
     return """
 [core]
-config_version = 1
+config_version = 2
 poll_interval_minutes = 15
 process_accounts_in_config_order = true
 staging_path = /mnt/ssd/photo-ingress/staging
+pending_path = /nightfall/media/photo-ingress/pending
 accepted_path = /nightfall/media/photo-ingress/accepted
+rejected_path = /nightfall/media/photo-ingress/rejected
 trash_path = /nightfall/media/photo-ingress/trash
 registry_path = /mnt/ssd/photo-ingress/registry.db
 staging_on_same_pool = false
@@ -62,7 +64,7 @@ def test_missing_required_key_fails(tmp_path: Path) -> None:
         tmp_path,
         """
 [core]
-config_version = 1
+config_version = 2
 poll_interval_minutes = 15
 """.strip()
         + "\n\n"
@@ -76,7 +78,7 @@ poll_interval_minutes = 15
 
 
 def test_unsupported_provider_rejected(tmp_path: Path) -> None:
-    """Provider must be onedrive in V1."""
+    """Provider must be onedrive in v2."""
 
     cfg = _write_config(
         tmp_path,
@@ -135,7 +137,7 @@ def test_duplicate_token_cache_and_delta_cursor_rejected(tmp_path: Path) -> None
 
 
 def test_live_photo_enum_validation_rejects_invalid_values(tmp_path: Path) -> None:
-    """V1 accepts only the documented default enum values."""
+    """v2 accepts only the documented default enum values."""
 
     cfg = _write_config(
         tmp_path,
@@ -189,3 +191,20 @@ delta_cursor = /tmp/legacy.cursor
         load_config(cfg)
 
     assert "Legacy single-account section [account] is not supported" in str(exc.value)
+
+
+def test_queue_roots_must_be_distinct(tmp_path: Path) -> None:
+    """Queue roots must not collapse lifecycle boundaries."""
+
+    cfg = _write_config(
+        tmp_path,
+        _base_core().replace(
+            "rejected_path = /nightfall/media/photo-ingress/rejected",
+            "rejected_path = /nightfall/media/photo-ingress/accepted",
+        )
+        + "\n\n"
+        + _account("primary"),
+    )
+
+    with pytest.raises(ConfigError, match="lifecycle roots must remain distinct"):
+        load_config(cfg)

@@ -123,7 +123,7 @@ def commit_staging_to_accepted(
     file_mode: int = 0o640,
     dir_mode: int = 0o750,
 ) -> CommitResult:
-    """Persist one staged file into accepted queue storage safely.
+    """Persist one staged file into a destination queue path safely.
 
     On same pool, uses atomic rename. On cross-pool, copies metadata, verifies
     byte count and SHA-256, then unlinks source only after verification.
@@ -200,6 +200,22 @@ def commit_pending_to_accepted(
         file_mode=file_mode,
         dir_mode=dir_mode,
     )
+
+
+def are_on_same_filesystem(path_a: Path, path_b: Path) -> bool:
+    """Return True when both paths reside on the same filesystem device."""
+
+    ref_a = path_a if path_a.exists() and path_a.is_dir() else path_a.parent
+    ref_b = path_b if path_b.exists() and path_b.is_dir() else path_b.parent
+    ref_a.mkdir(parents=True, exist_ok=True)
+    ref_b.mkdir(parents=True, exist_ok=True)
+    return ref_a.stat().st_dev == ref_b.stat().st_dev
+
+
+def ensure_within_root(path: Path, root: Path) -> None:
+    """Public safety helper: raise when path escapes configured root."""
+
+    _ensure_within_root(path, root)
 
 
 def _parse_timestamp(value: str) -> datetime:

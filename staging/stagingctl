@@ -2,8 +2,8 @@
 # stagingctl — LXC staging controller for nightfall-photo-ingress
 #
 # Usage:
-#   stagingctl create            create container + take "clean" snapshot
-#   stagingctl install [wheel]   push wheel + config, enable service
+#   stagingctl create            create container baseline
+#   stagingctl install [wheel]   push wheel + config, enable service, refresh "clean" snapshot
 #   stagingctl uninstall         delete container
 #   stagingctl reset             restore "clean" snapshot, restart
 #   stagingctl smoke             run headless smoke assertions, collect evidence
@@ -283,7 +283,13 @@ for line in config_path.read_text(encoding='utf-8').splitlines():
     lxc exec "$CONTAINER" -- systemctl enable "$SERVICE_NAME.timer"
     lxc exec "$CONTAINER" -- systemctl enable "$TRASH_PATH_NAME"
 
-    _ok "Installed $whl_name. Timer and trash path enabled."
+    # Refresh reset baseline after install so `stagingctl reset` returns to
+    # an installed, config-valid state with no onboarding token cache.
+    lxc delete "$CONTAINER/$SNAPSHOT_CLEAN" 2>/dev/null || true
+    _info "Taking LXD snapshot '$SNAPSHOT_CLEAN' (post-install baseline) ..."
+    lxc snapshot "$CONTAINER" "$SNAPSHOT_CLEAN"
+
+    _ok "Installed $whl_name. Timer and trash path enabled. Snapshot '$SNAPSHOT_CLEAN' refreshed."
     _info "Run 'stagingctl smoke' to verify or 'stagingctl reset' to roll back."
 }
 
@@ -652,8 +658,8 @@ _usage() {
 Usage: $(basename "$0") <command> [args]
 
 Commands:
-  create              Create LXC container (profiles: default+staging), take 'clean' snapshot.
-  install [wheel]     Push wheel + config, enable service. Builds wheel if not supplied.
+    create              Create LXC container (profiles: default+staging) and baseline state.
+    install [wheel]     Push wheel + config, enable service, and refresh 'clean' snapshot.
   uninstall [--purge] Delete container. --purge also removes host evidence/log directories.
   reset               Restore 'clean' snapshot and restart container.
   smoke               Run headless smoke assertions; collect evidence.

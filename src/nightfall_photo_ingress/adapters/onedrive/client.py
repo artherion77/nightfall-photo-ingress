@@ -466,6 +466,17 @@ def _poll_single_account(
             safe_hint=str(exc),
         ) from exc
 
+    unresolved_download_url_count = ghost_reason_counts.get(
+        "ghost_missing_download_url_after_refresh",
+        0,
+    )
+    if unresolved_download_url_count > 0:
+        _record_ghost_reason(
+            delta_anomaly_counts,
+            "ghost_missing_download_url_after_refresh",
+            count=unresolved_download_url_count,
+        )
+
     drift_state, drift_ratio, drift_events = _evaluate_drift_state(
         delta_anomaly_counts,
         warning_threshold=app_config.core.drift_warning_threshold_ratio,
@@ -490,7 +501,10 @@ def _poll_single_account(
         (
             (key, value)
             for key, value in delta_anomaly_counts.items()
-            if key.startswith(drift_prefixes)
+            if (
+                (key.startswith(drift_prefixes) and key != "delta_file_missing_download_url")
+                or key == "ghost_missing_download_url_after_refresh"
+            )
         ),
         key=lambda pair: pair[1],
         reverse=True,
@@ -1029,9 +1043,6 @@ def _apply_delta_page_to_reducer(
             reason = _classify_invalid_candidate_reason(raw)
             _record_ghost_reason(anomaly_counts, reason)
             continue
-
-        if not validated.download_url:
-            _record_ghost_reason(anomaly_counts, "delta_file_missing_download_url")
 
         reducer[item_id] = _ReducerEntry(sequence=sequence, candidate=validated)
 
@@ -2574,7 +2585,10 @@ def _evaluate_drift_state(
     drift_events = sum(
         value
         for key, value in anomaly_counts.items()
-        if key.startswith(drift_prefixes)
+        if (
+            (key.startswith(drift_prefixes) and key != "delta_file_missing_download_url")
+            or key == "ghost_missing_download_url_after_refresh"
+        )
     )
     total_events = max(sum(anomaly_counts.values()), 1)
     drift_ratio = drift_events / float(total_events)

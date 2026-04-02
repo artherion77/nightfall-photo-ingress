@@ -14,11 +14,13 @@ def _write_config(tmp_path: Path) -> Path:
     cfg.write_text(
         f"""
 [core]
-config_version = 1
+config_version = 2
 poll_interval_minutes = 15
 process_accounts_in_config_order = true
 staging_path = {tmp_path / 'staging'}
+pending_path = {tmp_path / 'pending'}
 accepted_path = {tmp_path / 'accepted'}
+rejected_path = {tmp_path / 'rejected'}
 trash_path = {tmp_path / 'trash'}
 registry_path = {tmp_path / 'registry.db'}
 staging_on_same_pool = false

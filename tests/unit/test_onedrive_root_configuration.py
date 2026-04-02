@@ -28,11 +28,13 @@ def _base_core_config() -> str:
     """Return a base core section with all required fields."""
     return """
 [core]
-config_version = 1
+config_version = 2
 poll_interval_minutes = 15
 process_accounts_in_config_order = true
 staging_path = /tmp/staging
+pending_path = /tmp/pending
 accepted_path = /tmp/accepted
+rejected_path = /tmp/rejected
 trash_path = /tmp/trash
 registry_path = /tmp/registry.db
 staging_on_same_pool = false

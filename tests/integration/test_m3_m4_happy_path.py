@@ -5,7 +5,7 @@ from __future__ import annotations
 from nightfall_photo_ingress.domain.storage import sha256_file
 
 
-def test_e2e_single_new_photo_same_pool_accepts_cleanly(
+def test_e2e_single_new_photo_same_pool_stages_to_pending_cleanly(
     poll_and_ingest_fixture,
     audit_reader_fixture,
 ) -> None:
@@ -42,7 +42,7 @@ def test_e2e_single_new_photo_same_pool_accepts_cleanly(
     assert audit_reader_fixture.terminal_actions() == ("pending",)
 
 
-def test_e2e_single_new_photo_cross_pool_accepts_with_copy_verify(
+def test_e2e_single_new_photo_cross_pool_stages_to_pending_with_copy_verify(
     app_config_fixture,
     poll_and_ingest_fixture,
     fs_snapshot_fixture,
@@ -133,7 +133,7 @@ def test_prefilter_hit_skips_hashing_for_known_metadata_match(
     assert second.registry_harness.registry.acceptance_count(sha256=accepted_hash or "") == 0
 
 
-def test_prefilter_miss_hashes_and_accepts_when_registry_unknown(
+def test_prefilter_miss_hashes_and_marks_pending_when_registry_unknown(
     poll_and_ingest_fixture,
 ) -> None:
     result = poll_and_ingest_fixture(

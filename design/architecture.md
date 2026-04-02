@@ -15,9 +15,9 @@
 
 A fully automated, server-side OneDrive-based photo ingest pipeline that feeds into the nightfall archival system. iOS devices upload photos to OneDrive (treated as an untrusted but reliable transport layer). A Linux server running ZFS storage ("nightfall"), Immich, and custom ingest services pulls those files down, validates them, and manages their lifecycle independently of Immich.
 
-**Immich's role is limited to indexing and viewing permanent library content only.** The ingress service writes into an accepted queue, while the operator manually promotes files into `/nightfall/media/pictures/...` outside ingress visibility. Ingress still blocks re-downloads using persistent acceptance history in the registry.
+**Immich's role is limited to indexing and viewing permanent library content only.** The ingress service writes new content into a pending queue. Human operators explicitly transition pending content to accepted or rejected. Rejected content is retained on disk until explicit purge.
 
-### 1.1 Naming Matrix (Canonical V1)
+### 1.1 Naming Matrix (Canonical V2)
 
 | Scope | Canonical Name | Notes |
 |---|---|---|
@@ -30,7 +30,7 @@ A fully automated, server-side OneDrive-based photo ingest pipeline that feeds i
 | SSD ZFS dataset (container) | `ssdpool/photo-ingress` | Always-on staging, cursors, token caches, registry |
 | SSD mountpoint | `/mnt/ssd/photo-ingress` | Working set for low-latency operations |
 | HDD ZFS dataset (container) | `nightfall/media/photo-ingress` | Queue/trash boundary on nightfall pool |
-| HDD mountpoint | `/nightfall/media/photo-ingress` | `accepted/` and `trash/` live here |
+| HDD mountpoint | `/nightfall/media/photo-ingress` | `pending/`, `accepted/`, `rejected/`, and `trash/` live here |
 | Permanent library root | `/nightfall/media/pictures` | Read-only to ingress, indexed by Immich |
 | Health status file | `/run/nightfall-status.d/photo-ingress.json` | Exported each poll cycle |
 
@@ -58,14 +58,17 @@ iOS Camera Roll
 │  registry.db (SQLite, SSD)              │  ← authoritative content ledger
 │       │                                 │
 │       ├─ rejected → delete from staging │
+│       ├─ pending  → delete from staging │
 │       ├─ accepted → delete from staging │
-│       └─ unknown  → move to accepted/   │
+│       ├─ purged   → delete from staging │
+│       └─ unknown  → move to pending/    │
 │                    + insert registry    │
 │                                         │
 │  /nightfall/media/photo-ingress/        │  ← HDD pool
-│    pending/    ← ingress queue          │    
-|    accepted/   ← acceptance trigger (*) │  (*) by operator in various forms: on disk, CLI, Web UI
-│    trash/      ← rejection trigger  (*) │
+│    pending/    ← ingest destination      │
+│    accepted/   ← explicit accept target  │
+│    rejected/   ← retained rejected files │
+│    trash/      ← rejection trigger       │
 └─────────────────────────────────────────┘
       │
      │  manual operator move/copy
@@ -84,8 +87,10 @@ iOS Camera Roll
 - **Fully automated** — no user behavior assumptions on iOS.
 - **Robust against Immich changes** — the pipeline operates independently; a fresh Immich DB simply rescans the permanent library.
 - **Reject-once, reject-forever** — a rejected SHA-256 is never ingested again regardless of re-uploads.
-- **Accepted-history persistence** — manually moving files out of `accepted/` must not cause future re-downloads.
-- **Minimize unnecessary I/O** — metadata pre-filtering avoids downloading files that are already known; HDD only spun up at accept-commit time.
+- **Explicit acceptance** — no automatic transition from unknown to accepted.
+- **Accepted-history persistence** — accepted content remains blocked from re-download even after operator relocation.
+- **Minimize unnecessary I/O** — metadata pre-filtering avoids downloading files that are already known; HDD is only touched for queue transitions.
+- **Legacy-free v2 boundary** — no accepted-first config fallbacks, no silent auto-accept, and no in-place registry upgrade from pre-v2 schemas.
 - **English-only** — all inline comments, logs, and documentation are in English.
 - **Auditable** — every state transition is recorded in an immutable `audit_log` table.
 - **Idempotent** — re-running the pipeline at any point produces the same end state.
@@ -102,8 +107,10 @@ ssdpool/photo-ingress  →  /mnt/ssd/photo-ingress/
    delta_cursor           — per-account delta traversal checkpoint (plain text)
 
 nightfall/media/photo-ingress  →  /nightfall/media/photo-ingress/
-   accepted/              — committed files; ingress queue only
-  trash/                 — operator drops files here to trigger rejection
+   pending/               — unknown-hash ingest destination (operator review queue)
+   accepted/              — explicit accept destination
+   rejected/              — retained rejected artifacts (until purge)
+   trash/                 — operator drops files here to trigger rejection flow
 
 nightfall/media/pictures  →  /nightfall/media/pictures/
    ...                    — permanent library, read-only to ingress (used by Immich and sync-import)
@@ -126,7 +133,7 @@ zfs create -o mountpoint=/nightfall/media/photo-ingress nightfall/media/photo-in
 CREATE TABLE files (
     sha256          TEXT PRIMARY KEY,
     size_bytes      INTEGER NOT NULL,
-    status          TEXT NOT NULL CHECK (status IN ('accepted', 'rejected', 'purged')),
+   status          TEXT NOT NULL CHECK (status IN ('pending', 'accepted', 'rejected', 'purged')),
     original_filename TEXT,
     onedrive_id     TEXT,
    first_seen_at   TEXT NOT NULL,   -- ISO-8601 UTC
@@ -172,6 +179,7 @@ CREATE TABLE accepted_records (
 - **Concurrent-safe**: `BEGIN EXCLUSIVE` transaction for all write paths; SQLite WAL mode.
 - **Resilient to restarts**: staging files named `{onedrive_id}.tmp` during download → renamed on completion; a crashed run leaves `.tmp` files that are cleaned up on next start.
 - **Move-safe**: `accepted_records` preserves acceptance history even if files are manually moved out of `accepted/`.
+- **Pending-first**: `accepted_records` is written only on explicit accept, never on unknown ingest.
 
 ---
 
@@ -189,8 +197,9 @@ CREATE TABLE accepted_records (
    d. **Compute SHA-256** (streaming 64 KB chunks; never loads full file into memory).
    e. **Registry lookup**:
       - `rejected` → delete from staging; append `rejected_duplicate` to `audit_log`.
+      - `pending`  → delete from staging; append `discard_pending` to `audit_log`.
       - `accepted` → delete from staging; append `duplicate_skipped` to `audit_log`.
-      - `unknown` → move to `accepted/YYYY/MM/{filename}`; insert `files` row as `accepted`; insert `accepted_records`; insert `metadata_index` row; append `accepted` to `audit_log`.
+      - `unknown` → move to `pending/YYYY/MM/{filename}`; insert `files` row as `pending`; insert `metadata_index` row; append `pending` to `audit_log`.
 4. Persist cursor checkpoints with a commit-gated streaming sequence per page:
    - fetch one page,
    - evaluate prefilter and ingest outcomes for that page,
@@ -209,18 +218,18 @@ The streaming page-commit model is authoritative. Cursor advancement is a commit
 Account execution rule:
 - Enabled accounts are processed serially in declaration order from the configuration file.
 
-### 6.2 Live Photo Support in V1
+### 6.2 Live Photo Support
 
-   - Pair detection is required in V1.
+   - Pair detection is required in v2.
    - Ingest tracks likely Live Photo components (for example HEIC/JPEG + MOV) as separate physical files.
-   - Pairing heuristics are configurable with V1 defaults:
+   - Pairing heuristics are configurable with current runtime defaults:
      - `live_photo_capture_tolerance_seconds = 3`
      - `live_photo_stem_mode = exact_stem`
      - `live_photo_component_order = photo_first`
      - `live_photo_conflict_policy = nearest_capture_time`
-   - V1 implementation can support only these defaults while exposing validated configuration parameters.
+   - The runtime currently supports only these validated defaults.
    - Pair linkage metadata is persisted for audit and future tooling.
-   - Merge/export workflows are deferred to V2.
+   - Merge/export workflows are deferred beyond v2.0.
 
 ### 6.3 Sync Hash Import Mode
 
@@ -236,17 +245,42 @@ Account execution rule:
 1. Operator places (or moves) a file into `/nightfall/media/photo-ingress/trash/`.
 2. systemd `.path` unit fires `photo-ingress-trash.service`.
 3. Service computes SHA-256 of each file in `trash/`.
-4. Looks up accepted path from registry, removes from `accepted/`.
-5. Updates registry `status = 'rejected'`; appends `audit_log` row with `actor = 'trash_watch'`.
-6. Deletes file from `trash/`.
+4. If a known queue artifact exists, it is moved to `rejected/`.
+5. If unknown, the trash artifact itself is moved to `rejected/` and registered as `rejected`.
+6. Registry `status = 'rejected'`; appends `audit_log` row with `actor = 'trash_watch'`.
 
 **Via CLI:**
 ```bash
 photo-ingress reject <sha256> [--reason "..."]
 ```
 - Idempotent: if already `rejected`, logs and exits cleanly.
-- Removes file from `accepted/` if present.
-- Updates registry and appends audit_log.
+- Moves current queue file to `rejected/` if present.
+- Updates registry and appends audit log.
+
+### 6.5 Accept and Purge Flows
+
+**Accept (explicit operator transition):**
+```bash
+photo-ingress accept <sha256> [--reason "..."]
+```
+- Requires current status `pending`.
+- Moves file from `pending/` to `accepted/` using `accepted_storage_template`.
+- Transitions status `pending -> accepted` and writes `accepted_records`.
+
+**Purge (explicit destructive transition):**
+```bash
+photo-ingress purge <sha256> [--reason "..."]
+```
+- Requires current status `rejected`.
+- Deletes retained file from `rejected/` with root-containment safety checks.
+- Transitions status `rejected -> purged`.
+
+### 6.6 Version Boundary and Bootstrap
+
+- `config_version = 2` is mandatory.
+- `pending_path`, `accepted_path`, `rejected_path`, and `trash_path` must be configured explicitly and must remain distinct.
+- v2.0 does not upgrade pre-v2 registries in place. Deployments must bootstrap a fresh `registry.db` at schema version 2.
+- Any stale registry `current_path` outside managed queue roots is treated as an operator error and accept/reject flows fail closed.
 
 ---
 
@@ -256,14 +290,15 @@ photo-ingress reject <sha256> [--reason "..."]
 |---|---|
 | OneDrive rename / move | Graph delta reports `deleted` + new `created`; metadata_index hit on `onedrive_id` prevents re-download after rename if size+mtime match |
 | Partial / in-progress upload | Delta API only returns complete items; items without `file.hashes` or missing `@microsoft.graph.downloadUrl` are skipped |
-| Name collision in accepted/ | Two different files with same name same month → `{sha256[:8]}-{original_filename}` suffix |
+| Name collision in pending/accepted/rejected | Template rendering + collision-safe suffixing preserves uniqueness |
 | Delta cursor loss | Fall back to `?token=latest` (last 30 days) or full folder scan; registry idempotency prevents re-ingesting known files |
-| Cross-pool atomic move | If staging (SSD) and accepted (HDD) are different ZFS pools: `shutil.copy2` → verify SHA-256 → `unlink` staging; controlled by `STAGING_SAME_POOL` config flag |
+| Cross-pool atomic move | Ingest and accept transitions choose rename vs copy-verify-unlink based on filesystem topology |
 | Concurrent poll runs | Explicit global process lock serializes full poll runs across CLI and timer paths; `Type=oneshot` is a secondary defense |
 | Auth token expiry | MSAL handles refresh transparently; alert email after ≥3 consecutive auth failures |
 | Operator manually moves accepted files away | `accepted_records` table preserves acceptance truth independent of current file location |
+| Rejected retention and purge safety | Rejected artifacts remain in `rejected/` until explicit purge; purge rejects out-of-root paths |
 | Immich DB purge or upgrade | Pipeline is Immich-independent; permanent library remains the viewer source of truth |
-| HDD spin-up discipline | Staging, hashing, and registry all on SSD; HDD only written at accept-commit (atomic move/copy) |
+| HDD spin-up discipline | Staging, hashing, and registry all on SSD; HDD writes occur on pending/accept/reject transitions only |
 
 ---
 
@@ -306,7 +341,7 @@ photo-ingress/
 │   │   ├── __init__.py
 │   │   ├── poller.py             — main poll loop: delta → staging
 │   │   └── ingest.py             — hash + registry decision + atomic move
-│   └── cli.py                    — entry points: auth-setup, poll, reject, process-trash
+│   └── cli.py                    — entry points: auth-setup, poll, reject, accept, purge, process-trash
 ├── conf/
 │   └── photo-ingress.conf      — .ini format; installed to /etc/nightfall/
 ├── systemd/
@@ -382,14 +417,14 @@ Steps:
 3. Document operator workflow for manually moving files from `accepted/` to permanent library
 4. Validate that manually moved files remain blocked from re-download due to registry acceptance history
 
-**Deliverable:** Files can be moved out of accepted queue without regressing dedupe behavior.
+**Deliverable:** Pending and accepted queue boundaries remain explicit while dedupe behavior is preserved.
 
 ### Phase 5 — Trash → Rejected Pipeline
 
 **Goal:** Operator can permanently block content by dropping a file into trash/ or running a CLI command.
 
 Steps:
-1. `cli.py`: `reject` subcommand and `process-trash` subcommand
+1. `cli.py`: `reject`, `accept`, `purge`, and `process-trash` subcommands
 2. `systemd/photo-ingress-trash.path`: watches `/nightfall/media/photo-ingress/trash/`
 3. `systemd/photo-ingress-trash.service`: runs `photo-ingress process-trash` on activation
 4. Both paths share `registry.mark_rejected(sha256, reason, actor)` — idempotent
@@ -471,6 +506,8 @@ auth_failure_threshold = 3
 5. Move accepted file to trash/; confirm it is removed from accepted/ and registry status = `rejected`
 6. Re-upload same photo to OneDrive; run poll; confirm file is silently discarded (audit_log entry: `rejected_duplicate`)
 7. `photo-ingress reject <sha256>` runs idempotently (no error if already rejected)
+8. `photo-ingress accept <sha256>` transitions pending to accepted and writes acceptance history
+9. `photo-ingress purge <sha256>` only purges within rejected root and marks status purged
 8. Move accepted files manually to `/nightfall/media/pictures/...`; confirm no re-download occurs on future polls
 9. Run `sync-import`; confirm imported hashes reduce candidate downloads
 10. Verify Live Photo pair metadata is recorded for HEIC/JPEG + MOV sets

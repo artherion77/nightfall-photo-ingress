@@ -56,7 +56,7 @@ def test_sha256_hashing_correctness(tmp_path: Path) -> None:
     )
 
 
-def test_decision_matrix_unknown_is_accepted(tmp_path: Path) -> None:
+def test_decision_matrix_unknown_is_pending(tmp_path: Path) -> None:
     registry = _init_registry(tmp_path)
     engine = IngestDecisionEngine(registry)
 

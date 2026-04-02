@@ -89,7 +89,7 @@ def _make_app_config(
     drift_fail_fast_enabled: bool = True,
 ) -> AppConfig:
     core = CoreConfig(
-        config_version=1,
+        config_version=2,
         poll_interval_minutes=15,
         process_accounts_in_config_order=True,
         staging_path=tmp_path / "staging",
@@ -301,13 +301,22 @@ def test_v2_chunk6_drift_critical_fail_fast(tmp_path: Path) -> None:
                         status_code=200,
                         text=(
                             '{"value":['
-                            '{"id":"a1","name":"IMG_1.HEIC","file":{}},'
-                            '{"id":"a2","name":"IMG_2.HEIC","file":{}},'
-                            '{"id":"a3","name":"IMG_3.HEIC","file":{}}],'
+                            '{"id":"a1","name":"IMG_1.HEIC","file":{},"size":3},'
+                            '{"id":"a2","name":"IMG_2.HEIC","file":{},"size":3},'
+                            '{"id":"a3","name":"IMG_3.HEIC","file":{},"size":3}],'
                             '"@odata.deltaLink":"https://delta/final"}'
                         ),
                     )
-                ]
+                ],
+                "https://graph.microsoft.com/v1.0/me/drive/items/a1": [
+                    _FakeResponse(status_code=200, text='{"id":"a1"}')
+                ],
+                "https://graph.microsoft.com/v1.0/me/drive/items/a2": [
+                    _FakeResponse(status_code=200, text='{"id":"a2"}')
+                ],
+                "https://graph.microsoft.com/v1.0/me/drive/items/a3": [
+                    _FakeResponse(status_code=200, text='{"id":"a3"}')
+                ],
             }
         )
 
@@ -341,11 +350,14 @@ def test_v2_chunk6_drift_warning_does_not_fail_when_failfast_disabled(tmp_path: 
                     _FakeResponse(
                         status_code=200,
                         text=(
-                            '{"value":[{"id":"a1","name":"IMG_1.HEIC","file":{}}],'
+                            '{"value":[{"id":"a1","name":"IMG_1.HEIC","file":{},"size":3}],'
                             '"@odata.deltaLink":"https://delta/final"}'
                         ),
                     )
-                ]
+                ],
+                "https://graph.microsoft.com/v1.0/me/drive/items/a1": [
+                    _FakeResponse(status_code=200, text='{"id":"a1"}')
+                ],
             }
         )
 

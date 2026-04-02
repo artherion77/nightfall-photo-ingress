@@ -42,8 +42,8 @@ def test_initialize_fresh_database_creates_expected_schema(tmp_path: Path) -> No
     assert registry.schema_version() == LATEST_SCHEMA_VERSION
 
 
-def test_canonical_v1_columns_present(tmp_path: Path) -> None:
-    """Canonical V1 column names should exist for files and metadata_index."""
+def test_canonical_v2_columns_present(tmp_path: Path) -> None:
+    """Canonical v2 column names should exist for files and metadata_index."""
 
     db_path = tmp_path / "registry.db"
     registry = Registry(db_path)
@@ -83,3 +83,24 @@ def test_migration_is_idempotent_on_repeated_initialize(tmp_path: Path) -> None:
     assert row is not None
     assert row.size_bytes == 123
     assert registry.schema_version() == LATEST_SCHEMA_VERSION
+
+
+def test_legacy_v1_registry_is_rejected(tmp_path: Path) -> None:
+    """v2 runtime must fail closed on legacy registry schemas."""
+
+    db_path = tmp_path / "registry.db"
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute("PRAGMA user_version = 1")
+        conn.commit()
+    finally:
+        conn.close()
+
+    registry = Registry(db_path)
+
+    try:
+        registry.initialize()
+    except Exception as exc:
+        assert "Legacy registry schema detected" in str(exc)
+    else:
+        raise AssertionError("Expected initialize() to reject legacy schema version 1")

@@ -35,7 +35,7 @@ def _make_app_config(tmp_path: Path) -> AppConfig:
         max_downloads=10,
     )
     core = CoreConfig(
-        config_version=1,
+        config_version=2,
         poll_interval_minutes=720,
         process_accounts_in_config_order=True,
         staging_path=tmp_path / "staging",

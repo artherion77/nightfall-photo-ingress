@@ -57,7 +57,7 @@ def _make_account(tmp_path: Path, name: str = "alice") -> AccountConfig:
 
 def _make_app_config(tmp_path: Path, account: AccountConfig) -> AppConfig:
     core = CoreConfig(
-        config_version=1,
+        config_version=2,
         poll_interval_minutes=15,
         process_accounts_in_config_order=True,
         staging_path=tmp_path / "staging",

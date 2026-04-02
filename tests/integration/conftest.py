@@ -390,7 +390,7 @@ def app_config_fixture(tmp_path: Path, registry_fixture: RegistryHarness):
             )
 
         core_values = {
-            "config_version": 1,
+            "config_version": 2,
             "poll_interval_minutes": 15,
             "process_accounts_in_config_order": True,
             "staging_path": tmp_path / "staging",

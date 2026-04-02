@@ -15,7 +15,7 @@
 #   p2  User onboarding: device-code auth setup (auth-setup --skip-discovery)
 #   p3  Path discovery: auto-discover OneDrive paths (discover-paths, reuses cached token)
 #   p4  Live integration: authenticated poll, status export
-#   p5  Snapshot isolation: reset, verify token cleared, config survives
+#   p5  Snapshot isolation: reset, verify token cleared, config-check survives
 #
 # Evidence is written to:
 #   $FLOW_EVIDENCE_BASE/flow-<run_id>/
@@ -224,7 +224,9 @@ print('schema_version=%s command=%s' % (d['schema_version'], d['command']))
     # S1.6 required runtime directory layout present inside the container
     local expected_dirs=(
         /var/lib/ingress/staging
+        /var/lib/ingress/pending
         /var/lib/ingress/accepted
+        /var/lib/ingress/rejected
         /var/lib/ingress/trash
         /var/lib/ingress/tokens
         /var/lib/ingress/cursors
@@ -524,7 +526,7 @@ print('command=%s state=%s' % (d['command'], d.get('state', '?')))
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# P5 — Snapshot isolation: reset clears install state, config survives
+# P5 — Snapshot isolation: reset clears onboarding state, config-check survives
 # ─────────────────────────────────────────────────────────────────────────────
 phase_p5() {
     _hdr "── P5  Snapshot isolation: reset clears onboarding state ────────────"
@@ -540,7 +542,7 @@ phase_p5() {
         || { _pfail "P5.1:reset_completed" "stagingctl reset failed — see $log_dir/reset.log"; return 1; }
 
     # P5.2 token cache must be absent after reset
-    # The 'clean' snapshot was taken before install, so token cache should not survive.
+    # The 'clean' snapshot is refreshed after install (pre-auth), so token cache must not survive.
     local token_path="/var/lib/ingress/tokens/${STAGING_ACCOUNT}.json"
     if lxc exec "$CONTAINER" -- test -f "$token_path" 2>/dev/null; then
         _pfail "P5.2:token_cleared_after_reset" \
@@ -550,7 +552,7 @@ phase_p5() {
     fi
 
     # P5.3 config-check still passes after reset
-    # Config was pushed before the clean snapshot; it must survive a reset.
+    # The install-time clean snapshot includes config and installed CLI.
     lxc exec "$CONTAINER" -- \
         "$VENV_ROOT/bin/nightfall-photo-ingress" --log-mode json \
         config-check --path "$CONF_DEST" \
