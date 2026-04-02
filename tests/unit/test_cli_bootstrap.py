@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import io
+
 from nightfall_photo_ingress import cli
 
 
@@ -18,6 +20,7 @@ def test_cli_commands_are_registered() -> None:
 
     assert commands == {
         "auth-setup",
+        "discover-paths",
         "poll",
         "reject",
         "process-trash",
@@ -30,3 +33,29 @@ def test_main_help_exit_code_zero() -> None:
     """Calling main with no subcommand should print help and return zero."""
 
     assert cli.main([]) == 0
+
+
+def test_confirm_config_writeback_respects_assume_yes(monkeypatch, capsys) -> None:
+    monkeypatch.setenv("NIGHTFALL_PROMPT_POLICY", "assume-yes")
+
+    assert cli._confirm_config_writeback("/Bilder/Eigene Aufnahmen") is True
+
+    out = capsys.readouterr().out
+    assert "Discovered OneDrive root: /Bilder/Eigene Aufnahmen" in out
+    assert "Assume-yes: Write discovered onedrive_root back to config file? -> yes" in out
+
+
+def test_confirm_config_writeback_respects_assume_default(monkeypatch, capsys) -> None:
+    monkeypatch.setenv("NIGHTFALL_PROMPT_POLICY", "assume-default")
+
+    assert cli._confirm_config_writeback("/Bilder") is False
+
+    out = capsys.readouterr().out
+    assert "Assume-default: Write discovered onedrive_root back to config file? -> no" in out
+
+
+def test_confirm_config_writeback_non_tty_defaults_to_no(monkeypatch) -> None:
+    monkeypatch.delenv("NIGHTFALL_PROMPT_POLICY", raising=False)
+    monkeypatch.setattr(cli.sys, "stdin", io.StringIO(""))
+
+    assert cli._confirm_config_writeback("/Bilder") is False

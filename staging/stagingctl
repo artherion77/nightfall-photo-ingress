@@ -221,13 +221,42 @@ cmd_install() {
     # Prepare staging config: substitute real client_id if provided
     local conf_src="$SCRIPT_DIR/container/photo-ingress.conf"
     local tmp_conf
+    local existing_client_id=""
     tmp_conf="$(mktemp /tmp/photo-ingress-staging-XXXXXX.conf)"
     trap 'rm -f "${tmp_conf:-}"' EXIT
     cp "$conf_src" "$tmp_conf"
 
+    existing_client_id="$(
+        lxc exec "$CONTAINER" -- python3 -c "
+from pathlib import Path
+
+config_path = Path('$CONF_DEST')
+placeholder = 'STAGING_CLIENT_ID_PLACEHOLDER'
+
+if not config_path.exists():
+    raise SystemExit(0)
+
+for line in config_path.read_text(encoding='utf-8').splitlines():
+    stripped = line.strip()
+    if not stripped.startswith('client_id'):
+        continue
+    _, _, value = stripped.partition('=')
+    client_id = value.strip()
+    if client_id and client_id != placeholder:
+        print(client_id)
+    break
+" 2>/dev/null || true
+    )"
+
     if [[ -n "${STAGING_CLIENT_ID:-}" ]]; then
         sed -i "s/STAGING_CLIENT_ID_PLACEHOLDER/$STAGING_CLIENT_ID/" "$tmp_conf"
+        if [[ -n "$existing_client_id" && "$existing_client_id" != "$STAGING_CLIENT_ID" ]]; then
+            _warn "Existing STAGING_CLIENT_ID $existing_client_id in staging container overwritten with new ID: $STAGING_CLIENT_ID"
+        fi
         _info "Substituted STAGING_CLIENT_ID."
+    elif [[ -n "$existing_client_id" ]]; then
+        sed -i "s/STAGING_CLIENT_ID_PLACEHOLDER/$existing_client_id/" "$tmp_conf"
+        _info "Preserved the existing STAGING_CLIENT_ID in the container."
     else
         _warn "STAGING_CLIENT_ID not set — config retains placeholder. Auth will fail."
     fi
@@ -237,7 +266,7 @@ cmd_install() {
 
     _info "Running pip install ..."
     lxc exec "$CONTAINER" -- \
-        "$VENV_ROOT/bin/pip" install --quiet --upgrade "$CT_TMP_DIR/$whl_name"
+        "$VENV_ROOT/bin/pip" install --quiet --upgrade --force-reinstall "$CT_TMP_DIR/$whl_name"
 
     # Push existing token cache if provided (DEPRECATED: use 'stagingctl auth-setup' instead)
     if [[ -n "${STAGING_TOKEN_JSON:-}" && -f "$STAGING_TOKEN_JSON" ]]; then
@@ -417,6 +446,7 @@ cmd_auth_setup() {
     # -t allocates a PTY inside the container so MSAL output is unbuffered and
     # the device-code prompt displays correctly in the operator's terminal.
     lxc exec -t "$CONTAINER" -- \
+        env NIGHTFALL_PROMPT_POLICY="${NIGHTFALL_PROMPT_POLICY:-}" \
         "$VENV_ROOT/bin/nightfall-photo-ingress" \
         auth-setup --account "$account" --path "$CONF_DEST" --skip-discovery
 
@@ -437,6 +467,7 @@ cmd_discover_paths() {
     echo ""
 
     lxc exec -t "$CONTAINER" -- \
+        env NIGHTFALL_PROMPT_POLICY="${NIGHTFALL_PROMPT_POLICY:-}" \
         "$VENV_ROOT/bin/nightfall-photo-ingress" \
         discover-paths --account "$account" --path "$CONF_DEST"
 

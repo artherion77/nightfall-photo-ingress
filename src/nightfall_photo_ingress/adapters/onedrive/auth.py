@@ -210,6 +210,14 @@ class OneDriveAuthClient:
         return cache_path.parent / (cache_path.stem + ".identity.json")
 
     @staticmethod
+    def _legacy_identity_path(cache_path: Path) -> Path:
+        """Return legacy identity sidecar path used by older builds."""
+
+        if cache_path.suffix:
+            return cache_path.with_suffix(cache_path.suffix + ".identity.json")
+        return Path(str(cache_path) + ".identity.json")
+
+    @staticmethod
     def _onboarding_path(cache_path: Path) -> Path:
         """Return onboarding metadata sidecar path bound to cache path."""
 
@@ -219,6 +227,13 @@ class OneDriveAuthClient:
         """Load expected identity sidecar for silent-token account binding."""
 
         identity_path = self._identity_path(account.token_cache)
+        if not identity_path.exists():
+            legacy_identity_path = self._legacy_identity_path(account.token_cache)
+            if legacy_identity_path.exists():
+                self._ensure_cache_parent(identity_path)
+                legacy_identity_path.replace(identity_path)
+                os.chmod(identity_path, 0o600)
+
         if not identity_path.exists():
             return None
 

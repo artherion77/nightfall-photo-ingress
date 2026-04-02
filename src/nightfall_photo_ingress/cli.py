@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import configparser
 import logging
+import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -497,6 +498,26 @@ def _resolve_target_account(app_config: AppConfig, requested_name: str | None):
 
 def _confirm_config_writeback(suggested_path: str | None = None) -> bool:
     """Ask operator consent before modifying config file."""
+
+    prompt_policy = os.getenv("NIGHTFALL_PROMPT_POLICY", "").strip().lower()
+
+    if prompt_policy == "assume-yes":
+        if suggested_path:
+            print(f"\nDiscovered OneDrive root: {suggested_path}\n")
+        print("Assume-yes: Write discovered onedrive_root back to config file? -> yes")
+        return True
+
+    if prompt_policy == "assume-no":
+        if suggested_path:
+            print(f"\nDiscovered OneDrive root: {suggested_path}\n")
+        print("Assume-no: Write discovered onedrive_root back to config file? -> no")
+        return False
+
+    if prompt_policy == "assume-default":
+        if suggested_path:
+            print(f"\nDiscovered OneDrive root: {suggested_path}\n")
+        print("Assume-default: Write discovered onedrive_root back to config file? -> no")
+        return False
 
     if not sys.stdin.isatty():
         return False

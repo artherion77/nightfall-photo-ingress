@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 from pathlib import Path
 import stat
 
@@ -150,3 +151,27 @@ def test_acquire_access_token_requires_cached_account(
 
     with pytest.raises(AuthError, match="Run auth-setup first"):
         OneDriveAuthClient().acquire_access_token(account)
+
+
+def test_load_expected_identity_migrates_legacy_sidecar(account: AccountConfig) -> None:
+    client = OneDriveAuthClient()
+    account.token_cache.parent.mkdir(parents=True, exist_ok=True)
+    account.token_cache.parent.chmod(0o700)
+
+    payload = {
+        "home_account_id": "home-123",
+        "username": "alice@example.com",
+        "updated_at": "2026-04-02T00:00:00+00:00",
+    }
+    payload["integrity_sha256"] = client._identity_integrity_hash(payload, account)
+
+    legacy_path = client._legacy_identity_path(account.token_cache)
+    current_path = client._identity_path(account.token_cache)
+    legacy_path.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
+    legacy_path.chmod(0o600)
+
+    identity = client._load_expected_identity(account)
+
+    assert identity == {"home_account_id": "home-123", "username": "alice@example.com"}
+    assert current_path.exists()
+    assert not legacy_path.exists()

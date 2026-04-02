@@ -113,7 +113,8 @@ class TestDocumentationCoverage:
 
 class TestAuthSetup:
     def test_auth_setup_command_dispatched(self, stagingctl_text: str) -> None:
-        assert "auth-setup) cmd_auth_setup" in stagingctl_text
+        assert "auth-setup)" in stagingctl_text
+        assert "cmd_auth_setup" in stagingctl_text
 
     def test_auth_setup_uses_tty_for_lxc_exec(self, stagingctl_text: str) -> None:
         # -t allocates a PTY so the device-code prompt renders in the operator's terminal
@@ -127,9 +128,27 @@ class TestAuthSetup:
         assert "--path \"$CONF_DEST\"" in stagingctl_text
 
 
+class TestInstallClientIdPreservation:
+    def test_install_reads_existing_client_id_from_container_config(self, stagingctl_text: str) -> None:
+        assert "existing_client_id" in stagingctl_text
+        assert "client_id" in stagingctl_text
+        assert "STAGING_CLIENT_ID_PLACEHOLDER" in stagingctl_text
+
+    def test_install_warns_when_existing_client_id_is_overwritten(self, stagingctl_text: str) -> None:
+        assert "Existing STAGING_CLIENT_ID" in stagingctl_text
+        assert "overwritten with new ID" in stagingctl_text
+
+    def test_install_preserves_existing_client_id_when_host_env_unset(self, stagingctl_text: str) -> None:
+        assert "Preserved the existing STAGING_CLIENT_ID in the container." in stagingctl_text
+
+    def test_install_force_reinstalls_same_version_wheels(self, stagingctl_text: str) -> None:
+        assert "install --quiet --upgrade --force-reinstall" in stagingctl_text
+
+
 class TestSmokeLive:
     def test_smoke_live_command_dispatched(self, stagingctl_text: str) -> None:
-        assert "smoke-live) cmd_smoke_live" in stagingctl_text
+        assert "smoke-live)" in stagingctl_text
+        assert "cmd_smoke_live" in stagingctl_text
 
     def test_smoke_live_checks_token_cache_before_poll(self, stagingctl_text: str) -> None:
         # Must gate on token cache presence before attempting live poll

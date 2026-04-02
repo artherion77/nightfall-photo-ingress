@@ -58,9 +58,13 @@ class TestInteractiveGating:
         assert "--phase" in flowctl_text
 
     def test_operator_prompt_function_present(self, flowctl_text: str) -> None:
-        # _prompt reads from /dev/tty so interactive phases don't consume stdin
-        assert "_prompt()" in flowctl_text
+        # _confirm reads from /dev/tty so interactive phases don't consume stdin
+        assert "_confirm()" in flowctl_text
         assert "/dev/tty" in flowctl_text
+
+    def test_assume_answer_flags_present(self, flowctl_text: str) -> None:
+        for flag in ("--assume-yes", "--assume-no", "--assume-default", "--yes", "--no"):
+            assert flag in flowctl_text
 
     def test_p2_skips_when_non_interactive(self, flowctl_text: str) -> None:
         assert "SKIP_INTERACTIVE" in flowctl_text
@@ -81,11 +85,11 @@ class TestStepLabels:
             assert step in flowctl_text, f"Step label {step} not found in flowctl"
 
     def test_p2_step_labels(self, flowctl_text: str) -> None:
-        for step in ("P2.1", "P2.2", "P2.3", "P2.4", "P2.5"):
+        for step in ("P2.1", "P2.2", "P2.3", "P2.4"):
             assert step in flowctl_text, f"Step label {step} not found in flowctl"
 
     def test_p3_step_labels(self, flowctl_text: str) -> None:
-        for step in ("P3.1",):
+        for step in ("P3.1", "P3.2"):
             assert step in flowctl_text, f"Step label {step} not found in flowctl"
 
     def test_p4_step_labels(self, flowctl_text: str) -> None:
@@ -136,9 +140,9 @@ class TestStagingctlIntegration:
         # flow. The comment in the script explains why.
         assert "TTY" in flowctl_text or "tty" in flowctl_text.lower()
 
-    def test_p2_onboarding_sidecar_check_present(self, flowctl_text: str) -> None:
+    def test_p3_onboarding_sidecar_check_present(self, flowctl_text: str) -> None:
         assert ".onboarding.json" in flowctl_text
-        assert "P2.5:onboarding_sidecar" in flowctl_text
+        assert "P3.2:onboarding_sidecar" in flowctl_text
 
 
 class TestDocumentationCoverage:
@@ -148,6 +152,10 @@ class TestDocumentationCoverage:
 
     def test_readme_documents_skip_interactive(self, readme_text: str) -> None:
         assert "--skip-interactive" in readme_text
+
+    def test_readme_documents_assume_answer_flags(self, readme_text: str) -> None:
+        for flag in ("--assume-yes", "--assume-no", "--assume-default"):
+            assert flag in readme_text
 
     def test_readme_documents_prerequisites(self, readme_text: str) -> None:
         assert "stagingctl create" in readme_text

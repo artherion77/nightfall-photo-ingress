@@ -10,8 +10,8 @@ require human input (device-code browser onboarding).
 | Phase | Kind | What is verified |
 |-------|------|------------------|
 | P1 | Automated | Container running, CLI `--help`, `auth-setup` discoverable, `config-check`, status file schema, directory layout, systemd units enabled |
-| P2 | **Interactive** | `stagingctl auth-setup` (device-code login only, no discovery); token cache written; file mode 0600; identity sidecar; onboarding sidecar |
-| P3 | **Interactive** | `stagingctl discover-paths` auto-discovers OneDrive paths using cached token (no new login); writeback to config |
+| P2 | **Interactive** | Detect existing cache; show cached identity (`user` + `auth_id`); confirm whether to skip re-auth (`Y/n`); if not skipped run `stagingctl auth-setup`; then verify token cache, mode 0600, identity sidecar |
+| P3 | **Interactive** | `stagingctl discover-paths` auto-discovers OneDrive paths using cached token (no new login); persists onboarding sidecar metadata; writeback to config |
 | P4 | Semi-automated | `stagingctl smoke-live` (live poll + secret scan); status file reflects `poll` command |
 | P5 | Automated | `stagingctl reset` restores clean snapshot; token cache absent; `config-check` still passes |
 
@@ -54,6 +54,21 @@ tests/staging-flow/flowctl run
 ```bash
 tests/staging-flow/flowctl run --skip-interactive
 ```
+
+### Non-interactive prompt policy:
+
+```bash
+# yes for all confirmations
+tests/staging-flow/flowctl run --assume-yes
+
+# no for all confirmations
+tests/staging-flow/flowctl run --assume-no
+
+# always choose prompt defaults
+tests/staging-flow/flowctl run --assume-default
+```
+
+Short aliases are also supported: `-y`/`--yes` and `-n`/`--no`.
 
 ### Single phase:
 

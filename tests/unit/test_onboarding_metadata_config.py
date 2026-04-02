@@ -68,3 +68,20 @@ def test_write_account_onedrive_root_updates_section_value(tmp_path: Path) -> No
     assert ok is True
     parsed = load_config(cfg)
     assert parsed.accounts[0].onedrive_root == "/Bilder/Eigene Aufnahmen"
+
+
+def test_load_config_migrates_legacy_onboarding_sidecar_name(tmp_path: Path) -> None:
+    cfg = _write_config(tmp_path)
+    legacy_metadata_path = tmp_path / "primary.token.json.onboarding.json"
+    migrated_metadata_path = tmp_path / "primary.token.onboarding.json"
+    legacy_metadata_path.write_text(
+        json.dumps({"resolved_onedrive_root": "/Bilder/Eigene Aufnahmen"}),
+        encoding="utf-8",
+    )
+
+    parsed = load_config(cfg)
+    account = parsed.accounts[0]
+
+    assert account.resolved_onedrive_root == "/Bilder/Eigene Aufnahmen"
+    assert migrated_metadata_path.exists()
+    assert not legacy_metadata_path.exists()

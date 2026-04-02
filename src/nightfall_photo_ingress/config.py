@@ -710,6 +710,12 @@ def _load_onboarding_resolved_root(token_cache_path: Path) -> str | None:
 
     metadata_path = _onboarding_metadata_path(token_cache_path)
     if not metadata_path.exists():
+        legacy_path = _legacy_onboarding_metadata_path(token_cache_path)
+        if legacy_path.exists():
+            metadata_path.parent.mkdir(parents=True, exist_ok=True)
+            legacy_path.replace(metadata_path)
+
+    if not metadata_path.exists():
         return None
 
     try:
@@ -734,6 +740,12 @@ def _load_onboarding_resolved_root(token_cache_path: Path) -> str | None:
 
 def _onboarding_metadata_path(token_cache_path: Path) -> Path:
     """Return onboarding metadata sidecar path for a token cache path."""
+
+    return token_cache_path.parent / (token_cache_path.stem + ".onboarding.json")
+
+
+def _legacy_onboarding_metadata_path(token_cache_path: Path) -> Path:
+    """Return legacy onboarding metadata sidecar path used by older builds."""
 
     if token_cache_path.suffix:
         return token_cache_path.with_suffix(token_cache_path.suffix + ".onboarding.json")
