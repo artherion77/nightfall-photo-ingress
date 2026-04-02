@@ -72,29 +72,64 @@ These mounts are recreated by `create` and naturally reset by snapshot restore.
 - `stagingctl install [wheel]`
   pushes wheel and config into container, installs in `/opt/ingress` venv,
   enables timer and trash path units
+- `stagingctl auth-setup`
+  runs `nightfall-photo-ingress auth-setup` interactively inside the container
+  via TTY pass-through; the operator completes the Entra device-code flow in a browser.
+  Writes the token cache and identity sidecar to the container's `/var/lib/ingress/tokens/`.
+  **This is the correct authentication path for live testing.**
+- `stagingctl smoke`
+  runs headless (no-auth) assertions and collects evidence
+- `stagingctl smoke-live`
+  runs after `auth-setup`; performs a live authenticated poll and secret scan.
+  Fails fast if no token cache is present.
 - `stagingctl reset`
-  restores snapshot `clean` and restarts container
+  restores snapshot `clean` and restarts container.
+  Auth state written at install time is cleared; re-run `auth-setup` after reset.
 - `stagingctl uninstall`
   removes container only
 - `stagingctl uninstall --purge`
   removes container and host evidence/log directories for the active storage mode
 
+## Authentication for live testing
+
+Production uses the MSAL delegated device-code flow with per-account identity binding.
+Staging must exercise the same path.
+
+**Recommended workflow:**
+
+```bash
+stagingctl create
+stagingctl install
+stagingctl smoke            # headless: config, dirs, units, status file
+stagingctl auth-setup       # interactive: complete device-code auth in browser
+stagingctl smoke-live       # live: authenticated poll + secret scan
+```
+
+`auth-setup` runs inside the container (TTY pass-through). The operator sees the
+device-code URL in their terminal and completes sign-in in a browser. After
+completion, the token cache and identity sidecar are verified automatically.
+
+After `stagingctl reset`, auth state is cleared (the snapshot was taken before
+`install`). Re-run `auth-setup` to re-authenticate.
+
 ## Evidence and smoke
 
-`stagingctl smoke` writes run artifacts to:
+All smoke commands write run artifacts to `<host-evidence-base>/<run-id>/`:
 
-- `<host-evidence-base>/<run-id>/`
+- `manifest.jsonl` — smoke start/finish events
+- `assertions.jsonl` — per-assertion pass/fail records
+- `*.log` — raw command output captured per step
 
-where host-evidence-base is mode-dependent (`/mnt/ssd/...` or `/run/...`).
+Host-evidence-base is mode-dependent (`/mnt/ssd/...` or `/run/...`).
 
 ## Environment variables
 
 | Variable | Default | Purpose |
 |---|---|---|
 | `STAGING_VOLATILE` | `0` | `1` => volatile `/run/staging-photo-ingress/*`; `0` => persistent `/mnt/ssd/staging/photo-ingress/*` |
-| `STAGING_CLIENT_ID` | unset | Azure client id substitution for staging config |
-| `STAGING_ACCOUNT` | `staging` | account name passed to poll command |
-| `STAGING_TOKEN_JSON` | unset | optional token cache pushed into container |
+| `STAGING_CLIENT_ID` | unset | Azure client id substituted into staging config |
+| `STAGING_ACCOUNT` | `staging` | account name passed to `auth-setup` and `poll` |
+| `STAGING_TOKEN_JSON` | unset | **[DEPRECATED]** Use `stagingctl auth-setup` instead |
 | `STAGING_EVIDENCE_BASE` | mode-derived default | optional override for evidence path |
 | `STAGING_LOG_BASE` | mode-derived default | optional override for log path |
 

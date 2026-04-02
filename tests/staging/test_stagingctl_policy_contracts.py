@@ -109,3 +109,50 @@ class TestDocumentationCoverage:
     def test_readme_mentions_profiles_and_image(self, readme_text: str) -> None:
         assert 'ubuntu:24.04' in readme_text
         assert '-p default -p staging' in readme_text
+
+
+class TestAuthSetup:
+    def test_auth_setup_command_dispatched(self, stagingctl_text: str) -> None:
+        assert "auth-setup) cmd_auth_setup" in stagingctl_text
+
+    def test_auth_setup_uses_tty_for_lxc_exec(self, stagingctl_text: str) -> None:
+        # -t allocates a PTY so the device-code prompt renders in the operator's terminal
+        assert "lxc exec -t \"$CONTAINER\" --" in stagingctl_text
+
+    def test_auth_setup_uses_staging_account_variable(self, stagingctl_text: str) -> None:
+        assert 'account="${STAGING_ACCOUNT:-staging}"' in stagingctl_text
+
+    def test_auth_setup_calls_auth_setup_subcommand(self, stagingctl_text: str) -> None:
+        assert "auth-setup --account" in stagingctl_text
+        assert "--path \"$CONF_DEST\"" in stagingctl_text
+
+
+class TestSmokeLive:
+    def test_smoke_live_command_dispatched(self, stagingctl_text: str) -> None:
+        assert "smoke-live) cmd_smoke_live" in stagingctl_text
+
+    def test_smoke_live_checks_token_cache_before_poll(self, stagingctl_text: str) -> None:
+        # Must gate on token cache presence before attempting live poll
+        assert "token_path=" in stagingctl_text
+        assert "token_cache_exists" in stagingctl_text
+
+    def test_smoke_live_runs_live_poll(self, stagingctl_text: str) -> None:
+        assert "live_poll_exit_0" in stagingctl_text
+        assert "poll-live.log" in stagingctl_text
+
+    def test_smoke_live_runs_secret_scan(self, stagingctl_text: str) -> None:
+        assert "secret_scan_clean" in stagingctl_text
+
+    def test_smoke_live_collects_evidence(self, stagingctl_text: str) -> None:
+        assert "smoke_live_started" in stagingctl_text
+        assert "smoke_live_finished" in stagingctl_text
+
+
+class TestDeprecations:
+    def test_staging_token_json_has_deprecation_warning(self, stagingctl_text: str) -> None:
+        assert "DEPRECATED" in stagingctl_text
+        assert "STAGING_TOKEN_JSON" in stagingctl_text
+
+    def test_deprecation_directs_to_auth_setup(self, stagingctl_text: str) -> None:
+        # Warning must point the operator to the correct replacement command
+        assert "stagingctl auth-setup" in stagingctl_text

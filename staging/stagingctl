@@ -6,13 +6,15 @@
 #   stagingctl install [wheel]   push wheel + config, enable service
 #   stagingctl uninstall         delete container
 #   stagingctl reset             restore "clean" snapshot, restart
-#   stagingctl smoke             run smoke assertions, collect evidence
+#   stagingctl smoke             run headless smoke assertions, collect evidence
+#   stagingctl auth-setup        run interactive device-code auth inside the container
+#   stagingctl smoke-live        run authenticated live poll + secret scan
 #   stagingctl evidence [run-id] list or inspect evidence runs
 #
 # Environment variables:
 #   STAGING_CLIENT_ID   real Azure client_id to substitute into config
 #   STAGING_ACCOUNT     account section name to target for live poll (default: staging)
-#   STAGING_TOKEN_JSON  path to an existing token cache to push into the container
+#   STAGING_TOKEN_JSON  [DEPRECATED] use 'stagingctl auth-setup' instead
 #   STAGING_VOLATILE    set to 1 to use /run/staging-photo-ingress/* tmpfs paths
 
 set -euo pipefail
@@ -223,9 +225,13 @@ cmd_install() {
     lxc exec "$CONTAINER" -- \
         "$VENV_ROOT/bin/pip" install --quiet --upgrade "/tmp/$whl_name"
 
-    # Push existing token cache if provided (for resumed smoke testing)
+    # Push existing token cache if provided (DEPRECATED: use 'stagingctl auth-setup' instead)
     if [[ -n "${STAGING_TOKEN_JSON:-}" && -f "$STAGING_TOKEN_JSON" ]]; then
-        _info "Pushing token cache $STAGING_TOKEN_JSON ..."
+        _warn "DEPRECATED: STAGING_TOKEN_JSON will be removed in a future version."
+        _warn "  Use 'stagingctl auth-setup' to authenticate interactively inside the container."
+        _warn "  STAGING_TOKEN_JSON bypasses auth-setup and does not populate the identity"
+        _warn "  sidecar (.identity.json) required by the OneDrive auth layer."
+        _info "Pushing token cache $STAGING_TOKEN_JSON (deprecated path) ..."
         lxc file push "$STAGING_TOKEN_JSON" \
             "$CONTAINER/var/lib/ingress/tokens/staging.json"
     fi
@@ -381,6 +387,93 @@ cmd_smoke() {
     fi
 }
 
+# ─────────────────────────────────────────────────────────────────────────────
+# stagingctl auth-setup
+# ─────────────────────────────────────────────────────────────────────────────
+cmd_auth_setup() {
+    _require_container_running
+
+    local account="${STAGING_ACCOUNT:-staging}"
+
+    _info "Starting device-code auth for account '$account' ..."
+    _info "A browser URL and one-time code will appear below."
+    _info "Open the URL in a browser and complete sign-in to proceed."
+    echo ""
+
+    # -t allocates a PTY inside the container so MSAL output is unbuffered and
+    # the device-code prompt displays correctly in the operator's terminal.
+    lxc exec -t "$CONTAINER" -- \
+        "$VENV_ROOT/bin/nightfall-photo-ingress" \
+        auth-setup --account "$account" --path "$CONF_DEST"
+
+    echo ""
+    _ok "auth-setup completed for account '$account'. Token cache written inside container."
+    _info "Next step: run 'stagingctl smoke-live' to verify authenticated polling."
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# stagingctl smoke-live
+# ─────────────────────────────────────────────────────────────────────────────
+cmd_smoke_live() {
+    _require_container_running
+
+    local run_id
+    run_id="$(_gen_run_id)"
+    local evidence_dir="$HOST_EVIDENCE_BASE/$run_id"
+    mkdir -p "$evidence_dir"
+
+    _info "Live smoke run: $run_id"
+    _info "Evidence    : $evidence_dir"
+
+    local manifest="$evidence_dir/manifest.jsonl"
+    printf '{"event":"smoke_live_started","run_id":"%s","ts":"%s"}\n' \
+        "$run_id" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$manifest"
+
+    local rc=0
+    local account="${STAGING_ACCOUNT:-staging}"
+    local token_path="/var/lib/ingress/tokens/${account}.json"
+
+    # ── 1. token cache present ────────────────────────────────────────────────
+    _info "Step 1/3: token cache"
+    if lxc exec "$CONTAINER" -- test -f "$token_path" 2>/dev/null; then
+        _assert_ok "$evidence_dir/assertions.jsonl" "token_cache_exists" "$token_path present"
+        _ok "Token cache found."
+    else
+        _assert_fail "$evidence_dir/assertions.jsonl" "token_cache_exists" \
+            "$token_path missing — run: stagingctl auth-setup"
+        _fail "No token cache. Run 'stagingctl auth-setup' first."
+    fi
+
+    # ── 2. live poll ──────────────────────────────────────────────────────────
+    _info "Step 2/3: live poll (account=$account)"
+    lxc exec "$CONTAINER" -- \
+        "$VENV_ROOT/bin/nightfall-photo-ingress" \
+        --log-mode json poll --account "$account" --path "$CONF_DEST" 2>&1 \
+        | tee "$evidence_dir/poll-live.log" \
+        && _assert_ok "$evidence_dir/assertions.jsonl" "live_poll_exit_0" "poll completed" \
+        || { _assert_fail "$evidence_dir/assertions.jsonl" "live_poll_exit_0" "poll failed"; rc=1; }
+
+    # ── 3. secret scan ────────────────────────────────────────────────────────
+    _info "Step 3/3: secret scan"
+    lxc file push "$SCRIPT_DIR/evidence/secret_scan.py" \
+        "$CONTAINER/tmp/staging_secret_scan.py"
+    lxc exec "$CONTAINER" -- \
+        "$VENV_ROOT/bin/python3" /tmp/staging_secret_scan.py \
+        "$CT_EVIDENCE_DIR/$run_id" 2>&1 \
+        | tee "$evidence_dir/secret-scan.log" \
+        && _assert_ok "$evidence_dir/assertions.jsonl" "secret_scan_clean" "no leaks" \
+        || { _assert_fail "$evidence_dir/assertions.jsonl" "secret_scan_clean" "potential leaks found"; rc=1; }
+
+    printf '{"event":"smoke_live_finished","run_id":"%s","ts":"%s","exit_code":%d}\n' \
+        "$run_id" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$rc" >> "$manifest"
+
+    if [[ $rc -eq 0 ]]; then
+        _ok "Live smoke PASSED — run_id=$run_id"
+    else
+        _fail "Live smoke FAILED — run_id=$run_id  evidence: $evidence_dir"
+    fi
+}
+
 # Write a passing assertion row to a JSONL audit file.
 _assert_ok() {
     local audit_file="$1" name="$2" detail="$3"
@@ -431,20 +524,21 @@ _usage() {
 Usage: $(basename "$0") <command> [args]
 
 Commands:
-    create            Create LXC container using profiles default+staging and take 'clean' snapshot.
-    install [wheel]   Push wheel + config, enable service. Builds if no wheel given.
-    uninstall [--purge]
-                                        Delete container. --purge also removes host evidence/log directories.
-  reset             Restore 'clean' snapshot and restart.
-  smoke             Run smoke assertions; collect evidence.
-  evidence [id]     List or inspect evidence runs.
+  create              Create LXC container (profiles: default+staging), take 'clean' snapshot.
+  install [wheel]     Push wheel + config, enable service. Builds wheel if not supplied.
+  uninstall [--purge] Delete container. --purge also removes host evidence/log directories.
+  reset               Restore 'clean' snapshot and restart container.
+  smoke               Run headless smoke assertions; collect evidence.
+  auth-setup          Run interactive device-code auth for the staging account (requires TTY).
+  smoke-live          Run authenticated live poll + secret scan; collect evidence.
+  evidence [id]       List or inspect evidence runs.
 
 Environment variables:
-  STAGING_CLIENT_ID       Azure client_id to inject into config (required for live poll).
+  STAGING_CLIENT_ID       Azure client_id to inject into config.
   STAGING_ACCOUNT         Account section name (default: staging).
-  STAGING_TOKEN_JSON      Path to token cache file to push into container.
-    STAGING_VOLATILE        1 => use /run/staging-photo-ingress/{evidence,logs} (tmpfs).
-                                                    0 => use /mnt/ssd/staging/photo-ingress/{evidence,logs}.
+  STAGING_TOKEN_JSON      [DEPRECATED] Token cache path to push. Use 'auth-setup' instead.
+  STAGING_VOLATILE        1 => use /run/staging-photo-ingress/{evidence,logs} (tmpfs).
+                          0 => use /mnt/ssd/staging/photo-ingress/{evidence,logs} (default).
   STAGING_EVIDENCE_BASE   Override host-side evidence directory.
   STAGING_LOG_BASE        Override host-side log directory.
 EOF
@@ -456,13 +550,15 @@ main() {
     shift || true
 
     case "$cmd" in
-        create)    cmd_create    "$@" ;;
-        install)   cmd_install   "$@" ;;
-        uninstall) cmd_uninstall "$@" ;;
-        reset)     cmd_reset     "$@" ;;
-        smoke)     cmd_smoke     "$@" ;;
-        evidence)  cmd_evidence  "$@" ;;
-        *)         _usage ;;
+        create)     cmd_create     "$@" ;;
+        install)    cmd_install    "$@" ;;
+        uninstall)  cmd_uninstall  "$@" ;;
+        reset)      cmd_reset      "$@" ;;
+        smoke)      cmd_smoke      "$@" ;;
+        auth-setup) cmd_auth_setup "$@" ;;
+        smoke-live) cmd_smoke_live "$@" ;;
+        evidence)   cmd_evidence   "$@" ;;
+        *)          _usage ;;
     esac
 }
 
