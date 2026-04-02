@@ -300,6 +300,129 @@ If trash processing does not trigger:
 - Check `systemctl status nightfall-photo-ingress-trash.path`.
 - Start the processor directly with `systemctl start nightfall-photo-ingress-trash.service` to separate path-watch failures from processor failures.
 
+## Staging Flow: P2 Interactive Authentication (Device-Code Flow)
+
+The staging test flow validates authentication and polling before production deployment. **P2** tests one-time interactive device-code setup.
+
+### Prerequisites
+
+- Staging container running (`./staging/stagingctl create`)
+- Wheel package built (`python -m build --wheel`)
+- Real Azure app registration client ID (see *How To: Register Entra App for Graph*)
+- Personal Microsoft account to authenticate with
+
+### Run P2 Authentication Flow
+
+```bash
+export STAGING_CLIENT_ID="58996ba4-b840-498f-8ccc-7d1a98c071a0"  # your app client ID
+./staging/stagingctl install dist/nightfall_photo_ingress-0.1.0-py3-none-any.whl
+
+tests/staging-flow/flowctl run --phase p2
+```
+
+### What P2 Validates
+
+The flow will:
+1. **P2.1**: Initiate device-code auth (`stagingctl auth-setup`)
+2. Display a Microsoft sign-in URL and one-time code
+3. User opens URL in browser, signs in with personal Microsoft account, completes consent
+4. **P2.2**: Verify token cache file created (`/var/lib/ingress/tokens/staging.json`)
+5. **P2.3**: Verify token cache has secure permissions (mode 0600)
+6. **P2.4**: Check for account identity sidecar (written on first poll)
+
+### Expected Output
+
+```
+── P2  Interactive authentication  [OPERATOR ACTION REQUIRED] ───
+
+Open https://www.microsoft.com/link and enter code: XXXXXXXX
+
+[stagingctl] OK: auth-setup completed for account 'staging'. Token cache written inside container.
+
+[flowctl] PASS  P2.1:auth_setup_exit — stagingctl auth-setup completed (exit 0)
+[flowctl] PASS  P2.2:token_cache_written — /var/lib/ingress/tokens/staging.json present
+[flowctl] PASS  P2.3:token_cache_permissions — token file mode 0600 (secure)
+[flowctl] All phases PASSED
+```
+
+### Troubleshooting P2 Failures
+
+**Error: "Application with identifier '...' was not found in the directory"**
+
+Root cause: App registration misconfigured. Check in Azure portal:
+- [ ] Verify Application (client) ID matches config
+- [ ] Verify "Supported account types" is set to "Personal Microsoft accounts only"
+- [ ] Verify API token version is set to 2 (in Authentication → Advanced settings)
+
+Fix: Update app registration, then rerun P2.
+
+**Error: "Device-code flow did not return verification details"**
+
+Root cause: MSAL cannot communicate with the auth endpoint. Check:
+- [ ] Container has network access (`curl https://login.microsoftonline.com >/dev/null`)
+- [ ] Config client_id is not a placeholder (check inside container: `cat /etc/nightfall/photo-ingress.conf | grep client_id`)
+
+**Error: User cancels sign-in or consent**
+
+User action required: Run P2 again and complete the full sign-in and consent flow.
+
+## Staging Flow: P3 Live Authenticated Poll
+
+**P3** validates that the cached token works and the application can access OneDrive files.
+
+### Prerequisites
+
+- P2 passed (token cache written)
+- Application has `Files.Read` permission granted
+
+### Run P3 Poll Flow
+
+```bash
+tests/staging-flow/flowctl run --phase p3
+```
+
+### What P3 Validates
+
+The flow will:
+1. **P3.1**: Verify token cache exists and is readable
+2. **P3.2**: Run authenticated poll
+   - Acquire token silently from cache (MSAL refresh token flow)
+   - Enumerate OneDrive delta for Camera Roll / Bilder folder
+   - Download file metadata and candidates
+3. **P3.3**: Run ingest decision engine on downloaded candidates
+4. **P3.4**: Verify no credentials leaked in logs (secret scan)
+
+### Expected Output
+
+```
+── P3  Live authenticated poll  ──────────────────────────────
+
+[stagingctl] Starting smoke-live: poll + secret scan ...
+
+[flowctl] PASS  P3.1:token_cache_readable — /var/lib/ingress/tokens/staging.json readable
+[flowctl] PASS  P3.2:poll_success — poll completed (exit 0)
+[flowctl] PASS  P3.3:ingest_executed — ingest decision engine ran
+[flowctl] PASS  P3.4:no_secrets_leaked — secret scan found no credentials
+[flowctl] All phases PASSED
+```
+
+### Troubleshooting P3 Failures
+
+**Error: "No cached account found for 'staging'. Run auth-setup first."**
+
+Token cache is missing or not signed in. Run P2 again.
+
+**Error: "Graph request returned error status"**
+
+OneDrive path is incorrect or user lacks permission. Check:
+- [ ] Configured `onedrive_root` exists in user's OneDrive (e.g., "/Camera Roll" or "/Bilder/Eigene Aufnahmen")
+- [ ] User has read access to the folder
+- [ ] Permission Files.Read is granted (check in Azure portal: App registration → API permissions)
+
+**Error: Secret scan failed (credentials detected in logs)**
+
+Review log files in `/mnt/ssd/staging/photo-ingress/logs/<run-id>` for leaked tokens or client IDs. Do not commit sensitive data.
+
 ## Controlled-environment validation
 
 Live systemd smoke testing must run in the staging container, not on the host. Use the staging workflow:
