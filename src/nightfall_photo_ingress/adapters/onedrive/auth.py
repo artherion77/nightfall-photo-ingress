@@ -207,17 +207,13 @@ class OneDriveAuthClient:
     def _identity_path(cache_path: Path) -> Path:
         """Return sidecar identity path bound to this cache path."""
 
-        if cache_path.suffix:
-            return cache_path.with_suffix(cache_path.suffix + ".identity.json")
-        return Path(str(cache_path) + ".identity.json")
+        return cache_path.parent / (cache_path.stem + ".identity.json")
 
     @staticmethod
     def _onboarding_path(cache_path: Path) -> Path:
         """Return onboarding metadata sidecar path bound to cache path."""
 
-        if cache_path.suffix:
-            return cache_path.with_suffix(cache_path.suffix + ".onboarding.json")
-        return Path(str(cache_path) + ".onboarding.json")
+        return cache_path.parent / (cache_path.stem + ".onboarding.json")
 
     def _load_expected_identity(self, account: AccountConfig) -> dict[str, str] | None:
         """Load expected identity sidecar for silent-token account binding."""

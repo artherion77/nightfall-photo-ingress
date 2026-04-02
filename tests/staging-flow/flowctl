@@ -12,9 +12,10 @@
 #
 # Phases:
 #   p1  Pre-flight: container, CLI surface, config-check, dir layout, units
-#   p2  User onboarding: device-code flow via stagingctl auth-setup
-#   p3  Live integration: authenticated poll, status export
-#   p4  Snapshot isolation: reset, verify token cleared, config survives
+#   p2  User onboarding: device-code auth setup (auth-setup --skip-discovery)
+#   p3  Path discovery: auto-discover OneDrive paths (discover-paths, reuses cached token)
+#   p4  Live integration: authenticated poll, status export
+#   p5  Snapshot isolation: reset, verify token cleared, config survives
 #
 # Evidence is written to:
 #   $FLOW_EVIDENCE_BASE/flow-<run_id>/
@@ -253,35 +254,35 @@ EOF
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# P3 — Live integration: authenticated poll and status export
+# P4 — Live integration: authenticated poll and status export
 # ─────────────────────────────────────────────────────────────────────────────
-phase_p3() {
-    _hdr "── P3  Live integration: authenticated poll ─────────────────────────"
+phase_p4() {
+    _hdr "── P4  Live integration: authenticated poll ─────────────────────────"
 
     if [[ "$SKIP_INTERACTIVE" == "1" ]]; then
-        _pskip "P3:live_poll" "--skip-interactive set; live poll phase skipped"
+        _pskip "P4:live_poll" "--skip-interactive set; live poll phase skipped"
         return 0
     fi
 
     # Gate: token cache must exist — skip gracefully if P2 was not run or failed
     local token_path="/var/lib/ingress/tokens/${STAGING_ACCOUNT}.json"
     if ! lxc exec "$CONTAINER" -- test -f "$token_path" 2>/dev/null; then
-        _pskip "P3:live_poll" "no token cache present — was Phase P2 skipped?"
+        _pskip "P4:live_poll" "no token cache present — was Phase P2 skipped?"
         return 0
     fi
 
-    local log_dir="$FLOW_EVIDENCE_DIR/p3"
+    local log_dir="$FLOW_EVIDENCE_DIR/p4"
     mkdir -p "$log_dir"
     local rc=0
 
-    # P3.1 stagingctl smoke-live: live poll + secret scan
+    # P4.1 stagingctl smoke-live: live poll + secret scan
     _info "Running stagingctl smoke-live ..."
     STAGING_ACCOUNT="$STAGING_ACCOUNT" "$STAGINGCTL" smoke-live \
         >"$log_dir/smoke-live.log" 2>&1 \
-        && _pass "P3.1:smoke_live" "stagingctl smoke-live passed" \
-        || { _pfail "P3.1:smoke_live" "stagingctl smoke-live failed — see $log_dir/smoke-live.log"; rc=1; }
+        && _pass "P4.1:smoke_live" "stagingctl smoke-live passed" \
+        || { _pfail "P4.1:smoke_live" "stagingctl smoke-live failed — see $log_dir/smoke-live.log"; rc=1; }
 
-    # P3.2 status file updated to reflect the poll command
+    # P4.2 status file updated to reflect the poll command
     lxc exec "$CONTAINER" -- \
         python3 -c "
 import json, pathlib, sys
@@ -297,39 +298,39 @@ print('command=%s state=%s' % (d['command'], d.get('state', '?')))
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# P4 — Snapshot isolation: reset clears install state, config survives
+# P5 — Snapshot isolation: reset clears install state, config survives
 # ─────────────────────────────────────────────────────────────────────────────
-phase_p4() {
-    _hdr "── P4  Snapshot isolation: reset clears onboarding state ────────────"
+phase_p5() {
+    _hdr "── P5  Snapshot isolation: reset clears onboarding state ────────────"
 
-    local log_dir="$FLOW_EVIDENCE_DIR/p4"
+    local log_dir="$FLOW_EVIDENCE_DIR/p5"
     mkdir -p "$log_dir"
     local rc=0
 
-    # P4.1 stagingctl reset
+    # P5.1 stagingctl reset
     _info "Running stagingctl reset ..."
     "$STAGINGCTL" reset >"$log_dir/reset.log" 2>&1 \
-        && _pass "P4.1:reset_completed" "stagingctl reset completed" \
-        || { _pfail "P4.1:reset_completed" "stagingctl reset failed — see $log_dir/reset.log"; return 1; }
+        && _pass "P5.1:reset_completed" "stagingctl reset completed" \
+        || { _pfail "P5.1:reset_completed" "stagingctl reset failed — see $log_dir/reset.log"; return 1; }
 
-    # P4.2 token cache must be absent after reset
+    # P5.2 token cache must be absent after reset
     # The 'clean' snapshot was taken before install, so token cache should not survive.
     local token_path="/var/lib/ingress/tokens/${STAGING_ACCOUNT}.json"
     if lxc exec "$CONTAINER" -- test -f "$token_path" 2>/dev/null; then
-        _pfail "P4.2:token_cleared_after_reset" \
+        _pfail "P5.2:token_cleared_after_reset" \
             "token cache still present after reset — snapshot isolation breach"; rc=1
     else
-        _pass "P4.2:token_cleared_after_reset" "token cache absent — install-time state cleared by reset"
+        _pass "P5.2:token_cleared_after_reset" "token cache absent — install-time state cleared by reset"
     fi
 
-    # P4.3 config-check still passes after reset
+    # P5.3 config-check still passes after reset
     # Config was pushed before the clean snapshot; it must survive a reset.
     lxc exec "$CONTAINER" -- \
         "$VENV_ROOT/bin/nightfall-photo-ingress" --log-mode json \
         config-check --path "$CONF_DEST" \
         >"$log_dir/config-check-after-reset.log" 2>&1 \
-        && _pass "P4.3:config_check_after_reset" "config-check passes after reset" \
-        || { _pfail "P4.3:config_check_after_reset" "config-check failed after reset — see $log_dir/config-check-after-reset.log"; rc=1; }
+        && _pass "P5.3:config_check_after_reset" "config-check passes after reset" \
+        || { _pfail "P5.3:config_check_after_reset" "config-check failed after reset — see $log_dir/config-check-after-reset.log"; rc=1; }
 
     return $rc
 }
@@ -341,7 +342,7 @@ cmd_run() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --skip-interactive) SKIP_INTERACTIVE=1 ;;
-            --phase) ONLY_PHASE="${2:?--phase requires a value: p1|p2|p3|p4}"; shift ;;
+            --phase) ONLY_PHASE="${2:?--phase requires a value: p1|p2|p3|p4|p5}"; shift ;;
             *) _die "Unknown option: $1" ;;
         esac
         shift
@@ -367,6 +368,7 @@ cmd_run() {
     _should_run "p2" && { phase_p2 || overall=1; }
     _should_run "p3" && { phase_p3 || overall=1; }
     _should_run "p4" && { phase_p4 || overall=1; }
+    _should_run "p5" && { phase_p5 || overall=1; }
 
     printf '{"event":"flow_finished","run_id":"%s","ts":"%s","exit_code":%d}\n' \
         "$FLOW_RUN_ID" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$overall" \
@@ -401,9 +403,10 @@ Options for 'run':
 
 Phases:
   p1  Pre-flight: container, CLI surface, config-check, dir layout, systemd units
-  p2  User onboarding: device-code flow via stagingctl auth-setup                [OPERATOR]
-  p3  Live integration: authenticated poll, status export verification           [OPERATOR]
-  p4  Snapshot isolation: reset, verify token cleared, config-check survives
+  p2  User onboarding: device-code auth (auth-setup --skip-discovery)            [OPERATOR]
+  p3  Path discovery: auto-discover OneDrive paths (discover-paths)              [OPERATOR]
+  p4  Live integration: authenticated poll, status export verification           [OPERATOR]
+  p5  Snapshot isolation: reset, verify token cleared, config-check survives
 
 Environment variables:
   CONTAINER           LXC container name (default: staging-photo-ingress)

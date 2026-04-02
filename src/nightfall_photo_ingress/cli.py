@@ -72,7 +72,14 @@ def _build_parser() -> argparse.ArgumentParser:
     auth.add_argument("--account", help="Optional account name.", default=None)
     auth.add_argument("--path", default="/etc/nightfall/photo-ingress.conf")
     auth.add_argument("--verbose", action="store_true", help="Show detailed Graph API calls and debug info.")
+    auth.add_argument("--skip-discovery", action="store_true", help="Skip OneDrive path auto-discovery after auth.")
     auth.set_defaults(handler=_cmd_auth_setup)
+
+    discover = subparsers.add_parser("discover-paths", help="Auto-discover OneDrive storage paths using cached token.")
+    discover.add_argument("--account", help="Optional account name.", default=None)
+    discover.add_argument("--path", default="/etc/nightfall/photo-ingress.conf")
+    discover.add_argument("--verbose", action="store_true", help="Show detailed Graph API calls and debug info.")
+    discover.set_defaults(handler=_cmd_discover_paths)
 
     poll = subparsers.add_parser("poll", help="Run one poll cycle.")
     poll.add_argument("--account", help="Optional account name.", default=None)
@@ -115,88 +122,13 @@ def _cmd_auth_setup(args: argparse.Namespace) -> int:
         
         token = auth_client.auth_setup(account)
 
-        try:
-            with httpx.Client() as client:
-                detected_locale = detect_account_locale(
-                    account=account,
-                    access_token=token.token,
-                    http_client=client,
-                )
-            if detected_locale is not None:
-                log_level = logging.INFO if verbose else logging.DEBUG
-                LOGGER.log(
-                    log_level,
-                    "onedrive locale auto-detected",
-                    extra={"account": account.name, "locale": detected_locale},
-                )
-        except GraphError as exc:
-            LOGGER.warning(
-                "onedrive locale auto-detect failed",
-                extra={
-                    "account": account.name,
-                    "error_code": exc.code,
-                },
-            )
+        skip_discovery = getattr(args, "skip_discovery", False)
+        if skip_discovery:
+            LOGGER.info("auth setup completed (discovery skipped)", extra={"account": account.name})
+            return 0
 
-        try:
-            with httpx.Client() as client:
-                path_resolution = resolve_camera_roll_path_for_onboarding(
-                    account=account,
-                    access_token=token.token,
-                    http_client=client,
-                )
+        return _run_discovery(account, auth_client, args.path, token.token, verbose)
 
-            if path_resolution.reason is not None:
-                log_level = logging.INFO if verbose else logging.DEBUG
-                LOGGER.log(
-                    log_level,
-                    "configured onedrive_root invalid; auto-discovery used",
-                    extra={
-                        "account": account.name,
-                        "configured_path": path_resolution.configured_path,
-                        "configured_exists": path_resolution.configured_exists,
-                        "configured_media_count": path_resolution.configured_media_count,
-                        "reason": path_resolution.reason,
-                    },
-                )
-
-            if path_resolution.suggested_path is not None:
-                log_level = logging.INFO if verbose else logging.DEBUG
-                LOGGER.log(
-                    log_level,
-                    "auto-discovery suggested onedrive_root",
-                    extra={
-                        "account": account.name,
-                        "suggested_path": path_resolution.suggested_path,
-                        "media_count": path_resolution.suggested_media_count,
-                    },
-                )
-
-            effective_root = path_resolution.effective_path
-            auth_client.persist_onboarding_root(account, effective_root)
-
-            if path_resolution.suggested_path is not None and _confirm_config_writeback():
-                if _write_account_onedrive_root(args.path, account.name, path_resolution.suggested_path):
-                    LOGGER.info(
-                        "wrote discovered onedrive_root to config",
-                        extra={"account": account.name, "path": path_resolution.suggested_path},
-                    )
-                else:
-                    LOGGER.warning(
-                        "unable to write discovered onedrive_root to config",
-                        extra={"account": account.name, "path": path_resolution.suggested_path},
-                    )
-        except GraphError as exc:
-            LOGGER.warning(
-                "camera-roll auto-discovery failed",
-                extra={
-                    "account": account.name,
-                    "error_code": exc.code,
-                },
-            )
-
-        LOGGER.info("auth setup completed", extra={"account": account.name})
-        return 0
     except AuthError as exc:
         # Log full error details including safe_hint for debugging
         LOGGER.error(str(exc), extra=exc.as_log_dict())
@@ -204,6 +136,120 @@ def _cmd_auth_setup(args: argparse.Namespace) -> int:
     except ValueError as exc:
         LOGGER.error(str(exc))
         return 2
+
+
+def _cmd_discover_paths(args: argparse.Namespace) -> int:
+    """Auto-discover OneDrive paths using a cached token for one account."""
+
+    try:
+        app_config = load_config(args.path)
+        account = _resolve_target_account(app_config, args.account)
+        auth_client = OneDriveAuthClient()
+        verbose = getattr(args, "verbose", False)
+        
+        # Acquire token from cache (no interactive auth)
+        token = auth_client.acquire_access_token(account)
+        
+        return _run_discovery(account, auth_client, args.path, token.token, verbose)
+    except AuthError as exc:
+        LOGGER.error(str(exc), extra=exc.as_log_dict())
+        return 2
+    except ValueError as exc:
+        LOGGER.error(str(exc))
+        return 2
+
+
+def _run_discovery(
+    account: AccountConfig,
+    auth_client: OneDriveAuthClient,
+    config_path: str,
+    access_token: str,
+    verbose: bool,
+) -> int:
+    """Run path auto-discovery using a cached or fresh access token."""
+
+    try:
+        with httpx.Client() as client:
+            detected_locale = detect_account_locale(
+                account=account,
+                access_token=access_token,
+                http_client=client,
+            )
+        if detected_locale is not None:
+            log_level = logging.INFO if verbose else logging.DEBUG
+            LOGGER.log(
+                log_level,
+                "onedrive locale auto-detected",
+                extra={"account": account.name, "locale": detected_locale},
+            )
+    except GraphError as exc:
+        LOGGER.warning(
+            "onedrive locale auto-detect failed",
+            extra={
+                "account": account.name,
+                "error_code": exc.code,
+            },
+        )
+
+    try:
+        with httpx.Client() as client:
+            path_resolution = resolve_camera_roll_path_for_onboarding(
+                account=account,
+                access_token=access_token,
+                http_client=client,
+            )
+
+        if path_resolution.reason is not None:
+            log_level = logging.INFO if verbose else logging.DEBUG
+            LOGGER.log(
+                log_level,
+                "configured onedrive_root invalid; auto-discovery used",
+                extra={
+                    "account": account.name,
+                    "configured_path": path_resolution.configured_path,
+                    "configured_exists": path_resolution.configured_exists,
+                    "configured_media_count": path_resolution.configured_media_count,
+                    "reason": path_resolution.reason,
+                },
+            )
+
+        if path_resolution.suggested_path is not None:
+            log_level = logging.INFO if verbose else logging.DEBUG
+            LOGGER.log(
+                log_level,
+                "auto-discovery suggested onedrive_root",
+                extra={
+                    "account": account.name,
+                    "suggested_path": path_resolution.suggested_path,
+                    "media_count": path_resolution.suggested_media_count,
+                },
+            )
+
+        effective_root = path_resolution.effective_path
+        auth_client.persist_onboarding_root(account, effective_root)
+
+        if path_resolution.suggested_path is not None and _confirm_config_writeback(path_resolution.suggested_path):
+            if _write_account_onedrive_root(config_path, account.name, path_resolution.suggested_path):
+                LOGGER.info(
+                    "wrote discovered onedrive_root to config",
+                    extra={"account": account.name, "path": path_resolution.suggested_path},
+                )
+            else:
+                LOGGER.warning(
+                    "unable to write discovered onedrive_root to config",
+                    extra={"account": account.name, "path": path_resolution.suggested_path},
+                )
+    except GraphError as exc:
+        LOGGER.warning(
+            "camera-roll auto-discovery failed",
+            extra={
+                "account": account.name,
+                "error_code": exc.code,
+            },
+        )
+
+    LOGGER.info("discovery completed", extra={"account": account.name})
+    return 0
 
 
 def _cmd_poll(args: argparse.Namespace) -> int:
@@ -449,12 +495,15 @@ def _resolve_target_account(app_config: AppConfig, requested_name: str | None):
     raise ValueError("Multiple enabled accounts found; pass --account")
 
 
-def _confirm_config_writeback() -> bool:
+def _confirm_config_writeback(suggested_path: str | None = None) -> bool:
     """Ask operator consent before modifying config file."""
 
     if not sys.stdin.isatty():
         return False
 
+    if suggested_path:
+        print(f"\nDiscovered OneDrive root: {suggested_path}\n")
+    
     answer = input("Write discovered onedrive_root back to config file? [y/N]: ").strip().lower()
     return answer in {"y", "yes"}
 
