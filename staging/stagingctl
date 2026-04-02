@@ -50,6 +50,7 @@ else
     HOST_LOG_BASE="${STAGING_LOG_BASE:-/mnt/ssd/staging/photo-ingress/logs}"
     CT_EVIDENCE_DIR="/var/lib/ingress/evidence"
     CT_LOG_DIR="/var/log/nightfall"
+    CT_TMP_DIR="/root/staging-photo-ingress-tmp"
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -76,7 +77,13 @@ _resolve_tmpfs_host_base() {
 }
 
 _require_container_running() {
-    lxc info "$CONTAINER" 2>/dev/null | grep -Eiq "Status:[[:space:]]+running" \
+    if lxc info "$CONTAINER" 2>/dev/null | grep -Eiq "Status:[[:space:]]+running"; then
+        return
+    fi
+
+    local state=""
+    state="$(lxc list "$CONTAINER" -c s --format csv 2>/dev/null | head -n 1 | tr '[:upper:]' '[:lower:]')"
+    [[ "$state" == "running" ]] \
         || _fail "Container '$CONTAINER' is not running. Run: stagingctl create && stagingctl install"
 }
 
@@ -138,8 +145,8 @@ cmd_create() {
     done
 
     _info "Running container bootstrap ..."
-    lxc file push "$SCRIPT_DIR/container/setup.sh" "$CONTAINER/tmp/setup.sh"
-    lxc exec "$CONTAINER" -- env STAGING_VOLATILE="$STAGING_VOLATILE" bash /tmp/setup.sh
+    lxc file push "$SCRIPT_DIR/container/setup.sh" "$CONTAINER$CT_TMP_DIR/setup.sh"
+    lxc exec "$CONTAINER" -- env STAGING_VOLATILE="$STAGING_VOLATILE" bash "$CT_TMP_DIR/setup.sh"
 
     _info "Attaching tmpfs boundaries (/tmp, /var/tmp, /var/cache/nightfall-photo-ingress) ..."
     lxc config device add "$CONTAINER" tmpfs-tmp disk source="$tmpfs_host_base/tmp" path=/tmp
@@ -191,8 +198,13 @@ cmd_install() {
 
     # Build a fresh wheel by default so staging validates the current tree.
     if [[ -z "$wheel_path" ]]; then
+        local build_python
+        build_python="python3"
+        if [[ -x "$PROJECT_ROOT/.venv/bin/python" ]]; then
+            build_python="$PROJECT_ROOT/.venv/bin/python"
+        fi
         _info "Building fresh wheel ..."
-        (cd "$PROJECT_ROOT" && python3 -m build --wheel --outdir dist/)
+        (cd "$PROJECT_ROOT" && "$build_python" -m build --wheel --outdir dist/)
         wheel_path="$(ls -t "$PROJECT_ROOT/dist/"*.whl | head -1)"
     fi
 
@@ -202,7 +214,8 @@ cmd_install() {
     local whl_name
     whl_name="$(basename "$wheel_path")"
     _info "Pushing $whl_name ..."
-    lxc file push "$wheel_path" "$CONTAINER/tmp/$whl_name"
+    lxc exec "$CONTAINER" -- mkdir -p "$CT_TMP_DIR"
+    lxc file push "$wheel_path" "$CONTAINER$CT_TMP_DIR/$whl_name"
 
     # Prepare staging config: substitute real client_id if provided
     local conf_src="$SCRIPT_DIR/container/photo-ingress.conf"
@@ -223,7 +236,7 @@ cmd_install() {
 
     _info "Running pip install ..."
     lxc exec "$CONTAINER" -- \
-        "$VENV_ROOT/bin/pip" install --quiet --upgrade "/tmp/$whl_name"
+        "$VENV_ROOT/bin/pip" install --quiet --upgrade "$CT_TMP_DIR/$whl_name"
 
     # Push existing token cache if provided (DEPRECATED: use 'stagingctl auth-setup' instead)
     if [[ -n "${STAGING_TOKEN_JSON:-}" && -f "$STAGING_TOKEN_JSON" ]]; then
@@ -368,9 +381,9 @@ cmd_smoke() {
     # ── 5. secret scan ───────────────────────────────────────────────────────
     _info "Step 5/5: secret scan"
     lxc file push "$SCRIPT_DIR/evidence/secret_scan.py" \
-        "$CONTAINER/tmp/staging_secret_scan.py"
+        "$CONTAINER$CT_TMP_DIR/staging_secret_scan.py"
     lxc exec "$CONTAINER" -- \
-        "$VENV_ROOT/bin/python3" /tmp/staging_secret_scan.py \
+        "$VENV_ROOT/bin/python3" "$CT_TMP_DIR/staging_secret_scan.py" \
         "$CT_EVIDENCE_DIR/$run_id" 2>&1 \
         | tee "$evidence_dir/secret-scan.log" \
         && _assert_ok "$evidence_dir/assertions.jsonl" "secret_scan_clean" "no leaks" \
@@ -456,9 +469,9 @@ cmd_smoke_live() {
     # ── 3. secret scan ────────────────────────────────────────────────────────
     _info "Step 3/3: secret scan"
     lxc file push "$SCRIPT_DIR/evidence/secret_scan.py" \
-        "$CONTAINER/tmp/staging_secret_scan.py"
+        "$CONTAINER$CT_TMP_DIR/staging_secret_scan.py"
     lxc exec "$CONTAINER" -- \
-        "$VENV_ROOT/bin/python3" /tmp/staging_secret_scan.py \
+        "$VENV_ROOT/bin/python3" "$CT_TMP_DIR/staging_secret_scan.py" \
         "$CT_EVIDENCE_DIR/$run_id" 2>&1 \
         | tee "$evidence_dir/secret-scan.log" \
         && _assert_ok "$evidence_dir/assertions.jsonl" "secret_scan_clean" "no leaks" \
