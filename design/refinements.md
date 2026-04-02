@@ -190,6 +190,11 @@ Define explicit states:
 - Sync import must pre-seed accepted records to avoid unnecessary OneDrive downloads.
 - Add `verify_sha256_on_first_download = true` default so advisory SHA1 matches require one canonical server-side SHA-256 verification before long-term trust.
 
+Design boundary note:
+- SHA-256 remains the canonical registry identity key.
+- When Microsoft Graph provides SHA-256 metadata for a file item, it may be used as canonical identity input.
+- SHA1 (including sync-import advisory data) remains non-canonical unless explicitly verified against canonical SHA-256.
+
 ---
 
 ## H. CLI Extensions
