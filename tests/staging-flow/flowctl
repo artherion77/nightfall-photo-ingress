@@ -185,7 +185,7 @@ phase_p2() {
     _hdr "── P2  User onboarding  [OPERATOR ACTION REQUIRED] ──────────────────"
 
     if [[ "$SKIP_INTERACTIVE" == "1" ]]; then
-        _pskip "P2:user_onboarding" "--skip-interactive set; onboarding phase skipped"
+        _pskip "P2:auth_setup" "--skip-interactive set; auth-setup phase skipped"
         return 0
     fi
 
@@ -254,6 +254,50 @@ EOF
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
+# P3 — Path discovery: auto-discover OneDrive paths using cached token
+# ─────────────────────────────────────────────────────────────────────────────
+phase_p3() {
+    _hdr "── P3  Path discovery [OPERATOR ACTION REQUIRED] ────────────────────"
+
+    # Gate: token cache must exist — skip gracefully if P2 was not run or failed
+    local token_path="/var/lib/ingress/tokens/${STAGING_ACCOUNT}.json"
+    if ! lxc exec "$CONTAINER" -- test -f "$token_path" 2>/dev/null; then
+        _pskip "P3:discovery" "no token cache present — was Phase P2 skipped?"
+        return 0
+    fi
+
+    if [[ "$SKIP_INTERACTIVE" == "1" ]]; then
+        _pskip "P3:discovery" "--skip-interactive set; discovery phase skipped"
+        return 0
+    fi
+
+    cat <<EOF
+
+    This phase auto-discovers OneDrive storage paths (Camera Roll, Photos, etc.)
+  using the cached token from P2. No new device-code login required.
+
+  Account : $STAGING_ACCOUNT
+  Config  : $CONF_DEST (inside container '$CONTAINER')
+
+EOF
+    _prompt "Press ENTER to run 'stagingctl discover-paths', or CTRL+C to abort."
+
+    local log_dir="$FLOW_EVIDENCE_DIR/p3"
+    mkdir -p "$log_dir"
+
+    echo ""
+    if "$STAGINGCTL" discover-paths; then
+        _pass "P3.1:discover_exit" "stagingctl discover-paths completed (exit 0)"
+    else
+        _pfail "P3.1:discover_exit" "stagingctl discover-paths exited with error"
+        return 1
+    fi
+    echo ""
+
+    return 0
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
 # P4 — Live integration: authenticated poll and status export
 # ─────────────────────────────────────────────────────────────────────────────
 phase_p4() {
@@ -291,8 +335,8 @@ d = json.loads(p.read_text())
 assert d.get('command') == 'poll', 'expected command=poll, got: %s' % d.get('command')
 print('command=%s state=%s' % (d['command'], d.get('state', '?')))
 " >"$log_dir/status-after-poll.log" 2>&1 \
-        && _pass "P3.2:status_after_poll" "status file reflects poll command" \
-        || { _pfail "P3.2:status_after_poll" "status file not updated after poll — see $log_dir/status-after-poll.log"; rc=1; }
+        && _pass "P4.2:status_after_poll" "status file reflects poll command" \
+        || { _pfail "P4.2:status_after_poll" "status file not updated after poll — see $log_dir/status-after-poll.log"; rc=1; }
 
     return $rc
 }
@@ -398,8 +442,8 @@ Commands:
   help            Show this help message.
 
 Options for 'run':
-  --skip-interactive  Skip phases requiring operator input (P2, P3).
-  --phase PHASE       Run a single phase only (p1|p2|p3|p4).
+  --skip-interactive  Skip phases requiring operator input (P2, P3, P4).
+  --phase PHASE       Run a single phase only (p1|p2|p3|p4|p5).
 
 Phases:
   p1  Pre-flight: container, CLI surface, config-check, dir layout, systemd units

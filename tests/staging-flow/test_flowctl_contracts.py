@@ -38,15 +38,15 @@ class TestFilePresence:
 
 
 class TestPhaseStructure:
-    def test_all_four_phases_defined(self, flowctl_text: str) -> None:
-        for phase in ("phase_p1", "phase_p2", "phase_p3", "phase_p4"):
+    def test_all_five_phases_defined(self, flowctl_text: str) -> None:
+        for phase in ("phase_p1", "phase_p2", "phase_p3", "phase_p4", "phase_p5"):
             assert f"{phase}()" in flowctl_text, f"phase function {phase}() not found"
 
     def test_phase_selector_present(self, flowctl_text: str) -> None:
         assert "_should_run" in flowctl_text
 
     def test_all_phases_dispatched_from_cmd_run(self, flowctl_text: str) -> None:
-        for phase in ("p1", "p2", "p3", "p4"):
+        for phase in ("p1", "p2", "p3", "p4", "p5"):
             assert f'_should_run "{phase}"' in flowctl_text
 
 
@@ -64,10 +64,13 @@ class TestInteractiveGating:
 
     def test_p2_skips_when_non_interactive(self, flowctl_text: str) -> None:
         assert "SKIP_INTERACTIVE" in flowctl_text
-        assert "P2:user_onboarding" in flowctl_text
+        assert "P2:auth_setup" in flowctl_text
 
     def test_p3_skips_when_non_interactive(self, flowctl_text: str) -> None:
-        assert "P3:live_poll" in flowctl_text
+        assert "P3:discovery" in flowctl_text
+
+    def test_p4_skips_when_non_interactive(self, flowctl_text: str) -> None:
+        assert "P4:live_poll" in flowctl_text
 
 
 class TestStepLabels:
@@ -82,11 +85,15 @@ class TestStepLabels:
             assert step in flowctl_text, f"Step label {step} not found in flowctl"
 
     def test_p3_step_labels(self, flowctl_text: str) -> None:
-        for step in ("P3.1", "P3.2"):
+        for step in ("P3.1",):
             assert step in flowctl_text, f"Step label {step} not found in flowctl"
 
     def test_p4_step_labels(self, flowctl_text: str) -> None:
-        for step in ("P4.1", "P4.2", "P4.3"):
+        for step in ("P4.1", "P4.2"):
+            assert step in flowctl_text, f"Step label {step} not found in flowctl"
+
+    def test_p5_step_labels(self, flowctl_text: str) -> None:
+        for step in ("P5.1", "P5.2", "P5.3"):
             assert step in flowctl_text, f"Step label {step} not found in flowctl"
 
 
@@ -108,7 +115,7 @@ class TestEvidenceContract:
 
     def test_per_phase_subdirs(self, flowctl_text: str) -> None:
         # Each phase writes logs to a named subdirectory
-        for phase in ("p1", "p2", "p3", "p4"):
+        for phase in ("p1", "p2", "p3", "p4", "p5"):
             assert f'"$FLOW_EVIDENCE_DIR/{phase}"' in flowctl_text
 
 
@@ -116,6 +123,7 @@ class TestStagingctlIntegration:
     def test_references_stagingctl(self, flowctl_text: str) -> None:
         assert 'STAGINGCTL=' in flowctl_text
         assert '"$STAGINGCTL" auth-setup' in flowctl_text
+        assert '"$STAGINGCTL" discover-paths' in flowctl_text
         assert '"$STAGINGCTL" smoke-live' in flowctl_text
         assert '"$STAGINGCTL" reset' in flowctl_text
 
@@ -135,7 +143,7 @@ class TestStagingctlIntegration:
 
 class TestDocumentationCoverage:
     def test_readme_documents_all_phases(self, readme_text: str) -> None:
-        for phase in ("P1", "P2", "P3", "P4"):
+        for phase in ("P1", "P2", "P3", "P4", "P5"):
             assert phase in readme_text
 
     def test_readme_documents_skip_interactive(self, readme_text: str) -> None:

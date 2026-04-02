@@ -10,11 +10,12 @@ require human input (device-code browser onboarding).
 | Phase | Kind | What is verified |
 |-------|------|------------------|
 | P1 | Automated | Container running, CLI `--help`, `auth-setup` discoverable, `config-check`, status file schema, directory layout, systemd units enabled |
-| P2 | **Interactive** | `stagingctl auth-setup` user onboarding flow; token cache written; file mode 0600; identity sidecar; onboarding sidecar |
-| P3 | Semi-automated | `stagingctl smoke-live` (live poll + secret scan); status file reflects `poll` command |
-| P4 | Automated | `stagingctl reset` restores clean snapshot; token cache absent; `config-check` still passes |
+| P2 | **Interactive** | `stagingctl auth-setup` (device-code login only, no discovery); token cache written; file mode 0600; identity sidecar; onboarding sidecar |
+| P3 | **Interactive** | `stagingctl discover-paths` auto-discovers OneDrive paths using cached token (no new login); writeback to config |
+| P4 | Semi-automated | `stagingctl smoke-live` (live poll + secret scan); status file reflects `poll` command |
+| P5 | Automated | `stagingctl reset` restores clean snapshot; token cache absent; `config-check` still passes |
 
-P2 and P3 are skipped when `--skip-interactive` is passed (e.g. for CI pre-flight
+P2, P3, and P4 are skipped when `--skip-interactive` is passed (e.g. for CI pre-flight
 checks against a known-good installed container).
 
 ## Files
@@ -58,7 +59,10 @@ tests/staging-flow/flowctl run --skip-interactive
 
 ```bash
 tests/staging-flow/flowctl run --phase p1
+tests/staging-flow/flowctl run --phase p2
+tests/staging-flow/flowctl run --phase p3
 tests/staging-flow/flowctl run --phase p4
+tests/staging-flow/flowctl run --phase p5
 ```
 
 ### Static contract tests only (no container):
@@ -75,9 +79,10 @@ Each `flowctl run` writes a timestamped evidence directory:
 $FLOW_EVIDENCE_BASE/flow-<run_id>/
     manifest.jsonl          # flow start/finish events with exit code
     p1/                     # pre-flight logs
-   p2/                     # onboarding step logs
-    p3/                     # live poll logs
-    p4/                     # reset verification logs
+    p2/                     # auth-setup step logs
+    p3/                     # path discovery logs
+    p4/                     # live poll logs
+    p5/                     # reset verification logs
 ```
 
 `FLOW_EVIDENCE_BASE` defaults to `/mnt/ssd/staging/photo-ingress/evidence`

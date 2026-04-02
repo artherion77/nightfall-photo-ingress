@@ -418,10 +418,30 @@ cmd_auth_setup() {
     # the device-code prompt displays correctly in the operator's terminal.
     lxc exec -t "$CONTAINER" -- \
         "$VENV_ROOT/bin/nightfall-photo-ingress" \
-        auth-setup --account "$account" --path "$CONF_DEST"
+        auth-setup --account "$account" --path "$CONF_DEST" --skip-discovery
 
     echo ""
     _ok "auth-setup completed for account '$account'. Token cache written inside container."
+    _info "Next step: run 'stagingctl discover-paths' to auto-discover storage paths."
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# stagingctl discover-paths
+# ─────────────────────────────────────────────────────────────────────────────
+cmd_discover_paths() {
+    _require_container_running
+
+    local account="${STAGING_ACCOUNT:-staging}"
+
+    _info "Auto-discovering OneDrive paths for account '$account' ..."
+    echo ""
+
+    lxc exec -t "$CONTAINER" -- \
+        "$VENV_ROOT/bin/nightfall-photo-ingress" \
+        discover-paths --account "$account" --path "$CONF_DEST"
+
+    echo ""
+    _ok "discover-paths completed for account '$account'."
     _info "Next step: run 'stagingctl smoke-live' to verify authenticated polling."
 }
 
@@ -544,6 +564,7 @@ Commands:
   reset               Restore 'clean' snapshot and restart container.
   smoke               Run headless smoke assertions; collect evidence.
   auth-setup          Run interactive device-code auth for the staging account (requires TTY).
+  discover-paths      Auto-discover OneDrive paths using cached token (no new login required).
   smoke-live          Run authenticated live poll + secret scan; collect evidence.
   evidence [id]       List or inspect evidence runs.
 
@@ -569,8 +590,9 @@ main() {
         uninstall)  cmd_uninstall  "$@" ;;
         reset)      cmd_reset      "$@" ;;
         smoke)      cmd_smoke      "$@" ;;
-        auth-setup) cmd_auth_setup "$@" ;;
-        smoke-live) cmd_smoke_live "$@" ;;
+        auth-setup)     cmd_auth_setup     "$@" ;;
+        discover-paths) cmd_discover_paths  "$@" ;;
+        smoke-live)     cmd_smoke_live      "$@" ;;
         evidence)   cmd_evidence   "$@" ;;
         *)          _usage ;;
     esac
