@@ -180,6 +180,58 @@ def test_interactive_trace_handler_suppresses_graph_trace_chatter() -> None:
     assert "poll alice p7 items=206 files=188 del=0 next=+ http=200 cp=next_link" in output
 
 
+def test_interactive_trace_handler_renders_download_progress_bar() -> None:
+    """Interactive handler should render byte progress for individual file downloads."""
+
+    class _FakeTty(io.StringIO):
+        def isatty(self) -> bool:
+            return True
+
+    stream = _FakeTty()
+    handler = _InteractiveTraceHandler(verbose=False, stream=stream)
+    handler.setFormatter(HumanFormatter("%(levelname)s %(name)s: %(message)s"))
+    logger = logging.getLogger("test.interactive.download.progress")
+
+    start_record = logger.makeRecord(
+        name=logger.name,
+        level=logging.INFO,
+        fn=__file__,
+        lno=1,
+        msg="onedrive_trace",
+        args=(),
+        exc_info=None,
+        extra={
+            "event": "download_attempt_start",
+            "account_name": "alice",
+            "destination": "/tmp/staging/IMG_0001.HEIC",
+            "expected_size": 1048576,
+        },
+    )
+    progress_record = logger.makeRecord(
+        name=logger.name,
+        level=logging.INFO,
+        fn=__file__,
+        lno=2,
+        msg="onedrive_trace",
+        args=(),
+        exc_info=None,
+        extra={
+            "event": "download_progress",
+            "account_name": "alice",
+            "destination": "/tmp/staging/IMG_0001.HEIC",
+            "bytes_written": 524288,
+            "expected_size": 1048576,
+        },
+    )
+
+    handler.emit(start_record)
+    handler.emit(progress_record)
+
+    output = stream.getvalue()
+    assert "poll alice dl IMG_0001.HEIC" in output
+    assert "( 50%)" in output
+
+
 def test_configure_logging_suppresses_httpx_console_propagation_by_default() -> None:
     """External library logs should not propagate to operator-visible handlers by default."""
 

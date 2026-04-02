@@ -122,6 +122,16 @@ class HumanFormatter(logging.Formatter):
                 f"url={getattr(record, 'url', '?')}"
             )
 
+        if event == "download_progress":
+            expected = getattr(record, "expected_size", None)
+            if isinstance(expected, int) and expected > 0:
+                pct = int((getattr(record, "bytes_written", 0) * 100) / expected)
+                return (
+                    f"{prefix}download progress {getattr(record, 'bytes_written', 0)}B"
+                    f"/{expected}B ({pct}%)"
+                )
+            return f"{prefix}download progress {getattr(record, 'bytes_written', 0)}B"
+
         if event == "delta_cursor_checkpoint_saved":
             return (
                 f"{prefix}checkpoint page={getattr(record, 'page_index', '?')} "
@@ -228,6 +238,20 @@ class _InteractiveTraceHandler(logging.StreamHandler):
             self._render_progress(record)
             return True
 
+        if event == "delta_page_start":
+            self._render_progress_start(record)
+            return True
+
+        if event == "download_attempt_start":
+            self._render_download_progress(record, bytes_written=0)
+            return True
+
+        if event == "download_progress":
+            bytes_written = getattr(record, "bytes_written", 0)
+            bytes_value = int(bytes_written) if isinstance(bytes_written, int) else 0
+            self._render_download_progress(record, bytes_written=bytes_value)
+            return True
+
         if event in {
             "delta_chain_completed_cursor_reset",
             "delta_traversal_summary",
@@ -262,6 +286,65 @@ class _InteractiveTraceHandler(logging.StreamHandler):
         self.flush()
         self._progress_active = True
         self._last_progress_width = max(self._last_progress_width, len(text))
+
+    def _render_progress_start(self, record: logging.LogRecord) -> None:
+        """Render an immediate page-start progress line before downloads begin."""
+
+        frame = _SPINNER_FRAMES[self._spinner_index % len(_SPINNER_FRAMES)]
+        self._spinner_index += 1
+        account = getattr(record, "account_name", "?")
+        page = getattr(record, "page_index", "?")
+        text = f"{frame} poll {account} p{page} fetching..."
+        padded = text.ljust(self._last_progress_width)
+        self.stream.write("\r" + padded)
+        self.flush()
+        self._progress_active = True
+        self._last_progress_width = max(self._last_progress_width, len(text))
+
+    def _render_download_progress(
+        self,
+        record: logging.LogRecord,
+        *,
+        bytes_written: int,
+    ) -> None:
+        """Render per-file download progress like curl/pip style byte counters."""
+
+        frame = _SPINNER_FRAMES[self._spinner_index % len(_SPINNER_FRAMES)]
+        self._spinner_index += 1
+        account = getattr(record, "account_name", "?")
+        destination = str(getattr(record, "destination", ""))
+        file_name = Path(destination).name or "file"
+        expected = getattr(record, "expected_size", None)
+        if isinstance(expected, int) and expected > 0:
+            pct = min(100, int((bytes_written * 100) / expected))
+            progress = (
+                f"{self._format_bytes(bytes_written)}/{self._format_bytes(expected)} "
+                f"({pct:3d}%)"
+            )
+        else:
+            progress = f"{self._format_bytes(bytes_written)}"
+        text = f"{frame} poll {account} dl {file_name} {progress}"
+        padded = text.ljust(self._last_progress_width)
+        self.stream.write("\r" + padded)
+        self.flush()
+        self._progress_active = True
+        self._last_progress_width = max(self._last_progress_width, len(text))
+
+    @staticmethod
+    def _format_bytes(value: int) -> str:
+        """Format byte values for compact interactive progress output."""
+
+        units = ("B", "KiB", "MiB", "GiB", "TiB")
+        size = float(max(0, value))
+        unit = units[0]
+        for candidate in units[1:]:
+            if size < 1024.0:
+                break
+            size /= 1024.0
+            unit = candidate
+        if unit == "B":
+            return f"{int(size)}{unit}"
+        return f"{size:.1f}{unit}"
 
     def _flush_progress_line(self) -> None:
         if not self._progress_active:

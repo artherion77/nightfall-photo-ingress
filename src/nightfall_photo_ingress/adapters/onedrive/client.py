@@ -1606,6 +1606,8 @@ def download_with_retry(
             )
 
         bytes_written = 0
+        progress_emit_step = 512 * 1024
+        next_progress_emit = progress_emit_step
         try:
             with destination.open("wb") as handle:
                 for chunk in response.iter_bytes(chunk_size=1024 * 1024):
@@ -1613,6 +1615,18 @@ def download_with_retry(
                         continue
                     handle.write(chunk)
                     bytes_written += len(chunk)
+                    if bytes_written >= next_progress_emit:
+                        _trace_event(
+                            "download_progress",
+                            poll_run_id=poll_run_id,
+                            account_name=account_name,
+                            operation="download",
+                            bytes_written=bytes_written,
+                            expected_size=expected_size,
+                            destination=destination,
+                            url=redact_url(url),
+                        )
+                        next_progress_emit = bytes_written + progress_emit_step
         except OSError as exc:
             _cleanup_partial()
             raise DownloadError(
@@ -1679,6 +1693,18 @@ def download_with_retry(
                 )
                 sleeper(delay)
                 continue
+
+        _trace_event(
+            "download_progress",
+            poll_run_id=poll_run_id,
+            account_name=account_name,
+            operation="download",
+            bytes_written=bytes_written,
+            expected_size=expected_size,
+            destination=destination,
+            url=redact_url(url),
+            complete=True,
+        )
 
         _trace_event(
             "download_attempt_success",
