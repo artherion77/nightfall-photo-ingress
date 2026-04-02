@@ -354,4 +354,5 @@ def test_v2_chunk6_drift_warning_does_not_fail_when_failfast_disabled(tmp_path: 
 
     assert len(results) == 1
     assert results[0].account_name == "alice"
-    assert results[0].candidate_count == 0
+    assert results[0].candidate_count == 1
+    assert results[0].delta_anomaly_count >= 1

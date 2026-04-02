@@ -105,7 +105,7 @@ class RemoteCandidate:
     size_bytes: int | None
     raw_modified_time: str | None
     normalized_modified_time: str
-    download_url: str
+    download_url: str | None
 
     @property
     def modified_time(self) -> str:
@@ -1030,6 +1030,9 @@ def _apply_delta_page_to_reducer(
             _record_ghost_reason(anomaly_counts, reason)
             continue
 
+        if not validated.download_url:
+            _record_ghost_reason(anomaly_counts, "delta_file_missing_download_url")
+
         reducer[item_id] = _ReducerEntry(sequence=sequence, candidate=validated)
 
     return sequence
@@ -1153,10 +1156,29 @@ def download_candidates(
             path=tmp_path,
             diagnostics_counts=diagnostics_counts,
         )
+        initial_download_url = candidate.download_url
+        if not initial_download_url:
+            _record_ghost_reason(ghost_reason_counts, "delta_file_missing_download_url")
+            initial_download_url, ghost_reason = _resolve_download_url_once(
+                item_id=candidate.item_id,
+                access_token=access_token,
+                refresh_access_token=refresh_access_token,
+                http_client=http_client,
+                account_name=account_name,
+                poll_run_id=poll_run_id,
+                diagnostics_counts=diagnostics_counts,
+                policy=policy,
+                sleeper=sleeper,
+                jitter_fn=jitter_fn,
+            )
+            if initial_download_url is None:
+                _record_ghost_reason(ghost_reason_counts, ghost_reason)
+                continue
+
         try:
             download_with_retry(
                 http_client=http_client,
-                url=candidate.download_url,
+                url=initial_download_url,
                 destination=tmp_path,
                 expected_size=candidate.size_bytes,
                 account_name=account_name,
@@ -2288,9 +2310,15 @@ def _extract_relative_path(raw: dict[str, object]) -> str:
     raw_path = _as_str(parent_ref.get("path")) or ""
     marker = "/root:"
     if marker not in raw_path:
-        return raw_path
+        normalized = raw_path.strip()
+        if not normalized:
+            return ""
+        return normalized if normalized.startswith("/") else f"/{normalized}"
 
-    return raw_path.split(marker, maxsplit=1)[1].strip("/")
+    rel = raw_path.split(marker, maxsplit=1)[1].strip("/")
+    if not rel:
+        return ""
+    return f"/{rel}"
 
 
 def _build_client(factory: Callable[[], httpx.Client] | None) -> httpx.Client:
@@ -2378,8 +2406,6 @@ def _build_candidate_from_payload(
         return None
 
     download_url = _as_str(raw.get("@microsoft.graph.downloadUrl"))
-    if not download_url:
-        return None
 
     size_raw = raw.get("size")
     size_bytes: int | None
@@ -2431,10 +2457,6 @@ def _classify_invalid_candidate_reason(raw: dict[str, object]) -> str:
     name = _as_str(raw.get("name"))
     if not name:
         return "delta_file_missing_name"
-
-    download_url = _as_str(raw.get("@microsoft.graph.downloadUrl"))
-    if not download_url:
-        return "delta_file_missing_download_url"
 
     size_raw = raw.get("size")
     if size_raw is None:

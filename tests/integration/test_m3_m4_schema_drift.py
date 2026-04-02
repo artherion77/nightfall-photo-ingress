@@ -23,11 +23,16 @@ def test_missing_required_fields_rejected_at_boundary_before_ingest(
                 ]
             }
         ],
-        downloads={},
+        downloads={
+            "https://graph.microsoft.com/v1.0/me/drive/items/missing-url-1": {
+                "status_code": 404,
+                "content": b"{}",
+            }
+        },
         run_ingest=False,
     )
 
-    assert result.poll_result.candidate_count == 0
+    assert result.poll_result.candidate_count == 1
     assert result.poll_result.delta_anomaly_count >= 1
     assert result.registry_harness.metadata_rows() == []
     assert result.registry_harness.terminal_events() == []

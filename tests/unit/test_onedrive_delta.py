@@ -111,8 +111,8 @@ def _make_app_config(tmp_path: Path, accounts: tuple[AccountConfig, ...]) -> App
     )
 
 
-def test_parse_delta_items_skips_deleted_non_files_and_missing_urls() -> None:
-    """Only active file entries with download URLs should become candidates."""
+def test_parse_delta_items_skips_deleted_non_files_but_keeps_missing_urls() -> None:
+    """Active file entries remain candidates even when download URL is missing."""
 
     payload = {
         "value": [
@@ -132,9 +132,11 @@ def test_parse_delta_items_skips_deleted_non_files_and_missing_urls() -> None:
     }
 
     parsed = parse_delta_items("alice", payload)
-    assert len(parsed) == 1
-    assert parsed[0].item_id == "4"
-    assert parsed[0].relative_path == "Camera Roll/2026"
+    assert len(parsed) == 2
+    assert parsed[0].item_id == "3"
+    assert parsed[0].download_url is None
+    assert parsed[1].item_id == "4"
+    assert parsed[1].relative_path == "/Camera Roll/2026"
 
 
 def test_download_with_retry_honors_retry_after_header(tmp_path: Path) -> None:

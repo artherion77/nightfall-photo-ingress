@@ -97,6 +97,46 @@ def test_download_url_reresolve_succeeds_after_first_403(tmp_path: Path) -> None
     assert delta_anomaly_counts == {}
 
 
+def test_missing_inline_download_url_is_resolved_just_in_time(tmp_path: Path) -> None:
+    """Candidates without inline URL should still download via one metadata refresh."""
+
+    account = _make_account(tmp_path, "alice", "/Camera Roll")
+    client = _FakeClient(
+        {
+            "https://graph.microsoft.com/v1.0/me/drive/root:/Camera%20Roll:/delta": [
+                _FakeResponse(
+                    status_code=200,
+                    text=(
+                        '{"value":[{"id":"a1","name":"IMG_1.HEIC","file":{},'
+                        '"size":3,"lastModifiedDateTime":"2026-01-01T00:00:00Z"}],'
+                        '"@odata.deltaLink":"https://delta/final"}'
+                    ),
+                )
+            ],
+            "https://graph.microsoft.com/v1.0/me/drive/items/a1": [
+                _FakeResponse(
+                    status_code=200,
+                    text='{"id":"a1","@microsoft.graph.downloadUrl":"https://download/fresh"}',
+                )
+            ],
+            "https://download/fresh": [_FakeResponse(status_code=200, content=b"one")],
+        }
+    )
+
+    downloaded, candidate_count, ghost_reason_counts, delta_anomaly_counts = poll_account_once(
+        account=account,
+        staging_root=tmp_path / "staging",
+        access_token="token",
+        http_client=client,
+    )
+
+    assert candidate_count == 1
+    assert len(downloaded) == 1
+    assert downloaded[0].read_bytes() == b"one"
+    assert ghost_reason_counts == {"delta_file_missing_download_url": 1}
+    assert delta_anomaly_counts == {"delta_file_missing_download_url": 1}
+
+
 def test_missing_download_url_after_refresh_is_classified_as_ghost(tmp_path: Path) -> None:
     """If refresh payload has no download URL, the item should be ghost-classified."""
 
