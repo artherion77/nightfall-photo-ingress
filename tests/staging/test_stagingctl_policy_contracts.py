@@ -168,6 +168,10 @@ class TestSmokeLive:
         assert "Poll traversal summary:" in stagingctl_text
         assert "traversal pages=" in stagingctl_text
 
+    def test_smoke_live_pulls_detailed_poll_log_into_evidence(self, stagingctl_text: str) -> None:
+        assert "poll-live-detailed.log" in stagingctl_text
+        assert "Detailed poll trace saved" in stagingctl_text
+
     def test_smoke_live_runs_secret_scan(self, stagingctl_text: str) -> None:
         assert "secret_scan_clean" in stagingctl_text
 

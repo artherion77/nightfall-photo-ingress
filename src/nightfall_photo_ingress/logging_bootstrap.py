@@ -159,6 +159,16 @@ class HumanFormatter(logging.Formatter):
                 f"pages={getattr(record, 'pages_walked', 0)}"
             )
 
+        if event == "drift_summary":
+            reasons = getattr(record, "top_drift_reasons", None)
+            reason_text = str(reasons) if reasons is not None else "[]"
+            return (
+                f"{prefix}drift state={getattr(record, 'drift_state', '?')} "
+                f"ratio={getattr(record, 'drift_ratio', 0)} "
+                f"events={getattr(record, 'drift_events', 0)} "
+                f"top={reason_text}"
+            )
+
         if event == "account_poll_start":
             return f"{prefix}poll start"
 
@@ -188,6 +198,8 @@ class _InteractiveTraceHandler(logging.StreamHandler):
         self._spinner_index = 0
         self._progress_active = False
         self._last_progress_width = 0
+        self._last_graph_status: int | None = None
+        self._last_checkpoint_kind: str | None = None
 
     def emit(self, record: logging.LogRecord) -> None:
         try:
@@ -201,13 +213,33 @@ class _InteractiveTraceHandler(logging.StreamHandler):
 
     def _emit_trace(self, record: logging.LogRecord) -> bool:
         event = getattr(record, "event", "")
+        if event == "graph_response_summary":
+            status = getattr(record, "status_code", None)
+            self._last_graph_status = int(status) if isinstance(status, int) else None
+            return True
+
+        if event == "delta_cursor_checkpoint_saved":
+            checkpoint_kind = getattr(record, "checkpoint_kind", None)
+            if isinstance(checkpoint_kind, str):
+                self._last_checkpoint_kind = checkpoint_kind
+            return True
+
         if event == "delta_page_progress":
             self._render_progress(record)
             return True
 
-        if self._verbose:
+        if event in {
+            "delta_chain_completed_cursor_reset",
+            "delta_traversal_summary",
+            "drift_state_evaluated",
+            "account_poll_end",
+        }:
             self._flush_progress_line()
             super().emit(record)
+            return True
+
+        # Suppress per-event trace chatter during polling; keep operator output
+        # as one animated line while detailed logs are captured elsewhere.
         return True
 
     def _render_progress(self, record: logging.LogRecord) -> None:
@@ -219,7 +251,12 @@ class _InteractiveTraceHandler(logging.StreamHandler):
         files = getattr(record, "file_items", 0)
         deleted = getattr(record, "deleted_items", 0)
         suffix = "+" if getattr(record, "has_next", False) else "done"
-        text = f"{frame} poll {account} p{page} items={items} files={files} del={deleted} {suffix}"
+        status = str(self._last_graph_status) if self._last_graph_status is not None else "?"
+        checkpoint = self._last_checkpoint_kind or "-"
+        text = (
+            f"{frame} poll {account} p{page} items={items} files={files} del={deleted} "
+            f"next={suffix} http={status} cp={checkpoint}"
+        )
         padded = text.ljust(self._last_progress_width)
         self.stream.write("\r" + padded)
         self.flush()

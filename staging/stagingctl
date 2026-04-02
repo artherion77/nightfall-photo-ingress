@@ -535,6 +535,26 @@ cmd_smoke_live() {
         _info "Poll traversal summary: $traversal_summary"
     fi
 
+    local latest_poll_detail_log=""
+    latest_poll_detail_log="$(
+        lxc exec "$CONTAINER" -- python3 - <<'PY' 2>/dev/null || true
+from pathlib import Path
+
+log_dir = Path('/var/lib/ingress/logs')
+if not log_dir.exists():
+    raise SystemExit(0)
+
+candidates = sorted(log_dir.glob('poll-*.log'), key=lambda p: p.stat().st_mtime, reverse=True)
+if candidates:
+    print(str(candidates[0]))
+PY
+    )"
+    if [[ -n "$latest_poll_detail_log" ]]; then
+        if lxc file pull "$CONTAINER$latest_poll_detail_log" "$evidence_dir/poll-live-detailed.log" 2>/dev/null; then
+            _info "Detailed poll trace saved to $evidence_dir/poll-live-detailed.log"
+        fi
+    fi
+
     # ── 3. secret scan ────────────────────────────────────────────────────────
     _info "Step 3/3: secret scan"
     lxc file push "$SCRIPT_DIR/evidence/secret_scan.py" \

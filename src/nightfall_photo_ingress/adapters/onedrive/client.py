@@ -476,6 +476,30 @@ def _poll_single_account(
         drift_ratio=drift_ratio,
         drift_events=drift_events,
     )
+    drift_prefixes = (
+        "delta_item_missing_",
+        "delta_file_missing_",
+        "delta_file_invalid_",
+    )
+    top_drift_reasons = sorted(
+        (
+            (key, value)
+            for key, value in delta_anomaly_counts.items()
+            if key.startswith(drift_prefixes)
+        ),
+        key=lambda pair: pair[1],
+        reverse=True,
+    )[:3]
+    _trace_event(
+        "drift_summary",
+        poll_run_id=poll_run_id,
+        account_name=account.name,
+        operation="drift_evaluation",
+        drift_state=drift_state,
+        drift_ratio=round(drift_ratio, 4),
+        drift_events=drift_events,
+        top_drift_reasons=top_drift_reasons,
+    )
     if app_config.core.drift_fail_fast_enabled and drift_state == "critical":
         raise GraphError(
             f"Schema drift threshold exceeded for account '{account.name}'",

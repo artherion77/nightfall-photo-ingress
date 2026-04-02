@@ -109,8 +109,75 @@ def test_interactive_trace_handler_renders_progress_and_flushes_before_normal_lo
 
     output = stream.getvalue()
     assert "\r" in output
-    assert "poll alice p2 items=50 files=44 del=1 +" in output
+    assert "poll alice p2 items=50 files=44 del=1 next=+" in output
     assert output.endswith("INFO test.interactive.trace: discovery completed\n")
+
+
+def test_interactive_trace_handler_suppresses_graph_trace_chatter() -> None:
+    """Verbose interactive mode should keep graph/chk trace in one compact polling line."""
+
+    class _FakeTty(io.StringIO):
+        def isatty(self) -> bool:
+            return True
+
+    stream = _FakeTty()
+    handler = _InteractiveTraceHandler(verbose=True, stream=stream)
+    handler.setFormatter(HumanFormatter("%(levelname)s %(name)s: %(message)s"))
+    logger = logging.getLogger("test.interactive.compact")
+
+    graph_record = logger.makeRecord(
+        name=logger.name,
+        level=logging.INFO,
+        fn=__file__,
+        lno=1,
+        msg="onedrive_trace",
+        args=(),
+        exc_info=None,
+        extra={
+            "event": "graph_response_summary",
+            "status_code": 200,
+        },
+    )
+    checkpoint_record = logger.makeRecord(
+        name=logger.name,
+        level=logging.INFO,
+        fn=__file__,
+        lno=2,
+        msg="onedrive_trace",
+        args=(),
+        exc_info=None,
+        extra={
+            "event": "delta_cursor_checkpoint_saved",
+            "checkpoint_kind": "next_link",
+        },
+    )
+    progress_record = logger.makeRecord(
+        name=logger.name,
+        level=logging.INFO,
+        fn=__file__,
+        lno=3,
+        msg="onedrive_trace",
+        args=(),
+        exc_info=None,
+        extra={
+            "event": "delta_page_progress",
+            "account_name": "alice",
+            "page_index": 7,
+            "items_total": 206,
+            "file_items": 188,
+            "deleted_items": 0,
+            "has_next": True,
+        },
+    )
+
+    handler.emit(graph_record)
+    handler.emit(checkpoint_record)
+    handler.emit(progress_record)
+
+    output = stream.getvalue()
+    assert "graph 200" not in output
+    assert "checkpoint page=" not in output
+    assert "poll alice p7 items=206 files=188 del=0 next=+ http=200 cp=next_link" in output
 
 
 def test_configure_logging_suppresses_httpx_console_propagation_by_default() -> None:

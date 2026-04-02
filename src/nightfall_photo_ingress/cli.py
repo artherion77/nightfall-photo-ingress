@@ -595,12 +595,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     verbose = getattr(args, "verbose", False)
     debug_httpx_transport = getattr(args, "debug_httpx_transport", False)
 
-    # Set up file logging for auth-setup operations
+    # Set up file logging for auth-setup and poll operations
     log_file_path = None
-    if args.command == "auth-setup":
+    if args.command in {"auth-setup", "poll"}:
         log_dir = Path("/var/lib/ingress/logs")
         log_dir.mkdir(parents=True, exist_ok=True)
-        log_file_path = log_dir / f"auth-setup-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.log"
+        ts = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
+        log_file_path = log_dir / f"{args.command}-{ts}.log"
 
     httpx_transport_log_path = None
     if debug_httpx_transport:
