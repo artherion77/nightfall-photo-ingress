@@ -401,7 +401,7 @@ Options for 'run':
 
 Phases:
   p1  Pre-flight: container, CLI surface, config-check, dir layout, systemd units
-    p2  User onboarding: device-code flow via stagingctl auth-setup                [OPERATOR]
+  p2  User onboarding: device-code flow via stagingctl auth-setup                [OPERATOR]
   p3  Live integration: authenticated poll, status export verification           [OPERATOR]
   p4  Snapshot isolation: reset, verify token cleared, config-check survives
 
