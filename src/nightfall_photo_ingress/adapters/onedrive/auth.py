@@ -27,7 +27,8 @@ from nightfall_photo_ingress.config import AccountConfig
 from .cache_lock import cache_file_lock
 from .errors import AuthError  # noqa: F401  re-export so existing imports work
 
-DEFAULT_SCOPES = ["Files.Read", "offline_access"]
+DEFAULT_SCOPES = ["Files.Read"]
+RESERVED_SCOPES = frozenset({"openid", "profile", "offline_access"})
 
 __all__ = ["AuthError", "AccessToken", "OneDriveAuthClient"]
 
@@ -43,7 +44,33 @@ class OneDriveAuthClient:
     """MSAL wrapper with strict, account-scoped token cache handling."""
 
     def __init__(self, scopes: list[str] | None = None) -> None:
-        self._scopes = scopes or DEFAULT_SCOPES
+        self._scopes = self._normalize_scopes(scopes or DEFAULT_SCOPES)
+
+    @staticmethod
+    def _normalize_scopes(scopes: list[str]) -> list[str]:
+        """Drop reserved OIDC scopes and de-duplicate while preserving order."""
+
+        normalized: list[str] = []
+        seen: set[str] = set()
+        for raw_scope in scopes:
+            scope = raw_scope.strip()
+            if not scope:
+                continue
+            if scope.lower() in RESERVED_SCOPES:
+                continue
+            lowered = scope.lower()
+            if lowered in seen:
+                continue
+            seen.add(lowered)
+            normalized.append(scope)
+
+        if not normalized:
+            raise AuthError(
+                "No valid non-reserved scopes configured for token acquisition.",
+                operation="scope_normalize",
+            )
+
+        return normalized
 
     def auth_setup(self, account: AccountConfig) -> AccessToken:
         """Run interactive device-code flow and persist cache securely."""

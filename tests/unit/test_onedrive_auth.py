@@ -28,9 +28,10 @@ class _FakeApp:
     def __init__(self, result: dict[str, object], accounts: list[dict[str, object]] | None = None):
         self._result = result
         self._accounts = accounts if accounts is not None else [{"home_account_id": "1"}]
+        self.last_scopes: list[str] | None = None
 
     def initiate_device_flow(self, scopes: list[str]) -> dict[str, str]:
-        _ = scopes
+        self.last_scopes = list(scopes)
         return {
             "user_code": "AAAA-BBBB",
             "verification_uri": "https://microsoft.com/devicelogin",
@@ -103,6 +104,30 @@ def test_auth_setup_returns_token_and_writes_cache(monkeypatch: pytest.MonkeyPat
     assert token.token == "token-123"
     assert account.token_cache.exists()
     assert stat.S_IMODE(account.token_cache.stat().st_mode) == 0o600
+
+
+def test_auth_setup_filters_reserved_scopes(
+    monkeypatch: pytest.MonkeyPatch,
+    account: AccountConfig,
+) -> None:
+    """Reserved OIDC scopes should never be passed to initiate_device_flow."""
+
+    fake_cache = _FakeCache(has_state_changed=False)
+    fake_app = _FakeApp(result={"access_token": "token-123"})
+
+    monkeypatch.setattr(
+        "nightfall_photo_ingress.adapters.onedrive.auth.msal.SerializableTokenCache",
+        lambda: fake_cache,
+    )
+    monkeypatch.setattr(
+        "nightfall_photo_ingress.adapters.onedrive.auth.msal.PublicClientApplication",
+        lambda **kwargs: fake_app,
+    )
+
+    client = OneDriveAuthClient(scopes=["Files.Read", "offline_access", "openid", "profile"])
+    client.auth_setup(account)
+
+    assert fake_app.last_scopes == ["Files.Read"]
 
 
 def test_acquire_access_token_requires_cached_account(
