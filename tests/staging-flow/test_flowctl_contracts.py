@@ -144,6 +144,10 @@ class TestStagingctlIntegration:
         assert ".onboarding.json" in flowctl_text
         assert "P3.2:onboarding_sidecar" in flowctl_text
 
+    def test_p4_preserves_tty_when_interactive(self, flowctl_text: str) -> None:
+        assert "script -qefc" in flowctl_text
+        assert "smoke-live.log" in flowctl_text
+
 
 class TestDocumentationCoverage:
     def test_readme_documents_all_phases(self, readme_text: str) -> None:

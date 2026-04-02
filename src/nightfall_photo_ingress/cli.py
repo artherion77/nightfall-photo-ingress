@@ -18,7 +18,7 @@ from typing import Sequence
 import httpx
 
 from . import __version__
-from .config import AppConfig, load_config, validate_config_file
+from .config import AccountConfig, AppConfig, load_config, validate_config_file
 from .logging_bootstrap import configure_logging
 from .adapters.onedrive.auth import AuthError, OneDriveAuthClient
 from .adapters.onedrive.client import (
@@ -85,6 +85,7 @@ def _build_parser() -> argparse.ArgumentParser:
     poll = subparsers.add_parser("poll", help="Run one poll cycle.")
     poll.add_argument("--account", help="Optional account name.", default=None)
     poll.add_argument("--path", default="/etc/nightfall/photo-ingress.conf")
+    poll.add_argument("--verbose", action="store_true", help="Show detailed Graph API calls and progress trace info.")
     poll.set_defaults(handler=_cmd_poll)
 
     reject = subparsers.add_parser("reject", help="Reject a hash permanently.")

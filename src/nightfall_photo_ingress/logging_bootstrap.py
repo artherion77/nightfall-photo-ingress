@@ -8,11 +8,15 @@ from __future__ import annotations
 
 import json
 import logging
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 
 LogMode = Literal["json", "human"]
+
+
+_SPINNER_FRAMES = ("|", "/", "-", "\\")
 
 
 class JsonFormatter(logging.Formatter):
@@ -75,6 +79,126 @@ class JsonFormatter(logging.Formatter):
         return json.dumps(payload, sort_keys=True)
 
 
+class HumanFormatter(logging.Formatter):
+    """Format human-mode logs, including concise OneDrive trace summaries."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        if record.msg == "onedrive_trace":
+            return self._format_trace(record)
+        return super().format(record)
+
+    def _format_trace(self, record: logging.LogRecord) -> str:
+        event = getattr(record, "event", "trace")
+        account = getattr(record, "account_name", None)
+        prefix = f"trace {account}: " if account else "trace: "
+
+        if event == "graph_response_summary":
+            return (
+                f"{prefix}graph {getattr(record, 'status_code', '?')} "
+                f"items={getattr(record, 'value_count', 0)} "
+                f"next={'yes' if getattr(record, 'has_next_link', False) else 'no'} "
+                f"delta={'yes' if getattr(record, 'has_delta_link', False) else 'no'} "
+                f"url={getattr(record, 'url', '?')}"
+            )
+
+        if event == "graph_retry_scheduled":
+            return (
+                f"{prefix}graph retry status={getattr(record, 'status_code', '?')} "
+                f"reason={getattr(record, 'reason', '?')} "
+                f"delay={getattr(record, 'delay_seconds', '?')}s "
+                f"url={getattr(record, 'url', '?')}"
+            )
+
+        if event == "download_content_summary":
+            return (
+                f"{prefix}download {getattr(record, 'bytes_written', 0)}B"
+                f"/{getattr(record, 'expected_size', '?')}B "
+                f"url={getattr(record, 'url', '?')}"
+            )
+
+        if event == "delta_cursor_checkpoint_saved":
+            return (
+                f"{prefix}checkpoint page={getattr(record, 'page_index', '?')} "
+                f"kind={getattr(record, 'checkpoint_kind', '?')}"
+            )
+
+        if event == "delta_page_progress":
+            return (
+                f"{prefix}page={getattr(record, 'page_index', '?')} "
+                f"items={getattr(record, 'items_total', 0)} "
+                f"files={getattr(record, 'file_items', 0)} "
+                f"deleted={getattr(record, 'deleted_items', 0)} "
+                f"next={'yes' if getattr(record, 'has_next', False) else 'no'}"
+            )
+
+        if event == "account_poll_start":
+            return f"{prefix}poll start"
+
+        if event == "account_poll_end":
+            return (
+                f"{prefix}poll done candidates={getattr(record, 'candidate_count', 0)} "
+                f"downloaded={getattr(record, 'downloaded_count', 0)}"
+            )
+
+        return f"{prefix}{event}"
+
+
+class _InteractiveTraceHandler(logging.StreamHandler):
+    """Render compact progress updates for trace events in interactive terminals."""
+
+    def __init__(self, *, verbose: bool, stream=None) -> None:
+        super().__init__(stream)
+        self._verbose = verbose
+        self._spinner_index = 0
+        self._progress_active = False
+        self._last_progress_width = 0
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            if record.msg == "onedrive_trace":
+                if self._emit_trace(record):
+                    return
+            self._flush_progress_line()
+            super().emit(record)
+        except Exception:
+            self.handleError(record)
+
+    def _emit_trace(self, record: logging.LogRecord) -> bool:
+        event = getattr(record, "event", "")
+        if event == "delta_page_progress":
+            self._render_progress(record)
+            return True
+
+        if self._verbose:
+            self._flush_progress_line()
+            super().emit(record)
+        return True
+
+    def _render_progress(self, record: logging.LogRecord) -> None:
+        frame = _SPINNER_FRAMES[self._spinner_index % len(_SPINNER_FRAMES)]
+        self._spinner_index += 1
+        account = getattr(record, "account_name", "?")
+        page = getattr(record, "page_index", "?")
+        items = getattr(record, "items_total", 0)
+        files = getattr(record, "file_items", 0)
+        deleted = getattr(record, "deleted_items", 0)
+        suffix = "+" if getattr(record, "has_next", False) else "done"
+        text = f"{frame} poll {account} p{page} items={items} files={files} del={deleted} {suffix}"
+        padded = text.ljust(self._last_progress_width)
+        self.stream.write("\r" + padded)
+        self.flush()
+        self._progress_active = True
+        self._last_progress_width = max(self._last_progress_width, len(text))
+
+    def _flush_progress_line(self) -> None:
+        if not self._progress_active:
+            return
+        self.stream.write("\n")
+        self.flush()
+        self._progress_active = False
+        self._last_progress_width = 0
+
+
 def configure_logging(
     mode: LogMode,
     verbose: bool = False,
@@ -94,19 +218,22 @@ def configure_logging(
     root.setLevel(logging.DEBUG if verbose else logging.INFO)
 
     # Console handler: verbose shows all, non-verbose hides noisy Graph/httpx details
-    handler = logging.StreamHandler()
+    interactive_human = mode == "human" and hasattr(sys.stderr, "isatty") and sys.stderr.isatty()
+    if interactive_human:
+        handler = _InteractiveTraceHandler(verbose=verbose)
+    else:
+        handler = logging.StreamHandler()
     if verbose:
         handler.setLevel(logging.DEBUG)
     else:
         handler.setLevel(logging.INFO)
         # Suppress verbose debug logging from external libraries in non-verbose mode
         logging.getLogger("httpx").setLevel(logging.WARNING)
-        logging.getLogger("nightfall_photo_ingress.adapters.onedrive.client").setLevel(logging.WARNING)
 
     if mode == "json":
         handler.setFormatter(JsonFormatter())
     else:
-        handler.setFormatter(logging.Formatter("%(levelname)s %(name)s: %(message)s"))
+        handler.setFormatter(HumanFormatter("%(levelname)s %(name)s: %(message)s"))
 
     root.addHandler(handler)
 
@@ -118,7 +245,7 @@ def configure_logging(
             file_handler.setFormatter(JsonFormatter())
         else:
             file_handler.setFormatter(
-                logging.Formatter(
+                HumanFormatter(
                     "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
                     datefmt="%Y-%m-%dT%H:%M:%S",
                 )

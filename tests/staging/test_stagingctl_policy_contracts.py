@@ -159,6 +159,11 @@ class TestSmokeLive:
         assert "live_poll_exit_0" in stagingctl_text
         assert "poll-live.log" in stagingctl_text
 
+    def test_smoke_live_uses_human_mode_when_interactive(self, stagingctl_text: str) -> None:
+        assert "Interactive terminal detected; using human-mode poll progress renderer." in stagingctl_text
+        assert "script -qefc" in stagingctl_text
+        assert "--log-mode human poll --verbose" in stagingctl_text
+
     def test_smoke_live_runs_secret_scan(self, stagingctl_text: str) -> None:
         assert "secret_scan_clean" in stagingctl_text
 

@@ -451,10 +451,18 @@ phase_p4() {
 
     # P4.1 stagingctl smoke-live: live poll + secret scan
     _info "Running stagingctl smoke-live ..."
-    STAGING_ACCOUNT="$STAGING_ACCOUNT" "$STAGINGCTL" smoke-live \
-        >"$log_dir/smoke-live.log" 2>&1 \
-        && _pass "P4.1:smoke_live" "stagingctl smoke-live passed" \
-        || { _pfail "P4.1:smoke_live" "stagingctl smoke-live failed — see $log_dir/smoke-live.log"; rc=1; }
+    if [[ -t 1 ]] && command -v script >/dev/null 2>&1; then
+        local smoke_cmd
+        printf -v smoke_cmd 'STAGING_ACCOUNT=%q %q smoke-live' "$STAGING_ACCOUNT" "$STAGINGCTL"
+        script -qefc "$smoke_cmd" "$log_dir/smoke-live.log" \
+            && _pass "P4.1:smoke_live" "stagingctl smoke-live passed" \
+            || { _pfail "P4.1:smoke_live" "stagingctl smoke-live failed — see $log_dir/smoke-live.log"; rc=1; }
+    else
+        STAGING_ACCOUNT="$STAGING_ACCOUNT" "$STAGINGCTL" smoke-live \
+            >"$log_dir/smoke-live.log" 2>&1 \
+            && _pass "P4.1:smoke_live" "stagingctl smoke-live passed" \
+            || { _pfail "P4.1:smoke_live" "stagingctl smoke-live failed — see $log_dir/smoke-live.log"; rc=1; }
+    fi
 
     # P4.2 status file updated to reflect the poll command
     lxc exec "$CONTAINER" -- \

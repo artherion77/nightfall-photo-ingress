@@ -137,6 +137,7 @@ def test_graph_trace_logs_attempt_retry_and_success(caplog) -> None:
     assert "graph_request_attempt_start" in events
     assert "graph_retry_scheduled" in events
     assert "graph_request_attempt_success" in events
+    assert "graph_response_summary" in events
 
     for record in records:
         assert getattr(record, "poll_run_id", None) == "poll-1"
@@ -174,6 +175,7 @@ def test_download_trace_redacts_signed_query_values(caplog, tmp_path: Path) -> N
     assert any(url == "https://files.example/content [query redacted]" for url in trace_urls)
     assert all("sig=" not in url for url in trace_urls)
     assert all("secret-token" not in url for url in trace_urls)
+    assert "download_content_summary" in [getattr(record, "event", "") for record in records]
 
 
 def test_delta_page_transitions_emit_trace_events(caplog, tmp_path: Path) -> None:
@@ -207,6 +209,8 @@ def test_delta_page_transitions_emit_trace_events(caplog, tmp_path: Path) -> Non
     events = [getattr(record, "event", "") for record in records]
 
     assert "delta_page_start" in events
+    assert "delta_page_progress" in events
+    assert "delta_cursor_checkpoint_saved" in events
     assert "delta_page_end" in events
 
     start = next(record for record in records if getattr(record, "event", "") == "delta_page_start")

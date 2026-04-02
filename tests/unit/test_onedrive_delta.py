@@ -17,6 +17,7 @@ from nightfall_photo_ingress.adapters.onedrive.client import (
     poll_account_once,
     poll_accounts,
 )
+from nightfall_photo_ingress.adapters.onedrive.retry import RetryPolicy
 
 
 @dataclass
@@ -207,6 +208,38 @@ def test_poll_account_once_paginates_downloads_and_persists_cursor(tmp_path: Pat
     assert delta_anomaly_counts == {}
     assert len(downloaded) == 2
     assert account.delta_cursor.read_text(encoding="utf-8") == "https://delta/final"
+
+
+def test_poll_account_once_persists_nextlink_checkpoint_before_failure(tmp_path: Path) -> None:
+    """A processed delta page should persist nextLink so interrupted runs can resume."""
+
+    account = _make_account(tmp_path, "alice", "/Camera Roll")
+    client = _FakeClient(
+        {
+            "https://graph.microsoft.com/v1.0/me/drive/root:/Camera%20Roll:/delta": [
+                _FakeResponse(
+                    status_code=200,
+                    text='{"value":[],"@odata.nextLink":"https://next/page"}',
+                )
+            ],
+            "https://next/page": [
+                _FakeResponse(status_code=500, text='{"error":"boom"}'),
+            ],
+        }
+    )
+
+    with pytest.raises(GraphError):
+        poll_account_once(
+            account=account,
+            staging_root=tmp_path / "staging",
+            access_token="token",
+            http_client=client,
+            policy=RetryPolicy(max_attempts=1, base_delay=0.0, max_delay=0.0),
+            sleeper=lambda _: None,
+            jitter_fn=lambda: 0.0,
+        )
+
+    assert account.delta_cursor.read_text(encoding="utf-8") == "https://next/page"
 
 
 def test_poll_accounts_runs_enabled_accounts_in_config_order(tmp_path: Path) -> None:

@@ -697,6 +697,43 @@ def poll_account_once(
         )
         next_url = _as_str(payload.get("@odata.nextLink"))
         delta_link = _as_str(payload.get("@odata.deltaLink")) or delta_link
+
+        raw_items = payload.get("value")
+        page_items = raw_items if isinstance(raw_items, list) else []
+        file_items = 0
+        deleted_items = 0
+        for raw in page_items:
+            if not isinstance(raw, dict):
+                continue
+            if isinstance(raw.get("file"), dict):
+                file_items += 1
+            if "deleted" in raw:
+                deleted_items += 1
+
+        checkpoint_cursor = next_url or delta_link
+        if checkpoint_cursor is not None:
+            _save_cursor(account.delta_cursor, checkpoint_cursor)
+            _clear_resync_marker(account.delta_cursor)
+            _trace_event(
+                "delta_cursor_checkpoint_saved",
+                poll_run_id=poll_run_id,
+                account_name=account.name,
+                operation="delta_cursor",
+                page_index=page_count,
+                checkpoint_kind="next_link" if next_url else "delta_link",
+            )
+
+        _trace_event(
+            "delta_page_progress",
+            poll_run_id=poll_run_id,
+            account_name=account.name,
+            operation="delta_page",
+            page_index=page_count,
+            items_total=len(page_items),
+            file_items=file_items,
+            deleted_items=deleted_items,
+            has_next=bool(next_url),
+        )
         _trace_event(
             "delta_page_end",
             poll_run_id=poll_run_id,
@@ -746,9 +783,6 @@ def poll_account_once(
     elif ghost_total >= delta_breaker_ghost_threshold:
         _record_ghost_reason(delta_anomaly_counts, "delta_breaker_armed_ghost")
         _arm_breaker_cooldown(account.delta_cursor, delta_breaker_cooldown_seconds)
-
-    _save_cursor(account.delta_cursor, delta_link)
-    _clear_resync_marker(account.delta_cursor)
 
     LOGGER.info(
         "account poll diagnostics",
@@ -1497,6 +1531,18 @@ def download_with_retry(
             url=redact_url(url),
         )
 
+        _trace_event(
+            "download_content_summary",
+            poll_run_id=poll_run_id,
+            account_name=account_name,
+            operation="download",
+            status_code=response.status_code,
+            bytes_written=bytes_written,
+            expected_size=expected_size,
+            url=redact_url(url),
+            content_kind="file",
+        )
+
         return
 
 
@@ -1724,6 +1770,20 @@ def _graph_get_json(
             request_id=request_id,
             correlation_id=correlation_id,
             url=redact_url(url),
+        )
+        value_field = payload.get("value")
+        value_count = len(value_field) if isinstance(value_field, list) else 0
+        _trace_event(
+            "graph_response_summary",
+            poll_run_id=poll_run_id,
+            account_name=account_name,
+            operation="graph_get",
+            status_code=response.status_code,
+            url=redact_url(url),
+            has_next_link=bool(_as_str(payload.get("@odata.nextLink"))),
+            has_delta_link=bool(_as_str(payload.get("@odata.deltaLink"))),
+            value_count=value_count,
+            content_kind="metadata",
         )
         return payload
 
