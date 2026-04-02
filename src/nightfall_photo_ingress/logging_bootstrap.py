@@ -75,21 +75,52 @@ class JsonFormatter(logging.Formatter):
         return json.dumps(payload, sort_keys=True)
 
 
-def configure_logging(mode: LogMode) -> None:
+def configure_logging(
+    mode: LogMode,
+    verbose: bool = False,
+    log_file_path: Path | None = None,
+) -> None:
     """Configure root logging for CLI execution.
 
     Args:
         mode: Either "json" for structured logs or "human" for plain output.
+        verbose: If True, set console handler to DEBUG level to show all details.
+                If False, set to INFO level but suppress specific noisy loggers.
+        log_file_path: Optional path to write all log details to a file.
     """
 
     root = logging.getLogger()
     root.handlers.clear()
-    root.setLevel(logging.INFO)
+    root.setLevel(logging.DEBUG if verbose else logging.INFO)
 
+    # Console handler: verbose shows all, non-verbose hides noisy Graph/httpx details
     handler = logging.StreamHandler()
+    if verbose:
+        handler.setLevel(logging.DEBUG)
+    else:
+        handler.setLevel(logging.INFO)
+        # Suppress verbose debug logging from external libraries in non-verbose mode
+        logging.getLogger("httpx").setLevel(logging.WARNING)
+        logging.getLogger("nightfall_photo_ingress.adapters.onedrive.client").setLevel(logging.WARNING)
+
     if mode == "json":
         handler.setFormatter(JsonFormatter())
     else:
         handler.setFormatter(logging.Formatter("%(levelname)s %(name)s: %(message)s"))
 
     root.addHandler(handler)
+
+    # File handler: always logs everything at DEBUG level for troubleshooting
+    if log_file_path:
+        file_handler = logging.FileHandler(log_file_path, mode="a", encoding="utf-8")
+        file_handler.setLevel(logging.DEBUG)
+        if mode == "json":
+            file_handler.setFormatter(JsonFormatter())
+        else:
+            file_handler.setFormatter(
+                logging.Formatter(
+                    "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+                    datefmt="%Y-%m-%dT%H:%M:%S",
+                )
+            )
+        root.addHandler(file_handler)

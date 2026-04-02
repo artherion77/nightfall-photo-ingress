@@ -10,6 +10,8 @@ import argparse
 import configparser
 import logging
 import sys
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Sequence
 
 import httpx
@@ -69,6 +71,7 @@ def _build_parser() -> argparse.ArgumentParser:
     auth = subparsers.add_parser("auth-setup", help="Initialize account authentication.")
     auth.add_argument("--account", help="Optional account name.", default=None)
     auth.add_argument("--path", default="/etc/nightfall/photo-ingress.conf")
+    auth.add_argument("--verbose", action="store_true", help="Show detailed Graph API calls and debug info.")
     auth.set_defaults(handler=_cmd_auth_setup)
 
     poll = subparsers.add_parser("poll", help="Run one poll cycle.")
@@ -108,6 +111,8 @@ def _cmd_auth_setup(args: argparse.Namespace) -> int:
         app_config = load_config(args.path)
         account = _resolve_target_account(app_config, args.account)
         auth_client = OneDriveAuthClient()
+        verbose = getattr(args, "verbose", False)
+        
         token = auth_client.auth_setup(account)
 
         try:
@@ -118,7 +123,9 @@ def _cmd_auth_setup(args: argparse.Namespace) -> int:
                     http_client=client,
                 )
             if detected_locale is not None:
-                LOGGER.info(
+                log_level = logging.INFO if verbose else logging.DEBUG
+                LOGGER.log(
+                    log_level,
                     "onedrive locale auto-detected",
                     extra={"account": account.name, "locale": detected_locale},
                 )
@@ -140,7 +147,9 @@ def _cmd_auth_setup(args: argparse.Namespace) -> int:
                 )
 
             if path_resolution.reason is not None:
-                LOGGER.warning(
+                log_level = logging.INFO if verbose else logging.DEBUG
+                LOGGER.log(
+                    log_level,
                     "configured onedrive_root invalid; auto-discovery used",
                     extra={
                         "account": account.name,
@@ -152,7 +161,9 @@ def _cmd_auth_setup(args: argparse.Namespace) -> int:
                 )
 
             if path_resolution.suggested_path is not None:
-                LOGGER.info(
+                log_level = logging.INFO if verbose else logging.DEBUG
+                LOGGER.log(
+                    log_level,
                     "auto-discovery suggested onedrive_root",
                     extra={
                         "account": account.name,
@@ -483,7 +494,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     except SystemExit as exc:
         return int(exc.code)
 
-    configure_logging(args.log_mode)
+    # Determine if verbose mode is requested (for auth-setup command)
+    verbose = getattr(args, "verbose", False)
+
+    # Set up file logging for auth-setup operations
+    log_file_path = None
+    if args.command == "auth-setup":
+        log_dir = Path("/var/lib/ingress/logs")
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_file_path = log_dir / f"auth-setup-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.log"
+
+    configure_logging(args.log_mode, verbose=verbose, log_file_path=log_file_path)
 
     handler = getattr(args, "handler", None)
     if handler is None:

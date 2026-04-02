@@ -102,7 +102,9 @@ class OneDriveAuthClient:
             result = app.acquire_token_by_device_flow(flow)
             token = self._extract_token(result, account=account.name)
             self._save_cache(account.token_cache, cache)
-            self._persist_account_identity(account, app.get_accounts())
+            # Reload app to ensure cache state is synchronized before persisting identity
+            app_reloaded, _ = self._build_app(account)
+            self._persist_account_identity(account, app_reloaded.get_accounts())
             return AccessToken(token=token)
 
     def acquire_access_token(self, account: AccountConfig) -> AccessToken:
