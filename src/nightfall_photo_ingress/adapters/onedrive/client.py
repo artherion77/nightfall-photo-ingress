@@ -58,6 +58,8 @@ _EXPORTED_DIAGNOSTIC_KEYS = {
     "graph_response_request_id_seen_total",
     "graph_response_correlation_id_seen_total",
 }
+_GERMAN_FOLDER_NAMES = frozenset({"bilder", "eigene aufnahmen"})
+_ENGLISH_FOLDER_NAMES = frozenset({"camera roll", "pictures", "photos"})
 
 
 def _trace_event(event: str, **fields: object) -> None:
@@ -1695,6 +1697,43 @@ def _build_initial_delta_url(account: AccountConfig) -> str:
     encoded_root = "/" + "/".join(segments)
 
     return f"{GRAPH_BASE}/me/drive/root:{encoded_root}:/delta"
+
+
+def detect_account_locale(
+    account: AccountConfig,
+    access_token: str,
+    http_client: httpx.Client,
+) -> str | None:
+    """Best-effort locale detection based on top-level OneDrive folder names.
+
+    Returns:
+        "de" when German naming is detected, "en" for English naming, or
+        None when there is no confident signal.
+    """
+
+    payload = _graph_get_json(
+        http_client=http_client,
+        url=f"{GRAPH_BASE}/me/drive/root/children?$select=name,folder",
+        access_token=access_token,
+        account_name=account.name,
+    )
+
+    folder_names: set[str] = set()
+    for raw in payload.get("value", []):
+        if not isinstance(raw, dict):
+            continue
+        if not isinstance(raw.get("folder"), dict):
+            continue
+        name = _as_str(raw.get("name"))
+        if not name:
+            continue
+        folder_names.add(name.casefold())
+
+    if folder_names & _GERMAN_FOLDER_NAMES:
+        return "de"
+    if folder_names & _ENGLISH_FOLDER_NAMES:
+        return "en"
+    return None
 
 
 def _load_cursor(path: Path) -> str | None:

@@ -10,12 +10,15 @@ import argparse
 import logging
 from typing import Sequence
 
+import httpx
+
 from . import __version__
 from .config import AppConfig, load_config, validate_config_file
 from .logging_bootstrap import configure_logging
 from .adapters.onedrive.auth import AuthError, OneDriveAuthClient
 from .adapters.onedrive.client import (
     GraphError,
+    detect_account_locale,
     load_boundary_handoff_candidates,
     poll_accounts,
 )
@@ -101,7 +104,29 @@ def _cmd_auth_setup(args: argparse.Namespace) -> int:
     try:
         app_config = load_config(args.path)
         account = _resolve_target_account(app_config, args.account)
-        OneDriveAuthClient().auth_setup(account)
+        token = OneDriveAuthClient().auth_setup(account)
+
+        try:
+            with httpx.Client() as client:
+                detected_locale = detect_account_locale(
+                    account=account,
+                    access_token=token.token,
+                    http_client=client,
+                )
+            if detected_locale is not None:
+                LOGGER.info(
+                    "onedrive locale auto-detected",
+                    extra={"account": account.name, "locale": detected_locale},
+                )
+        except GraphError as exc:
+            LOGGER.warning(
+                "onedrive locale auto-detect failed",
+                extra={
+                    "account": account.name,
+                    "error_code": exc.code,
+                },
+            )
+
         LOGGER.info("auth setup completed", extra={"account": account.name})
         return 0
     except AuthError as exc:
