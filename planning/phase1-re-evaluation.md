@@ -1,9 +1,10 @@
 # Phase 1 Re-Evaluation
 
 Status: Decided
-Date: 2026-04-03
+Date: 2026-04-03 (rev 2: 2026-04-03)
 Owner: Systems Engineering
-Supersedes: Relevant sections of integration-plan.md (Phase 7), webui-architecture.md (§2, §3.2, §6)
+Supersedes: Relevant sections of integration-plan.md (Phase 7), webui-architecture.md (§2, §3.2, §6),
+            design-tokens.md (§11), ui-mapping.md (§3.1, §4.1, §6.1, §7.1, §7.3)
 
 ---
 
@@ -30,6 +31,10 @@ documents are amended separately where noted.
 | C6 | SQLite concurrency acceptable for Phase 1; migration path needed | Phase 2 optional | Phase 1 stays SQLite with WAL; migration path documented in Phase 2 doc |
 | C7 | Retry/backoff in API client for Phase 2 | Phase 2 | Phase 1 uses fail-fast; retry adds complexity without Phase 1 benefit |
 | C8 | Keep Phase 1 minimal; defer non-essential complexity | Guiding principle | Applied per-item; see §3.8 |
+| C9 | Filter Sidebar not essential for Phase 1 | Phase 2 mandatory | Phase 1 uses full-width main content; sidebar deferred |
+| C10 | Infinite Scroll in Audit Timeline is Phase 2 complexity | Modified Phase 1 | Phase 1 uses explicit `LoadMoreButton` cursor pagination; infinite scroll deferred |
+| C11 | KPI Thresholds must not be hard-coded in UI | Modified Phase 1 | Thresholds served from `GET /api/v1/config`; no hardcoded values in SPA |
+| C12 | Photo-Wheel blur levels should be tokenized | Modified Phase 1 | Raw `4px`/`8px` values replaced with `--wheel-blur-near`/`--wheel-blur-far` tokens |
 
 ---
 
@@ -200,6 +205,120 @@ concerns moves to Phase 2. Phase 1 scope contracts to:
 
 ---
 
+### C9 — Filter Sidebar: Phase 2 Mandatory
+
+**Original design:** ui-mapping.md §4.1 listed `FilterSidebar` as a Phase 1 Dashboard
+component providing file-type filtering (`All Files`, `Images`, `Videos`, `Documents`).
+
+**Critique:** The sidebar is browsing ergonomics, not core operator workflow. The
+operator can triage, audit, and manage the blocklist without type filtering in
+Phase 1.
+
+**Decision: Phase 2 mandatory.** Justification:
+- The filter sidebar requires a filter-state store, filter parameters propagated to all
+  Dashboard API calls, the API returning counts broken down by file type, a sidebar
+  collapse/drawer on tablet, and a modal sheet on mobile — a non-trivial slice of work.
+- The core workflow is type-agnostic in Phase 1. The queue is small enough that an
+  unfiltered view is fully usable.
+- No API endpoint changes are deferred by this decision: `GET /api/v1/staging/items`
+  already supports a `type` query parameter per the integration plan.
+
+**Phase 1 change:** Phase 1 Dashboard uses a full-width main content area (no sidebar
+column). The `FilterSidebar` component is not built. The layout diagram in ui-mapping.md
+§3.1 is annotated with a deferral note.
+
+**Phase 2 scope:** Filter Sidebar introduction is documented in phase2-architecture.md
+§13.
+
+**Documents affected:** ui-mapping.md §3.1 (annotation), §4.1 (deferral note), §6.1
+(note).
+
+---
+
+### C10 — Infinite Scroll: Phase 1 Uses LoadMoreButton Pagination
+
+**Original design:** ui-mapping.md §7.3 specified automatic infinite scroll for the
+Audit Timeline: "On scroll near the bottom of the list, the next page is loaded
+automatically (infinite scroll with a load threshold of 80% of container height)."
+
+**Critique:** Infinite scroll adds complexity that is not justified for Phase 1. The
+Audit Timeline will contain tens to low hundreds of events in normal Phase 1 use.
+
+**Decision: Modified Phase 1.** Phase 1 uses cursor-based pagination via an explicit
+`LoadMoreButton` component (already listed as `Load-more / pagination → LoadMoreButton`
+in ui-mapping.md §4.3). The automatic IntersectionObserver scroll trigger is removed
+from Phase 1. Operators click "Load more" to fetch the next cursor page.
+
+**Phase 1 behaviour:**
+- Audit Timeline loads first page (default 20 items) on mount.
+- `LoadMoreButton` appears below the list if more pages are available.
+- Clicking it appends the next cursor page to the existing list.
+- Changing the action-type filter resets cursor and reloads from page one.
+
+**Phase 2 scope:** Replacing `LoadMoreButton` with IntersectionObserver-based automatic
+scroll loading is documented in phase2-architecture.md §14.
+
+**Documents affected:** ui-mapping.md §7.3 (scrolling description).
+
+---
+
+### C11 — KPI Thresholds: From API Config, Not Hard-Coded
+
+**Original design:** design-tokens.md §11 defined a hard-coded threshold table per KPI
+metric (e.g., Pending in Staging: green 0–50, amber 51–200, red >200). These values
+would have been static constants baked into the SPA build.
+
+**Critique:** Thresholds are operational configuration, not visual constants. Hard-coding
+them in the UI requires a UI rebuild every time deployment-specific thresholds need
+adjustment.
+
+**Decision: Modified Phase 1.** The thresholds are served from the existing
+`GET /api/v1/config` endpoint (already in integration-plan.md Phase 1). The endpoint
+returns a `kpi_thresholds` object with per-metric warning and error boundaries. The
+`config.svelte.js` store caches this response. `KpiCard` receives thresholds as props
+from the parent page/store; no hardcoded values remain in the SPA.
+
+**What changes for Phase 1:**
+- design-tokens.md §11: Hard-coded threshold table removed. Replaced with a design
+  note explaining that thresholds are runtime configuration values from the config API.
+- KpiCard props: `thresholds: { warning: number, error: number }` (passed in).
+- The config endpoint's `kpi_thresholds` field is specified in the API integration
+  document; the threshold values come from `photo-ingress.conf` on the server
+  (operator configures by editing the config file in Phase 1).
+
+**Phase 2 scope:** A settings UI allowing in-place threshold editing via
+`PATCH /api/v1/config/thresholds` is documented in phase2-architecture.md §15.
+
+**Documents affected:** design-tokens.md §11 (remove threshold table; add config-API
+note); web-api-ui-integration-plan.md config endpoint response shape (noted change,
+no new file required).
+
+---
+
+### C12 — Photo-Wheel Blur Tokenization
+
+**Original design:** ui-mapping.md §7.1 specified raw pixel values in the visual
+transform rules table: `4px` for ±1 offset cards, `8px` for ±2 offset cards.
+
+**Critique:** design-tokens.md §1 explicitly states that "no raw values appear in
+component styles". Using raw `4px` and `8px` in the interaction spec contradicts the
+token-first principle already established for the project.
+
+**Decision: Modified Phase 1.** This is a quality correction, not a feature change.
+Three tokens are added to design-tokens.md in a new §13:
+
+- `--wheel-blur-center` = `0px` (center card, fully sharp)
+- `--wheel-blur-near` = `4px` (cards at ±1 offset)
+- `--wheel-blur-far` = `8px` (cards at ±2 offset)
+
+The visual transform rules table in ui-mapping.md §7.1 references these tokens.
+No visual change to the user.
+
+**Documents affected:** design-tokens.md (new §13: Photo Wheel Visual Transform Tokens);
+ui-mapping.md §7.1 (Blur column).
+
+---
+
 ## 4. Phase 1 Final Scope (Amended)
 
 The following table defines what is and is not in Phase 1 after the re-evaluation.
@@ -226,6 +345,9 @@ The following table defines what is and is not in Phase 1 after the re-evaluatio
 | Input validation on all route parameters | Via Pydantic models at API routers |
 | CORS allowlist to configured UI origin | Default: `http://localhost:8000` |
 | Security headers (X-Content-Type-Options etc.) | Via FastAPI middleware |
+| Photo-Wheel blur levels tokenized | `--wheel-blur-near` / `--wheel-blur-far` tokens in design-tokens.md (C12) |
+| KPI thresholds from `GET /api/v1/config` | `kpi_thresholds` object; no hardcoded values in SPA (C11) |
+| Audit Timeline: `LoadMoreButton` cursor pagination | Explicit click to load next page; no infinite scroll (C10) |
 
 ### 4.2 Explicitly Deferred to Phase 2
 
@@ -245,6 +367,9 @@ The following table defines what is and is not in Phase 1 after the re-evaluatio
 | Task queue (Redis or alternative) | Optional |
 | OIDC/OAuth authentication | Optional |
 | CDN or asset caching | Optional |
+| Filter Sidebar | Mandatory (Phase 1 Dashboard uses full-width layout without type filtering) |
+| Audit Timeline infinite scroll | Mandatory (Phase 1 uses LoadMoreButton; IntersectionObserver approach deferred) |
+| KPI threshold settings UI | Mandatory (Phase 2 introduces `PATCH /api/v1/config/thresholds` + Settings page form) |
 
 ---
 
@@ -254,3 +379,5 @@ The following table defines what is and is not in Phase 1 after the re-evaluatio
 |----------|------------------|-----------------|
 | `design/webui-architecture.md` | §2, §3.2, §6.1, §6.2 | SSR framing (C1); health polling ownership (C3) |
 | `planning/integration-plan.md` | Phase table, Phase 7 | Phase 7 reclassified via this document; no direct edit required |
+| `design/design-tokens.md` | §11, new §13 | KPI threshold table removed, config-API note added (C11); Photo-Wheel blur tokens added (C12) |
+| `design/ui-mapping.md` | §3.1, §4.1, §6.1, §7.1, §7.3 | Filter Sidebar deferred to Phase 2 (C9); blur tokenization (C12); LoadMoreButton pagination (C10) |

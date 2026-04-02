@@ -32,6 +32,9 @@ Phase 2 has two tiers:
 | API versioning policy | Mandatory | Required before any breaking API change |
 | Build artifact versioning and rollback | Mandatory | Enables safe re-deployment |
 | Retry/backoff for read-only API client | Mandatory | Reduces transient error noise |
+| Filter Sidebar | Mandatory | File-type filtering deferred from Phase 1 |
+| Audit Timeline: Pagination → Infinite Scroll | Mandatory | Phase 1 uses LoadMoreButton; Phase 2 adds auto-scroll |
+| KPI Threshold Configuration via API | Mandatory | Phase 2 settings UI for operator-editable thresholds |
 | SSR capability | Optional | Only if load time or auth complexity warrants it |
 | SQLite → Postgres migration | Optional | Only under concurrency pressure |
 | Background worker architecture | Optional | For sidecar/thumbnail processing |
@@ -503,7 +506,162 @@ to the CDN origin URL.
 
 ---
 
-## 13. Phase 2 Deployment Topology
+## 13. Filter Sidebar Introduction (Phase 2 Mandatory)
+
+### 13.1 Context
+
+The Phase 1 Dashboard uses a full-width main content area. The Dashboard mockup shows a
+Filter Sidebar (file-type checkboxes: All Files, Images, Videos, Documents), but this
+was deferred in the Phase 1 re-evaluation (C9) because it is browsing ergonomics, not
+core operator workflow.
+
+### 13.2 Requirements
+
+- The sidebar provides per-type filtering scoped to staging queue items and dashboard
+  KPI counts.
+- Selecting `Images` shows only image-type items in the staging queue count and the
+  audit preview; `All Files` is the default unfiltered state.
+- Filter state is ephemeral (session only; not persisted to the URL or server).
+- The sidebar is only present on the Dashboard page in Phase 2. The Staging Queue
+  page has its own inline filter in a later iteration.
+
+### 13.3 API Changes
+
+No new API endpoint is required. `GET /api/v1/staging/items` already supports a `type`
+query parameter (defined in the integration plan). In Phase 2, the Dashboard queries
+passing the selected type when a filter is active.
+
+`GET /api/v1/config` returns an `allowed_types` list so the sidebar options are
+dynamic (driven by what the system is configured to process), not hardcoded in the UI.
+
+### 13.4 Frontend Architecture
+
+```
+Dashboard Page
+  FilterSidebar (new Phase 2 component)
+    props: options[] (from config store), selected: string, onChange: (type) => void
+  |
+  └─ Emits selected type to page-level svelte $state
+        └─ All Dashboard API calls gain type= query parameter when filter active
+```
+
+The sidebar introduces a `filterType` state variable at page level. This is passed
+as a prop to all child components that query the API for counts or items.
+
+### 13.5 Layout Changes
+
+The Phase 1 full-width main content grid gains a sidebar column:
+
+```
+┌──────────┬──────────────────────────────────────────────┐
+│ Filters  │ KPI grid + Audit timeline                      │
+└──────────┴──────────────────────────────────────────────┘
+```
+
+Responsive behaviour is as originally specified in ui-mapping.md §6.2 and §6.3
+(slide-out drawer on tablet, modal sheet on mobile).
+
+### 13.6 Phase 1 Compatibility
+
+- Phase 1 API endpoints are unchanged (the `type` query parameter is already defined).
+- Phase 1 SPA has no `FilterSidebar` component; adding it in Phase 2 is purely additive.
+- The Phase 2 Dashboard layout CSS adds a grid column; no Phase 1 component changes.
+
+---
+
+## 14. Audit Timeline: Pagination → Infinite Scroll (Phase 2 Mandatory)
+
+### 14.1 Context
+
+Phase 1 uses an explicit `LoadMoreButton` for the Audit Timeline. The button appends the
+next cursor page to the list when clicked. This is correct Phase 1 behaviour (C10).
+
+### 14.2 Phase 2 Change
+
+Phase 2 replaces the explicit `LoadMoreButton` with an IntersectionObserver-based
+automated scroll trigger. When the operator scrolls to within 200px of the bottom of
+the list, the next cursor page is fetched and appended automatically.
+
+### 14.3 Migration Approach
+
+The backend API is unchanged. `GET /api/v1/audit-log?cursor=...&limit=...` continues
+to operate identically. The migration is frontend-only:
+
+1. Replace `<LoadMoreButton>` in `AuditTimeline` with a sentinel `<div>` observed by
+   `IntersectionObserver`.
+2. The observer fires the next-page fetch when the sentinel enters the viewport.
+3. A loading skeleton row is shown while the next page loads.
+4. If no more pages are available, the sentinel is removed from the DOM.
+5. Filter changes reset cursor state and clear the appended list, triggering a fresh
+   first-page load (same behaviour as Phase 1).
+
+### 14.4 Phase 1 Compatibility
+
+`LoadMoreButton` remains in `src/lib/components/common/` and continues to be used by
+other paginated lists (e.g., blocklist rules). No Phase 1 component is removed during
+this migration.
+
+### 14.5 Rollback
+
+Restoring the `LoadMoreButton` variant requires a single component swap in
+`AuditTimeline.svelte`. The API contract is unchanged.
+
+---
+
+## 15. KPI Threshold Configuration via API (Phase 2 Mandatory)
+
+### 15.1 Context
+
+In Phase 1, KPI thresholds (the warning/error boundaries for each metric's status bar
+colour) are served from `GET /api/v1/config` as the `kpi_thresholds` field. They are
+read from `photo-ingress.conf` on the server. The operator edits the config file
+directly to change thresholds (Phase 1 behaviour).
+
+Phase 2 adds an in-UI settings page allowing the operator to view and edit KPI
+thresholds without SSH access to the server.
+
+### 15.2 New API Endpoint (Phase 2)
+
+```
+PATCH /api/v1/config/thresholds
+```
+
+Request body: JSON object mapping metric keys to `{ warning: number, error: number }`.
+
+Validation rules:
+- `warning < error` for all metrics.
+- All values must be non-negative integers (or floats for percentage-based metrics).
+- Unknown metric keys are rejected (`422 Unprocessable Entity`).
+
+The endpoint updates the running configuration and persists changes to a
+`config_overrides` SQLite table (so file-based config remains the baseline; overrides
+take precedence at runtime). A `GET /api/v1/config` call after a successful PATCH
+reflects the updated values immediately.
+
+### 15.3 Frontend: Settings Page
+
+The Settings page (`/settings`, already a Phase 1 route) gains a
+"KPI Thresholds" section with an editable form:
+
+- One row per metric (label, warning input, error input, unit indicator).
+- Inline validation (warning must be less than error).
+- "Save" button calls `PATCH /api/v1/config/thresholds`; success toasts confirmation.
+- "Reset to defaults" restores config-file values (calls DELETE on the overrides row).
+
+### 15.4 Phase 1 Compatibility
+
+`GET /api/v1/config` already returns `kpi_thresholds` in Phase 1 (read-only). Phase 2
+adds the PATCH endpoint. The GET response shape is unchanged (additive `kpi_thresholds`
+field was already present). No breaking change.
+
+### 15.5 Rollback
+
+If the PATCH endpoint is problematic: delete the `config_overrides` table row for
+thresholds; the system falls back to config-file values on next API start.
+
+---
+
+## 16. Phase 2 Deployment Topology
 
 ### 13.1 Service Inventory (Phase 2 Mandatory)
 
@@ -566,7 +724,7 @@ Rollback:
 
 ---
 
-## 14. Phase 2 Component Dependency Graph
+## 17. Phase 2 Component Dependency Graph
 
 The following graph shows build-time and runtime dependencies between components.
 Arrows point from dependent to dependency.
@@ -612,7 +770,7 @@ Phase 2 Deployment Dependencies
 
 ---
 
-## 15. Phase 1 → Phase 2 Compatibility Guarantees
+## 18. Phase 1 → Phase 2 Compatibility Guarantees
 
 Phase 2 must not break any Phase 1 operator workflow. The following constraints apply:
 
@@ -624,6 +782,9 @@ Phase 2 must not break any Phase 1 operator workflow. The following constraints 
 | SQLite schema stable | Phase 2 migrations are additive only |
 | Feature-flag rollback | UI/API can be stopped without affecting CLI ingest timers |
 | RapiDoc docs still accessible | `/api/docs` continues to be proxied through Caddy |
+| `LoadMoreButton` still usable | `AuditTimeline` infinite scroll is additive; component not removed |
+| Filter Sidebar additive | Phase 2 adds sidebar column; no Phase 1 component removed |
+| KPI Thresholds GET unchanged | `kpi_thresholds` field in config response was already present in Phase 1 |
 
 Phase 2 is complete when all mandatory items in §2 are operational and the LAN exposure
 checklist in §3.6 is signed off.

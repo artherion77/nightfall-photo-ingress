@@ -242,17 +242,36 @@ dark colour with subtle opacity, plus an accent glow for focused and highlighted
 
 ## 11. KPI Card Status Bar
 
-KPI cards display a thin coloured bar along their bottom edge to convey status. The bar
-colour is derived from thresholds defined per metric:
+KPI cards display a thin coloured bar along their bottom edge to convey status. The
+colour is derived from per-metric warning and error thresholds.
 
-| KPI Metric         | Green (`--status-ok`) | Amber (`--status-warning`) | Red (`--status-error`) |
-|--------------------|-----------------------|---------------------------|------------------------|
-| Pending in Staging | 0–50                  | 51–200                    | > 200 |
-| Disk Usage         | < 70%                 | 70–85%                    | > 85% |
-| Last Poll Duration | < 10s                 | 10–30s                    | > 30s |
+**Thresholds are not hard-coded in the UI.** The `GET /api/v1/config` endpoint returns
+a `kpi_thresholds` object, for example:
 
-The status bar is a 3px tall `border-bottom` using the appropriate semantic status
-token.
+```
+{
+  "kpi_thresholds": {
+    "pending_in_staging":  { "warning": 50,  "error": 200 },
+    "disk_usage_pct":      { "warning": 70,  "error": 85  },
+    "last_poll_duration_s": { "warning": 10,  "error": 30  }
+  }
+}
+```
+
+The `config.svelte.js` store fetches and caches these values. `KpiCard` receives
+`thresholds: { warning: number, error: number }` as a prop; parent pages source the
+values from the config store.
+
+**Status bar colour logic (CSS class selection at render time):**
+
+| Value range        | Token applied        |
+|--------------------|---------------------|
+| < warning          | `--status-ok`        |
+| ≥ warning, < error | `--status-warning`   |
+| ≥ error            | `--status-error`     |
+
+The status bar is a 3px tall `border-bottom` using the applicable token. No raw colour
+values appear in component styles.
 
 ---
 
@@ -274,3 +293,20 @@ background: linear-gradient(
 
 The four service status dots (Polling, OneDrive Auth, Registry Integrity, Disk Usage)
 are absolutely positioned along this bar at evenly spaced intervals.
+
+---
+
+## 13. Photo Wheel Visual Transform Tokens
+
+The Photo Wheel carousel applies per-position visual transforms. Blur levels are
+tokenised so they can be adjusted from one location without touching component styles.
+
+| Token                  | Value  | Usage |
+|------------------------|--------|-------|
+| `--wheel-blur-center`  | `0px`  | Center card (position offset 0): fully sharp |
+| `--wheel-blur-near`    | `4px`  | Cards at offset ±1: gently blurred |
+| `--wheel-blur-far`     | `8px`  | Cards at offset ±2: strongly blurred |
+
+`PhotoCard` references `--wheel-blur-near` and `--wheel-blur-far` (via CSS
+`var()`) rather than inline pixel values. Changing the token values updates all
+affected card positions simultaneously without a component logic change.

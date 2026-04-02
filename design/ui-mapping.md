@@ -110,6 +110,10 @@ Two mockups were analysed:
 └──────────┴─────────────────────────────────────────────────┘
 ```
 
+> **Phase 1 note:** The Filter Sidebar column is **deferred to Phase 2** (C9).
+> The Phase 1 Dashboard uses a full-width main content area. The layout diagram above
+> reflects the eventual Phase 2 layout for reference.
+
 ### 3.2 Staging Queue Layout Pattern
 
 ```
@@ -136,7 +140,7 @@ Two mockups were analysed:
 |------------|-----------------|---------------|
 | Page title + health bar | `PageTitle` + `HealthBar` | `title`, `services[]` |
 | Polling status row | `HealthBar` (compact variant) | `services[]` (inline) |
-| Filter sidebar | `FilterSidebar` | `options[]`, `selected`, `onChange` |
+| Filter sidebar | `FilterSidebar` *(Phase 2 — deferred; C9)* | `options[]`, `selected`, `onChange` |
 | KPI card (count) | `KpiCard` | `label`, `value`, `status`, `trend?` |
 | KPI chart card | `PollRuntimeChart` | `data[]`, `labels[]` |
 | Audit timeline section | `AuditPreview` (dashboard) or `AuditTimeline` (full view) | `events[]`, `onViewAll` |
@@ -197,8 +201,9 @@ designed as fully general-purpose:
 
 ### 6.1 Desktop (≥ 1024px)
 
-- Full layout as in mockups.
-- Filter sidebar visible alongside main content area (column layout).
+- Full layout as in mockups (Phase 2 final state).
+- Filter sidebar visible alongside main content area in Phase 2. In Phase 1, main
+  content is full-width (no sidebar column).
 - Photo Wheel shows 5 cards (center + 2 on each side).
 - KPI grid: 3 columns + chart column.
 - Header: all navigation tabs visible as text.
@@ -244,10 +249,10 @@ detection is used in Svelte component logic.
 **Visual transform rules (per card position relative to center):**
 
 | Position offset | Scale | Opacity | Blur | Z-index |
-|----------------|-------|---------|------|---------|
-| 0 (center)     | 1.0   | 1.0     | 0    | 10 |
-| ±1             | 0.78  | 0.7     | 4px  | 5 |
-| ±2             | 0.60  | 0.4     | 8px  | 2 |
+|----------------|-------|---------|------|-------|
+| 0 (center)     | 1.0   | 1.0     | `var(--wheel-blur-center)` | 10 |
+| ±1             | 0.78  | 0.7     | `var(--wheel-blur-near)` | 5 |
+| ±2             | 0.60  | 0.4     | `var(--wheel-blur-far)` | 2 |
 
 **Transition:** Position shifts use `--duration-slow` (`350ms`) with `--easing-spring`
 for the snap-to-center animation.
@@ -278,9 +283,16 @@ suppressed on touch devices.
 
 ### 7.3 Audit Timeline
 
-**Scrolling:** The audit timeline is a vertically scrollable list. Cursor-based
-pagination is used. On scroll near the bottom of the list, the next page is loaded
-automatically (infinite scroll with a load threshold of 80% of container height).
+**Scrolling (Phase 1):** The audit timeline uses cursor-based pagination with an
+explicit `LoadMoreButton`. The first page (default 20 items) loads on mount. The
+`LoadMoreButton` is visible below the list if additional pages are available. Clicking
+it fetches and appends the next cursor page to the existing list. This is simple,
+predictable, and requires no scroll event or IntersectionObserver logic.
+
+**Scrolling (Phase 2):** `LoadMoreButton` is replaced with an IntersectionObserver
+sentinel. When the sentinel enters the viewport (within 200px of the bottom of the
+list), the next cursor page is fetched and appended automatically. See
+`design/phase2-architecture.md` §14 for the migration plan.
 
 **Event row interaction:** Clicking an event row expands it inline to show the full
 audit entry (actor, action, item ID, timestamp, correlation ID). Keyboard: `Enter`
