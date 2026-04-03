@@ -1,8 +1,9 @@
 # SvelteKit Web UI Architecture
 
-Status: Proposed
+Status: Implemented (Chunk 2 design system complete)
 Date: 2026-04-03
 Owner: Systems Engineering
+Last Updated: 2026-04-03
 
 ---
 
@@ -13,13 +14,81 @@ The photo-ingress Web UI is a SvelteKit single-page application (SPA) built with
 backend. There is no server-side rendering (SSR) at runtime — the app is fully
 client-side after the initial asset delivery.
 
+**Phase 1 Chunk 2 Status:** Global design tokens and reset stylesheet fully implemented.
+All components reference tokens exclusively; no raw colour, pixel, or named CSS values
+appear in component styles.
+
 This document describes:
+- Design token system and global styling
 - Layout system
 - Route and page structure
 - Component hierarchy
 - State management strategy
 - API layer design
 - Error handling and loading state patterns
+
+---
+
+## 1.5 Global Styling and Design Tokens
+
+### 1.5.1 Design Token System
+
+All visual properties (colours, spacing, typography, shadows, animations) are defined
+as CSS custom properties in `webui/src/styles/tokens.css`. This is the single source
+of truth for the design system.
+
+**Location:** `webui/src/styles/tokens.css`
+
+**Categories of tokens:**
+- Colour palette (background, neutral, status, action, surface, text, border)
+- Spacing scale (space-1 through space-16)
+- Typography (font families, sizes, weights, line heights)
+- Border radius (radius-sm through radius-full)
+- Shadows (shadow-sm through shadow-xl)
+- Animation (durations and easing functions)
+
+Components reference tokens exclusively. No raw colour hex, pixel values, or named
+colours appear in component `<style>` blocks.
+
+See `design/web/webui-design-tokens-phase1.md` for the complete token catalogue.
+
+### 1.5.2 Global Reset Stylesheet
+
+**Location:** `webui/src/styles/reset.css`
+
+The reset stylesheet normalizes browser defaults and establishes consistent baselines:
+- Removes default margins and padding from all HTML elements
+- Normalizes form elements (input, button, textarea, select)
+- Applies focus ring styling using `--action-primary` token
+- Establishes body background (`--surface-base`) and text colour (`--text-primary`)
+- Provides consistent typography sizing and link styling
+
+### 1.5.3 Root Layout Integration
+
+**File:** `webui/src/routes/+layout.svelte`
+
+```javascript
+<script>
+  import '../styles/reset.css';
+  import '../styles/tokens.css';
+</script>
+
+<main>
+  <slot />
+</main>
+```
+
+**Import order:** Reset is imported before tokens globally available to all components.
+
+### 1.5.4 Dark Mode Meta Tag
+
+**File:** `webui/src/app.html`
+
+```html
+<meta name="color-scheme" content="dark" />
+```
+
+This signals native dark-mode support in the browser.
 
 ---
 

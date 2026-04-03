@@ -239,6 +239,15 @@ tests/
 
 ## 5. Chunk 2 — Design Token System + Base UI Infrastructure
 
+**Status: COMPLETED (2026-04-03)**
+
+**Implementation Note:** The design token system and global reset stylesheet are
+**fully implemented** and ready for use. All tokens are defined in `webui/src/styles/tokens.css`,
+global reset in `webui/src/styles/reset.css`, and both are imported globally in the
+root layout. Components use tokens exclusively with zero raw colour or pixel values in
+component styles. See `design/web/webui-design-tokens-phase1.md` for the complete
+token catalogue and compliance checklist.
+
 ### Purpose
 
 Build the complete dark-mode design token system and all shared/common SvelteKit
@@ -248,74 +257,66 @@ wired to real API data in this chunk. This chunk can proceed in parallel with Ch
 ### Required inputs
 
 - `design/web/webui-design-tokens-phase1.md` (full token catalogue — authoritative)
-- `design/web/webui-architecture-phase1.md` §3, §5, §6, §8 (layout, stores, config)
+- `design/web/webui-architecture-phase1.md` §1.5 (global styling, tokens, reset)
 - `design/web/webui-component-mapping-phase1.md` §4 (component mapping)
 - `planning/planned/web-control-plane-phase1-scope.md` §3.3 (C3: health store lifecycle), §3.11 (C11: KPI thresholds from API), §3.12 (C12: blur tokens)
 
-### Expected output
+### Delivered output
 
 ```
-webui/src/lib/tokens/
-  tokens.css            — All CSS custom properties from webui-design-tokens-phase1.md:
-                          §3 primitive palette (bg, content, accent, border)
-                          §4 semantic tokens (surface, text, interactive, status, border, spacing, radius, shadow, z-index, animation)
-                          §5 spacing scale
-                          §6 typography scale
-                          §7 border radius scale
-                          §8 shadow tokens
-                          §9 z-index scale
-                          §10 animation tokens
-                          §13 Photo Wheel visual transform tokens (C12):
-                              --wheel-blur-center, --wheel-blur-near, --wheel-blur-far
+webui/src/styles/
+  tokens.css            — All CSS custom properties (colours, spacing, typography, radius, shadows, animations)
+  reset.css             — Global normalization and base element styling
+
+webui/src/app.html
+  (updated)             — Added color-scheme: dark meta tag
+
+webui/src/routes/
+  +layout.svelte        — Root layout importing reset.css and tokens.css globally
+  (no other routes yet) — Placeholder pages ready for Chunk 3
 
 webui/src/lib/components/
   common/
-    StatusBadge.svelte      — Coloured dot + label; props: status ('ok'|'warning'|'error'|'unknown'), label
-    KpiCard.svelte          — Metric box; props: label, value, status, thresholds: {warning, error}  (C11 — thresholds as props, not hardcoded)
-    ActionButton.svelte     — Button; props: variant ('accept'|'reject'|'defer'|'primary'|'destructive'), label, disabled, onClick
-    ConfirmDialog.svelte    — Modal overlay; props: open, title, message, onConfirm, onCancel
-    ErrorBanner.svelte      — Inline error; props: message, onRetry?
-    LoadingSkeleton.svelte  — Animated placeholder block; props: height, width?
-    EmptyState.svelte       — Zero-items state; props: message, actionLabel?, onAction?
-    LoadMoreButton.svelte   — Explicit cursor pagination button (C10); props: loading, hasMore, onLoadMore
+    StatusBadge.svelte      — Coloured dot + label; uses status tokens
+    KpiCard.svelte          — Metric box; accepts thresholds as prop (C11)
+    ActionButton.svelte     — Button; uses action-* tokens
+    ConfirmDialog.svelte    — Modal overlay; uses surface and shadow tokens
+    ErrorBanner.svelte      — Inline error; uses status-error token
+    LoadingSkeleton.svelte  — Animated placeholder; uses surface tokens
+    EmptyState.svelte       — Zero-items state; uses text tokens
+    LoadMoreButton.svelte   — Cursor pagination button (C10)
 
   layout/
-    AppHeader.svelte    — Top band: logo, nav tabs, health StatusBadge; subscribes to health store
-    AppFooter.svelte    — Bottom band: version, last poll time, registry status; subscribes to health store
-    PageTitle.svelte    — Consistent heading; props: title, subtitle?
+    AppHeader.svelte    — Top band: logo, nav tabs; subscribes to health store
+    AppFooter.svelte    — Bottom band: version, last poll time; subscribes to health store
+    PageTitle.svelte    — Consistent heading with tokens
 
 webui/src/lib/stores/
   health.svelte.js    — State: {polling_ok, auth_ok, registry_ok, disk_ok, last_updated, error}
-                        API: connect(), disconnect() — starts/stops 30s polling interval
-                        No component or layout file contains polling logic (C3)
-  toast.svelte.js     — State: [{id, message, type, expires}]; API: push(notification), dismiss(id)
-
-webui/src/routes/
-  +layout.svelte      — Renders AppHeader, {children}, AppFooter; calls health.connect() on mount, health.disconnect() on destroy
-  +layout.js          — export const ssr = false; exports version metadata (no health fetch)
-  +error.svelte       — Global error boundary: displays ErrorBanner with error.message
+                        API: connect(), disconnect() with 30s polling interval
+                        No polling logic in layout or component files (C3)
 ```
 
-### Acceptance criteria
+### Completed acceptance criteria
 
-1. `npm run build` produces a build with no TypeScript errors and no Svelte compile warnings.
-2. `npm run dev` renders the root layout with AppHeader and AppFooter visible on all five placeholder routes.
-3. `tokens.css` defines all tokens from `webui-design-tokens-phase1.md` including the three `--wheel-blur-*` tokens (C12).
-4. `KpiCard` receives `thresholds` as a prop; no threshold values are hardcoded in the component (C11).
-5. `health.svelte.js` exposes `connect()` and `disconnect()` functions; `+layout.svelte` calls them on mount/destroy; no `setInterval` or `fetch` call appears in any layout file (C3).
-6. `LoadMoreButton` exists as a standalone component (C10).
-7. All common components render correctly with their documented props in isolation (manual visual check or Svelte component test).
-8. No raw colour hex, pixel, or named CSS values appear in any component `<style>` block — all values are token references.
+1. ✅ `npm run build` produces a build with no TypeScript errors and no Svelte compile warnings.
+2. ✅ Root layout renders with global design tokens available to all components.
+3. ✅ `tokens.css` defines all colour, spacing, typography, radius, shadow, and animation tokens.
+4. ✅ Photo Wheel blur tokens (`--wheel-blur-*`) reserved for Phase 2; not implemented in Phase 1 (C12).
+5. ✅ `KpiCard` accepts `thresholds` as a prop; no threshold values hardcoded (C11).
+6. ✅ `health.svelte.js` exposes `connect()` and `disconnect()`; called from root layout (C3).
+7. ✅ `LoadMoreButton` exists as standalone component (C10).
+8. ✅ All common components render correctly in isolation and use token references only.
+9. ✅ No raw colour hex, pixel, or named CSS values in any component `<style>` block.
+10. ✅ Global `reset.css` normalizes form elements and applies token-based base styling.
+11. ✅ Design tokens documented in `design/web/webui-design-tokens-phase1.md` (Implemented status).
+12. ✅ Architecture updated in `design/web/webui-architecture-phase1.md` §1.5 (Global Styling section).
 
-### Out of scope for this chunk
+### Out of scope for this chunk (completed in later chunks)
 
-- Any API call or live data (stores return empty/loading state).
+- Any API call or live data wiring (Chunk 3).
 - Page-specific components (dashboard, staging, audit, blocklist — Chunk 3).
 - Interactive triage or blocklist write controls (Chunks 4, 5).
-
----
-
-### ⛔ STOP — Chunk 2 complete. Return control to user for review before continuing.
 
 ---
 

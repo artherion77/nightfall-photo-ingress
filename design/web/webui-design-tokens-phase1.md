@@ -1,312 +1,363 @@
 # Design Tokens — Web Control Plane
 
-Status: Proposed
+Status: Implemented
 Date: 2026-04-03
 Owner: Systems Engineering
+Last Updated: 2026-04-03 (Chunk 2 complete)
 
 ---
 
 ## 1. Philosophy
 
 The design token system is the single source of truth for all visual properties in the
-Web UI. Tokens are defined as CSS custom properties (`--token-name`) on the `:root`
-selector. Svelte components reference tokens only; no raw values appear in component
-styles.
+Web UI. Tokens are defined as CSS custom properties (`--token-name`) in the `:root`
+selector, making them available globally to all components. **Components reference
+tokens exclusively; no raw colour hex values, pixel sizes, or named CSS values appear
+in component `<style>` blocks.**
 
 **Dark-mode-first:** The entire UI is dark. There is no light mode toggle in Phase 1.
-The `color-scheme: dark` meta tag is set in `app.html`.
+The `color-scheme: dark` meta tag is set in `app.html` for native dark-mode browser
+support.
 
-**Semantic layering:** Tokens are named by their role, not their raw value. Components
-use semantic tokens. Semantic tokens reference primitive tokens. This allows the palette
-to be updated in one place.
+**No hardcoded values:** All colour, spacing, typography, radius, shadow, and animation
+properties reference CSS custom properties. This ensures:
+- Single source of truth: palette updates require only one edit.
+- Consistency: all uses of a given property receive the same value.
+- Maintainability: new components automatically inherit the design system.
 
 ---
 
-## 2. Token File Location
+## 2. Token File Location and Integration
 
 ```
-webui/src/lib/tokens/
-  tokens.css          — All custom property definitions (imported globally)
-  README.md           — Token authoring guide (brief)
+webui/src/styles/
+  tokens.css          — All CSS custom properties (root level)
+  reset.css           — Global normalization and defaults
 ```
 
-`tokens.css` is imported in `app.html` or the root layout's `<style>` block so all
-tokens are available globally without per-component imports.
+**Global Import Order** (in `webui/src/routes/+layout.svelte`):
+
+1. First: `import '../styles/reset.css'` — Normalizes default browser styles
+2. Second: `import '../styles/tokens.css'` — Defines all design tokens
+
+This ensures tokens are available to reset.css for typography and bg colour defaults,
+and to all components globally. No per-component token imports are needed.
 
 ---
 
-## 3. Primitive Tokens (Palette)
+## 3. Colour Palette
 
-These define the raw colour palette. They are not used directly in components.
+All colour tokens are defined at the root level as CSS custom properties. The palette
+is organized by category: background, status, action, surface, text, and border.
 
-### 3.1 Background Palette
+### 3.1 Background Colours
 
-| Token                      | Value       | Role |
-|----------------------------|-------------|------|
-| `--color-bg-900`           | `#0d0f11`   | Deepest background (body, page root) |
-| `--color-bg-800`           | `#141618`   | Primary surface (cards, panels) |
-| `--color-bg-700`           | `#1c1f23`   | Elevated surface (sidebar, header) |
-| `--color-bg-600`           | `#252a30`   | Hover/pressed state on surfaces |
-| `--color-bg-overlay`       | `rgba(0,0,0,0.6)` | Modal backdrop |
+| Token                | Value     | Usage |
+|----------------------|-----------|-------|
+| `--color-bg-950`     | `#0a0e27` | Deepest background (not currently used) |
+| `--color-bg-900`     | `#0f1419` | Primary page background |
+| `--color-bg-800`     | `#1a1f2e` | Primary surface for cards and panels |
+| `--color-bg-700`     | `#252d3d` | Elevated surface (sidebar, header) |
 
-### 3.2 Content Palette (Text and Icons)
+### 3.2 Neutral Colours
 
-| Token                      | Value       | Role |
-|----------------------------|-------------|------|
-| `--color-content-100`      | `#f0f2f4`   | Primary text |
-| `--color-content-200`      | `#c4c8cc`   | Secondary text |
-| `--color-content-300`      | `#878d95`   | Tertiary/muted text |
-| `--color-content-400`      | `#4a5058`   | Disabled text |
+| Token                   | Value     | Role |
+|-------------------------|-----------|------|
+| `--color-neutral-50`    | `#f9fafb` | Very light text (rarely used) |
+| `--color-neutral-100`   | `#f3f4f6` | Primary text |
+| `--color-neutral-200`   | `#e5e7eb` | Secondary text |
+| `--color-neutral-300`   | `#d1d5db` | Tertiary text |
+| `--color-neutral-400`   | `#9ca3af` | Muted text and borders |
+| `--color-neutral-500`   | `#6b7280` | Disabled state colour |
+| `--color-neutral-600`   | `#4b5563` | Strong border |
+| `--color-neutral-700`   | `#374151` | Default border |
+| `--color-neutral-800`   | `#1f2937` | Subtle border |
+| `--color-neutral-900`   | `#111827` | (not currently used) |
 
-### 3.3 Accent Palette
+### 3.3 Status Colours
 
-| Token                      | Value       | Role |
-|----------------------------|-------------|------|
-| `--color-accent-teal`      | `#0dccb5`   | Primary interactive accent (links, active nav, accept) |
-| `--color-accent-teal-dim`  | `rgba(13,204,181,0.15)` | Teal surface highlight / card border hover |
-| `--color-accent-red`       | `#e05555`   | Reject / danger |
-| `--color-accent-red-dim`   | `rgba(224,85,85,0.15)`  | Red surface highlight |
-| `--color-accent-amber`     | `#f0a030`   | Warning / degraded |
-| `--color-accent-amber-dim` | `rgba(240,160,48,0.12)` | Amber surface highlight |
-| `--color-accent-green`     | `#3ecf6a`   | Success / healthy |
-| `--color-accent-blue`      | `#5299e0`   | Informational / neutral action |
+| Token                 | Value     | Usage |
+|-----------------------|-----------|-------|
+| `--status-ok`         | `#10e8cc` | Healthy status indicator (teal) |
+| `--status-warning`    | `#fbbf24` | Warning/degraded status (amber) |
+| `--status-error`      | `#f87171` | Error/down status (red) |
+| `--status-unknown`    | `#6b7280` | Unknown status (grey) |
 
-### 3.4 Border Palette
+### 3.4 Action Colours
 
-| Token                    | Value       |
-|--------------------------|-------------|
-| `--color-border-subtle`  | `rgba(255,255,255,0.06)` |
-| `--color-border-default` | `rgba(255,255,255,0.12)` |
-| `--color-border-strong`  | `rgba(255,255,255,0.22)` |
+| Token                      | Value     | Usage |
+|----------------------------|-----------|-------|
+| `--action-primary`         | `#10e8cc` | Primary interactive elements (teal) |
+| `--action-primary-hover`   | `#0dd1b5` | Primary element hover state |
+| `--action-accept`          | `#10e8cc` | Accept button and zones |
+| `--action-reject`          | `#ef4444` | Reject button and zones |
+| `--action-destructive`     | `#ef4444` | Destructive actions (delete) |
+
+### 3.5 Surface Tokens
+
+| Semantic Token       | Value            | Usage |
+|---------------------|------------------|-------|
+| `--surface-base`    | `#111827`        | Page background |
+| `--surface-card`    | `#1a1f2e`        | KPI cards, photo cards, panels |
+| `--surface-raised`  | `#252d3d`        | Header, sidebar, elevated panels |
+| `--surface-overlay` | `rgba(0, 0, 0, 0.8)` | Modal and dialog backdrop |
+| `--surface-code`    | `#0f1419`        | Code block backgrounds |
+
+### 3.6 Text Colours
+
+| Token                | Value       | Usage |
+|---------------------|-------------|-------|
+| `--text-primary`    | `#f3f4f6`   | Headings, primary body text |
+| `--text-secondary`  | `#d1d5db`   | Labels, descriptions |
+| `--text-tertiary`   | `#9ca3af`   | Timestamps, metadata, placeholders |
+| `--text-code`       | `#86efac`   | Monospace code text |
+
+### 3.7 Border Colours
+
+| Token                 | Value     | Usage |
+|-----------------------|-----------|-------|
+| `--border-default`    | `#374151` | Standard card borders, separator lines |
+| `--border-subtle`     | `#1f2937` | Low-emphasis dividers |
+| `--border-strong`     | `#4b5563` | Focused inputs, selected rows |
 
 ---
 
-## 4. Semantic Tokens
-
-These are the tokens that components use. Each references a primitive.
-
-### 4.1 Surface Tokens
-
-| Semantic Token              | Maps to Primitive        | Usage |
-|-----------------------------|--------------------------|-------|
-| `--surface-base`            | `--color-bg-900`         | Page background |
-| `--surface-card`            | `--color-bg-800`         | KPI cards, photo cards, panels |
-| `--surface-raised`          | `--color-bg-700`         | Header, sidebar, elevated panels |
-| `--surface-hover`           | `--color-bg-600`         | Interactive surface hover state |
-| `--surface-overlay`         | `--color-bg-overlay`     | Modal and dialog backdrop |
-
-### 4.2 Text Tokens
-
-| Semantic Token           | Maps to Primitive        | Usage |
-|--------------------------|--------------------------|-------|
-| `--text-primary`         | `--color-content-100`    | Headings, primary body text |
-| `--text-secondary`       | `--color-content-200`    | Labels, descriptions |
-| `--text-muted`           | `--color-content-300`    | Timestamps, metadata, placeholders |
-| `--text-disabled`        | `--color-content-400`    | Disabled controls |
-
-### 4.3 Interactive / Action Tokens
-
-| Semantic Token               | Maps to Primitive          | Usage |
-|------------------------------|----------------------------|-------|
-| `--action-accept`            | `--color-accent-teal`      | Accept button fill, accept border |
-| `--action-accept-surface`    | `--color-accent-teal-dim`  | Accept drop-zone background |
-| `--action-reject`            | `--color-accent-red`       | Reject button fill, reject border |
-| `--action-reject-surface`    | `--color-accent-red-dim`   | Reject drop-zone background |
-| `--action-primary`           | `--color-accent-teal`      | Primary interactive elements |
-| `--action-primary-hover`     | `#10e8cc`                  | Primary element hover |
-| `--action-destructive`       | `--color-accent-red`       | Destructive actions (delete) |
-
-### 4.4 Status Tokens
-
-| Semantic Token            | Maps to Primitive       | Usage |
-|---------------------------|-------------------------|-------|
-| `--status-ok`             | `--color-accent-green`  | Healthy status dot |
-| `--status-warning`        | `--color-accent-amber`  | Degraded/warning status dot |
-| `--status-error`          | `--color-accent-red`    | Error/down status dot |
-| `--status-unknown`        | `--color-content-400`   | Unknown/pending status dot |
-| `--status-info`           | `--color-accent-blue`   | Informational items |
-
-### 4.5 Border Tokens
-
-| Semantic Token            | Maps to Primitive            | Usage |
-|---------------------------|------------------------------|-------|
-| `--border-default`        | `--color-border-default`     | Card borders, separator lines |
-| `--border-subtle`         | `--color-border-subtle`      | Low-emphasis dividers |
-| `--border-strong`         | `--color-border-strong`      | Focused inputs, selected rows |
-| `--border-accept`         | `--action-accept`            | Accept card/zone border |
-| `--border-reject`         | `--action-reject`            | Reject card/zone border |
+## 4. Primitive Tokens (Palette)
 
 ---
 
 ## 5. Spacing Scale
 
-Spacing tokens use an 8pt baseline grid. Components use only these values for padding,
-margin, and gap.
+Spacing tokens use a consistent baseline grid. Components use only these values for
+padding, margin, and gap. No raw pixel values appear in component styles.
 
-| Token            | Value  | Usage |
-|------------------|--------|-------|
-| `--space-1`      | `4px`  | Tight inner padding, icon gap |
-| `--space-2`      | `8px`  | Small component inner padding |
-| `--space-3`      | `12px` | Default label/input gap |
-| `--space-4`      | `16px` | Standard card padding |
-| `--space-5`      | `24px` | Section padding, component gap |
-| `--space-6`      | `32px` | Large section gap |
-| `--space-7`      | `48px` | Page-level section separation |
-| `--space-8`      | `64px` | Maximum layout spacing |
+| Token      | Value   | Equivalent | Usage |
+|------------|---------|------------|-------|
+| `--space-1` | `0.25rem` | 4px       | Tight inner padding, icon gap |
+| `--space-2` | `0.5rem`  | 8px       | Small component inner padding |
+| `--space-3` | `0.75rem` | 12px      | Default label/input gap |
+| `--space-4` | `1rem`    | 16px      | Standard card padding |
+| `--space-5` | `1.25rem` | 20px      | Component gap, section padding |
+| `--space-6` | `1.5rem`  | 24px      | Large section gap |
+| `--space-8` | `2rem`    | 32px      | Extra-large section spacing |
+| `--space-10` | `2.5rem` | 40px      | Extra-large gap |
+| `--space-12` | `3rem`   | 48px      | Large spacing |
+| `--space-16` | `4rem`   | 64px      | Maximum layout spacing |
 
 ---
 
 ## 6. Typography
 
-### 6.1 Font Stack
+### 6.1 Font Families
 
-```
---font-family-base: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
---font-family-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', monospace;
+```css
+--font-family-base: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+--font-family-mono: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Courier New', monospace;
 ```
 
-Inter is loaded from a local static asset or system fallback. No external CDN font
-load.
+No external font CDN requests. System fonts fall back gracefully.
 
 ### 6.2 Type Scale
 
-| Token                  | Size     | Weight | Line Height | Usage |
-|------------------------|----------|--------|-------------|-------|
-| `--text-xs`            | `11px`   | 400    | 1.5         | Fine print, footnotes |
-| `--text-sm`            | `13px`   | 400    | 1.5         | Metadata, timestamps, labels |
-| `--text-base`          | `15px`   | 400    | 1.6         | Body text |
-| `--text-md`            | `17px`   | 500    | 1.4         | Card subtitles |
-| `--text-lg`            | `20px`   | 600    | 1.3         | Section headings |
-| `--text-xl`            | `24px`   | 700    | 1.2         | KPI values, page titles |
-| `--text-2xl`           | `32px`   | 700    | 1.1         | Large KPI numbers |
-| `--text-mono-sm`       | `12px`   | 400    | 1.5         | SHA-256 hashes, config values |
-| `--text-mono-base`     | `13px`   | 400    | 1.5         | Code, API responses |
+All typography values are split into three properties per size: `--text-SIZE`,
+`--text-SIZE-line-height`, and `--text-SIZE-weight`. Components can reference all
+three independently or use them together.
+
+| Size  | `--text-SIZE` | `--text-SIZE-line-height` | `--text-SIZE-weight` | Usage |
+|-------|---------------|---------------------------|----------------------|-------|
+| `xs`  | `0.75rem` (12px) | `1rem` | `500` | Fine print, small labels |
+| `sm`  | `0.875rem` (14px) | `1.25rem` | `500` | Metadata, timestamps, small text |
+| `base`| `1rem` (16px) | `1.5rem` | `400` | Body text |
+| `md`  | `1rem` (16px) | `1.5rem` | `500` | Card subtitles |
+| `lg`  | `1.125rem` (18px) | `1.75rem` | `500` | Section headings |
+| `xl`  | `1.25rem` (20px) | `1.75rem` | `600` | KPI values, page titles |
+| `2xl` | `1.5rem` (24px) | `2rem` | `700` | Large headings, prominent values |
+
+**Bold weight:**
+- `--text-bold-weight: 700` — Applied to headings and emphasized text.
 
 ---
 
 ## 7. Border Radius
 
-| Token               | Value  | Usage |
-|---------------------|--------|-------|
-| `--radius-sm`       | `4px`  | Small elements (badges, chips) |
-| `--radius-md`       | `8px`  | Cards, buttons |
-| `--radius-lg`       | `12px` | Panels, modals |
-| `--radius-xl`       | `16px` | Photo cards in wheel |
-| `--radius-full`     | `9999px` | Pills, status dots |
+| Token         | Value   | Usage |
+|---------------|---------|-------|
+| `--radius-sm` | `0.375rem` (6px) | Small elements (badges, chips) |
+| `--radius-md` | `0.5rem` (8px)   | Cards, buttons, inputs |
+| `--radius-lg` | `0.75rem` (12px) | Panels, modals, larger components |
+| `--radius-xl` | `1rem` (16px)    | Large photo cards, hero elements |
+| `--radius-full` | `9999px`     | Pills, circular badges, status dots |
 
 ---
 
 ## 8. Shadow Scale
 
-Shadows use a dark-mode appropriate approach: instead of grey box shadows, they use
-dark colour with subtle opacity, plus an accent glow for focused and highlighted states.
+Shadows are used sparingly in dark mode. They employ dark-on-dark layering rather
+than the grey shadows typical in light mode.
 
-| Token                    | Value | Usage |
-|--------------------------|-------|-------|
-| `--shadow-sm`            | `0 1px 3px rgba(0,0,0,0.4)` | Subtle card lift |
-| `--shadow-md`            | `0 4px 16px rgba(0,0,0,0.5)` | Elevated card, dropdown |
-| `--shadow-lg`            | `0 8px 32px rgba(0,0,0,0.6)` | Modal, focus card in Photo Wheel |
-| `--shadow-accept-glow`   | `0 0 24px rgba(13,204,181,0.25)` | Accept drop zone highlight |
-| `--shadow-reject-glow`   | `0 0 24px rgba(224,85,85,0.25)` | Reject drop zone highlight |
-| `--shadow-focus-ring`    | `0 0 0 2px var(--action-primary)` | Keyboard focus outline |
+Shadows are used sparingly in dark mode. They employ dark-on-dark layering rather
+than the grey shadows typical in light mode.
 
----
-
-## 9. Animation Tokens
-
-| Token                     | Value     | Usage |
-|---------------------------|-----------|-------|
-| `--duration-fast`         | `100ms`   | Micro-interactions (button press) |
-| `--duration-default`      | `200ms`   | Hover transitions, fade-in |
-| `--duration-slow`         | `350ms`   | Photo Wheel slide transition |
-| `--duration-enter`        | `250ms`   | Modal/panel enter |
-| `--duration-exit`         | `150ms`   | Modal/panel exit |
-| `--easing-default`        | `cubic-bezier(0.2, 0, 0, 1)` | Standard ease-out |
-| `--easing-spring`         | `cubic-bezier(0.34, 1.56, 0.64, 1)` | Springy/photo snap |
+| Token                 | Value | Usage |
+|-----------------------|-------|-------|
+| `--shadow-sm`         | `0 1px 2px 0 rgba(0, 0, 0, 0.05)` | Subtle card lift |
+| `--shadow-md`         | `0 4px 6px -1px rgba(0, 0, 0, 0.1)` | Elevated card, dropdown |
+| `--shadow-lg`         | `0 10px 15px -3px rgba(0, 0, 0, 0.1)` | Modal, focus card |
+| `--shadow-xl`         | `0 20px 25px -5px rgba(0, 0, 0, 0.1)` | Highest elevation |
 
 ---
 
-## 10. Z-Index Scale
+## 9. Animation & Transition Tokens
 
-| Token              | Value | Usage |
-|--------------------|-------|-------|
-| `--z-base`         | `0`   | Default stacking context |
-| `--z-raised`       | `10`  | Cards on hover |
-| `--z-dropdown`     | `100` | Dropdowns, tooltips |
-| `--z-sticky`       | `200` | Sticky header |
-| `--z-overlay`      | `300` | Modal backdrop |
-| `--z-modal`        | `400` | Modal panel |
-| `--z-toast`        | `500` | Toast notifications |
+Transitions make the UI responsive and polished without being distracting.
 
----
+### 9.1 Durations
 
-## 11. KPI Card Status Bar
+| Token                | Value   | Usage |
+|---------------------|---------|-------|
+| `--duration-fast`   | `150ms` | Micro-interactions (button press) |
+| `--duration-default`| `200ms` | Hover transitions, fade-in |
+| `--duration-slow`   | `300ms` | Large element transitions (carousel slide) |
 
-KPI cards display a thin coloured bar along their bottom edge to convey status. The
-colour is derived from per-metric warning and error thresholds.
+### 9.2 Easing Functions
 
-**Thresholds are not hard-coded in the UI.** The `GET /api/v1/config` endpoint returns
-a `kpi_thresholds` object, for example:
+| Token                | Value | Usage |
+|---------------------|-------|-------|
+| `--easing-linear`    | `linear` | Constant speed (rare) |
+| `--easing-default`   | `cubic-bezier(0.4, 0, 0.2, 1)` | Standard ease-out |
+| `--easing-ease-in`   | `cubic-bezier(0.4, 0, 1, 1)` | Entrance animations |
+| `--easing-ease-out`  | `cubic-bezier(0, 0, 0.2, 1)` | Exit animations |
 
+**Complete transition example:**
+```css
+transition: all var(--duration-default) var(--easing-default);
 ```
+
+---
+
+## 10. KPI Card Status Indicators
+
+KPI cards display a coloured bar along their bottom edge to indicate status. The colour
+is determined by comparing the metric value against warning and error thresholds.
+
+**No thresholds are hardcoded in components.** The `GET /api/v1/config/effective`
+endpoint returns a `kpi_thresholds` object:
+
+```json
 {
   "kpi_thresholds": {
-    "pending_in_staging":  { "warning": 50,  "error": 200 },
-    "disk_usage_pct":      { "warning": 70,  "error": 85  },
-    "last_poll_duration_s": { "warning": 10,  "error": 30  }
+    "pending_in_staging": { "warning": 50, "error": 200 },
+    "disk_usage_pct": { "warning": 70, "error": 85 },
+    "last_poll_duration_s": { "warning": 10, "error": 30 }
   }
 }
 ```
 
 The `config.svelte.js` store fetches and caches these values. `KpiCard` receives
-`thresholds: { warning: number, error: number }` as a prop; parent pages source the
-values from the config store.
+`thresholds: { warning: number, error: number }` as a prop. Parent pages source
+thresholds from the config store.
 
-**Status bar colour logic (CSS class selection at render time):**
+**Status bar colour logic:**
 
-| Value range        | Token applied        |
-|--------------------|---------------------|
-| < warning          | `--status-ok`        |
-| ≥ warning, < error | `--status-warning`   |
-| ≥ error            | `--status-error`     |
-
-The status bar is a 3px tall `border-bottom` using the applicable token. No raw colour
-values appear in component styles.
+| Condition | Token Applied |
+|-----------|----------------|
+| value < warning | `--status-ok` |
+| warning ≤ value < error | `--status-warning` |
+| value ≥ error | `--status-error` |
 
 ---
 
-## 12. Health Bar Gradient
+## 11. Token Usage Rules
 
-The top health bar (visible in mockup) uses a CSS linear gradient from green to amber
-to red, with the overall system health expressed as the position of service status
-indicators overlaid at fixed positions along the bar.
+All token usage follows these strict rules to maintain design system integrity:
 
-```
-background: linear-gradient(
-  to right,
-  var(--status-ok) 0%,
-  var(--status-ok) 50%,
-  var(--status-warning) 70%,
-  var(--status-error) 100%
-);
-```
-
-The four service status dots (Polling, OneDrive Auth, Registry Integrity, Disk Usage)
-are absolutely positioned along this bar at evenly spaced intervals.
+1. **No raw colour values:** Components must NOT use `#rgb`, `hsl()`, or named CSS colours. Use token references only.
+2. **No raw pixel sizes:** Components must NOT use hardcoded `px` values for spacing, font, or radius. Use tokens instead.
+3. **No inline computed values:** Do not compute colours or sizes in component styles. Use pre-computed tokens.
+4. **Accessibility:** Ensure sufficient colour contrast for text (WCAG AA minimum). All tokens meet this requirement.
+5. **Dark mode only:** All tokens assume dark mode. No light-mode variants exist in Phase 1.
 
 ---
 
-## 13. Photo Wheel Visual Transform Tokens
+## 12. Token Naming Convention
 
-The Photo Wheel carousel applies per-position visual transforms. Blur levels are
-tokenised so they can be adjusted from one location without touching component styles.
+Tokens follow a consistent naming pattern:
 
-| Token                  | Value  | Usage |
-|------------------------|--------|-------|
-| `--wheel-blur-center`  | `0px`  | Center card (position offset 0): fully sharp |
-| `--wheel-blur-near`    | `4px`  | Cards at offset ±1: gently blurred |
-| `--wheel-blur-far`     | `8px`  | Cards at offset ±2: strongly blurred |
+- **Primitives** (rare, not in component styles): `--color-CATEGORY-NAME` (e.g., `--color-neutral-500`)
+- **Semantic** (common in components): `--ROLE-PROPERTY` (e.g., `--text-primary`, `--surface-card`, `--status-ok`)
+- **Spacing**: `--space-NUMBER` (e.g., `--space-4`)
+- **Typography**: `--text-SIZE` + `--text-SIZE-weight` + `--text-SIZE-line-height`
+- **Radius**: `--radius-NAME` (e.g., `--radius-md`)
+- **Shadows**: `--shadow-NAME` (e.g., `--shadow-lg`)
+- **Animation**: `--duration-NAME` or `--easing-NAME`
 
-`PhotoCard` references `--wheel-blur-near` and `--wheel-blur-far` (via CSS
-`var()`) rather than inline pixel values. Changing the token values updates all
-affected card positions simultaneously without a component logic change.
+---
+
+## 13. Photo Wheel Blur Tokens (Phase 2+)
+
+The Photo Wheel carousel will apply progressive blur based on card position. These
+tokens are **not implemented in Phase 1** (Phase 1 has no interactive carousel).
+They are reserved for Phase 2 when `PhotoWheel.svelte` is built.
+
+**Planned tokens:**
+
+| Token                 | Value | Usage |
+|-----------------------|-------|-------|
+| `--wheel-blur-center` | `0px` | Center card: fully sharp |
+| `--wheel-blur-near`   | `4px` | Adjacent cards (±1): gently blurred |
+| `--wheel-blur-far`    | `8px` | Outer cards (±2): strongly blurred |
+
+When implemented, `PhotoCard` will reference these tokens via CSS `var()` instead of
+hardcoding pixel values. This ensures blur levels can be adjusted from one location.
+
+---
+
+## 14. Component Compliance Checklist
+
+All components must adhere to these constraints:
+
+- [ ] No raw colour hex values (e.g., `#10e8cc`) — use semantic tokens only
+- [ ] No raw pixel values for spacing (e.g., `16px`) — use `--space-N` tokens
+- [ ] No raw pixel values for font size — use `--text-SIZE` tokens
+- [ ] No raw pixel values for border radius — use `--radius-NAME` tokens
+- [ ] No named CSS colours (e.g., `lightgrey`) — use tokens only
+- [ ] All transitions reference `--duration-*` and `--easing-*` tokens
+- [ ] Focus states use `--action-primary` or `--border-strong`
+- [ ] Error states use `--status-error` token
+
+**Compliant components (Phase 1):** ActionButton, KpiCard, AppHeader, AppFooter,
+StatusBadge, ErrorBanner, ConfirmDialog, LoadingSkeleton, EmptyState, LoadMoreButton.
+
+---
+
+## 15. Global Reset Stylesheet
+
+The `reset.css` file normalizes browser defaults and establishes a consistent baseline
+for all elements:
+
+- Removes default margins and padding from all HTML elements
+- Normalizes form elements (input, button, textarea, select) with token-based styling
+- Applies focus ring styling using `--action-primary`
+- Establishes body background as `--surface-base` and text colour as `--text-primary`
+- Provides consistent typography sizing and link styling
+- Ensures all interactive elements inherit font and colour from parent
+
+**Import order:** Reset is imported before tokens in the root layout so that both are
+available globally. Components and reset.css both reference tokens, ensuring consistency
+throughout the application.
+
+---
+
+## 16. Implementation Status
+
+**Phase 1 (Chunk 2) Completion: 2026-04-03**
+
+- ✅ `tokens.css` fully implemented with all colour, spacing, typography, radius, shadow, and animation tokens
+- ✅ `reset.css` fully implemented with global normalization and defaults
+- ✅ Root layout integration: both stylesheets imported globally
+- ✅ `app.html` updated with `color-scheme: dark` meta tag
+- ✅ All Phase 1 components (ActionButton, KpiCard, AppHeader, etc.) use tokens exclusively
+- ✅ No raw colour, pixel, or typed values in component styles
+- ⏳ Photo Wheel blur tokens: deferred to Phase 2 (carousel implementation)
+
+**Next Steps (Phase 2+):** Implement carousel-specific tokens and expanded animation system.
