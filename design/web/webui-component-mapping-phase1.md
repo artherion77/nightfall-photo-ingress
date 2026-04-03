@@ -90,6 +90,10 @@ Two mockups were analysed:
 
 ### 3.1 Dashboard Layout Pattern
 
+### 3.1.1 UI Mockup
+
+[Photo-ingress dashboard with KPIs and audit.png](design/ui-mocks/Photo-ingress%20dashboard%20with%20KPIs%20and%20audit.png)
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │ HEADER BAND: Title (left) + Health Status (right)           │
@@ -115,6 +119,10 @@ Two mockups were analysed:
 > reflects the eventual Phase 2 layout for reference.
 
 ### 3.2 Staging Queue Layout Pattern
+
+### 3.2.1 UI Mockup
+
+[Astronaut photo review interface.png](design/ui-mocks/Astronaut%20photo%20review%20interface.png)
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
