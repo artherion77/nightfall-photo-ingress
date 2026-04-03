@@ -148,9 +148,9 @@ It does not cover:
 Affected file: `design/domain-architecture-overview.md`
 
 Tasks:
-- [ ] Change `Status: DRAFT — pending review` → `Status: active`
-- [ ] Add `Updated: 2026-04-03` field
-- [ ] In Section 1.1 (Naming Matrix), update:
+- [x] Change `Status: DRAFT — pending review` → `Status: active`
+- [x] Add `Updated: 2026-04-03` field
+- [x] In Section 1.1 (Naming Matrix), update:
   - CLI command: `photo-ingress` → `nightfall-photo-ingress`
   - systemd units: `photo-ingress-poll.*` / `photo-ingress-trash.*` →
     `nightfall-photo-ingress.service`, `nightfall-photo-ingress.timer`,
@@ -159,42 +159,42 @@ Tasks:
 ### Chunk 1.2 — Update Section 5 (Registry Schema)
 
 Tasks:
-- [ ] Add `file_origins` table (account-to-file provenance mapping)
-- [ ] Add `live_photo_pairs` table (pair_id, account, stem, photo_sha256,
+- [x] Add `file_origins` table (account-to-file provenance mapping)
+- [x] Add `live_photo_pairs` table (pair_id, account, stem, photo_sha256,
   video_sha256, status, created_at, updated_at)
-- [ ] Add `blocked_rules` table (for future web control plane blocklist API)
-- [ ] Correct any field names that differ from the actual schema in `domain/registry.py`
+- [x] Add `blocked_rules` table (for future web control plane blocklist API)
+- [x] Correct any field names that differ from the actual schema in `domain/registry.py`
 
 ### Chunk 1.3 — Update Section 9 (File Layout)
 
 Tasks:
-- [ ] Replace old monolithic layout (with `onedrive/` and `pipeline/` subdirs) with
+- [x] Replace old monolithic layout (with `onedrive/` and `pipeline/` subdirs) with
   the actual `domain/`, `adapters/onedrive/`, `runtime/` refactored layout
-- [ ] Ensure all files listed in the layout exist in `src/nightfall_photo_ingress/`
+- [x] Ensure all files listed in the layout exist in `src/nightfall_photo_ingress/`
 
 ### Chunk 1.4 — Update Section 11 (Configuration) and Section 6 (Pipeline)
 
 Tasks:
-- [ ] Replace the old single-account config example (with `[onedrive]` + `[paths]`
+- [x] Replace the old single-account config example (with `[onedrive]` + `[paths]`
   + `[polling]` + `[alerts]` sections) with the current `[core]` + `[account.<name>]`
   format — reference `design/cli-config-specification.md` for the canonical spec
-- [ ] In Section 6.1 (Poll Cycle), adjust step c1 to reference the journal append
+- [x] In Section 6.1 (Poll Cycle), adjust step c1 to reference the journal append
   step and the M3→M4 `DownloadedHandoffCandidate` contract
-- [ ] In Section 6.4 (Rejection Flow), verify the trash flow description reflects
+- [x] In Section 6.4 (Rejection Flow), verify the trash flow description reflects
   the actual `reject.py` implementation
 
 ### Chunk 1.5 — Update Section 10 (Implementation Phases) and add new subsections
 
 Tasks:
-- [ ] Reframe Section 10 from forward plan to delivery record: mark phases 1–7 as
+- [x] Reframe Section 10 from forward plan to delivery record: mark phases 1–7 as
   delivered (brief one-liner each); retain as historical record but mark clearly
-- [ ] Add Section 12: Ingest Lifecycle Journal — brief architecture-level description
+- [x] Add Section 12: Ingest Lifecycle Journal — brief architecture-level description
   of the JSONL journal, its role in crash recovery, and relationship to the SQLite
   audit_log
-- [ ] Add Section 13: Error Taxonomy and Resilience — structured error hierarchy,
+- [x] Add Section 13: Error Taxonomy and Resilience — structured error hierarchy,
   retry policy, consecutive auth-failure alerting threshold, circuit-breaker behavior
   at delta-resync boundaries
-- [ ] Add Section 14: Observability Internals — run-ID threading, diagnostic counter
+- [x] Add Section 14: Observability Internals — run-ID threading, diagnostic counter
   keys, safe-logging redaction rules, status snapshot contract
 
 ---
@@ -206,7 +206,7 @@ Tasks:
 ### Chunk 2.1 — Add naming finalization decision
 
 Tasks:
-- [ ] Add `DEC-20260403-01`: CLI and systemd unit naming finalization
+- [x] Add `DEC-20260403-01`: CLI and systemd unit naming finalization
   - Decision: retain `nightfall-` prefix for CLI (`nightfall-photo-ingress`) and
     systemd units; `photo-ingress` used for config paths and service-level naming
   - Rationale: consistency with other nightfall tooling; `nightfall-` prefix in PATH
@@ -216,7 +216,7 @@ Tasks:
 ### Chunk 2.2 — Add domain/adapters/runtime architecture decision
 
 Tasks:
-- [ ] Add `DEC-20260403-02`: Domain/adapters/runtime module separation
+- [x] Add `DEC-20260403-02`: Domain/adapters/runtime module separation
   - Decision: refactor from monolithic layout to a three-layer separation
   - Rationale: allows future source adapters without touching domain core
   - References: `src/nightfall_photo_ingress/`, `ARCHITECTURE.md`
@@ -224,7 +224,7 @@ Tasks:
 ### Chunk 2.3 — Add crash-recovery journal decision
 
 Tasks:
-- [ ] Add `DEC-20260403-03`: Append-only JSONL lifecycle journal for crash recovery
+- [x] Add `DEC-20260403-03`: Append-only JSONL lifecycle journal for crash recovery
   - Decision: maintain a separate JSONL journal alongside the SQLite audit_log
   - Rationale: provides phase-tagged operation recovery without locking the DB;
     SQLite audit_log remains authoritative for state; journal is for crash-boundary
@@ -234,12 +234,12 @@ Tasks:
 ### Chunk 2.4 — Add safe-logging and singleton lock decisions
 
 Tasks:
-- [ ] Add `DEC-20260403-04`: URL/token redaction at all raise sites
+- [x] Add `DEC-20260403-04`: URL/token redaction at all raise sites
   - Decision: all exception raise sites in the adapter use `redact_url()`; no
     pre-authenticated URLs appear in logs or tracebacks
   - Rationale: pre-authenticated OneDrive download URLs carry bearer material in
     query strings; logs must never capture them
-- [ ] Add `DEC-20260403-05`: Per-account singleton lock for concurrent poll safety
+- [x] Add `DEC-20260403-05`: Per-account singleton lock for concurrent poll safety
   - Decision: `account_singleton_lock` in `cache_lock.py` prevents two concurrent
     polls from touching the same account's MSAL token cache
   - Rationale: MSAL token cache is not safe for concurrent writers; the global
@@ -315,21 +315,21 @@ Topics to cover:
 ### Chunk 4.1 — cli-domain-post-audit-next-steps.md: gate status
 
 Tasks:
-- [ ] Read `review/module3-module4-integration-suite-compliance-audit-final.md`
+- [x] Read `review/module3-module4-integration-suite-compliance-audit-final.md`
   and `review/module4-cross-module-state-machine-operator-readiness-final.md`
-- [ ] For each checkbox in Gates 1, 2, 3: determine actual status (done / partial /
+- [x] For each checkbox in Gates 1, 2, 3: determine actual status (done / partial /
   still open)
-- [ ] Update checkboxes or add a status summary block at the top of the document
-- [ ] If all three gates are passed, move this doc to `planning/implemented/`
+- [x] Update checkboxes or add a status summary block at the top of the document
+- [ ] If all three gates are passed, move this doc to `planning/implemented/` (Gates 1–3 remain open)
 
 ### Chunk 4.2 — cli-domain-iterative-implementation-roadmap.md: Modules 5–8
 
 Tasks:
-- [ ] Review what is actually implemented for Modules 5, 6, 7, 8 vs what the roadmap
+- [x] Review what is actually implemented for Modules 5, 6, 7, 8 vs what the roadmap
   describes (core trash/reject/accept/purge is present; production systemd
   path-unit smoke test may not be)
-- [ ] Update implementation status checkboxes for any steps that are complete
-- [ ] Add a note for what remains for each module before it can be marked complete
+- [x] Update implementation status checkboxes for any steps that are complete
+- [x] Add a note for what remains for each module before it can be marked complete
 
 ### Chunk 4.3 — Web control plane planning docs: status and coherence
 
@@ -341,22 +341,22 @@ Files to review:
 - `planning/proposed/web-control-plane-phase2-implementation-roadmap.md`
 
 Tasks:
-- [ ] Confirm Phase 0 of the web control plane has not been started (no `api/` or
+- [x] Confirm Phase 0 of the web control plane has not been started (no `api/` or
   `webui/` directories exist in the repo)
-- [ ] Verify cross-references between these documents are consistent and alive
-- [ ] Confirm the Phase 1 re-evaluation decisions in `web-control-plane-phase1-scope.md`
+- [x] Verify cross-references between these documents are consistent and alive
+- [x] Confirm the Phase 1 re-evaluation decisions in `web-control-plane-phase1-scope.md`
   are reflected in `webui-architecture-phase1.md` and `web-control-plane-integration-plan.md`
-- [ ] Add a status header block to `web-control-plane-integration-plan.md` that
+- [x] Add a status header block to `web-control-plane-integration-plan.md` that
   clearly states "Phase 0 not yet started as of 2026-04-03"
 
 ### Chunk 4.4 — cli-v2-deferred-backlog.md: staleness check
 
 Tasks:
-- [ ] Review §7.3 (Identity provider abstraction) — this is referenced in the
+- [x] Review §7.3 (Identity provider abstraction) — this is referenced in the
   design decision log as a future option; confirm it remains deferred
-- [ ] Review §7.1 (MCP exposure) — nightfall-mcp exists as a separate project;
+- [x] Review §7.1 (MCP exposure) — nightfall-mcp exists as a separate project;
   confirm this item is still valid and note the relationship
-- [ ] If any items have been silently implemented, move them out of this doc
+- [x] If any items have been silently implemented, move them out of this doc
 
 ---
 
