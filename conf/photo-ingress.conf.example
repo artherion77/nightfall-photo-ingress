@@ -1,40 +1,204 @@
+# photo-ingress.conf — runtime configuration for nightfall-photo-ingress
+#
+# Recommended location: /etc/nightfall/photo-ingress.conf
+# (set via --config or the PHOTO_INGRESS_CONFIG env var)
+#
+# This file uses INI syntax (configparser, no interpolation).
+# The config_version key must match the version the daemon expects.
+# For parameter details see: design/cli-config-specification.md
+
+# ─────────────────────────────────────────────────────
+# [core]  — global runtime settings
+# ─────────────────────────────────────────────────────
 [core]
+
+# Config schema version — must equal 2. The daemon refuses to start if
+# this does not match the compiled-in SUPPORTED_CONFIG_VERSION constant.
 config_version = 2
+
+# How often the daemon polls all accounts, in minutes.
+# 720 = every 12 hours. Lower values increase API quota consumption.
 poll_interval_minutes = 720
+
+# When true, accounts are processed in the order they are declared in this
+# file. Useful for prioritising one account's downloads over another's.
 process_accounts_in_config_order = true
+
+# Number of account workers to run in parallel. 1 is safe and predictable;
+# increase only if you have many accounts and sufficient I/O headroom.
+account_worker_count = 1
+
+# ── Paths ────────────────────────────────────────────
+# staging_path: fast temporary storage (ideally on SSD) where files are
+#   downloaded and validated before being moved to the media pool.
+# registry_path: SQLite database that tracks every file ever processed.
+# staging_on_same_pool: set true if staging_path is on the same ZFS pool
+#   as the media paths below, so moves become atomic renames instead of copies.
 staging_path = /mnt/ssd/photo-ingress/staging
-pending_path = /nightfall/media/photo-ingress/pending
-accepted_path = /nightfall/media/photo-ingress/accepted
-accepted_storage_template = {yyyy}/{mm}/{original}
-rejected_path = /nightfall/media/photo-ingress/rejected
-trash_path = /nightfall/media/photo-ingress/trash
 registry_path = /mnt/ssd/photo-ingress/registry.db
 staging_on_same_pool = false
+
+# ── Output queue paths ───────────────────────────────
+# pending_path:  files awaiting the accept/reject pipeline consumer.
+# accepted_path: files approved by the pipeline consumer.
+# rejected_path: files the pipeline consumer decided to reject.
+# trash_path:    soft-delete destination (safe to prune periodically).
+pending_path = /nightfall/media/photo-ingress/pending
+accepted_path = /nightfall/media/photo-ingress/accepted
+rejected_path = /nightfall/media/photo-ingress/rejected
+trash_path = /nightfall/media/photo-ingress/trash
+
+# ── Storage templates ────────────────────────────────
+# Path template relative to pending_path / accepted_path for organising files.
+# Available variables: {yyyy} {mm} {dd} {sha256} {sha8} {original} {account}
+#   {original} — the original filename as downloaded from the provider.
+#   {account}  — the account section name (e.g. "christopher").
 storage_template = {yyyy}/{mm}/{original}
+
+# accepted_storage_template: same variables, applied when the pipeline
+# consumer moves a file from pending to accepted. Defaults to storage_template
+# if omitted. Override here only when the accepted hierarchy should differ.
+accepted_storage_template = {yyyy}/{mm}/{original}
+
+# ── Download safety ──────────────────────────────────
+# Verify the SHA-256 of every file on first download against the provider's
+# reported hash. Catches corruption in transit. Recommended: true.
 verify_sha256_on_first_download = true
+
+# Hard cap on files downloaded per poll cycle across all accounts.
 max_downloads_per_poll = 200
+
+# Wall-clock timeout for a single poll cycle (seconds). The daemon aborts
+# gracefully and resumes on the next cycle if this is exceeded.
 max_poll_runtime_seconds = 300
+
+# ── Staging cleanup TTLs ─────────────────────────────
+# tmp_ttl_minutes:  how long incomplete/in-progress staging entries are kept.
+# failed_ttl_hours: how long failed-download entries survive before removal.
+# orphan_ttl_days:  how long unclaimed staging files are retained.
 tmp_ttl_minutes = 120
 failed_ttl_hours = 24
 orphan_ttl_days = 7
+
+# ── Live Photo pairing ───────────────────────────────
+# Live Photos arrive as a paired .heic/.jpg + .mov.  These settings control
+# how the two components are matched and ordered.
+#
+# capture_tolerance_seconds: how close in capture time two files must be
+#   to be considered a pair (3 s is the Apple Live Photo window).
+# stem_mode: exact_stem (filename without extension must match exactly)
+#   or prefix_stem (allows suffix variants).
+# component_order: photo_first | video_first — which file is stored first
+#   when writing the pair to the output queue.
+# conflict_policy: nearest_capture_time | prefer_photo | prefer_video —
+#   how to resolve ties when multiple candidates match.
 live_photo_capture_tolerance_seconds = 3
 live_photo_stem_mode = exact_stem
 live_photo_component_order = photo_first
 live_photo_conflict_policy = nearest_capture_time
+
+# ── Hash import / deduplication ──────────────────────
+# Optionally seed the registry with SHA-1 hashes from an existing media
+# library so that files already present are skipped on first run.
+# sync_hash_import_glob: filename pattern that hash sidecar files match.
 sync_hash_import_enabled = true
 sync_hash_import_path = /nightfall/media/pictures
 sync_hash_import_glob = .hashes.sha1
 
-[account.primary]
+# ── Advanced: staging integrity ──────────────────────
+# integrity_mode controls how strictly staging-file anomalies are treated.
+#   strict   — any anomaly aborts the affected file's processing (default).
+#   tolerant — anomalies are logged and skipped rather than hard-failing.
+# The drift thresholds trigger warnings / critical alerts when the ratio of
+# anomalous events in a window exceeds the threshold.  Raise only if your
+# environment produces legitimate noise at the default levels.
+# (uncomment and adjust to override defaults)
+#
+# integrity_mode = strict
+# drift_warning_threshold_ratio  = 0.05
+# drift_critical_threshold_ratio = 0.20
+# drift_min_events_for_evaluation = 20
+# drift_fail_fast_enabled = true
+
+# ── Advanced: delta circuit-breakers ─────────────────
+# The delta loop circuit-breaker prevents runaway API calls when the remote
+# delta feed is in a bad state (e.g. ghost items or permanently stale pages).
+#   delta_loop_resync_threshold: consecutive empty delta pages before forcing
+#     a full resync instead of incrementally walking the delta token.
+#   delta_breaker_ghost_threshold: how many ghost items trigger the breaker.
+#   delta_breaker_stale_page_threshold: stale pages before the breaker trips.
+#   delta_breaker_cooldown_seconds: back-off duration after the breaker trips.
+# (uncomment and adjust to override defaults)
+#
+# delta_loop_resync_threshold          = 3
+# delta_breaker_ghost_threshold        = 10
+# delta_breaker_stale_page_threshold   = 10
+# delta_breaker_cooldown_seconds       = 300
+
+# ── Advanced: adaptive backpressure ──────────────────
+# Slows download scheduling when the downstream queue is under stress
+# (many retries or transport errors), preventing quota exhaustion cascades.
+#   backpressure_retry_threshold: running retry count that activates throttle.
+#   backpressure_transport_error_threshold: transport errors before throttle.
+#   backpressure_cooldown_seconds: how long throttle stays active per trigger.
+# (uncomment and adjust to override defaults)
+#
+# adaptive_backpressure_enabled            = true
+# backpressure_retry_threshold             = 20
+# backpressure_transport_error_threshold   = 5
+# backpressure_cooldown_seconds            = 300
+
+
+# ─────────────────────────────────────────────────────
+# [account.<name>]  — one section per device / cloud account
+#
+# Required keys:
+#   provider      — cloud provider identifier. Currently: onedrive
+#   client_id     — OAuth application (client) ID registered in Azure AD.
+#   onedrive_root — folder path on OneDrive to mirror (e.g. /Camera Roll).
+#   token_cache   — path to the MSAL token cache JSON for this account.
+#   delta_cursor  — path to the OneDrive delta-link cursor file.
+#
+# Optional keys:
+#   enabled       — set false to skip this account without removing config.
+#   display_name  — human-readable label shown in logs and alerts.
+#   authority     — OAuth authority URL. Default: Microsoft personal accounts.
+#   max_downloads — per-account download cap per cycle, overriding the core
+#                   max_downloads_per_poll value for this account only.
+# ─────────────────────────────────────────────────────
+[account.christopher]
 enabled = true
-display_name = Primary iPhone
+display_name = Christopher's iPhone
+provider = onedrive
+; default authority covers personal Microsoft accounts (consumers tenant)
+authority = https://login.microsoftonline.com/consumers
+client_id = REPLACE_WITH_CLIENT_ID
+onedrive_root = /Camera Roll
+token_cache = /mnt/ssd/photo-ingress/tokens/christopher.json
+delta_cursor = /mnt/ssd/photo-ingress/cursors/christopher.cursor
+
+# Second account — disabled until onboarding is complete.
+# Copy-and-modify this block to add further devices.
+[account.danny]
+enabled = false
+display_name = Danny's iPhone
 provider = onedrive
 authority = https://login.microsoftonline.com/consumers
 client_id = REPLACE_WITH_CLIENT_ID
 onedrive_root = /Camera Roll
-token_cache = /mnt/ssd/photo-ingress/tokens/primary.json
-delta_cursor = /mnt/ssd/photo-ingress/cursors/primary.cursor
+token_cache = /mnt/ssd/photo-ingress/tokens/danny.json
+delta_cursor = /mnt/ssd/photo-ingress/cursors/danny.cursor
 
+
+# ─────────────────────────────────────────────────────
+# [logging]  — log output format
+# ─────────────────────────────────────────────────────
 [logging]
+
+# log_level: standard Python logging level — DEBUG, INFO, WARNING, ERROR.
 log_level = INFO
+
+# console_format controls the log structure written to stdout/stderr.
+#   json  — machine-readable JSON lines; use this under systemd / journald.
+#   human — coloured, human-readable text; useful during interactive testing.
 console_format = json
