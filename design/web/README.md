@@ -9,6 +9,7 @@ layer of the system.
 
 | File | Phase | Purpose |
 |------|-------|---------|
+| [web-control-plane-api-phase1.md](web-control-plane-api-phase1.md) | Phase 1 | REST API specification with endpoint reference, authentication, pagination semantics, and response schemas |
 | [webui-architecture-phase1.md](webui-architecture-phase1.md) | Phase 1 | SvelteKit application structure, API client layer, stores, routing, layout system, and adapter configuration |
 | [webui-component-mapping-phase1.md](webui-component-mapping-phase1.md) | Phase 1 | Component decomposition derived from UI mockup analysis; interaction logic, visual transforms, and scroll behaviour |
 | [webui-design-tokens-phase1.md](webui-design-tokens-phase1.md) | Phase 1 | Dark-mode design token catalogue; CSS custom property naming scheme; token categories and usage rules |

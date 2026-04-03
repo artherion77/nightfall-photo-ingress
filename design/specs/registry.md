@@ -14,6 +14,8 @@ The registry is a SQLite database (`registry.db`) stored on the SSD dataset. It 
 
 ## Schema
 
+**Current schema version:** v3 (Chunk 1 introduces optional additive tables)
+
 **Core tables (schema version 2 — bootstrapped at first `initialize()` call):**
 
 ```sql
@@ -114,7 +116,7 @@ BEGIN
 END;
 ```
 
-**Optional/additive table (created by `_ensure_optional_tables()` on `initialize()`):**
+**Optional/additive tables (created by `_ensure_optional_tables()` on `initialize()`):**
 
 ```sql
 CREATE TABLE IF NOT EXISTS ingest_terminal_audit (
@@ -128,6 +130,28 @@ CREATE TABLE IF NOT EXISTS ingest_terminal_audit (
     reason       TEXT,
     actor        TEXT NOT NULL,
     ts           TEXT NOT NULL        -- ISO-8601 UTC
+);
+
+CREATE TABLE IF NOT EXISTS blocked_rules (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    pattern      TEXT UNIQUE NOT NULL,
+    rule_type    TEXT NOT NULL,       -- e.g., 'filename', 'sha256', 'account'
+    reason       TEXT,
+    enabled      INTEGER DEFAULT 1,   -- 0=disabled, 1=enabled
+    created_at   TEXT NOT NULL,       -- ISO-8601 UTC
+    updated_at   TEXT NOT NULL        -- ISO-8601 UTC
+);
+
+CREATE TABLE IF NOT EXISTS ui_action_idempotency (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    idempotency_key     TEXT UNIQUE NOT NULL,
+    action              TEXT NOT NULL,       -- e.g., 'accept', 'reject', 'defer'
+    item_id             TEXT NOT NULL,       -- SHA-256 or file identifier
+    request_body_json   TEXT,                -- Full request body for audit/replay
+    response_status     INTEGER NOT NULL,   -- HTTP status returned
+    response_body_json  TEXT,                -- Response body for audit
+    created_at          TEXT NOT NULL,      -- ISO-8601 UTC
+    expires_at          TEXT NOT NULL       -- ISO-8601 UTC (TTL for garbage collection)
 );
 ```
 
@@ -144,9 +168,26 @@ CREATE TABLE IF NOT EXISTS ingest_terminal_audit (
 - **Provenance-tracked**: `file_origins` records the `(account, onedrive_id)` → `sha256` mapping for every file ever encountered, independent of current status.
 - **Advisory hash import**: `external_hash_cache` stores SHA1 hashes imported from `.hashes.sha1` files; `verified_sha256` column is populated after first-download SHA-256 confirmation, converting an advisory hint to a confirmed identity mapping.
 
+### v3 Optional Tables (Chunk 1: Web Control Plane Phase 1)
+
+**blocklist:**
+- Stores operator-definable block rules for file filtering.
+- Each rule has a pattern (glob or regex), type (filename / sha256 / account), human-readable reason, and enabled flag.
+- Allows toggling rules on/off without deletion (audit trail in `updated_at`).
+- Queried by read-only `/api/v1/blocklist` endpoint.
+
+**ui_action_idempotency:**
+- Tracks write-path action idempotency keys (introduced in Phase 3 triage write path).
+- Enables exactly-once semantics for triage operations (accept / reject / defer).
+- Stores request body, response status, and response body for replay on duplicate key.
+- Rows tagged with `expires_at` for garbage collection (TTL-based cleanup).
+- Not queried by any API endpoint in Phase 1 (unused until Phase 3).
+
+**Migration note:** Chunk 1 introduces these tables as new optional migrations. No upgrade path from v2 to v3 is supported. Fresh databases receive both tables on `initialize()`. Existing v2 databases will fail to run Phase 3+ operations until manually upgraded (out of scope for Phase 1).
+
 ---
 
-## Audit Log Action Values
+## Properties
 
 | Action | Actor | Trigger |
 |---|---|---|

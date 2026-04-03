@@ -227,6 +227,8 @@ restored and a toast notification appears.
 
 ## 7. API Layer
 
+**See also:** [web-control-plane-api-phase1.md](web-control-plane-api-phase1.md) for detailed API endpoint specification, response schemas, and authentication reference.
+
 ### 7.1 Location and Structure (`src/lib/api/`)
 
 ```
