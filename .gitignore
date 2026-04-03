@@ -10,3 +10,7 @@ build/
 dist/
 .mypy_cache/
 .ruff_cache/
+webui/node_modules/
+webui/.svelte-kit/
+webui/build/
+api/__pycache__/

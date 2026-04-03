@@ -18,6 +18,10 @@ dev = [
   "build>=1.2.0",
   "pytest>=8.0.0",
 ]
+web = [
+  "fastapi>=0.115.0",
+  "uvicorn[standard]>=0.30.0",
+]
 
 [project.scripts]
 nightfall-photo-ingress = "nightfall_photo_ingress.cli:main"

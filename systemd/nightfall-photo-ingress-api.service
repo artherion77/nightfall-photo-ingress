@@ -1,0 +1,16 @@
+[Unit]
+Description=Nightfall Photo Ingress API (FastAPI/Uvicorn)
+After=network.target
+
+[Service]
+Type=simple
+User=photo-ingress
+Group=photo-ingress
+WorkingDirectory=/opt/photo-ingress
+EnvironmentFile=/etc/nightfall/photo-ingress-api.env
+ExecStart=/opt/photo-ingress/.venv/bin/uvicorn api.app:app --host ${NIGHTFALL_API_HOST:-127.0.0.1} --port ${NIGHTFALL_API_PORT:-8000}
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

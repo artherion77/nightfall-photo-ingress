@@ -72,6 +72,8 @@ Chunk 0: Foundation
 
 ## 3. Chunk 0 — Project Foundation
 
+Status: Implemented (2026-04-03)
+
 ### Purpose
 
 Establish the repository skeleton (`api/` and `webui/` trees), add required
@@ -217,8 +219,10 @@ tests/
 6. `GET /api/docs` returns an HTML page containing the RapiDoc component; no auth required.
 7. `GET /api/openapi.json` lists all six data endpoints.
 8. Both database migrations run without error against an existing registry (idempotent).
-9. All `tests/test_api_*.py` tests pass using `httpx.AsyncClient` with `ASGITransport`.
-10. All existing CLI tests still pass.
+9. These migrations are v3-only, require a fresh database, and no upgrade path from earlier schema versions is supported.
+10. API read-path results must match CLI/domain queries for identical filters (snapshot comparison).
+11. All `tests/test_api_*.py` tests pass using `httpx.AsyncClient` with `ASGITransport`.
+12. All existing CLI tests still pass.
 
 ### Out of scope for this chunk
 
@@ -318,6 +322,9 @@ webui/src/routes/
 ## 6. Chunk 3 — Read-Only UI Pages
 
 ### Purpose
+
+This chunk may be internally executed as 3a (API clients + stores + Dashboard +
+Settings) and 3b (Staging display + Audit + Blocklist) if needed.
 
 Wire all five SvelteKit pages to the live API (Chunk 1 required). Implement all
 page-specific components. Produce a deployable static build served by the FastAPI
@@ -567,7 +574,8 @@ tests/integration/ui/
 4. Deleting a rule removes it from the database (hard delete).
 5. The `ConfirmDialog` appears before delete is executed; cancelling does not delete.
 6. `X-Idempotency-Key` replay on POST returns the previously created rule without duplicate insertion.
-7. All `test_api_blocklist.py` and `test_blocklist_crud.py` tests pass.
+7. Blocklist rules created via the UI must behave identically to manually created rules in DB/Config (ingest behavior parity).
+8. All `test_api_blocklist.py` and `test_blocklist_crud.py` tests pass.
 
 ### Out of scope for this chunk
 
@@ -592,7 +600,7 @@ for localhost-only operator use. No new user-visible functionality is added.
 - Chunks 0–5 complete (all endpoints and UI functional)
 - `planning/planned/web-control-plane-integration-plan.md` §9 (hardening checklist)
 - `planning/planned/web-control-plane-phase1-scope.md` §4.1 (in-scope items: rate limiting, CORS, headers, auth-failure audit, input validation)
-- OWASP Top 10 checklist
+- Targeted OWASP checklist limited to Phase-1-relevant concerns
 
 ### Expected output
 
@@ -627,7 +635,7 @@ tests/
 - Confirm no raw user input is passed to file system operations or SQL queries outside of parameterised ORM/query methods.
 - Document findings in `audit/open-points/` if any gap is found (do not block hardening if issue is minor and fixable immediately).
 
-**OWASP Top 10 review (in-scope items for Phase 1):**
+**Targeted OWASP review (Phase-1-relevant concerns only):**
 
 | OWASP Category | Phase 1 mitigation |
 |---|---|
@@ -651,7 +659,7 @@ tests/
 5. A CORS `Origin` header from an unlisted origin receives no `Access-Control-Allow-Origin` response header.
 6. `pip-audit` reports no critical vulnerabilities in the `[web]` dependency group.
 7. All `test_api_rate_limit.py`, `test_api_cors.py`, `test_api_security_headers.py`, and `test_api_auth_audit.py` tests pass.
-8. OWASP review completed; any new open points are logged in `audit/open-points/`.
+8. Targeted OWASP review completed for Phase-1-relevant concerns; any new open points are logged in `audit/open-points/`.
 9. All prior test suites (Chunks 0–5) continue to pass.
 
 ### Out of scope for this chunk
@@ -736,4 +744,4 @@ At the end of Chunk 6, the following artefacts must exist and be passing tests:
 
 ### Documentation
 - This roadmap document (updated with chunk completion status as work progresses)
-- OWASP review findings documented in `audit/open-points/` if any gaps remained unresolved
+- Targeted OWASP review findings documented in `audit/open-points/` if any gaps remained unresolved
