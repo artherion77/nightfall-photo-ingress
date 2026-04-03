@@ -13,14 +13,17 @@
 
   let { label, value, status = 'unknown', thresholds }: Props = $props();
 
-  // Determine status from value and thresholds if not explicitly provided
-  let computedStatus = $derived(() => {
-    if (status !== 'unknown') return status;
-    if (typeof value !== 'number' || !thresholds) return 'unknown';
-    if (value >= thresholds.error) return 'error';
-    if (value >= thresholds.warning) return 'warning';
-    return 'ok';
-  })();
+  let computedStatus = $derived(
+    status !== 'unknown'
+      ? status
+      : typeof value !== 'number' || !thresholds
+        ? 'unknown'
+        : value >= thresholds.error
+          ? 'error'
+          : value >= thresholds.warning
+            ? 'warning'
+            : 'ok'
+  );
 
   const statusColors = {
     ok: 'var(--status-ok)',

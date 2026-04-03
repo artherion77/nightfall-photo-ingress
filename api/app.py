@@ -1,15 +1,43 @@
 """FastAPI application factory for nightfall-photo-ingress web control plane."""
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 import sqlite3
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.responses import FileResponse, Response
 
 from nightfall_photo_ingress.config import AppConfig, load_config
 from nightfall_photo_ingress.domain.registry import Registry
 
 from api.rapiddoc import router as rapiddoc_router
 from api.routers import audit_log, blocklist, config, health, staging
+
+
+class SPAStaticFiles(StaticFiles):
+    """Static file mount with SPA fallback to 200.html or index.html."""
+
+    async def get_response(self, path: str, scope) -> Response:
+        try:
+            response = await super().get_response(path, scope)
+            if response.status_code != 404:
+                return response
+        except StarletteHTTPException as exc:
+            if exc.status_code != 404:
+                raise
+
+        root = Path(self.directory)
+        fallback_200 = root / "200.html"
+        if fallback_200.exists():
+            return FileResponse(str(fallback_200))
+
+        fallback_index = root / "index.html"
+        if fallback_index.exists():
+            return FileResponse(str(fallback_index))
+
+        return await super().get_response(path, scope)
 
 
 def create_app(
@@ -65,6 +93,13 @@ def create_app(
     app.include_router(config.router)
     app.include_router(blocklist.router)
     app.include_router(rapiddoc_router)
+
+    web_build = Path(__file__).resolve().parent.parent / "webui" / "build"
+    app.mount(
+        "/",
+        SPAStaticFiles(directory=str(web_build), html=True, check_dir=False),
+        name="spa",
+    )
 
     return app
 

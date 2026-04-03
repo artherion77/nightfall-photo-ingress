@@ -16,7 +16,7 @@
   }
 
   function getRegistryStatus() {
-    return health.registry_ok ? 'ok' : 'error';
+    return health.registry_ok?.ok ? 'ok' : 'error';
   }
 </script>
 

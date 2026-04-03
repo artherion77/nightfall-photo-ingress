@@ -1,10 +1,10 @@
 import { writable } from 'svelte/store';
 
 const initialState = {
-  polling_ok: false,
-  auth_ok: false,
-  registry_ok: false,
-  disk_ok: false,
+  polling_ok: { ok: false, message: 'unknown' },
+  auth_ok: { ok: false, message: 'unknown' },
+  registry_ok: { ok: false, message: 'unknown' },
+  disk_ok: { ok: false, message: 'unknown' },
   error: null
 };
 
@@ -23,10 +23,10 @@ async function fetchHealth() {
     if (response.ok) {
       const data = await response.json();
       update(() => ({
-        polling_ok: data.polling_ok ?? false,
-        auth_ok: data.auth_ok ?? false,
-        registry_ok: data.registry_ok ?? false,
-        disk_ok: data.disk_ok ?? false,
+        polling_ok: data.polling_ok ?? initialState.polling_ok,
+        auth_ok: data.auth_ok ?? initialState.auth_ok,
+        registry_ok: data.registry_ok ?? initialState.registry_ok,
+        disk_ok: data.disk_ok ?? initialState.disk_ok,
         last_updated_at: data.last_updated_at,
         error: data.error || null
       }));
@@ -71,4 +71,8 @@ export const health = {
 // Update store to be reactive to health state changes
 subscribe((state) => {
   Object.assign(health, state);
+  health.polling_ok_flag = Boolean(state.polling_ok?.ok);
+  health.auth_ok_flag = Boolean(state.auth_ok?.ok);
+  health.registry_ok_flag = Boolean(state.registry_ok?.ok);
+  health.disk_ok_flag = Boolean(state.disk_ok?.ok);
 });

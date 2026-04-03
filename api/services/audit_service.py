@@ -31,13 +31,22 @@ class AuditService:
 
         query = (
             "SELECT id, sha256, account_name, action, reason, details_json, actor, ts "
-            "FROM audit_log WHERE id > ?"
+            "FROM audit_log"
         )
-        params: list[object] = [cursor_id]
+        params: list[object] = []
+
+        conditions: list[str] = []
+        if cursor_id:
+            # Descending pagination: follow-up pages fetch rows older than the last id.
+            conditions.append("id < ?")
+            params.append(cursor_id)
 
         if action_filter:
-            query += " AND action = ?"
+            conditions.append("action = ?")
             params.append(action_filter)
+
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
 
         query += " ORDER BY id DESC LIMIT ?"
         params.append(limit + 1)
