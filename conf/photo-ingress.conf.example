@@ -179,15 +179,15 @@ delta_cursor = /mnt/ssd/photo-ingress/cursors/christopher.cursor
 
 # Second account — disabled until onboarding is complete.
 # Copy-and-modify this block to add further devices.
-[account.danny]
+[account.bob]
 enabled = false
-display_name = Danny's iPhone
+display_name = Bob's iPhone
 provider = onedrive
 authority = https://login.microsoftonline.com/consumers
 client_id = REPLACE_WITH_CLIENT_ID
 onedrive_root = /Camera Roll
-token_cache = /mnt/ssd/photo-ingress/tokens/danny.json
-delta_cursor = /mnt/ssd/photo-ingress/cursors/danny.cursor
+token_cache = /mnt/ssd/photo-ingress/tokens/bob.json
+delta_cursor = /mnt/ssd/photo-ingress/cursors/bob.cursor
 
 
 # ─────────────────────────────────────────────────────
