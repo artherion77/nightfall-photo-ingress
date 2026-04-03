@@ -33,7 +33,7 @@ def test_missing_required_fields_rejected_at_boundary_before_ingest(
     )
 
     assert result.poll_result.candidate_count == 1
-    assert result.poll_result.delta_anomaly_count >= 1
+    assert result.poll_result.ghost_item_count >= 1
     assert result.registry_harness.metadata_rows() == []
     assert result.registry_harness.terminal_events() == []
 

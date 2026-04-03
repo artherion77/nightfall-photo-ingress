@@ -11,7 +11,7 @@ from typing import Any, Callable
 
 import pytest
 
-from nightfall_photo_ingress.config import AccountConfig, AppConfig, CoreConfig, LoggingConfig
+from nightfall_photo_ingress.config import AccountConfig, AppConfig, CoreConfig, LoggingConfig, WebConfig
 from nightfall_photo_ingress.adapters.onedrive.client import (
     load_boundary_handoff_candidates,
     poll_accounts,
@@ -437,6 +437,7 @@ def app_config_fixture(tmp_path: Path, registry_fixture: RegistryHarness):
             source_path=tmp_path / "photo-ingress.conf",
             core=CoreConfig(**core_values),
             logging=LoggingConfig(log_level="INFO", console_format="json"),
+            web=WebConfig(),
             accounts=tuple(accounts),
         )
 

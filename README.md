@@ -71,17 +71,17 @@ Run any command with `--help` for full option descriptions.
 
 ```bash
 python -m pip install -e ".[dev]"    # install in editable mode with dev extras
-pytest                               # full test suite
+pytest                               # default isolated suite (unit + integration, including web API tests)
 pytest tests/unit/                   # unit tests only (fast)
 pytest tests/integration/            # integration tests
-pytest tests/test_api_*.py           # isolated web control plane ASGI/API tests
-pytest -m robustness                # resilience regression suite only
+pytest tests/integration/api/        # isolated web control plane ASGI/API tests
+pytest -m robustness                 # resilience regression suite only
 ```
 
 ### Test environment boundaries
 
 - `tests/unit/` and `tests/integration/` are intended to run in a normal local development environment.
-- `tests/test_api_*.py` are isolated web control plane API contract tests using in-process ASGI transport; they do not require the staging environment.
+- `tests/integration/api/` contains isolated web control plane API contract tests using in-process ASGI transport; they do not require the staging environment.
 - `tests/staging/` and `tests/staging-flow/` require the staging environment and may depend on runtime packages, container state, or other environment-specific prerequisites.
 
 ## Build and install
@@ -103,10 +103,9 @@ nightfall-photo-ingress/
 ├── tests/
 │   ├── unit/                   fast isolated tests
 │   ├── integration/            isolated cross-module workflow tests
+│   │   └── api/                isolated web control plane API contract tests
 │   ├── staging/                staging-environment-only tests
-│   ├── staging-flow/           production-flow staging validation
-│   ├── test_api_*.py           isolated web control plane API tests
-│   └── api_test_support.py     shared ASGI/API test fixtures
+│   └── staging-flow/           production-flow staging validation
 ├── conf/                       example configuration
 ├── docs/                       operator documentation and runbook
 ├── design/                     architecture and design documentation

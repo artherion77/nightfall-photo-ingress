@@ -1,4 +1,4 @@
-"""Shared fixtures and helpers for Chunk 1 API tests."""
+"""Shared fixtures and helpers for isolated web control plane API tests."""
 
 from __future__ import annotations
 

@@ -94,10 +94,9 @@ nightfall-photo-ingress/
 ├── tests/
 │   ├── unit/                       # isolated Python tests; run outside staging environment
 │   ├── integration/                # isolated cross-module tests; run outside staging environment
+│   │   └── api/                    # isolated ASGI API contract tests for the web control plane
 │   ├── staging/                    # staging-environment-only tests with runtime/container deps
-│   ├── staging-flow/               # production-flow staging tests against the staging environment
-│   ├── test_api_*.py               # isolated ASGI API contract tests for the web control plane
-│   └── api_test_support.py         # shared ASGI fixtures for web control plane API tests
+│   └── staging-flow/               # production-flow staging tests against the staging environment
 ├── conf/
 └── pyproject.toml
 ```
@@ -162,12 +161,13 @@ The repository now distinguishes tests by execution environment:
 |-----------|---------|-------------|
 | `tests/unit/` | Fast isolated unit tests | Any local dev environment |
 | `tests/integration/` | Isolated integration tests without staging container dependency | Any local dev environment |
-| `tests/test_api_*.py` | Isolated FastAPI/ASGI contract tests for the web control plane | Any local dev environment |
+| `tests/integration/api/` | Isolated FastAPI/ASGI contract tests for the web control plane | Any local dev environment |
 | `tests/staging/` | Tests that require the staging environment or runtime package dependencies present there | Staging environment only |
 | `tests/staging-flow/` | Production-flow validation against the staging environment | Staging environment only |
 
-The API contract tests are intentionally separated from `tests/staging/` so they can run
-without container-only dependencies.
+The API contract tests are intentionally separated from `tests/staging/` and placed under
+`tests/integration/api/` so they participate in the normal default pytest collection
+(`tests/unit` + `tests/integration`) without depending on container-only prerequisites.
 
 Current test harness note: isolated FastAPI API tests use in-process ASGI transport and a
 SQLite connection opened with `check_same_thread=False` so the same test registry can be

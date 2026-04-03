@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from tests.api_test_support import auth_headers
+from tests.integration.api.support import auth_headers
 
 
 @pytest.mark.anyio
