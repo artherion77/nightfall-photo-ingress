@@ -1,7 +1,8 @@
 # photo-ingress: Architecture Design
 
-**Status:** DRAFT — pending review  
+**Status:** active  
 **Date:** 2026-03-31  
+**Updated:** 2026-04-03  
 **Author:** ops/copilot design session
 
 ## Related Documents
@@ -24,9 +25,9 @@ A fully automated, server-side OneDrive-based photo ingest pipeline that feeds i
 | Project and service | `photo-ingress` | Primary name in docs, CLI, and operational language |
 | Source adapter | `onedrive` | Current adapter; kept explicit in config and module names |
 | Python package | `nightfall_photo_ingress` | Keeps namespace alignment with existing nightfall Python projects |
-| CLI command | `photo-ingress` | Main operational command |
+| CLI command | `nightfall-photo-ingress` | Main operational command (binary installed under `/opt/nightfall-photo-ingress/bin/`) |
 | Config file | `/etc/nightfall/photo-ingress.conf` | Single versioned INI file |
-| systemd units | `photo-ingress-poll.*`, `photo-ingress-trash.*` | systemd-managed runtime inside the `photo-ingress` LXC container |
+| systemd units | `nightfall-photo-ingress.service`, `nightfall-photo-ingress.timer`, `nightfall-photo-ingress-trash.path`, `nightfall-photo-ingress-trash.service` | systemd-managed runtime inside the `photo-ingress` LXC container |
 | SSD ZFS dataset (container) | `ssdpool/photo-ingress` | Always-on staging, cursors, token caches, registry |
 | SSD mountpoint | `/mnt/ssd/photo-ingress` | Working set for low-latency operations |
 | HDD ZFS dataset (container) | `nightfall/media/photo-ingress` | Queue/trash boundary on nightfall pool |
@@ -129,57 +130,126 @@ zfs create -o mountpoint=/nightfall/media/photo-ingress nightfall/media/photo-in
 
 ### Schema
 
+**Core tables (schema version 2 — bootstrapped at first `initialize()` call):**
+
 ```sql
-CREATE TABLE files (
-    sha256          TEXT PRIMARY KEY,
-    size_bytes      INTEGER NOT NULL,
-   status          TEXT NOT NULL CHECK (status IN ('pending', 'accepted', 'rejected', 'purged')),
+CREATE TABLE IF NOT EXISTS files (
+    sha256            TEXT PRIMARY KEY,
+    size_bytes        INTEGER NOT NULL,
+    status            TEXT NOT NULL CHECK (status IN ('pending', 'accepted', 'rejected', 'purged')),
     original_filename TEXT,
-    onedrive_id     TEXT,
-   first_seen_at   TEXT NOT NULL,   -- ISO-8601 UTC
-    updated_at      TEXT NOT NULL    -- ISO-8601 UTC
+    current_path      TEXT,           -- last known filesystem path (advisory; not canonical identity)
+    first_seen_at     TEXT NOT NULL,  -- ISO-8601 UTC
+    updated_at        TEXT NOT NULL   -- ISO-8601 UTC
 );
 
-CREATE TABLE metadata_index (
-    -- Fast pre-filter: check if we already processed this OneDrive item
-   account_name   TEXT NOT NULL,
-    onedrive_id     TEXT NOT NULL,
-    size_bytes      INTEGER NOT NULL,
-    modified_time   TEXT NOT NULL,
-    sha256          TEXT NOT NULL,
-   PRIMARY KEY (account_name, onedrive_id)
+CREATE TABLE IF NOT EXISTS metadata_index (
+    account_name  TEXT NOT NULL,
+    onedrive_id   TEXT NOT NULL,
+    size_bytes    INTEGER NOT NULL,
+    modified_time TEXT NOT NULL,
+    sha256        TEXT NOT NULL,
+    created_at    TEXT NOT NULL,      -- ISO-8601 UTC
+    updated_at    TEXT NOT NULL,      -- ISO-8601 UTC
+    PRIMARY KEY (account_name, onedrive_id)
 );
 
-CREATE TABLE audit_log (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-   sha256          TEXT,
-   account_name    TEXT,
-    action          TEXT NOT NULL,   -- 'accepted', 'rejected', 'purged', 'duplicate_skipped', etc.
-    reason          TEXT,
-   details_json    TEXT,
-    actor           TEXT NOT NULL,   -- 'pipeline', 'cli', 'trash_watch'
-    ts              TEXT NOT NULL    -- ISO-8601 UTC
+CREATE TABLE IF NOT EXISTS accepted_records (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    sha256      TEXT NOT NULL,
+    account     TEXT NOT NULL,
+    source_path TEXT NOT NULL,        -- path at time of acceptance
+    accepted_at TEXT NOT NULL,        -- ISO-8601 UTC
+    FOREIGN KEY (sha256) REFERENCES files(sha256)
 );
 
-CREATE TABLE accepted_records (
-   sha256            TEXT PRIMARY KEY,
-   accepted_at       TEXT NOT NULL,
-   original_filename TEXT,
-   storage_relpath   TEXT,
-   account_name      TEXT NOT NULL,
-   onedrive_id       TEXT,
-   source_modified_time TEXT
+CREATE TABLE IF NOT EXISTS file_origins (
+    account      TEXT NOT NULL,
+    onedrive_id  TEXT NOT NULL,
+    sha256       TEXT NOT NULL,
+    path_hint    TEXT,
+    first_seen_at TEXT NOT NULL,      -- ISO-8601 UTC
+    last_seen_at  TEXT NOT NULL,      -- ISO-8601 UTC
+    PRIMARY KEY (account, onedrive_id),
+    FOREIGN KEY (sha256) REFERENCES files(sha256)
+);
+
+CREATE TABLE IF NOT EXISTS audit_log (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    sha256       TEXT,
+    account_name TEXT,
+    action       TEXT NOT NULL,       -- e.g. 'pending', 'accepted', 'rejected', 'purged', 'duplicate_skipped'
+    reason       TEXT,
+    details_json TEXT,
+    actor        TEXT NOT NULL,       -- 'pipeline', 'cli', 'trash_watch'
+    ts           TEXT NOT NULL        -- ISO-8601 UTC
+);
+
+CREATE TABLE IF NOT EXISTS live_photo_pairs (
+    pair_id      TEXT PRIMARY KEY,
+    account      TEXT NOT NULL,
+    stem         TEXT NOT NULL,
+    photo_sha256 TEXT NOT NULL,
+    video_sha256 TEXT NOT NULL,
+    status       TEXT NOT NULL CHECK (status IN ('paired', 'pending', 'accepted', 'rejected', 'purged')),
+    created_at   TEXT NOT NULL,       -- ISO-8601 UTC
+    updated_at   TEXT NOT NULL,       -- ISO-8601 UTC
+    FOREIGN KEY (photo_sha256) REFERENCES files(sha256),
+    FOREIGN KEY (video_sha256) REFERENCES files(sha256)
+);
+
+CREATE TABLE IF NOT EXISTS external_hash_cache (
+    account_name   TEXT NOT NULL,
+    source_relpath TEXT NOT NULL,
+    hash_algo      TEXT NOT NULL,
+    hash_value     TEXT NOT NULL,
+    verified_sha256 TEXT,
+    first_seen_at  TEXT NOT NULL,     -- ISO-8601 UTC
+    updated_at     TEXT NOT NULL,     -- ISO-8601 UTC
+    PRIMARY KEY (account_name, source_relpath, hash_algo, hash_value)
+);
+
+-- Triggers enforcing append-only invariant on audit_log
+CREATE TRIGGER IF NOT EXISTS trg_audit_log_no_update
+BEFORE UPDATE ON audit_log
+BEGIN
+    SELECT RAISE(FAIL, 'audit_log is append-only');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_audit_log_no_delete
+BEFORE DELETE ON audit_log
+BEGIN
+    SELECT RAISE(FAIL, 'audit_log is append-only');
+END;
+```
+
+**Optional/additive table (created by `_ensure_optional_tables()` on `initialize()`):**
+
+```sql
+CREATE TABLE IF NOT EXISTS ingest_terminal_audit (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    batch_run_id TEXT NOT NULL,
+    sequence_no  INTEGER NOT NULL,
+    account      TEXT NOT NULL,
+    onedrive_id  TEXT NOT NULL,
+    sha256       TEXT,
+    action       TEXT NOT NULL,
+    reason       TEXT,
+    actor        TEXT NOT NULL,
+    ts           TEXT NOT NULL        -- ISO-8601 UTC
 );
 ```
 
 ### Properties
 
-- **Idempotent**: `INSERT OR IGNORE` on first insert; status transitions use `UPDATE` + audit append in a single transaction.
-- **Auditable**: `audit_log` is append-only; no rows are ever deleted from it.
-- **Concurrent-safe**: `BEGIN EXCLUSIVE` transaction for all write paths; SQLite WAL mode.
-- **Resilient to restarts**: staging files named `{onedrive_id}.tmp` during download → renamed on completion; a crashed run leaves `.tmp` files that are cleaned up on next start.
+- **Idempotent**: `INSERT OR IGNORE` / `ON CONFLICT DO UPDATE` on first insert; status transitions use `UPDATE` + audit append in one `BEGIN IMMEDIATE` transaction.
+- **Auditable**: `audit_log` is append-only; enforcement is at the DB layer via SQL triggers (`trg_audit_log_no_update`, `trg_audit_log_no_delete`).
+- **Concurrent-safe**: `BEGIN IMMEDIATE` transaction for all write paths; SQLite WAL mode enabled at first open.
+- **Resilient to restarts**: staging files named `{onedrive_id}.tmp` during download → renamed on completion; a crashed run leaves `.tmp` files that are cleaned up on next start via `StagingDriftReport`.
 - **Move-safe**: `accepted_records` preserves acceptance history even if files are manually moved out of `accepted/`.
 - **Pending-first**: `accepted_records` is written only on explicit accept, never on unknown ingest.
+- **Provenance-tracked**: `file_origins` records the `(account, onedrive_id)` → `sha256` mapping for every file ever encountered, independent of current status.
+- **Advisory hash import**: `external_hash_cache` stores SHA1 hashes imported from `.hashes.sha1` files; `verified_sha256` column is populated after first-download SHA-256 confirmation, converting an advisory hint to a confirmed identity mapping.
 
 ---
 
@@ -193,8 +263,8 @@ CREATE TABLE accepted_records (
    a. **Metadata pre-filter**: look up `metadata_index` by `(account_name, onedrive_id, size, modified_time)`. If hit and SHA-256 is in `files`, skip — no download needed.
    b. **Download** file to `/mnt/ssd/photo-ingress/staging/{onedrive_id}.tmp` (streaming, chunked).
    c. Rename `.tmp` → `{onedrive_id}.{ext}` on success.
-   c1. Build poll-to-ingest handoff records from downloaded files and process them immediately in the same poll run.
-   d. **Compute SHA-256** (streaming 64 KB chunks; never loads full file into memory).
+   c1. Each downloaded file is wrapped in a `DownloadedHandoffCandidate` record (the production-owned M3→M4 boundary contract: `account_name`, `onedrive_id`, `original_filename`, `relative_path`, `modified_time`, `size_bytes`, `staging_path`). The ingest engine processes these immediately within the same poll run.
+   d. **Compute SHA-256** (streaming 64 KB chunks; never loads full file into memory). The lifecycle journal (`IngestOperationJournal`) records phase transitions (`download_started`, `hash_computed`, `decision_applied`, `finalized`) for crash-boundary recovery.
    e. **Registry lookup**:
       - `rejected` → delete from staging; append `rejected_duplicate` to `audit_log`.
       - `pending`  → delete from staging; append `discard_pending` to `audit_log`.
@@ -243,7 +313,7 @@ Account execution rule:
 
 **Via trash directory (filesystem trigger):**
 1. Operator places (or moves) a file into `/nightfall/media/photo-ingress/trash/`.
-2. systemd `.path` unit fires `photo-ingress-trash.service`.
+2. systemd `.path` unit fires `nightfall-photo-ingress-trash.service`.
 3. Service computes SHA-256 of each file in `trash/`.
 4. If a known queue artifact exists, it is moved to `rejected/`.
 5. If unknown, the trash artifact itself is moved to `rejected/` and registered as `rejected`.
@@ -251,7 +321,7 @@ Account execution rule:
 
 **Via CLI:**
 ```bash
-photo-ingress reject <sha256> [--reason "..."]
+nightfall-photo-ingress reject <sha256> [--reason "..."]
 ```
 - Idempotent: if already `rejected`, logs and exits cleanly.
 - Moves current queue file to `rejected/` if present.
@@ -261,7 +331,7 @@ photo-ingress reject <sha256> [--reason "..."]
 
 **Accept (explicit operator transition):**
 ```bash
-photo-ingress accept <sha256> [--reason "..."]
+nightfall-photo-ingress accept <sha256> [--reason "..."]
 ```
 - Requires current status `pending`.
 - Moves file from `pending/` to `accepted/` using `accepted_storage_template`.
@@ -269,7 +339,7 @@ photo-ingress accept <sha256> [--reason "..."]
 
 **Purge (explicit destructive transition):**
 ```bash
-photo-ingress purge <sha256> [--reason "..."]
+nightfall-photo-ingress purge <sha256> [--reason "..."]
 ```
 - Requires current status `rejected`.
 - Deletes retained file from `rejected/` with root-containment safety checks.
@@ -319,205 +389,385 @@ photo-ingress purge <sha256> [--reason "..."]
 
 ---
 
-## 9. File Layout (Planned Project Structure)
+## 9. Source and Project Layout (As-Implemented)
 
 ```
-photo-ingress/
-├── pyproject.toml
+nightfall-photo-ingress/
+├── pyproject.toml               — package metadata, dependencies, entry point
 ├── README.md
-├── design/
-│   └── architecture.md          ← this file
-├── nightfall_photo_ingress/
-│   ├── __init__.py
-│   ├── __main__.py
-│   ├── config.py                 — config loading from .ini file
-│   ├── schemas.py                — TypedDict response types
-│   ├── registry.py               — SQLite schema, CRUD, audit log
-│   ├── onedrive/
-│   │   ├── __init__.py
-│   │   ├── auth.py               — MSAL device-code flow, token cache
-│   │   └── client.py             — GraphClient: delta pagination + streaming download
-│   ├── pipeline/
-│   │   ├── __init__.py
-│   │   ├── poller.py             — main poll loop: delta → staging
-│   │   └── ingest.py             — hash + registry decision + atomic move
-│   └── cli.py                    — entry points: auth-setup, poll, reject, accept, purge, process-trash
+├── ARCHITECTURE.md              — module-level overview (cross-ref to this file)
+├── design/                      — authoritative architecture documents (this tree)
+│   ├── domain-architecture-overview.md   ← this file
+│   ├── cli-config-specification.md
+│   ├── architecture-decision-log.md
+│   ├── webui-architecture-phase1.md
+│   ├── web-control-plane-architecture-phase2.md
+│   ├── web-control-plane-architecture-phase3.md
+│   └── webui-component-mapping-phase1.md
+├── src/
+│   └── nightfall_photo_ingress/
+│       ├── __init__.py          — package version (`__version__ = "2.0.0"`)
+│       ├── __main__.py          — `python -m nightfall_photo_ingress` entry
+│       ├── cli.py               — CLI entrypoint; all operator subcommands
+│       ├── config.py            — INI config loading, validation, typed models
+│       ├── logging_bootstrap.py — JSON/human log mode selection
+│       ├── live_photo.py        — Live Photo pairing heuristics and deferred queue
+│       ├── reject.py            — accept/reject/purge/process-trash operator flows
+│       ├── status.py            — atomic status snapshot export
+│       ├── sync_import.py       — advisory SHA1 import from permanent library
+│       ├── domain/              — source-agnostic core business logic
+│       │   ├── __init__.py
+│       │   ├── registry.py      — SQLite system-of-record (schema, CRUD, audit)
+│       │   ├── storage.py       — path templating, cross-pool commit workflows
+│       │   ├── ingest.py        — IngestDecisionEngine (hash-based policy matrix)
+│       │   ├── journal.py       — append-only JSONL crash-recovery lifecycle log
+│       │   └── migrations/      — schema migration framework scaffold
+│       ├── adapters/            — pluggable external data source adapters
+│       │   └── onedrive/
+│       │       ├── __init__.py
+│       │       ├── auth.py      — MSAL device-code flow, serializable token cache
+│       │       ├── client.py    — GraphClient: delta pagination, download, retries
+│       │       ├── retry.py     — RetryPolicy dataclass and backoff logic
+│       │       ├── cache_lock.py — per-account singleton lock for poll safety
+│       │       ├── errors.py    — structured error taxonomy, URL redaction
+│       │       └── safe_logging.py — credential/URL scrubbing for log extras
+│       └── runtime/             — infrastructure and orchestration helpers
+│           └── process_lock.py  — global fcntl advisory lock for poll serialization
 ├── conf/
-│   └── photo-ingress.conf      — .ini format; installed to /etc/nightfall/
-├── systemd/
-│   ├── photo-ingress-poll.service
-│   ├── photo-ingress-poll.timer
-│   ├── photo-ingress-trash.path
-│   └── photo-ingress-trash.service
+│   └── photo-ingress.conf.example  — annotated example config
+├── systemd/                         — production systemd units
+│   ├── nightfall-photo-ingress.service
+│   ├── nightfall-photo-ingress.timer
+│   ├── nightfall-photo-ingress-trash.path
+│   └── nightfall-photo-ingress-trash.service
 ├── install/
-│   ├── install.sh
+│   ├── install.sh               — LXC container bootstrap and service install
 │   └── uninstall.sh
+├── docs/                        — operator-facing documentation
+│   ├── operations-runbook.md
+│   └── app-registration-design.md
+├── planning/                    — planning and roadmap artifacts
+│   ├── implemented/
+│   ├── planned/
+│   ├── proposed/
+│   └── superseeded/
+├── review/                      — audit and compliance review artifacts
 └── tests/
-    ├── __init__.py
     ├── conftest.py
-    ├── test_registry.py
-    ├── test_ingest.py
-    └── test_onedrive_client.py
+    ├── unit/                    — unit test suite (per-module)
+    ├── integration/             — M3+M4 integration harness
+    ├── staging/                 — staging environment test harness
+    └── staging-flow/            — flowctl staging contract tests
 ```
 
 ---
 
-## 10. Implementation Phases
+## 10. Implementation Delivery Record
 
-### Phase 1 — Azure App Registration + Auth
+The following phases were used to drive implementation. All phases are delivered as of
+2026-04-01. This section is retained as a historical record; it is not a forward plan.
 
-**Goal:** The service can authenticate to Microsoft Graph API from the server without a GUI.
+| Phase | Scope | Status |
+|-------|-------|--------|
+| 1 — Auth | MSAL device-code flow, token cache, `auth-setup` CLI | Delivered |
+| 2 — Delta Poller + Staging | GraphClient, delta pagination, staging downloads, cursor persistence | Delivered |
+| 3 — Registry + Ingest Engine | SQLite schema v2, IngestDecisionEngine, hash-based policy matrix | Delivered |
+| 4 — Queue Boundaries | Pending queue, accepted queue, permanent library boundary enforcement | Delivered |
+| 5 — Operator Rejection Flows | `reject`, `accept`, `purge`, `process-trash` CLI; trash path unit | Delivered |
+| 6 — Observability | JSON logger, status snapshot, run-ID threading, diagnostic counters | Delivered |
+| 7 — Sync Import + Live Photo | `sync-import` CLI, `external_hash_cache`, Live Photo pairing heuristics | Delivered |
 
-Steps:
-1. Register a new app in [Azure portal](https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps):
-   - Platform: **Mobile and desktop applications**
-   - Redirect URI: `https://login.microsoftonline.com/common/oauth2/nativeclient`
-   - Enable **"Allow public client flows"**
-   - Add API permissions: `Files.Read` (Microsoft Graph, delegated) + `offline_access`
-2. Record the **Application (client) ID** — stored in `/etc/nightfall/photo-ingress.conf`
-3. Run `photo-ingress auth-setup` once on the server:
-   - Prints a device-code URL and code
-   - Operator opens URL on any browser, signs in
-   - Token cache written to `/mnt/ssd/photo-ingress/token_cache.json` (mode 0600)
+For current planning and next-step work (Modules 5–8 in the implementation roadmap,
+web control plane phases), see `planning/`.
 
-**Deliverable:** `onedrive/auth.py` — MSAL `PublicClientApplication` with device-code flow + silent refresh.
-
-### Phase 2 — Graph API Delta Poller + Staging Download
-
-**Goal:** Reliably discover new/changed files in OneDrive and land them in staging without re-downloading known files.
-
-Steps:
-1. `onedrive/client.py`: `GraphClient` wrapping `httpx`; methods:
-   - `get_delta(folder_path)` → yields `DeltaItem` TypedDicts
-   - `download_file(download_url, dest_path)` → streaming chunked write
-2. Delta cursor: persisted to `/mnt/ssd/photo-ingress/delta_cursor`; on loss, falls back to `?token=latest`
-3. `pipeline/poller.py`: metadata pre-filter using `metadata_index`; staging file naming `{onedrive_id}.tmp` → `{onedrive_id}.{ext}`
-4. `--dry-run` flag: lists delta items without downloading
-
-**Deliverable:** `poller.py` discoverable by the systemd timer; `--dry-run` mode for safe testing.
-
-### Phase 3 — SQLite Hash Registry + Ingest Decision Engine
-
-**Goal:** Server-owned content ledger that makes authoritative accept/reject decisions.
-
-Steps:
-1. `registry.py`: schema creation, `insert_file()`, `lookup_sha256()`, `mark_rejected()`, `insert_metadata_index()`, `append_audit()`
-2. `pipeline/ingest.py`: SHA-256 computation (streaming 64 KB chunks); registry lookup and branch logic; atomic move with cross-pool fallback
-3. Transactions: `BEGIN EXCLUSIVE` for all writes; WAL mode enabled on first open
-
-**Deliverable:** Registry fully functional; `pytest tests/test_registry.py` and `pytest tests/test_ingest.py` green.
-
-### Phase 4 — Accepted Queue and Permanent Library Boundary
-
-**Goal:** Keep ingress and permanent library ownership separate, while preserving dedupe history.
-
-Steps:
-1. Create ZFS datasets (see Storage Layout above)
-2. Ensure ingress has write access to `accepted/` and no write access to `/nightfall/media/pictures/...`
-3. Document operator workflow for manually moving files from `accepted/` to permanent library
-4. Validate that manually moved files remain blocked from re-download due to registry acceptance history
-
-**Deliverable:** Pending and accepted queue boundaries remain explicit while dedupe behavior is preserved.
-
-### Phase 5 — Trash → Rejected Pipeline
-
-**Goal:** Operator can permanently block content by dropping a file into trash/ or running a CLI command.
-
-Steps:
-1. `cli.py`: `reject`, `accept`, `purge`, and `process-trash` subcommands
-2. `systemd/photo-ingress-trash.path`: watches `/nightfall/media/photo-ingress/trash/`
-3. `systemd/photo-ingress-trash.service`: runs `photo-ingress process-trash` on activation
-4. Both paths share `registry.mark_rejected(sha256, reason, actor)` — idempotent
-
-**Deliverable:** Drop a previously accepted file into trash → it disappears from `accepted/`; re-upload is silently discarded at next poll.
-
-### Phase 6 — Observability + systemd Integration
-
-**Goal:** Operational visibility without requiring active monitoring tooling.
-
-Steps:
-1. JSON log formatter: every line includes `ts`, `level`, `component`, `msg`, and context fields (`sha256`, `filename`, `status`) — feeds journald via stdout
-2. Status file: write `/run/nightfall-status.d/photo-ingress.json` after each poll run — consumed by nightfall-mcp `HealthService`
-3. Alert emails: consecutive auth failures (≥3), SSD dataset >90% full, ingest errors
-4. Install scripts following nightfall-scripts conventions (`install.sh`, `uninstall.sh`)
-
-**Deliverable:** `pytest tests/` fully green; systemd timers enabled and observable via `journalctl -u photo-ingress-poll`.
-
-### Phase 7 — Sync Import + Live Photo Pairing
-
-**Goal:** Reduce duplicate downloads and support modern iPhone defaults in V1.
-
-Steps:
-1. Add `sync-import` CLI command to parse `.hashes.sha1` from `/nightfall/media/pictures/...`
-2. Persist imported hash index for pre-filter checks during poll
-3. Add Live Photo pair detection and pair-link persistence in registry
-4. Validate paired/unpaired behavior with HEIC/JPEG + MOV test fixtures
-
-**Deliverable:** Sync import is operational and Live Photo pairing metadata is written in V1.
+For compliance audit artifacts covering Modules 3 and 4, see `review/`.
 
 ---
 
 ## 11. Configuration File (conf/photo-ingress.conf)
 
+The full config spec, including all required keys, defaults, and validation rules, is in
+[design/cli-config-specification.md](cli-config-specification.md).
+
+The format uses a `[core]` global section plus one `[account.<name>]` section per OneDrive
+account. Below is a minimal representative example:
+
 ```ini
-[onedrive]
-# Azure app registration client ID (required)
-client_id = REPLACE_WITH_CLIENT_ID
+[core]
+config_version = 2
+poll_interval_minutes = 720
+staging_path = /mnt/ssd/photo-ingress/staging
+pending_path = /nightfall/media/photo-ingress/pending
+accepted_path = /nightfall/media/photo-ingress/accepted
+rejected_path = /nightfall/media/photo-ingress/rejected
+trash_path = /nightfall/media/photo-ingress/trash
+registry_path = /mnt/ssd/photo-ingress/registry.db
+storage_template = {yyyy}/{mm}/{original}
+accepted_storage_template = {yyyy}/{mm}/{original}
+staging_on_same_pool = false
+verify_sha256_on_first_download = true
+max_downloads_per_poll = 200
+max_poll_runtime_seconds = 300
+live_photo_capture_tolerance_seconds = 3
+live_photo_stem_mode = exact_stem
+live_photo_component_order = photo_first
+live_photo_conflict_policy = nearest_capture_time
+sync_hash_import_enabled = true
+sync_hash_import_path = /nightfall/media/pictures
+sync_hash_import_glob = .hashes.sha1
 
-# OneDrive folder path to watch (relative to root)
-watch_folder = /Camera Roll
-
-# Microsoft identity platform authority
+[account.christopher]
+enabled = true
+display_name = Christopher iPhone
+provider = onedrive
 authority = https://login.microsoftonline.com/consumers
+client_id = REPLACE_WITH_CLIENT_ID
+onedrive_root = /Camera Roll
+token_cache = /mnt/ssd/photo-ingress/tokens/christopher.json
+delta_cursor = /mnt/ssd/photo-ingress/cursors/christopher.cursor
 
-[paths]
-# SSD-backed working area
-staging_dir = /mnt/ssd/photo-ingress/staging
-registry_db = /mnt/ssd/photo-ingress/registry.db
-token_cache  = /mnt/ssd/photo-ingress/token_cache.json
-delta_cursor = /mnt/ssd/photo-ingress/delta_cursor
-
-# HDD pool — accepted files and trash trigger
-accepted_dir = /nightfall/media/photo-ingress/accepted
-trash_dir    = /nightfall/media/photo-ingress/trash
-
-# Set to true if staging and accepted are on the same ZFS pool
-# (enables os.replace() atomic rename; otherwise shutil.copy2 + verify + unlink)
-staging_same_pool = false
-
-[polling]
-# Folder to use as delta fallback (days to look back when cursor is lost)
-delta_fallback_days = 30
-
-[alerts]
-# Path to nightfall alert email config
-alert_config = /etc/nightfall/alert-email.conf
-auth_failure_threshold = 3
+[logging]
+log_level = INFO
+console_format = json
 ```
+
+Key properties:
+- `config_version = 2` is mandatory; the runtime rejects any other value.
+- Token cache and delta cursor paths must be unique per account.
+- `process_accounts_in_config_order = true` (default) preserves declaration order.
+- All path fields are validated for existence at startup.
 
 ---
 
 ## 12. Verification Checklist
 
-1. `photo-ingress auth-setup` completes; token file written at mode 0600
-2. `photo-ingress poll --dry-run` lists known OneDrive items without downloading
-3. End-to-end: single photo ingested; appears in `accepted/YYYY/MM/`; SHA-256 in registry
+1. `nightfall-photo-ingress auth-setup --account <name>` completes; token file written at mode 0600
+2. `nightfall-photo-ingress poll --dry-run` lists known OneDrive items without downloading
+3. End-to-end: single photo ingested; appears in `pending/YYYY/MM/`; SHA-256 in registry with status `pending`
 4. Re-run poll; confirm file NOT downloaded again (metadata_index hit)
-5. Move accepted file to trash/; confirm it is removed from accepted/ and registry status = `rejected`
-6. Re-upload same photo to OneDrive; run poll; confirm file is silently discarded (audit_log entry: `rejected_duplicate`)
-7. `photo-ingress reject <sha256>` runs idempotently (no error if already rejected)
-8. `photo-ingress accept <sha256>` transitions pending to accepted and writes acceptance history
-9. `photo-ingress purge <sha256>` only purges within rejected root and marks status purged
-8. Move accepted files manually to `/nightfall/media/pictures/...`; confirm no re-download occurs on future polls
-9. Run `sync-import`; confirm imported hashes reduce candidate downloads
-10. Verify Live Photo pair metadata is recorded for HEIC/JPEG + MOV sets
-11. `pytest tests/` all green with mocked HTTP and mocked filesystem
-12. `journalctl -u photo-ingress-poll` shows structured JSON log output
+5. `nightfall-photo-ingress accept <sha256>` transitions pending to accepted; file moves to `accepted/`
+6. Move accepted file to `trash/`; confirm it is removed from `accepted/` and registry status = `rejected`
+7. Re-upload same photo to OneDrive; run poll; confirm file is silently discarded (audit_log entry: `rejected_duplicate`)
+8. `nightfall-photo-ingress reject <sha256>` runs idempotently (no error if already rejected)
+9. `nightfall-photo-ingress purge <sha256>` only purges within rejected root and marks status `purged`
+10. Move accepted files manually to `/nightfall/media/pictures/...`; confirm no re-download on future polls
+11. Run `nightfall-photo-ingress sync-import`; confirm imported hashes reduce candidate downloads
+12. Verify Live Photo pair metadata is recorded for HEIC/JPEG + MOV sets
+13. `pytest tests/` all green with mocked HTTP and mocked filesystem
+14. `journalctl -u nightfall-photo-ingress.service` shows structured JSON log output
 
 ---
 
 ## 13. Open Questions (for Refinement)
 
-1. **Live Photo heuristics scope**: confirm whether V1 should remain fixed to defaults only, while still validating all related config parameters.
-2. **Sync import trust model**: confirm whether imported SHA1 matches should always skip download, or only skip after minimum metadata checks.
+1. **Live Photo heuristics scope**: confirm whether V1 should remain fixed to defaults only, while still validating all related config parameters. *(Partially answered: runtime enforces defaults; config keys are validated but runtime rejects non-default values.)*
+2. **Sync import trust model**: confirm whether imported SHA1 matches should always skip download, or only skip after minimum metadata checks. *(Resolved: `verify_sha256_on_first_download = true` requires one SHA-256 confirmation before advisory SHA1 matches gate future skips.)*
 3. **Scope of `Files.Read` permission**: `Files.Read` is sufficient for personal accounts via the `/me/drive` endpoint. Confirm whether the specific Camera Roll folder is accessible or if a broader scope is needed.
+
+---
+
+## 14. Ingest Lifecycle Journal
+
+The `IngestOperationJournal` (`domain/journal.py`) is a per-operation append-only JSONL
+file that records coarse phase transitions during the staging-to-pending commit path. It
+exists as a crash-boundary recovery mechanism, separate from and complementary to the
+SQLite `audit_log`.
+
+### Role and relationship to audit_log
+
+| Concern | IngestOperationJournal | audit_log |
+|---------|----------------------|-----------|
+| Scope | One file per ingest operation, ephemeral | All state transitions, permanent |
+| Format | JSONL on disk | SQLite rows |
+| Retention | Cleared after successful commit | Append-only, never deleted |
+| Purpose | Crash recovery / replay | Audit, operator visibility |
+
+### Phase sequence
+
+Each ingest operation for one `DownloadedHandoffCandidate` records the following phases
+in order:
+
+1. `download_started` — download began (recorded by adapter before first byte written)
+2. `hash_computed` — SHA-256 computed and canonical identity established
+3. `decision_applied` — registry policy decision resolved (pending/discard/duplicate)
+4. `finalized` — file moved to destination and registry row committed
+
+### Crash recovery
+
+On startup (before the first poll), `IngestDecisionEngine.reconcile_interrupted_operations()`
+reads all journal records and replays any operation that reached `hash_computed` or
+`decision_applied` but not `finalized`. Replay is safe because all downstream operations
+are idempotent via `ON CONFLICT DO UPDATE` and `INSERT OR IGNORE` guards.
+
+If `journal_path` is not configured, the journal is disabled and crash recovery falls back
+to manual staging reconciliation.
+
+### StagingDriftReport
+
+The `StagingDriftReport` dataclass classifies the staging directory content on each
+reconciliation pass:
+
+| Classification | Meaning |
+|---------------|---------|
+| `stale_temp_count` | `.tmp` files from interrupted downloads; safe to delete |
+| `completed_unpersisted_count` | Downloaded files with no journal record; require hash + ingest pass |
+| `orphan_unknown_count` | Files in staging with no corresponding journal or registry entry |
+| `quarantined_count` | Files quarantined due to zero-byte or integrity check failures |
+
+Zero-byte files discovered during ingest are quarantined (moved to a quarantine directory)
+and an audit record is appended. They are never silently discarded.
+
+---
+
+## 15. Error Taxonomy and Resilience
+
+The adapter layer defines a structured hierarchy of exceptions, all carrying loggable
+fields without exposing sensitive material.
+
+### Exception types
+
+| Exception | Module | Meaning |
+|-----------|--------|---------|
+| `AuthError` | `adapters/onedrive/auth.py` | MSAL authentication failure (device-code flow, silent refresh) |
+| `GraphError` | `adapters/onedrive/errors.py` | Microsoft Graph API request failure |
+| `DownloadError` | `adapters/onedrive/errors.py` | File download failure (transport or HTTP error) |
+| `GraphResyncRequired` | `adapters/onedrive/errors.py` | Graph delta returned `410 Gone`; cursor must be reset |
+
+### URL/token redaction
+
+All raise sites in the adapter call `redact_url()` before attaching a URL to an exception
+or log record. The rules applied by `redact_url()`:
+
+1. If the URL contains a query string, strip it entirely (pre-authenticated OneDrive
+   download URLs embed bearer material as query parameters).
+2. Truncate netloc+path to 80 characters for readability.
+3. Never raise — if URL parsing fails, return a fixed sentinel `<unparseable-url>`.
+
+Safe parameters (no query string) are logged at full length up to 120 characters.
+
+### Retry policy
+
+`RetryPolicy` (`adapters/onedrive/retry.py`) governs backoff for transient failures:
+
+- Retryable status codes: 429, 500, 502, 503, 504 and any `Retry-After` response.
+- `Retry-After` header is parsed and honoured (seconds or HTTP-date format).
+- Exponential backoff with jitter; configurable max attempts and base delay.
+- Non-retryable errors (4xx except 429, auth errors, resync) propagate immediately.
+
+### Delta resync
+
+On `GraphResyncRequired` (HTTP 410 from the Graph delta endpoint):
+1. The current cursor is cleared.
+2. The delta traversal restarts from `?token=latest`.
+3. `resync_required_total` diagnostic counter is incremented.
+4. Registry idempotency ensures no already-ingested files are re-processed.
+
+### Auth resilience threshold
+
+Consecutive authentication failures are counted per poll run. After ≥3 consecutive
+failures (`auth_failure_threshold` in config), the runtime:
+1. Writes a status snapshot with `state = "auth_failed"`.
+2. Emits a structured log at ERROR level with `component = "auth"`.
+3. Stops the current poll run (does not retry further).
+
+Diagnostic counters tracked per run: `auth_refresh_attempt_total`,
+`auth_refresh_success_total`, `auth_refresh_failure_total`.
+
+### Throughput bounds
+
+Two soft bounds prevent poll runs from consuming unbounded time or I/O:
+
+- `max_downloads_per_poll`: when the per-run download count reaches this limit, the
+  current page is committed and the poll terminates cleanly. The cursor is advanced to
+  the last committed page; the next scheduled run resumes from there.
+- `max_poll_runtime_seconds`: wall-clock timeout. Same clean-commit behaviour applies.
+
+Neither bound raises an exception; both result in an orderly, auditable stop.
+
+---
+
+## 16. Observability Internals
+
+### Structured logging
+
+Every log record emitted by the service is structured. In JSON mode (`--log-mode json`),
+each line is a JSON object with at minimum:
+
+```json
+{
+  "ts": "2026-04-03T12:00:00.000000+00:00",
+  "level": "INFO",
+  "component": "onedrive.client",
+  "msg": "...",
+  "run_id": "...",
+  "account": "christopher"
+}
+```
+
+Context fields appended where relevant: `sha256`, `filename`, `status`, `onedrive_id`,
+`action`, `actor`, `reason`.
+
+In human mode (`--log-mode human`, default for interactive use), records are plain text
+but carry the same fields. Both modes feed into journald via stdout.
+
+### Run-ID
+
+A UUID is generated once per poll invocation and propagated to:
+- All log records emitted during that run
+- `ingest_terminal_audit` rows (`batch_run_id` column)
+- Status snapshot `details`
+
+This enables cross-surface correlation: a single `run_id` links journal log lines,
+audit rows, and the status snapshot produced by one poll cycle.
+
+### Diagnostic counters
+
+The following counters are accumulated per poll run inside `GraphClient` and emitted
+via structured logs and the status snapshot `details` block on run completion:
+
+| Counter key | Meaning |
+|-------------|---------|
+| `retry_attempt_total` | Total retry attempts made |
+| `retry_transport_error_total` | Transport-layer errors that triggered retries |
+| `throttle_response_total` | HTTP 429 / Retry-After responses received |
+| `resync_required_total` | Delta resync (410 Gone) events |
+| `auth_refresh_attempt_total` | MSAL silent refresh attempts |
+| `auth_refresh_success_total` | Successful token refreshes |
+| `auth_refresh_failure_total` | Failed token refreshes |
+| `graph_response_request_id_seen_total` | Graph responses carrying `request-id` headers |
+| `graph_response_correlation_id_seen_total` | Graph responses carrying `client-request-id` headers |
+
+### Safe logging
+
+`sanitize_extra()` (`adapters/onedrive/safe_logging.py`) is applied to all `extra=`
+dicts before they reach the logging handler. It strips any key whose name matches known
+credential patterns (e.g. `token`, `access_token`, `sig`, `tempauth`). The function
+never raises; on internal error it returns a sanitized sentinel instead.
+
+### Status snapshot
+
+Written atomically to `/run/nightfall-status.d/photo-ingress.json` (tmp file then
+`os.replace()`) after each CLI command that modifies system state.
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `schema_version` | int | `1` — increment on breaking changes |
+| `service` | string | always `"photo-ingress"` |
+| `version` | string | package `__version__` |
+| `host` | string | `socket.gethostname()` |
+| `state` | string | see state values below |
+| `success` | bool | whether the command succeeded |
+| `command` | string | CLI subcommand that wrote this snapshot |
+| `updated_at` | string | ISO-8601 UTC |
+| `details` | object | command-specific data (counters, error info, etc.) |
+
+State values and their operator meaning:
+
+| State | Meaning |
+|-------|---------|
+| `healthy` | Last command completed successfully |
+| `degraded` | Non-fatal error; service continues on next scheduled run |
+| `auth_failed` | Authentication failed; token refresh required before next poll |
+| `disk_full` | SSD staging dataset above threshold; manual intervention required |
+| `ingest_error` | Ingest engine failed; check journal and audit log |
+| `registry_corrupt` | SQLite registry integrity check failed; manual recovery required |
