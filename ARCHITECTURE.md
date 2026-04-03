@@ -3,8 +3,9 @@
 This document explains the new modular structure, designed for extensibility to support multiple data sources (OneDrive, Google Photos, Flickr, etc.).
 
 For web operator surface and API expansion planning, see:
-- [design/web-control-plane-architecture-extension.md](design/web-control-plane-architecture-extension.md)
-- [planning/web-control-plane-implementation-roadmap.md](planning/web-control-plane-implementation-roadmap.md)
+- [design/web-control-plane-architecture-phase2.md](design/web-control-plane-architecture-phase2.md)
+- [design/web-control-plane-architecture-phase3.md](design/web-control-plane-architecture-phase3.md)
+- [planning/planned/web-control-plane-integration-plan.md](planning/planned/web-control-plane-integration-plan.md)
 
 ### Directory Structure
 
@@ -70,6 +71,8 @@ Currently a placeholder for:
 - Command orchestration
 - Lifecycle management
 - Pluggable runtime adapters (e.g., systemd integration, container runtimes)
+- Process-level singleton lock (`cache_lock.py`) ensuring one poll runs at a time
+- Per-account singleton lock preventing concurrent poll runs from racing on the same account's MSAL token cache
 
 ---
 

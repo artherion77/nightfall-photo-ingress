@@ -367,14 +367,14 @@ Tasks:
 ### Chunk 5.1 — operations-runbook.md: validation pass
 
 Tasks:
-- [ ] Validate all CLI command invocations use `nightfall-photo-ingress` (not
+- [x] Validate all CLI command invocations use `nightfall-photo-ingress` (not
   `photo-ingress`)
-- [ ] Validate systemd unit names throughout match actual filenames in `systemd/`
-- [ ] Validate install path `/opt/nightfall-photo-ingress` and config path
+- [x] Validate systemd unit names throughout match actual filenames in `systemd/`
+- [x] Validate install path `/opt/nightfall-photo-ingress` and config path
   `/etc/nightfall/photo-ingress.conf` match install script behavior
-- [ ] Check working state path (`/var/lib/ingress` is mentioned in runbook but
+- [x] Check working state path (`/var/lib/ingress` is mentioned in runbook but
   design says `/mnt/ssd/photo-ingress` — confirm which is correct in production)
-- [ ] Add section: **Operator Workflows** covering:
+- [x] Add section: **Operator Workflows** covering:
   - `nightfall-photo-ingress config-check` — purpose and expected output
   - `nightfall-photo-ingress accept <sha256>` — when and how to use
   - `nightfall-photo-ingress reject <sha256>` — when and how to use
@@ -382,24 +382,24 @@ Tasks:
   - `nightfall-photo-ingress process-trash` — when and how to use
   - Trash directory workflow (drop file → systemd path unit → auto-process)
   - `nightfall-photo-ingress sync-import` — when to run and what it does
-- [ ] Add section: **Status File Interpretation** — each `state` value and what
+- [x] Add section: **Status File Interpretation** — each `state` value and what
   operator action it implies
-- [ ] Add section: **Staged File Recovery** — what to do if poll crashed mid-run:
+- [x] Add section: **Staged File Recovery** — what to do if poll crashed mid-run:
   staging reconciliation, stale .tmp cleanup, safe restart
 
 ### Chunk 5.2 — app-registration-design.md: reclassification
 
 Tasks:
-- [ ] Split the file:
+- [x] Split the file:
   - Design-level content (error detection design, scope normalization, design
     principles) → new file `design/auth-design.md`
   - Operator content (how to register the app, config-check steps, bootstrap token
     cache, verify Graph access, registered instance record) → stays in `docs/`
     integrated into or alongside `operations-runbook.md`
-- [ ] Update `docs/app-registration-design.md` to contain only operator-facing
+- [x] Update `docs/app-registration-design.md` to contain only operator-facing
   content; add a reference at the top pointing to `design/auth-design.md` for
   the design rationale
-- [ ] In `design/auth-design.md`, reference `design/domain-architecture-overview.md`
+- [x] In `design/auth-design.md`, reference `design/domain-architecture-overview.md`
   §13 (Error Taxonomy) and the new `design/error-taxonomy-and-resilience.md`
 
 ---
@@ -411,12 +411,12 @@ Tasks:
 ### Chunk 6.1 — Fix broken cross-references
 
 Tasks:
-- [ ] Replace `design/web-control-plane-architecture-extension.md` reference with
+- [x] Replace `design/web-control-plane-architecture-extension.md` reference with
   correct paths: `design/web-control-plane-architecture-phase2.md` and
   `design/web-control-plane-architecture-phase3.md`
-- [ ] Replace `planning/web-control-plane-implementation-roadmap.md` reference with
+- [x] Replace `planning/web-control-plane-implementation-roadmap.md` reference with
   `planning/planned/web-control-plane-integration-plan.md`
-- [ ] Review the module responsibilities table and verify it is consistent with the
+- [x] Review the module responsibilities table and verify it is consistent with the
   current source tree; update `runtime/` description to mention process lock and
   per-account singleton lock
 
@@ -477,9 +477,9 @@ For each markdown file in `/design/`, `/planning/`, and `/docs/`:
 | 4.2 | Planning: roadmap Modules 5–8 status update | Yes | ✅ Done — 2026-04-03 |
 | 4.3 | Planning: web control plane docs coherence | Yes | ✅ Done — 2026-04-03 |
 | 4.4 | Planning: v2 deferred backlog staleness | Yes | ✅ Done — 2026-04-03 |
-| 5.1 | Docs: operations-runbook validation + expansion | Yes | |
-| 5.2 | Docs: app-registration-design reclassification | Yes | |
-| 6.1 | Root ARCHITECTURE.md reference fixes | Yes | |
+| 5.1 | Docs: operations-runbook validation + expansion | Yes | ✅ Done — 2026-04-03 |
+| 5.2 | Docs: app-registration-design reclassification | Yes | ✅ Done — 2026-04-03 |
+| 6.1 | Root ARCHITECTURE.md reference fixes | Yes | ✅ Done — 2026-04-03 |
 | 7.1–7.3 | Consistency validation sweep | Yes | |
 
 Total: 18 stopping-point chunks.

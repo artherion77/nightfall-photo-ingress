@@ -438,4 +438,166 @@ These smoke checks should validate:
 - the binary is installed and responds to `--version`
 - `config-check` succeeds with the staging config
 - poll and trash units are known to systemd inside the container
+
+---
+
+## Operator Workflows
+
+This section covers the routine CLI commands used to manage the ingest service.
+
+### Config check
+
+Validates the configuration file format, required keys, account sections, and path accessibility. Run this any time the config is modified.
+
+```bash
+nightfall-photo-ingress config-check --path /etc/nightfall/photo-ingress.conf
+```
+
+A passing run exits 0 and prints a summary of all validated accounts. A failing run exits non-zero and prints actionable messages identifying which key or section is invalid.
+
+### Accepting a file
+
+Accept a file by its SHA-256 hash. This moves it from the pending queue to the accepted queue in the registry and writes an `accepted_records` row.
+
+```bash
+nightfall-photo-ingress accept <sha256> --path /etc/nightfall/photo-ingress.conf
+```
+
+Use when inspecting the pending queue and explicitly approving an item for permanent library inclusion. Accepted files are not moved to permanent storage by this command — a separate operator step moves the accepted queue to `/nightfall/media/photo-ingress/accepted/`.
+
+### Rejecting a file
+
+Reject a file by its SHA-256 hash. This marks the file as rejected in the registry with an audit record. Rejected files are blocked from re-download if OneDrive serves them again.
+
+```bash
+nightfall-photo-ingress reject <sha256> --reason "<description>" --path /etc/nightfall/photo-ingress.conf
+```
+
+The `--reason` flag is optional but strongly recommended for audit clarity. The actor recorded in the audit row will be `operator-cli`.
+
+### Purging a file
+
+Purge a file by its SHA-256 hash. This transitions the registry record to `purged` state and removes the physical staging copy if present.
+
+```bash
+nightfall-photo-ingress purge <sha256> --path /etc/nightfall/photo-ingress.conf
+```
+
+Purge is intended for records that are confirmed unwanted and should be completely removed from tracking. The audit history is retained.
+
+### Processing the trash queue
+
+Drain files placed in the trash directory by the operator. This command reads all items in `trash_path`, creates rejected registry records for each, removes the physical files, and emits audit rows.
+
+```bash
+nightfall-photo-ingress process-trash --path /etc/nightfall/photo-ingress.conf
+```
+
+This command is also triggered automatically by the `nightfall-photo-ingress-trash.path` systemd unit whenever files are dropped into the trash directory. The path unit watches `trash_path` and starts `nightfall-photo-ingress-trash.service` on change.
+
+**Trash workflow:**
+1. Operator drops a file into the configured `trash_path` directory.
+2. `nightfall-photo-ingress-trash.path` detects the change.
+3. `nightfall-photo-ingress-trash.service` runs `process-trash` automatically.
+4. Audit log records the rejection with actor `trash-processor`.
+
+To process manually (for example, when debugging the path unit):
+```bash
+systemctl start nightfall-photo-ingress-trash.service
+```
+
+### Sync-import from permanent library
+
+Populate the registry with SHA-1 hashes from existing `.hashes.sha1` files in the permanent library. This prevents re-downloading files that are already in the library.
+
+```bash
+nightfall-photo-ingress sync-import --path /etc/nightfall/photo-ingress.conf
+```
+
+Run this once after initial deployment against an existing library. Also run it after bulk additions to the permanent library to keep the advisory hash index current. The command is read-only with respect to the library — it never modifies `.hashes.sha1` files.
+
+Use `--dry-run` to preview the import without writing to the registry:
+
+```bash
+nightfall-photo-ingress sync-import --dry-run --path /etc/nightfall/photo-ingress.conf
+```
+
+---
+
+## Status File Interpretation
+
+The status file at `/run/nightfall-status.d/photo-ingress.json` is written atomically after each command run. Each `state` value indicates a specific condition and implies a specific operator action.
+
+| State | Meaning | Operator action |
+|-------|---------|----------------|
+| `healthy` | Last command completed successfully with no anomalies | None required |
+| `degraded` | Command completed but encountered recoverable issues (for example, partial poll due to runtime limit) | Check `details` field for specifics; monitor next poll result |
+| `auth_failed` | MSAL token refresh failed; account cannot be polled | Run `nightfall-photo-ingress auth-setup --account <name>` to re-authenticate; check token cache permissions |
+| `disk_full` | Staging or accepted path is below the configured minimum free space threshold | Free space on the relevant volume; poll will resume automatically |
+| `ingest_error` | Ingest decision engine encountered an unexpected error processing one or more candidates | Inspect journald logs for the failed run ID; check staging directory for stale `.tmp` files |
+| `registry_corrupt` | Registry integrity check failed (for example, WAL recovery failure) | Stop the service immediately; run SQLite integrity check (`PRAGMA integrity_check`); restore from last ZFS snapshot |
+
+To read the status file:
+
+```bash
+jq . /run/nightfall-status.d/photo-ingress.json
+jq .state /run/nightfall-status.d/photo-ingress.json
+jq '{state, updated_at, command}' /run/nightfall-status.d/photo-ingress.json
+```
+
+If the status file is absent after a run, confirm that `/run/nightfall-status.d/` exists and is writable by the service user, then check journald output.
+
+---
+
+## Staged File Recovery
+
+If the poll service crashes or is killed mid-run, follow this procedure to return to a consistent state.
+
+### When recovery is needed
+
+Signs that a partial poll run occurred:
+- Status file shows `ingest_error` or is absent
+- Stale `.tmp` files present in the `staging_path` directory
+- Registry and journal are out of sync (pending rows without corresponding journal entries)
+
+### Recovery procedure
+
+**Step 1: Stop the poll timer to prevent overlapping runs**
+
+```bash
+systemctl stop nightfall-photo-ingress.timer
+```
+
+**Step 2: Inspect the staging directory**
+
+```bash
+find /var/lib/ingress/staging -name "*.tmp" -ls
+find /var/lib/ingress/staging -type f -ls
+```
+
+`.tmp` files are incomplete downloads. They are safe to delete. Any non-`.tmp` file in staging that has a corresponding `pending` registry record was downloaded successfully but not finalized.
+
+**Step 3: Run config-check to verify the service can start**
+
+```bash
+nightfall-photo-ingress config-check --path /etc/nightfall/photo-ingress.conf
+```
+
+**Step 4: Remove stale `.tmp` files**
+
+```bash
+find /var/lib/ingress/staging -name "*.tmp" -delete
+```
+
+The next poll run will re-download any files that were only partially downloaded.
+
+**Step 5: Restart the timer**
+
+```bash
+systemctl start nightfall-photo-ingress.timer
+```
+
+The next triggered poll will re-enumerate the delta from the last committed cursor position. Because all registry writes are idempotent, any files already recorded as `pending` will be recognized as known and will not be re-ingested.
+
+**Note on working state path:** Inside the deployed LXC container, the working state directory is `/var/lib/ingress/`. This is the correct path for staging, tokens, cursors, and the registry database. The configuration example (`conf/photo-ingress.conf.example`) uses `/mnt/ssd/photo-ingress/` as a host-relative path example — that applies only to non-containerized deployments.
 - the status file is created and parseable inside the container
