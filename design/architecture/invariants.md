@@ -1,7 +1,7 @@
 # System Invariants Catalogue
 
 **Status:** active  
-**Sources:** `design/domain/constraints.md`, `design/domain-architecture-overview.md` §3 and §5, `design/ingest-lifecycle-and-crash-recovery.md`, `design/specs/registry.md`, `design/architecture/lifecycle.md`  
+**Sources:** `design/domain/constraints.md`, `design/domain-architecture-overview.md` §3 and §5, `design/architecture/ingest-lifecycle-and-crash-recovery.md`, `design/specs/registry.md`, `design/architecture/lifecycle.md`  
 **See also:** [domain/constraints.md](../domain/constraints.md), [specs/registry.md](../specs/registry.md)
 
 ---
@@ -32,7 +32,7 @@ enforcement mechanism, and a traceable source citation.
 
 | ID | Invariant | Scope | Enforcement | Source |
 |---|---|---|---|---|
-| INV-R01 | SHA-256 is the canonical content identity — never a filename, path, or advisory SHA1 | `files` table | `sha256 TEXT PRIMARY KEY`; advisory SHA1 entries from `external_hash_cache` are never promoted to canonical status without a verified server-side SHA-256 | `design/domain-architecture-overview.md` §5; `design/ingest-lifecycle-and-crash-recovery.md` §10.3 |
+| INV-R01 | SHA-256 is the canonical content identity — never a filename, path, or advisory SHA1 | `files` table | `sha256 TEXT PRIMARY KEY`; advisory SHA1 entries from `external_hash_cache` are never promoted to canonical status without a verified server-side SHA-256 | `design/domain-architecture-overview.md` §5; `design/architecture/ingest-lifecycle-and-crash-recovery.md` §10.3 |
 | INV-R02 | `files.status` is constrained to `('pending', 'accepted', 'rejected', 'purged')` | `files` table | `CHECK (status IN ('pending', 'accepted', 'rejected', 'purged'))` SQLite constraint | `design/domain-architecture-overview.md` §5 |
 | INV-R03 | A file in `rejected` status cannot be re-accepted — there is no `rejected → accepted` transition | `files.status` | `accept` CLI requires current status `pending`; `rejected` files are never re-entered into the pending queue | `design/domain-architecture-overview.md` §3 ("Reject-once, reject-forever") |
 | INV-R04 | A rejected SHA-256 encountered again on any future poll is silently discarded with a `rejected_duplicate` audit record — never re-downloaded | `domain/ingest.py` | Registry lookup before every staging write; `rejected` hit deletes staged file and appends audit record | `design/domain-architecture-overview.md` §6.1 |
@@ -62,7 +62,7 @@ enforcement mechanism, and a traceable source citation.
 | ID | Invariant | Scope | Enforcement | Source |
 |---|---|---|---|---|
 | INV-ST01 | Downloaded files are named `{onedrive_id}.tmp` during transfer and renamed to `{onedrive_id}.{ext}` on completion — a final filename is never assigned until the download is complete | `adapters/onedrive/client.py` | `.tmp`-suffix convention; rename called only after successful response consumption | `design/domain-architecture-overview.md` §5 ("Resilient to restarts") |
-| INV-ST02 | Zero-byte files are never silently discarded — they are processed, quarantined, or explicitly rejected per `zero_byte_policy` with an audit record in every case | `domain/ingest.py` | `zero_byte_policy` branch always produces a classified `IngestOutcome`; quarantine and reject paths both write audit records | `design/ingest-lifecycle-and-crash-recovery.md` §7 |
+| INV-ST02 | Zero-byte files are never silently discarded — they are processed, quarantined, or explicitly rejected per `zero_byte_policy` with an audit record in every case | `domain/ingest.py` | `zero_byte_policy` branch always produces a classified `IngestOutcome`; quarantine and reject paths both write audit records | `design/architecture/ingest-lifecycle-and-crash-recovery.md` §7 |
 | INV-ST03 | Cursor is advanced only after all ingest side effects for the current page are durably committed to the registry — never before | `adapters/onedrive/client.py` | Page-commit sequence: fetch one page → evaluate → commit registry/storage → advance `nextLink` cursor | `design/domain-architecture-overview.md` §6.1, §6.1.1 |
 | INV-ST04 | Metadata pre-filter hits (known `(account_name, onedrive_id, size, modified_time)`) never trigger a download — they produce a `discard` outcome with an audit record | `domain/ingest.py` | Pre-filter path returns before any staging write; audit entry records the skip | `design/domain-architecture-overview.md` §6.1 step 3a |
 
@@ -95,7 +95,7 @@ enforcement mechanism, and a traceable source citation.
 | ID | Invariant | Scope | Enforcement | Source |
 |---|---|---|---|---|
 | INV-P01 | At most one poll run executes concurrently across CLI and timer paths | `runtime/process_lock.py` | `fcntl` non-blocking advisory file lock acquired before poll start; a locked state causes an immediate logged abort | `design/domain-architecture-overview.md` §7 ("Concurrent poll runs") |
-| INV-P02 | The lifecycle journal is cleared only after `replay_interrupted_operations()` completes successfully — if a crash occurs during replay, the journal is not cleared and replay repeats on next startup | `domain/journal.py` | `clear()` (`os.unlink`) is called at the end of the replay method, after all recovery actions | `design/ingest-lifecycle-and-crash-recovery.md` §5.4 |
+| INV-P02 | The lifecycle journal is cleared only after `replay_interrupted_operations()` completes successfully — if a crash occurs during replay, the journal is not cleared and replay repeats on next startup | `domain/journal.py` | `clear()` (`os.unlink`) is called at the end of the replay method, after all recovery actions | `design/architecture/ingest-lifecycle-and-crash-recovery.md` §5.4 |
 | INV-P03 | The domain layer never imports from `adapters/` — dependency direction is one-way: adapters depend on domain, not vice versa | all modules | Import discipline; CI runs domain unit tests in an environment that has no MSAL or httpx installed | `ARCHITECTURE.md`; DEC-20260403-02 |
 | INV-P04 | Auth failures are counted per poll run; after ≥3 consecutive failures the run is stopped and a status snapshot with `state = "auth_failed"` is written | `adapters/onedrive/auth.py`, `status.py` | `auth_failure_threshold` config key governs the limit; counter is not persisted across runs | `design/domain-architecture-overview.md` §15 ("Auth resilience threshold") |
 

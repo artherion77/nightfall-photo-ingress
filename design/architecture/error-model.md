@@ -2,8 +2,8 @@
 
 **Status:** active — overview  
 **Source:** extracted from `design/domain-architecture-overview.md` §15  
-**Full specification:** [design/error-taxonomy-and-resilience.md](../error-taxonomy-and-resilience.md) — complete exception hierarchy, GhostItemError, `as_log_dict()` contract, and implementation detail  
-**See also:** [architecture/observability.md](observability.md), [architecture/lifecycle.md](lifecycle.md)
+**Full specification:** [error-taxonomy-and-resilience.md](error-taxonomy-and-resilience.md) — complete exception hierarchy, GhostItemError, `as_log_dict()` contract, and implementation detail  
+**See also:** [observability-overview.md](observability-overview.md), [lifecycle.md](lifecycle.md)
 
 ---
 

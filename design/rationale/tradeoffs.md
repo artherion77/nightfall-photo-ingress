@@ -96,7 +96,7 @@ The tradeoff this design accepts:
 This pattern was specifically chosen to avoid the tight coupling of the pre-refactor
 monolithic layout, where OneDrive specifics were entangled with domain policy.
 
-ADL reference: DEC-20260403-02 in `design/architecture-decision-log.md`.
+ADL reference: DEC-20260403-02 in `design/rationale/architecture-decision-log.md`.
 
 ---
 
@@ -132,4 +132,4 @@ ADL reference: DEC-20260403-02 (process model context); deployment model describ
 ---
 
 *For full system constraints, see [domain/constraints.md](../domain/constraints.md).*  
-*For architecture decision log, see [architecture-decision-log.md](../architecture-decision-log.md).*
+*For architecture decision log, see [architecture-decision-log.md](architecture-decision-log.md).*

@@ -2,7 +2,7 @@
 
 **Status:** active  
 **Sources:** `design/superseeded/v1-lifecycle-baseline-superseded.md`, `design/superseeded/web-control-plane-initial-extension-superseded.md`  
-**See also:** [tradeoffs.md](tradeoffs.md), [design/architecture-decision-log.md](../architecture-decision-log.md)
+**See also:** [tradeoffs.md](tradeoffs.md), [architecture-decision-log.md](architecture-decision-log.md)
 
 ---
 
@@ -47,7 +47,7 @@ record per hash); V2 uses an autoincrement `id` primary key to support multiple
 acceptance event records per file.
 
 **Current design:** `design/specs/ingest.md`, `design/specs/accept.md`  
-**ADL reference:** DEC-20260402-01 in `design/architecture-decision-log.md`
+**ADL reference:** DEC-20260402-01 in `design/rationale/architecture-decision-log.md`
 
 ---
 
@@ -64,7 +64,7 @@ form for operator ergonomics. The V1 CLI name is no longer valid for any invocat
 example in documentation or operator tooling.
 
 **Current naming:** `design/domain/glossary.md` §"Canonical Naming Conventions"  
-**ADL reference:** DEC-20260403-01 in `design/architecture-decision-log.md`
+**ADL reference:** DEC-20260403-01 in `design/rationale/architecture-decision-log.md`
 
 ---
 
@@ -87,7 +87,7 @@ There is no migration path from V1 to V2. Deployments must bootstrap a fresh
 `registry.db` using `domain/registry.py`'s `initialize()` at schema version 2.
 
 **Current schema:** `design/specs/registry.md`  
-**ADL reference:** DEC-20260402-01 in `design/architecture-decision-log.md`
+**ADL reference:** DEC-20260402-01 in `design/rationale/architecture-decision-log.md`
 
 ---
 
@@ -114,5 +114,5 @@ carried forward unchanged in both replacement documents.
 
 ---
 
-*For architecture evolution context, see [tradeoffs.md](tradeoffs.md) and [design/architecture-decision-log.md](../architecture-decision-log.md).*  
+*For architecture evolution context, see [tradeoffs.md](tradeoffs.md) and [architecture-decision-log.md](architecture-decision-log.md).*  
 *For the V2 current design, see [design/domain-architecture-overview.md](../domain-architecture-overview.md) (navigation index).*

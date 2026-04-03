@@ -15,10 +15,10 @@ For the operator-facing procedures (app registration steps, device-code flow, an
 registered instance record), see `docs/app-registration-design.md`.
 
 For the error hierarchy, retry policy, and resilience design, see
-`design/error-taxonomy-and-resilience.md`.
+`design/architecture/error-taxonomy-and-resilience.md`.
 
 For diagnostic counters and observability fields emitted by the auth client, see
-`design/observability.md`.
+`design/architecture/observability.md`.
 
 ---
 
@@ -154,7 +154,7 @@ See `design/domain-architecture-overview.md` §11 for the full config key refere
 
 - `src/nightfall_photo_ingress/adapters/onedrive/auth.py` — MSAL integration
 - `src/nightfall_photo_ingress/adapters/onedrive/cache_lock.py` — singleton lock
-- `design/error-taxonomy-and-resilience.md` — `AuthError` hierarchy and resilience
-- `design/observability.md` — auth diagnostic counter keys
+- `design/architecture/error-taxonomy-and-resilience.md` — `AuthError` hierarchy and resilience
+- `design/architecture/observability.md` — auth diagnostic counter keys
 - `design/domain-architecture-overview.md` §13 — error taxonomy summary
 - `docs/app-registration-design.md` — operator procedures (app registration, bootstrap)
