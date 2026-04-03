@@ -217,7 +217,7 @@ PHASE 0 (this document) → STOP, await user approval
     ↓
 CHUNK A (state-machine.md) ✅ COMPLETE → commit fa18fe6 + state-machine spec
     ↓
-CHUNK B (live-photo-pair-lifecycle.md) ✅ COMPLETE → commit TBD + live-photo-pair-lifecycle spec
+CHUNK B (live-photo-pair-lifecycle.md) ✅ COMPLETE → commit ac89d15 + live-photo-pair-lifecycle spec
     ↓
 CHUNK C (schema-and-migrations.md) → STOP, await user review and steering
 ```
