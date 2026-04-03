@@ -1,6 +1,6 @@
 <script>
-  export let error;
+  import { page } from '$app/stores';
 </script>
 
 <h1>Something went wrong</h1>
-<p>{error?.message ?? 'Unknown error'}</p>
+<p>{$page.error?.message ?? 'Unknown error'}</p>

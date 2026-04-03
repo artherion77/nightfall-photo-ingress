@@ -1,3 +1,5 @@
+import { PUBLIC_API_TOKEN } from '$env/static/public';
+
 export class ApiError extends Error {
   status: number;
   details: unknown;
@@ -10,7 +12,7 @@ export class ApiError extends Error {
   }
 }
 
-const API_TOKEN = import.meta.env.PUBLIC_API_TOKEN;
+const API_TOKEN = PUBLIC_API_TOKEN;
 
 export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   try {

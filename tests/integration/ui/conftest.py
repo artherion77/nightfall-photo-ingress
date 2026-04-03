@@ -5,9 +5,6 @@ from pathlib import Path
 import pytest
 
 
-pytest_plugins = ["tests.integration.api.conftest"]
-
-
 @pytest.fixture
 def spa_build_stub() -> None:
     build_dir = Path(__file__).resolve().parents[3] / "webui" / "build"

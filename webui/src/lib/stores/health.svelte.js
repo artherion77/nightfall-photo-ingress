@@ -1,4 +1,5 @@
 import { writable } from 'svelte/store';
+import { PUBLIC_API_TOKEN } from '$env/static/public';
 
 const initialState = {
   polling_ok: { ok: false, message: 'unknown' },
@@ -16,7 +17,7 @@ async function fetchHealth() {
   try {
     const response = await fetch('/api/v1/health', {
       headers: {
-        'Authorization': `Bearer ${import.meta.env.PUBLIC_API_TOKEN}`
+        'Authorization': `Bearer ${PUBLIC_API_TOKEN}`
       }
     });
 
