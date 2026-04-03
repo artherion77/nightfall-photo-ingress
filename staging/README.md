@@ -11,6 +11,8 @@ The subsystem is intentionally minimal and non-invasive:
 - does not modify host network definitions
 - does not modify host Python, host systemd, or host packages
 - keeps rollback deterministic via snapshot `clean`
+- installs web control-plane runtime dependencies (`.[web]`) only inside the
+  container venv (`/opt/ingress`), never as host-level dev packages
 
 ## Launch contract and profiles
 
@@ -70,8 +72,8 @@ These mounts are recreated by `create` and naturally reset by snapshot restore.
   creates container, runs setup, mounts storage and tmpfs boundaries, installs units,
   and creates snapshot `clean`
 - `stagingctl install [wheel]`
-  pushes wheel and config into container, installs in `/opt/ingress` venv,
-  enables timer and trash path units
+  pushes wheel and config into container, installs in `/opt/ingress` venv with
+  web extras (`[web]`), enables timer and trash path units
 - `stagingctl auth-setup`
   runs `nightfall-photo-ingress auth-setup` interactively inside the container
   via TTY pass-through; the operator completes the Entra device-code flow in a browser.

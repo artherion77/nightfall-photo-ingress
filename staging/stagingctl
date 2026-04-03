@@ -264,9 +264,9 @@ for line in config_path.read_text(encoding='utf-8').splitlines():
     lxc exec "$CONTAINER" -- mkdir -p /etc/nightfall
     lxc file push "$tmp_conf" "$CONTAINER$CONF_DEST"
 
-    _info "Running pip install ..."
+    _info "Running pip install (base + web extras) in container venv ..."
     lxc exec "$CONTAINER" -- \
-        "$VENV_ROOT/bin/pip" install --quiet --upgrade --force-reinstall "$CT_TMP_DIR/$whl_name"
+        "$VENV_ROOT/bin/pip" install --quiet --upgrade --force-reinstall "$CT_TMP_DIR/$whl_name[web]"
 
     # Push existing token cache if provided (DEPRECATED: use 'stagingctl auth-setup' instead)
     if [[ -n "${STAGING_TOKEN_JSON:-}" && -f "$STAGING_TOKEN_JSON" ]]; then
