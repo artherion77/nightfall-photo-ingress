@@ -436,3 +436,42 @@ Field notes:
   - `src/nightfall_photo_ingress/adapters/onedrive/cache_lock.py`
   - `src/nightfall_photo_ingress/runtime/process_lock.py`
   - `design/domain-architecture-overview.md` (§7 Process Model and Concurrency)
+
+## DEC-20260403-06: Separate development container lifecycle from staging
+- Status: accepted
+- Date (UTC): 2026-04-03 00:00:00 UTC
+- Scope: other
+- Decision:
+  - Adopt a dedicated development container named `dev-photo-ingress`.
+  - Keep staging container (`staging-photo-ingress`) focused on release-rehearsal
+    validation (wheel-first install, smoke/live checks, evidence).
+  - Prefer separate command surfaces for dev and staging lifecycle management,
+    while sharing common orchestration helpers to avoid duplicated shell logic.
+- Rationale:
+  - Staging should remain policy-constrained and production-like; frontend dev
+    toolchain churn (Node/npm, Vite, hot reload) increases drift risk.
+  - A dedicated dev container allows fast iteration without forcing host-level
+    Node/npm installation.
+  - Distinct tools improve operator clarity: staging commands are operational
+    contracts, dev commands are iterative workflows.
+- Alternatives Considered:
+  - Continue hosting web UI development in staging.
+  - Keep a single controller (`stagingctl`) for both staging and dev workflows.
+- Consequences:
+  - Documentation now separates environment responsibilities across dev, staging,
+    and production.
+  - A new dev lifecycle controller is expected (proposed `dev/devctl`).
+  - Shared helper extraction is required to prevent maintenance duplication between
+    controllers.
+- Implementation Notes:
+  - Target-state docs: `design/architecture/environment-separation-and-container-lifecycle.md`
+    and `docs/deployment/dev-container-workflow.md`.
+  - Command implementation is deferred; this decision records the architecture
+    boundary and migration direction first.
+- Supersedes:
+  - none
+- References:
+  - `design/architecture/environment-separation-and-container-lifecycle.md`
+  - `docs/deployment/dev-container-workflow.md`
+  - `staging/README.md`
+  - `docs/deployment/environment-setup.md`

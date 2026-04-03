@@ -99,6 +99,7 @@ fresh Immich rebuild has no effect on ingress state.
 | Topic | Document |
 |---|---|
 | End-to-end pipeline diagram | [design/architecture/data-flow.md](design/architecture/data-flow.md) |
+| Environment separation and container lifecycle | [design/architecture/environment-separation-and-container-lifecycle.md](design/architecture/environment-separation-and-container-lifecycle.md) |
 | File status state machine | [design/architecture/state-machine.md](design/architecture/state-machine.md) |
 | Ingest lifecycle and crash recovery — overview | [design/architecture/lifecycle.md](design/architecture/lifecycle.md) |
 | Ingest lifecycle — full specification | [design/architecture/ingest-lifecycle-and-crash-recovery.md](design/architecture/ingest-lifecycle-and-crash-recovery.md) |

@@ -1,0 +1,172 @@
+#!/usr/bin/env bash
+# devctl — Development container controller for nightfall-photo-ingress.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+source "$PROJECT_ROOT/lib/container-common.sh"
+
+CONTAINER="dev-photo-ingress"
+PROFILE_DEFAULT="default"
+PROFILE_DEV="staging"
+DEV_TMP_DIR="/root/dev-photo-ingress-tmp"
+DEV_WEBUI_ROOT="/opt/nightfall-webui"
+DEV_VENV_ROOT="/opt/ingress"
+DEV_WEBUI_PORT="${DEV_WEBUI_PORT:-5173}"
+DEV_WEBUI_PROXY_DEVICE="dev-webui-proxy"
+
+_info() { nf_log_info "devctl" "$*"; }
+_ok() { nf_log_ok "devctl" "$*"; }
+_warn() { nf_log_warn "devctl" "$*"; }
+_fail() { nf_log_fail "devctl" "$*"; }
+
+cmd_create() {
+    if lxc info "$CONTAINER" &>/dev/null; then
+        _fail "Container '$CONTAINER' already exists. Run: devctl destroy"
+    fi
+
+    _info "Launching container $CONTAINER (ubuntu:24.04, profiles: $PROFILE_DEFAULT+$PROFILE_DEV) ..."
+    lxc launch ubuntu:24.04 "$CONTAINER" -p "$PROFILE_DEFAULT" -p "$PROFILE_DEV"
+
+    _info "Waiting for container readiness ..."
+    local i=0
+    while ! lxc exec "$CONTAINER" -- systemctl is-system-running --quiet 2>/dev/null; do
+        sleep 2
+        i=$((i + 2))
+        [[ $i -lt 40 ]] || _fail "Container did not become ready within 40 s."
+    done
+
+    _ok "Development container created."
+}
+
+cmd_destroy() {
+    _info "Deleting container $CONTAINER ..."
+    lxc delete --force "$CONTAINER" 2>/dev/null || true
+    _ok "Development container deleted."
+}
+
+cmd_reset() {
+    nf_require_container_running "$CONTAINER" "devctl create" "devctl"
+    _warn "Reset scaffold is not implemented yet. Recreate container with: devctl destroy && devctl create"
+}
+
+cmd_bootstrap_python() {
+    nf_require_container_running "$CONTAINER" "devctl create" "devctl"
+
+    _info "Installing Python toolchain in container ..."
+    lxc exec "$CONTAINER" -- bash -lc '
+set -euo pipefail
+apt-get update -qq
+apt-get install -y --no-install-recommends python3 python3-pip python3-venv
+python3 -m venv /opt/ingress
+/opt/ingress/bin/pip install --quiet --upgrade pip
+'
+
+    _ok "Python bootstrap completed in $DEV_VENV_ROOT."
+}
+
+cmd_bootstrap_webui() {
+    nf_require_container_running "$CONTAINER" "devctl create" "devctl"
+
+    _info "Installing Node/npm toolchain in container ..."
+    lxc exec "$CONTAINER" -- bash -lc '
+set -euo pipefail
+apt-get update -qq
+apt-get install -y --no-install-recommends nodejs npm
+'
+
+    _ok "Web UI toolchain bootstrap completed."
+}
+
+_sync_webui_sources() {
+    lxc exec "$CONTAINER" -- mkdir -p "$DEV_WEBUI_ROOT"
+    tar -C "$PROJECT_ROOT" \
+        --exclude='webui/node_modules' \
+        --exclude='webui/.svelte-kit' \
+        --exclude='webui/build' \
+        -czf - webui \
+        | lxc exec "$CONTAINER" -- tar -xzf - -C "$DEV_WEBUI_ROOT" --strip-components=1
+}
+
+cmd_run_webui() {
+    nf_require_container_running "$CONTAINER" "devctl create" "devctl"
+
+    _sync_webui_sources
+
+    _info "Configuring host loopback proxy for Vite: 127.0.0.1:$DEV_WEBUI_PORT"
+    lxc config device remove "$CONTAINER" "$DEV_WEBUI_PROXY_DEVICE" >/dev/null 2>&1 || true
+    lxc config device add "$CONTAINER" "$DEV_WEBUI_PROXY_DEVICE" proxy \
+        listen="tcp:127.0.0.1:$DEV_WEBUI_PORT" \
+        connect="tcp:127.0.0.1:$DEV_WEBUI_PORT"
+
+    _ok "Dev web UI URL: http://127.0.0.1:$DEV_WEBUI_PORT/"
+    _info "Starting Vite dev server in container (Ctrl+C to stop)."
+
+    lxc exec -t "$CONTAINER" -- bash -lc "
+set -euo pipefail
+cd '$DEV_WEBUI_ROOT'
+npm install
+npx svelte-kit sync
+npm run dev -- --host 0.0.0.0 --port '$DEV_WEBUI_PORT'
+"
+}
+
+cmd_run_api() {
+    nf_require_container_running "$CONTAINER" "devctl create" "devctl"
+    _warn "API run scaffold is not implemented yet. Bootstrap Python first, then run nightfall-photo-ingress commands in devctl shell."
+}
+
+cmd_status() {
+    if lxc info "$CONTAINER" &>/dev/null; then
+        lxc info "$CONTAINER"
+    else
+        _warn "Container '$CONTAINER' does not exist."
+    fi
+}
+
+cmd_shell() {
+    nf_require_container_running "$CONTAINER" "devctl create" "devctl"
+    lxc exec -t "$CONTAINER" -- bash
+}
+
+_usage() {
+    cat <<EOF
+Usage: $(basename "$0") <command>
+
+Commands:
+  create              Create development container ($CONTAINER).
+  destroy             Delete development container.
+  reset               Reset scaffold (currently suggests recreate).
+  bootstrap-python    Install Python toolchain + venv in development container.
+  bootstrap-webui     Install Node/npm in development container.
+  run-api             API run scaffold (placeholder for upcoming implementation).
+  run-webui           Sync webui source and run Vite dev server in container.
+  status              Show container status.
+  shell               Open interactive shell in development container.
+
+Environment variables:
+  DEV_WEBUI_PORT      Host/container port for Vite dev server (default: 5173).
+EOF
+    exit 1
+}
+
+main() {
+    local cmd="${1:-}"
+    shift || true
+
+    case "$cmd" in
+        create) cmd_create "$@" ;;
+        destroy) cmd_destroy "$@" ;;
+        reset) cmd_reset "$@" ;;
+        bootstrap-python) cmd_bootstrap_python "$@" ;;
+        bootstrap-webui) cmd_bootstrap_webui "$@" ;;
+        run-api) cmd_run_api "$@" ;;
+        run-webui) cmd_run_webui "$@" ;;
+        status) cmd_status "$@" ;;
+        shell) cmd_shell "$@" ;;
+        *) _usage ;;
+    esac
+}
+
+main "$@"

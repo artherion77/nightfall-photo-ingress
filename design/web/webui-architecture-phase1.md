@@ -376,6 +376,9 @@ store actions) handle loading states by:
 
 - Dev proxy: `/api` → `http://localhost:8000/api` for local development.
 - No special asset handling beyond defaults (Svelte/Vite handles CSS and image imports).
+- Planned containerized dev workflow: run Vite in dedicated development container
+  `dev-photo-ingress` (see `docs/deployment/dev-container-workflow.md`). Staging remains
+  focused on release validation and smoke/live operator checks.
 
 ### 8.3 `app.html`
 

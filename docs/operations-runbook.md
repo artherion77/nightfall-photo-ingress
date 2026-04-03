@@ -16,6 +16,7 @@
 | Failure handling, recovery, troubleshooting | [docs/operator/troubleshooting.md](operator/troubleshooting.md) |
 | Install, runtime layout, environment setup | [docs/deployment/environment-setup.md](deployment/environment-setup.md) |
 | Staging flows (P2 auth, P3 live poll, smoke tests) | [docs/operator/maintenance.md](operator/maintenance.md) |
+| Development container lifecycle and scaffold | [docs/deployment/dev-container-workflow.md](deployment/dev-container-workflow.md) |
 
 ---
 

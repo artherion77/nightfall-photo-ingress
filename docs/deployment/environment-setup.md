@@ -2,7 +2,7 @@
 
 **Status:** active  
 **Source:** extracted from `docs/operations-runbook.md` §Runtime layout, §Packaged units, §Install and uninstall  
-**See also:** [docs/operator/cli-guide.md](../operator/cli-guide.md), [design/architecture/storage-topology.md](../../design/architecture/storage-topology.md)
+**See also:** [docs/operator/cli-guide.md](../operator/cli-guide.md), [design/architecture/storage-topology.md](../../design/architecture/storage-topology.md), [dev-container-workflow.md](dev-container-workflow.md)
 
 ---
 
@@ -16,6 +16,19 @@
 | journald | Structured log output from systemd units and file outputs if configured |
 
 > **Note on paths:** The `conf/photo-ingress.conf.example` uses `/mnt/ssd/photo-ingress/` as a host-relative path example. Inside the deployed LXC container, the working state directory is `/var/lib/ingress/`. Use the container path in production config.
+
+---
+
+## Environment Profiles
+
+| Environment | Container | Intent | Toolchain policy |
+|---|---|---|---|
+| Development | `dev-photo-ingress` | rapid iteration, debug loops, web UI development | may include Node/npm and editable installs |
+| Staging | `staging-photo-ingress` | release rehearsal and smoke/live validation | wheel-first validation; avoid dev-only assumptions |
+| Production | `photo-ingress` (default) | stable unattended runtime | minimal runtime dependencies only |
+
+For planned development-container lifecycle details, see
+[dev-container-workflow.md](dev-container-workflow.md).
 
 ---
 
@@ -119,4 +132,5 @@ For full storage topology details, see [design/architecture/storage-topology.md]
 ---
 
 *For CLI setup (Entra app registration, auth-setup), see [docs/operator/cli-guide.md](../operator/cli-guide.md).*  
-*For staging environment validation, see [docs/operator/maintenance.md](../operator/maintenance.md).*
+*For staging environment validation, see [docs/operator/maintenance.md](../operator/maintenance.md).*  
+*For development-container lifecycle, see [dev-container-workflow.md](dev-container-workflow.md).*

@@ -21,6 +21,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+source "$PROJECT_ROOT/lib/container-common.sh"
 
 # ── container identity ────────────────────────────────────────────────────────
 CONTAINER="staging-photo-ingress"
@@ -57,10 +58,10 @@ fi
 # Helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
-_info()  { printf '\033[0;34m[stagingctl]\033[0m %s\n' "$*"; }
-_ok()    { printf '\033[0;32m[stagingctl] OK:\033[0m %s\n' "$*"; }
-_warn()  { printf '\033[0;33m[stagingctl] WARN:\033[0m %s\n' "$*" >&2; }
-_fail()  { printf '\033[0;31m[stagingctl] FAIL:\033[0m %s\n' "$*" >&2; exit 1; }
+_info()  { nf_log_info "stagingctl" "$*"; }
+_ok()    { nf_log_ok "stagingctl" "$*"; }
+_warn()  { nf_log_warn "stagingctl" "$*"; }
+_fail()  { nf_log_fail "stagingctl" "$*"; }
 
 _resolve_tmpfs_host_base() {
     if [[ -n "${STAGING_TMPFS_BASE:-}" ]]; then
@@ -77,19 +78,11 @@ _resolve_tmpfs_host_base() {
 }
 
 _require_container_running() {
-    if lxc info "$CONTAINER" 2>/dev/null | grep -Eiq "Status:[[:space:]]+running"; then
-        return
-    fi
-
-    local state=""
-    state="$(lxc list "$CONTAINER" -c s --format csv 2>/dev/null | head -n 1 | tr '[:upper:]' '[:lower:]')"
-    [[ "$state" == "running" ]] \
-        || _fail "Container '$CONTAINER' is not running. Run: stagingctl create && stagingctl install"
+    nf_require_container_running "$CONTAINER" "stagingctl create && stagingctl install" "stagingctl"
 }
 
 _require_container_exists() {
-    lxc info "$CONTAINER" &>/dev/null \
-        || _fail "Container '$CONTAINER' does not exist. Run: stagingctl create"
+    nf_require_container_exists "$CONTAINER" "stagingctl create" "stagingctl"
 }
 
 _validate_network_policy() {

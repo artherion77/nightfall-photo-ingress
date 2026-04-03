@@ -14,6 +14,7 @@ is the complete specification. All other topics are covered by a single file.
 | File | Status | What it covers |
 |---|---|---|
 | [data-flow.md](data-flow.md) | active | High-level pipeline diagram from iOS → OneDrive → staging → queue; stage-by-stage descriptions |
+| [environment-separation-and-container-lifecycle.md](environment-separation-and-container-lifecycle.md) | proposed | Development vs staging vs production container boundaries, lifecycle contracts, and migration plan (`dev-photo-ingress`) |
 | [error-taxonomy-and-resilience.md](error-taxonomy-and-resilience.md) | active | Exception hierarchy, `as_log_dict()` contract, URL/token redaction policy, retry backoff, auth resilience, delta resync circuit-breakers, throughput bounds, edge case mitigations |
 | [invariants.md](invariants.md) | active | Catalogue of 28 system invariants grouped by category (registry, storage, staging, audit log, configuration, process model); each with enforcement mechanism and source citation |
 | [ingest-lifecycle-and-crash-recovery.md](ingest-lifecycle-and-crash-recovery.md) | active | **Full spec:** complete IngestOperationJournal JSONL format, phase sequence, recovery action detail, StagingDriftReport classification, zero-byte policy |
@@ -35,6 +36,7 @@ For a first read, start with the overview sequence:
 4. [invariants.md](invariants.md) — understand system guarantees
 
 For implementation or debugging:
+- Environment boundaries: [environment-separation-and-container-lifecycle.md](environment-separation-and-container-lifecycle.md)
 - Error handling: [error-taxonomy-and-resilience.md](error-taxonomy-and-resilience.md)
 - Crash recovery: [lifecycle.md](lifecycle.md) → [ingest-lifecycle-and-crash-recovery.md](ingest-lifecycle-and-crash-recovery.md)
 - Observability: [observability.md](observability.md)

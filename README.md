@@ -16,9 +16,9 @@ explicitly purged.
 ## Use cases
 
 - Automated ingestion from OneDrive Camera Roll into a ZFS-backed media server
-- Operator-reviewed accept / reject workflow before files enter Immich
+- Operator-reviewed accept / reject workflow before files enter a local [Immich](https://immich.app/) installation.
 - SHA-256 based deduplication across multiple OneDrive accounts
-- Crash-safe, resumable delta polling with structured observability
+- Crash-safe, resumable Microsoft Graph API delta polling with structured observability
 
 ---
 
@@ -78,6 +78,14 @@ pytest tests/integration/api/        # isolated web control plane ASGI/API tests
 pytest -m robustness                 # resilience regression suite only
 ```
 
+### Development container workflow
+
+An initial scaffold now exists for a dedicated development container named
+`dev-photo-ingress`, separate from staging. See
+`docs/deployment/dev-container-workflow.md` and
+`design/architecture/environment-separation-and-container-lifecycle.md` for the
+lifecycle and command surface.
+
 ### Test environment boundaries
 
 - `tests/unit/` and `tests/integration/` are intended to run in a normal local development environment.
@@ -123,6 +131,8 @@ nightfall-photo-ingress/
 |---|---|
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Module structure, key architectural properties, design doc index |
 | [docs/operations-runbook.md](docs/operations-runbook.md) | Installation, configuration, day-to-day operator procedures |
+| [staging/README.md](staging/README.md) | Staging container lifecycle and smoke contracts |
+| [docs/deployment/dev-container-workflow.md](docs/deployment/dev-container-workflow.md) | Development container workflow and initial `devctl` scaffold (`dev-photo-ingress`) |
 | [design/architecture/data-flow.md](design/architecture/data-flow.md) | End-to-end pipeline diagram and stage descriptions |
 | [design/domain/domain-model.md](design/domain/domain-model.md) | Domain entities, bounded context, module responsibilities |
 | [design/README.md](design/README.md) | Full design documentation index |

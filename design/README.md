@@ -61,7 +61,8 @@ Three files remain directly in `design/`. All other content has been moved into 
 1. [architecture/lifecycle.md](architecture/lifecycle.md) + [architecture/ingest-lifecycle-and-crash-recovery.md](architecture/ingest-lifecycle-and-crash-recovery.md) — crash recovery detail
 2. [specs/registry.md](specs/registry.md) — full SQLite schema
 3. [architecture/error-taxonomy-and-resilience.md](architecture/error-taxonomy-and-resilience.md) — error taxonomy, retry policy, resilience
-4. [rationale/architecture-decision-log.md](rationale/architecture-decision-log.md) — why decisions were made
+4. [architecture/environment-separation-and-container-lifecycle.md](architecture/environment-separation-and-container-lifecycle.md) — dev/staging/prod container boundaries and lifecycle contracts
+5. [rationale/architecture-decision-log.md](rationale/architecture-decision-log.md) — why decisions were made
 
 **Web control plane:**
 1. [web/](web/) — Phase 1–3 architecture and component specs

@@ -120,5 +120,16 @@ Smoke checks validate:
 
 ---
 
+## Development Container Boundary
+
+Staging validation intentionally remains focused on wheel-based release rehearsal.
+Web UI development workflows are defined separately under the proposed dev
+container model (`dev-photo-ingress`).
+
+See [docs/deployment/dev-container-workflow.md](../deployment/dev-container-workflow.md)
+for the design and planned command surface.
+
+---
+
 *For failure handling during staging, see [troubleshooting.md](troubleshooting.md).*  
 *For install and container setup, see [deployment/environment-setup.md](../deployment/environment-setup.md).*

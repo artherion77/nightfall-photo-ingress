@@ -114,6 +114,13 @@ completion, the token cache and identity sidecar are verified automatically.
 After `stagingctl reset`, auth state is cleared (the snapshot was taken before
 `install`). Re-run `auth-setup` to re-authenticate.
 
+## Development boundary
+
+Staging is intentionally a release-validation environment. Web UI development
+tooling belongs to the dedicated development container model (`dev-photo-ingress`)
+defined in `docs/deployment/dev-container-workflow.md` and
+`design/architecture/environment-separation-and-container-lifecycle.md`.
+
 ## Evidence and smoke
 
 All smoke commands write run artifacts to `<host-evidence-base>/<run-id>/`:
