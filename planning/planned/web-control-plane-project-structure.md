@@ -84,22 +84,7 @@ nightfall-photo-ingress/
 │   └── vite.config.js
 │
 ├── design/                         # EXISTING + EXTENDED: architecture and UI specs
-│   ├── architecture.md
-│   ├── web-control-plane-architecture-extension.md
-│   ├── webui-architecture-phase1.md       # NEW
-│   ├── webui-design-tokens-phase1.md            # NEW
-│   ├── webui-component-mapping-phase1.md               # NEW
-│   └── ui-mocks/
-│       ├── Astronaut photo review interface.png
-│       └── Photo-ingress dashboard with KPIs and audit.png
-│
 ├── planning/                       # EXISTING + EXTENDED
-│   ├── iterative-implementation-roadmap.md
-│   ├── web-control-plane-integration-plan.md
-│   ├── techstack-decision.md       # NEW
-│   ├── project-structure.md        # NEW (this document)
-│   └── integration-plan.md         # NEW
-│
 ├── install/
 ├── systemd/
 ├── tests/
