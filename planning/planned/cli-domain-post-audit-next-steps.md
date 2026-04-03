@@ -1,8 +1,23 @@
 # photo-ingress Post-Audit Next Steps Plan
 
 Date: 2026-04-01
-Status: Proposed execution plan after roadmap drift correction
+Status: Partially executed — Gate 4 complete; Gates 1–3 open as of 2026-04-03
 Owner: Systems Engineering
+
+## Gate execution summary (as of 2026-04-03)
+
+| Gate | Description | Status |
+|------|-------------|--------|
+| 1 | Boundary fidelity M3→M4 | Open — `DownloadedHandoffCandidate` introduced but integration fixture refactoring tasks remain open |
+| 2 | Operator semantics + audit coherence | Open — `test_m3_m4_operator_semantics.py` exists; invariant assertions not yet complete |
+| 3 | Containerized staging environment | Open — no `deploy/compose/` stack created |
+| 4 | Module 5 Live Photo V1 | ✅ Complete — all roadmap checkboxes ticked; `live_photo.py`, `live_photo_pairs` migration, and tests present |
+
+Note: The original gate ordering (1 → 2 → 3 → 4) was not followed strictly. Module 5 was
+implemented before Gates 1–3 were formally closed. Gates 1–3 remain as hardening items before
+production use.
+
+---
 
 ## Objective
 
@@ -123,17 +138,17 @@ heuristics enforced and compatibility surface exposed.
 
 ### Concrete tasks
 
-- [ ] Add `live_photo_pairs` schema migration.
-- [ ] Implement pairing detector + deferred queue.
-- [ ] Enforce V1 default-only runtime values with explicit validation errors for others.
-- [ ] Ensure reject/accept propagation across pair members.
-- [ ] Add unit + integration tests from Module 5 roadmap section.
+- [x] Add `live_photo_pairs` schema migration.
+- [x] Implement pairing detector + deferred queue.
+- [x] Enforce V1 default-only runtime values with explicit validation errors for others.
+- [x] Ensure reject/accept propagation across pair members.
+- [x] Add unit + integration tests from Module 5 roadmap section.
 
 ### Exit criteria
 
-- [ ] Module 5 unit/integration tests are green.
-- [ ] Pair provenance visible in registry and audit output.
-- [ ] Rejected pair re-upload block behavior confirmed.
+- [x] Module 5 unit/integration tests are green.
+- [x] Pair provenance visible in registry and audit output.
+- [x] Rejected pair re-upload block behavior confirmed.
 
 ---
 

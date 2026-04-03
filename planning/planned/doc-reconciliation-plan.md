@@ -462,25 +462,25 @@ For each markdown file in `/design/`, `/planning/`, and `/docs/`:
 
 ## Execution Order and Stopping Points
 
-| Chunk | Description | Stop after? |
-|-------|-------------|-------------|
-| 1.1 | Promote domain-architecture-overview.md status + fix naming | Yes |
-| 1.2 | Update schema section | Yes |
-| 1.3 | Update file layout section | Yes |
-| 1.4 | Update config + pipeline sections | Yes |
-| 1.5 | Update phases section + add new design sections | Yes |
-| 2.1–2.4 | ADL additions (all four in one pass) | Yes |
-| 3.1 | New doc: ingest-lifecycle-and-crash-recovery | Yes |
-| 3.2 | New doc: error-taxonomy-and-resilience | Yes |
-| 3.3 | New doc: observability | Yes |
-| 4.1 | Planning: gate status update | Yes |
-| 4.2 | Planning: roadmap Modules 5–8 status update | Yes |
-| 4.3 | Planning: web control plane docs coherence | Yes |
-| 4.4 | Planning: v2 deferred backlog staleness | Yes |
-| 5.1 | Docs: operations-runbook validation + expansion | Yes |
-| 5.2 | Docs: app-registration-design reclassification | Yes |
-| 6.1 | Root ARCHITECTURE.md reference fixes | Yes |
-| 7.1–7.3 | Consistency validation sweep | Yes |
+| Chunk | Description | Stop after? | Status |
+|-------|-------------|-------------|--------|
+| 1.1 | Promote domain-architecture-overview.md status + fix naming | Yes | ✅ Done — 2026-04-03 |
+| 1.2 | Update schema section | Yes | ✅ Done — 2026-04-03 |
+| 1.3 | Update file layout section | Yes | ✅ Done — 2026-04-03 |
+| 1.4 | Update config + pipeline sections | Yes | ✅ Done — 2026-04-03 |
+| 1.5 | Update phases section + add new design sections | Yes | ✅ Done — 2026-04-03 |
+| 2.1–2.4 | ADL additions (all four in one pass) | Yes | ✅ Done — 2026-04-03 |
+| 3.1 | New doc: ingest-lifecycle-and-crash-recovery | Yes | ✅ Done — 2026-04-03 |
+| 3.2 | New doc: error-taxonomy-and-resilience | Yes | ✅ Done — 2026-04-03 |
+| 3.3 | New doc: observability | Yes | ✅ Done — 2026-04-03 |
+| 4.1 | Planning: gate status update | Yes | ✅ Done — 2026-04-03 |
+| 4.2 | Planning: roadmap Modules 5–8 status update | Yes | ✅ Done — 2026-04-03 |
+| 4.3 | Planning: web control plane docs coherence | Yes | ✅ Done — 2026-04-03 |
+| 4.4 | Planning: v2 deferred backlog staleness | Yes | ✅ Done — 2026-04-03 |
+| 5.1 | Docs: operations-runbook validation + expansion | Yes | |
+| 5.2 | Docs: app-registration-design reclassification | Yes | |
+| 6.1 | Root ARCHITECTURE.md reference fixes | Yes | |
+| 7.1–7.3 | Consistency validation sweep | Yes | |
 
 Total: 18 stopping-point chunks.
 

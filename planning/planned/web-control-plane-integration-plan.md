@@ -1,8 +1,24 @@
 # Integration Plan — Web Control Plane
 
-Status: Proposed
+Status: Proposed — Phase 0 not yet started as of 2026-04-03
 Date: 2026-04-03
 Owner: Systems Engineering
+
+## Implementation status (as of 2026-04-03)
+
+| Phase | Name | Status |
+|-------|------|--------|
+| 0 | Foundation | Not started — no `api/` or `webui/` directories exist |
+| 1 | Read-only API | Not started |
+| 2 | Read-only UI | Not started |
+| 3 | Triage write path | Not started |
+| 4 | Blocklist management | Not started |
+| 5 | Sidecar and metadata | Not started |
+| 6 | Hardening | Not started |
+| 7 | Reverse proxy | Not started |
+
+This plan was written to specify the full web control plane build-out. No implementation work
+has begun. All CLI and ingest pipeline functionality remains independent of this plan.
 
 ---
 

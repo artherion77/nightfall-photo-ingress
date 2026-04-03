@@ -2,6 +2,26 @@
 
 Status: deferred backlog
 Date: 2026-03-31
+Reviewed: 2026-04-03
+
+## Staleness review (2026-04-03)
+
+No items in this backlog have been silently implemented in V1. All items remain correctly
+deferred. Key observations:
+
+- **§3.1–3.2 Live Photo advanced features**: Module 5 (V1 Live Photo pairing) is now
+  implemented, but the items in this section (merge/export workflows, improved heuristics)
+  are genuinely V2-scope and remain deferred.
+- **§7.1 MCP exposure**: The `nightfall-mcp` project exists as a separate repository
+  providing MCP tools for system-operator diagnostics. Photo-ingress has not been wired
+  into this project. If ingest-domain MCP tools are needed, coordination with the
+  `nightfall-mcp` project is the implementation path rather than adding MCP tooling
+  directly to this package.
+- **§1.1–1.2 Container packaging / orchestration**: A staging container environment
+  (`systemd/container/`) exists for controlled smoke testing of Module 8. This is a
+  test harness, not the production container image described in §1.1. The V2 container
+  packaging item remains deferred.
+- All other items unchanged.
 
 ---
 

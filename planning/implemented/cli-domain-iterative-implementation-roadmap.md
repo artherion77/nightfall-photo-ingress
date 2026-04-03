@@ -1,18 +1,21 @@
 # photo-ingress Iterative Implementation Roadmap
 
-Status: Partially implemented — Modules 0–4 complete; Modules 5–8 planned
+Status: Substantially implemented — Modules 0–7 complete; Module 8 partially complete (3 open items)
 Date: 2026-04-01
+Updated: 2026-04-03
 Owner: Systems Engineering
 
 Implementation status:
-- Modules 0–4: Implemented and drift-corrected as of 2026-04-01. See audited snapshot below.
-- Modules 5–8: Still planned. See `planning/planned/cli-domain-post-audit-next-steps.md` for the
-  immediate next steps before beginning Module 5.
+- Modules 0–7: Implemented. See audited snapshot below.
+- Module 8: Implemented with three open items — per-account counters, logging field completeness
+  tests, and end-to-end health consumer compatibility test.
+- Gates 1–3 from `planning/planned/cli-domain-post-audit-next-steps.md` remain open as
+  hardening work before production use.
 
 Related roadmap (renamed):
 - [Web Control Plane Integration Plan](../planned/web-control-plane-integration-plan.md)
 
-## Audited reality snapshot (2026-04-01)
+## Audited reality snapshot (2026-04-03)
 
 This section corrects documentation drift between the original sequential plan and
 the implemented repository state.
@@ -24,20 +27,24 @@ the implemented repository state.
 | Module 2 | Completed | Completed |
 | Module 3 | Not started | Implemented + hardening delivered (Chunk 1-10 and V2-1..V2-10) |
 | Module 4 | Not started | Implemented + hardening delivered (H1-H9 coverage present) |
-| Integration M3+M4 | Planned | Implemented with documented compliance gaps to close |
-| Module 5-8 | Planned | Still planned (not yet implemented) |
+| Integration M3+M4 | Planned | Implemented with documented compliance gaps to close (Gates 1–2 open) |
+| Module 5 | Planned | Implemented — `live_photo.py`, `live_photo_pairs` migration, unit/integration tests present |
+| Module 6 | Planned | Substantially implemented — `sync_import.py` present; 3 items open (verify_sha256_on_first_download path, two unit tests, one integration test) |
+| Module 7 | Planned | Implemented — `reject.py` present; artifact at root rather than `pipeline/` (deviation from expected path) |
+| Module 8 | Planned | Substantially implemented — systemd units, install scripts, status export tests present; 3 items open (per-account counters, logging field tests, health consumer compatibility test) |
 
 Evidence base:
-- `review/module3-hardening-chunk-plan.md`
-- `review/module3-hardening-plan-v2.md`
-- `review/module3-module4-integration-suite-compliance-audit-final.md`
+- `audit/module3-hardening-chunk-plan.md`
+- `audit/module3-hardening-plan-v2.md`
+- `audit/module3-module4-integration-suite-compliance-audit-final.md`
 - `tests/unit/` and `tests/integration/` current tree
 - `src/nightfall_photo_ingress/` current module tree
 
 Note:
 - The original STOP gates were not followed strictly in execution order.
+- Module 5 was implemented before Gates 1–3 from the post-audit next steps plan were closed.
 - This roadmap remains the planning artifact; implementation truth is recorded by
-  source, tests, and review artifacts above.
+  source, tests, and audit artifacts above.
 
 ## How to use this plan
 
@@ -534,11 +541,13 @@ Apply this protocol after every module and before starting the next:
 
 ## Immediate post-audit execution order (next)
 
-1. Boundary fidelity correction for Module 3 -> Module 4 integration harness.
-2. Operator semantics and audit-coherence integration assertions.
-3. Containerized staging environment for real-account smoke integration path.
-4. Module 5 implementation (Live Photo V1 scope) after gates 1-3 are green.
-5. Optional hardening idea: add deterministic time-control fixture for stale/replay tests.
+1. Boundary fidelity correction for Module 3 -> Module 4 integration harness. (Gate 1 — open)
+2. Operator semantics and audit-coherence integration assertions. (Gate 2 — open)
+3. Containerized staging environment for real-account smoke integration path. (Gate 3 — open)
+4. ~~Module 5 implementation (Live Photo V1 scope) after gates 1-3 are green.~~ (Done — Module 5 implemented)
+5. Close Module 6 open items: verify_sha256_on_first_download path, two unit tests, poll-after-import integration test.
+6. Close Module 8 open items: per-account counters, logging field completeness tests, health consumer compatibility test.
+7. Optional hardening idea: add deterministic time-control fixture for stale/replay tests.
 
 ## Definition of done per module
 
