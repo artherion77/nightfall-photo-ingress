@@ -1,6 +1,6 @@
 # Chunk 3 UI Drift Analysis — Staging Deploy Review
 
-**Status:** Open  
+**Status:** Partially resolved — blocking bugs fixed, visual drift remains  
 **Date:** 2026-04-03  
 **Source:** Visual comparison of live staging preview (`http://192.168.200.184:8000/`)
 against UI mockups in `design/ui-mocks/` during Chunk 3 validation.
@@ -16,7 +16,7 @@ The Chunk 3 staging deploy revealed two categories of problem:
    function to receive an HTTP 401 from the API and route to `+error.svelte`. The
    `+error.svelte` component additionally uses the deprecated SvelteKit v1 prop API
    (`export let error`), so the error message is always rendered as "unknown error".
-   See §2 for root cause detail. **Fix applied in same session** — see commit history.
+   See §2 for root cause detail. **Fix applied and verified in commit `3a94e06`**.
 
 2. **Part 2 — UI mockup drift:** With the blocking defect set aside, the implemented
    pages differ from the mockups in `design/ui-mocks/` in both visual presentation and
@@ -24,7 +24,7 @@ The Chunk 3 staging deploy revealed two categories of problem:
 
 ---
 
-## 2. Part 1 — Bug Detail (for record; fix already applied)
+## 2. Part 1 — Bug Detail (for record; fixed in commit `3a94e06`)
 
 ### Bug A — `import.meta.env.PUBLIC_API_TOKEN` compiles to `undefined`
 
@@ -141,11 +141,11 @@ deliverables:
 
 | ID | Work item | Where to fix | When |
 |----|-----------|-------------|------|
-| Bug A | `PUBLIC_API_TOKEN` undefined in bundle | `client.ts`, `health.svelte.js` | Immediate (blocking) |
-| Bug B | `+error.svelte` SvelteKit v1 API | `+error.svelte` | Immediate (blocking) |
-| D-V1–D-V8 | Dashboard visual / text corrections | Chunk 3 remaining work | Before Chunk 4 |
-| S-V1–S-V3 | PhotoWheel 3D coverflow + blur tokens | Chunk 3 remaining work; `tokens.css` | Before Chunk 4 |
-| S-V5–S-V6 | PhotoCard metadata formatting | Chunk 3 remaining work | Before Chunk 4 |
+| Bug A | `PUBLIC_API_TOKEN` undefined in bundle | `client.ts`, `health.svelte.js` | Done in `3a94e06` |
+| Bug B | `+error.svelte` SvelteKit v1 API | `+error.svelte` | Done in `3a94e06` |
+| D-V1–D-V8 | Dashboard visual / text corrections | Chunk 3 remaining work | Before Chunk 4 UI half |
+| S-V1–S-V3 | PhotoWheel 3D coverflow + blur tokens | Chunk 3 remaining work; `tokens.css` | Before Chunk 4 UI half |
+| S-V5–S-V6 | PhotoCard metadata formatting | Chunk 3 remaining work | Before Chunk 4 UI half |
 | D-A1–D-A4 | Dashboard summary counts + poll history | Phase 2 — P2-I, P2-J | Phase 2 mandatory |
 | D-A5 | Filename field in audit events | Phase 2 — P2-K | Phase 2 mandatory |
 | S-A1 | Item thumbnail endpoint | Phase 2 — P2-L | Phase 2 mandatory |

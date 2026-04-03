@@ -1,6 +1,6 @@
 # Web Control Plane — Phase 1 Implementation Roadmap
 
-Status: In progress — Chunks 0-3 implemented
+Status: In progress — Chunks 0-3 implemented; Chunk 3 blocking defects closed
 Date: 2026-04-03
 Owner: Systems Engineering
 
@@ -452,10 +452,13 @@ tests/
 ### Known Gaps — Staging Deploy Review (2026-04-03)
 
 The following deviations from the UI mockups were found during Chunk 3 staging
-validation. All are within the defined Chunk 3 scope and should be corrected before
-Chunk 4 work begins. Full analysis in `audit/open-points/chunk3-ui-drift-analysis.md`.
+validation. The two blocking defects are now closed and verified in git history;
+the remaining visual drift items are still within the defined Chunk 3 scope and
+should be corrected before Chunk 4 UI work begins. Chunk 4 backend work may still
+proceed in parallel if desired, consistent with the dependency model in §2. Full
+analysis in `audit/open-points/chunk3-ui-drift-analysis.md`.
 
-**Two blocking bugs (fixed in the same session — see §2 of audit doc):**
+**Two blocking bugs (verified fixed in commit `3a94e06`):**
 - `import.meta.env.PUBLIC_API_TOKEN` compiled to `"undefined"` in the Vite bundle;
   replaced with `$env/static/public` import in `client.ts` and `health.svelte.js`.
 - `+error.svelte` used the SvelteKit v1 prop API (`export let error`); updated to
