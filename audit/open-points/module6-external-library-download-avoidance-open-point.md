@@ -47,3 +47,28 @@ This open point is closed only when the system can reliably avoid downloading th
 ## Current Constraint
 
 Until this is implemented, sync-import should be treated as registry preparation work only, not as a complete download-avoidance optimization.
+
+---
+
+## Update — 2026-04-03
+
+The external library has been upgraded and now generates a V2 hash file (`.hashes.v2`)
+alongside the existing `.hashes.sha1` files. The V2 format includes **SHA-256 hashes**
+in addition to SHA-1.
+
+**Implication for this open point:** when a `.hashes.v2` file is present, its SHA-256
+entries can be treated as **authoritative** (not merely advisory) for download-avoidance
+purposes. This removes the need for the one-time verification download described in
+Required Future Work step 3 for any file whose SHA-256 is present in `.hashes.v2`,
+since the hash is the same algorithm used by the canonical server-side Graph API
+metadata (`file.hashes.sha256Hash`).
+
+Implementation notes to carry forward:
+- The import layer should be extended to detect and prefer `.hashes.v2` over
+  `.hashes.sha1` when both are present in a directory.
+- A V2 entry with a matching SHA-256 against the Graph API response satisfies the
+  `verify_sha256_on_first_download` requirement directly — no download needed.
+- SHA-1-only entries (from `.hashes.sha1` without a corresponding V2 entry) remain
+  advisory and still require the one-time verification download.
+- The two-tier trust model (authoritative SHA-256 from V2, advisory SHA-1 from V1)
+  should be documented in the module design before implementation.
