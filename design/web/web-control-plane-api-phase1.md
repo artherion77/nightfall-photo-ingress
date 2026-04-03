@@ -41,9 +41,12 @@ The token value is read from `photo-ingress.conf` under the `[web]` section as `
 
 ```json
 {
-  "detail": "Invalid authentication credentials"
+  "detail": "Human-readable error message"
 }
 ```
+
+Current implementation returns specific 401 detail strings such as missing header,
+invalid scheme, token not configured, or invalid token.
 
 ---
 
@@ -79,12 +82,17 @@ For most endpoints, the response body is the typed JSON object directly (Pydanti
 
 ```typescript
 interface HealthResponse {
-  polling_ok: boolean;      // Ingest poll cycle last completed without error
-  auth_ok: boolean;          // OneDrive auth tokens valid
-  registry_ok: boolean;      // SQLite registry accessible
-  disk_ok: boolean;          // /nightfall ZFS pool and mount accessible
+  polling_ok: ServiceStatus;
+  auth_ok: ServiceStatus;
+  registry_ok: ServiceStatus;
+  disk_ok: ServiceStatus;
   last_updated_at: string;   // ISO-8601 UTC timestamp of last status update
   error: string | null;      // Error message if any subsystem failed; null if all ok
+}
+
+interface ServiceStatus {
+  ok: boolean;
+  message: string;
 }
 ```
 
@@ -97,10 +105,10 @@ curl -H "Authorization: Bearer test-token-12345" \
 
 ```json
 {
-  "polling_ok": true,
-  "auth_ok": true,
-  "registry_ok": true,
-  "disk_ok": true,
+  "polling_ok": { "ok": true, "message": "Ingest process is running" },
+  "auth_ok": { "ok": true, "message": "Auth OK" },
+  "registry_ok": { "ok": true, "message": "Registry OK" },
+  "disk_ok": { "ok": true, "message": "Disk OK" },
   "last_updated_at": "2026-04-03T14:32:00Z",
   "error": null
 }
@@ -220,6 +228,10 @@ curl -H "Authorization: Bearer test-token-12345" \
 **Description:** Retrieve paginated audit log entries. Optional action filter to show only
 events of a specific type.
 
+Current implementation stores the audit cursor as a numeric ID string in the response.
+The intended semantics are cursor-based pagination for the audit timeline; any consumer
+must treat the cursor as opaque rather than deriving ordering rules from the value.
+
 **Response schema:**
 
 ```typescript
@@ -271,9 +283,10 @@ interface EffectiveConfig {
   
   // KPI thresholds for operator display
   kpi_thresholds: {
-    polling_interval_warning: number;
-    pending_queue_warning: number;
-    // ... other threshold values ...
+    pending_warning: number;
+    pending_error: number;
+    disk_warning_percent: number;
+    disk_error_percent: number;
   };
 }
 ```
@@ -290,8 +303,10 @@ curl -H "Authorization: Bearer test-token-12345" \
   "polling_interval_minutes": 15,
   "api_token": "[redacted]",
   "kpi_thresholds": {
-    "pending_queue_warning": 100,
-    "poll_runtime_warning_seconds": 300
+    "pending_warning": 100,
+    "pending_error": 500,
+    "disk_warning_percent": 80,
+    "disk_error_percent": 95
   }
 }
 ```
@@ -312,7 +327,7 @@ curl -H "Authorization: Bearer test-token-12345" \
 interface BlockRule {
   id: number;               // Unique rule ID
   pattern: string;          // Glob or regex pattern
-  rule_type: string;        // E.g., 'filename', 'sha256', 'account'
+  rule_type: string;        // Current implementation: 'filename' or 'regex'
   reason: string;           // Human-readable reason for block
   enabled: boolean;         // Is rule currently active
   created_at: string;       // ISO-8601 UTC timestamp
@@ -384,7 +399,8 @@ All list endpoints (`/staging`, `/audit-log`) use cursor-based pagination:
 1. **First page:** Omit the `after` parameter.
 2. **Subsequent pages:** Include the `after` parameter with the cursor value from the previous response.
 3. **Cursor format:** SHA-256 hash (for `/staging`) or numeric ID string (for `/audit-log`).
-4. **Termination:** When `has_more` is `false`, no further pages exist.
+4. **Consumer rule:** Treat cursors as opaque continuation tokens.
+5. **Termination:** When `has_more` is `false`, no further pages exist.
 
 ### 5.2 Limit Parameter
 

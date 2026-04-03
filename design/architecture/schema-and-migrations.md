@@ -1,7 +1,7 @@
 # Schema and Migrations
 
-**Scope:** SQLite schema versioning, bootstrap path, and additive extension mechanism  
-**Source authority:** `src/nightfall_photo_ingress/domain/registry.py` (functions: `_run_migrations`, `_schema_v2_sql`, `_ensure_optional_tables`, `_set_pragmas`, `Registry.initialize`), `src/nightfall_photo_ingress/migrations/__init__.py`  
+**Scope:** SQLite schema versioning, bootstrap path, additive extension mechanism, and web control plane schema additions  
+**Source authority:** `src/nightfall_photo_ingress/domain/registry.py` (functions: `_run_migrations`, `_schema_v2_sql`, `_ensure_optional_tables`, `_set_pragmas`, `Registry.initialize`)  
 **Prerequisite:** [`design/architecture/state-machine.md`](state-machine.md) — `files.status` state machine  
 **Status:** Authoritative  
 **Created:** 2026-04-03  
@@ -15,7 +15,9 @@ SQLite database file. The schema version is tracked directly in the SQLite file 
 built-in `PRAGMA user_version` mechanism. There is no third-party migration library; all
 migration and bootstrap logic resides in `src/nightfall_photo_ingress/domain/registry.py`.
 
-The current supported schema version is **2** (`LATEST_SCHEMA_VERSION = 2`).
+The current supported schema version is **2** (`LATEST_SCHEMA_VERSION = 2`). Chunk 1
+does not increment `PRAGMA user_version`; it adds optional tables idempotently after
+baseline schema validation.
 
 ---
 
@@ -61,7 +63,7 @@ def initialize(self) -> None:
 |------|----------|---------|
 | 1 | `_set_pragmas(conn)` | Enable WAL mode and foreign key enforcement |
 | 2 | `_run_migrations(conn)` | Bootstrap or validate schema version |
-| 3 | `_ensure_optional_tables(conn)` | Idempotently create additive tables |
+| 3 | `_ensure_optional_tables(conn)` | Idempotently create additive tables, including web control plane support tables |
 
 ---
 
@@ -302,7 +304,20 @@ CREATE TABLE IF NOT EXISTS ingest_terminal_audit ( ... );
 - Removing a table from `_ensure_optional_tables()` does not drop the table from existing
   databases; old tables persist until explicitly dropped.
 
-### 7.1 Currently Registered Optional Table: `ingest_terminal_audit`
+### 7.1 Currently Registered Optional Tables
+
+The current runtime registers three optional tables:
+
+| Table | Purpose |
+|-------|---------|
+| `ingest_terminal_audit` | Additive ingest diagnostics for later runtime analysis |
+| `blocked_rules` | Web control plane blocklist storage used by Chunk 1 read APIs |
+| `ui_action_idempotency` | Future write-path idempotency replay storage |
+
+These tables are additive extensions to schema version 2. They are not modeled as a
+schema version 3 and they are not currently driven by a numbered migration runner.
+
+### 7.2 `ingest_terminal_audit`
 
 ```sql
 CREATE TABLE IF NOT EXISTS ingest_terminal_audit (
@@ -340,18 +355,35 @@ CREATE TABLE IF NOT EXISTS ingest_terminal_audit (
 
 ---
 
+### 7.3 `blocked_rules`
+
+`blocked_rules` is created idempotently by `_ensure_optional_tables()` and is available
+to any valid schema-v2 registry after `Registry.initialize()`.
+
+Implementation notes:
+
+- It backs `GET /api/v1/blocklist` in the read-only web control plane.
+- `rule_type` is currently constrained to `filename` and `regex`.
+- It is an additive table and does not imply a schema-version bump.
+
+### 7.4 `ui_action_idempotency`
+
+`ui_action_idempotency` is also created idempotently by `_ensure_optional_tables()`.
+It is provisioned in advance of later write-path chunks and is not used by Chunk 1 read
+endpoints.
+
+### 7.5 Current Role of `src/nightfall_photo_ingress/migrations/`
+
+Standalone files may exist under `src/nightfall_photo_ingress/migrations/`, but the
+current runtime does not execute a numbered migration runner from that package. The
+authoritative schema behavior remains in `domain/registry.py`.
+
 ## 8. `migrations/` Package
 
-`src/nightfall_photo_ingress/migrations/__init__.py` contains only a module docstring:
-
-```python
-"""Database migration definitions for photo-ingress."""
-```
-
-The package exists as a placeholder. All active migration and schema logic currently lives
-in `domain/registry.py`. If future migration steps require separate migration scripts
-(e.g., for a v2 → v3 upgrade), they would be implemented in this package as numbered
-migration functions and imported by `_run_migrations()`.
+The `migrations/` package is not the active authority for Chunk 1 runtime schema changes.
+Today, additive table creation is performed by `_ensure_optional_tables()` in
+`domain/registry.py`. Any future numbered migration system would need to replace this
+authority rather than duplicate it.
 
 ---
 
@@ -369,7 +401,8 @@ No action required beyond running the application. When `Registry.initialize()` 
 
 No action required. `user_version = 2` matches `LATEST_SCHEMA_VERSION = 2`; `_run_migrations()`
 returns immediately. `_ensure_optional_tables()` idempotently creates any new optional
-tables introduced in the new binary version.
+tables introduced in the new binary version, including the Chunk 1 web control plane
+tables.
 
 ### 9.3 Upgrading from v1 to v2
 

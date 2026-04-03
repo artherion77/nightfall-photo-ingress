@@ -218,10 +218,10 @@ tests/
 5. Any endpoint with a missing or invalid `Authorization: Bearer` header returns HTTP 401.
 6. `GET /api/docs` returns an HTML page containing the RapiDoc component; no auth required.
 7. `GET /api/openapi.json` lists all six data endpoints.
-8. Both database migrations run without error against an existing registry (idempotent).
-9. These migrations are v3-only, require a fresh database, and no upgrade path from earlier schema versions is supported.
+8. The `blocked_rules` and `ui_action_idempotency` schema additions are applied idempotently for valid schema-v2 registries.
+9. The current runtime does not bump `PRAGMA user_version` for these additions; they are created as optional additive tables during registry initialization.
 10. API read-path results must match CLI/domain queries for identical filters (snapshot comparison).
-11. All `tests/test_api_*.py` tests pass using `httpx.AsyncClient` with `ASGITransport`.
+11. All `tests/test_api_*.py` tests pass using `httpx.AsyncClient` with `ASGITransport` when executed explicitly or included in the active pytest collection.
 12. All existing CLI tests still pass.
 
 ### Out of scope for this chunk

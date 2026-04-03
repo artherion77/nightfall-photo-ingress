@@ -27,6 +27,14 @@ This document describes:
 - API layer design
 - Error handling and loading state patterns
 
+This document is phase-wide. It describes the intended Phase 1 UI end state across
+multiple roadmap chunks. Chunk boundaries still apply:
+
+- Chunk 2 covers global tokens, reset styles, base components, and shared stores.
+- Chunk 3 covers read-only page wiring.
+- Chunk 4 adds staging triage interactions.
+- Chunk 5 adds blocklist write controls.
+
 ---
 
 ## 1.5 Global Styling and Design Tokens
@@ -165,7 +173,7 @@ src/routes/
   +error.svelte            — Global error boundary
 
   staging/
-    +page.svelte           — Staging Queue: Photo Wheel, accept/reject controls
+    +page.svelte           — Staging Queue: Photo Wheel; write controls added in Chunk 4
     +page.js               — Load: paginated staging items
 
   audit/
@@ -173,7 +181,7 @@ src/routes/
     +page.js               — Load: paginated audit events
 
   blocklist/
-    +page.svelte           — Blocklist: rule list, add/edit/delete
+    +page.svelte           — Blocklist: read-only list in Chunk 3; write controls added in Chunk 5
     +page.js               — Load: blocklist rules
 
   settings/
@@ -186,9 +194,9 @@ src/routes/
 | Route       | Responsibility |
 |-------------|----------------|
 | `/`         | Dashboard with health status, KPIs (pending/accepted/rejected counts, poll runtime chart), and recent audit events (last 5). |
-| `/staging`  | Photo Wheel triage interface. Displays center item with neighbors. Accept, Reject, Defer actions. |
-| `/audit`    | Full paginated audit log with cursor-based infinite scroll or pagination. Filter by action type. |
-| `/blocklist`| List of blocked rules. Toggle enabled/disabled. Add new rule. Edit pattern/reason. Delete with confirmation. |
+| `/staging`  | Photo Wheel view. Chunk 3 is read-only display; Accept, Reject, and Defer actions arrive in Chunk 4. |
+| `/audit`    | Full paginated audit log with cursor-based pagination. Filter by action type. |
+| `/blocklist`| List of blocked rules. Chunk 3 is read-only; toggle, add, edit, and delete controls arrive in Chunk 5. |
 | `/settings` | Read-only display of effective runtime config (`GET /api/v1/config/effective`). |
 
 ---
@@ -223,7 +231,7 @@ components/
   staging/
     PhotoWheel.svelte        — Carousel: center focus, blurred/scaled neighbors
     PhotoCard.svelte         — Individual photo/file card (thumbnail, filename, metadata)
-    TriageControls.svelte    — Accept / Reject / Defer buttons and drop zones
+    TriageControls.svelte    — Accept / Reject / Defer buttons and drop zones (Chunk 4)
     ItemMetaPanel.svelte     — Detail panel: filename, SHA-256, timestamp, account
 
   audit/
@@ -231,8 +239,8 @@ components/
     AuditEvent.svelte        — Single audit event row (icon, filename, action, time)
 
   blocklist/
-    BlockRuleList.svelte     — List of block rules with toggle/edit/delete controls
-    BlockRuleForm.svelte     — Add / edit rule form (pattern, type, reason)
+    BlockRuleList.svelte     — List of block rules; write controls added in Chunk 5
+    BlockRuleForm.svelte     — Add / edit rule form (Chunk 5)
 
   settings/
     ConfigTable.svelte       — Read-only key/value config display
@@ -255,11 +263,11 @@ components/
 
 | Store              | Contents | Update Strategy |
 |--------------------|----------|-----------------|
-| `health.svelte.js` | `{ polling_ok, auth_ok, registry_ok, disk_ok, last_updated }` | Store owns polling lifecycle: exposes `connect()` / `disconnect()`. Polling interval (default 30s) starts on `connect()`, stops on `disconnect()`. `+layout.svelte` calls both. |
+| `health.svelte.js` | `{ polling_ok, auth_ok, registry_ok, disk_ok, last_updated }` where each subsystem status is sourced from the API's `ServiceStatus` object shape | Store owns polling lifecycle: exposes `connect()` / `disconnect()`. Polling interval (default 30s) starts on `connect()`, stops on `disconnect()`. `+layout.svelte` calls both. |
 | `kpis.svelte.js`   | `{ pending_count, accepted_today, rejected_today, live_photo_pairs, last_poll_duration_s }` | Loaded by dashboard page load; refreshed on interval |
-| `stagingQueue.svelte.js` | Current page of staging items, cursor, total, loading flag | Updated by staging page load and triage actions |
+| `stagingQueue.svelte.js` | Current page of staging items, cursor, total, loading flag | Updated by staging page load; triage actions arrive in Chunk 4 |
 | `auditLog.svelte.js` | Current page of audit events, cursor, filter, loading flag | Updated by audit page load and pagination actions |
-| `blocklist.svelte.js` | List of block rules, loading flag, last mutation result | Updated by blocklist page load and CRUD actions |
+| `blocklist.svelte.js` | List of block rules, loading flag, last mutation result | Read-only load in Chunk 3; CRUD actions arrive in Chunk 5 |
 | `toast.svelte.js`  | Array of transient notifications `{ id, message, type, expires }` | Appended by error handler; auto-expired |
 
 ### 6.2 Store Design Pattern
@@ -288,15 +296,22 @@ store module.
 ### 6.3 Optimistic UI
 
 Optimistic updates are applied only where an idempotency key is supplied with the
-request. For triage actions (accept, reject, defer), the staging queue optimistically
-removes the triaged item and stores the idempotency key. On server error, the item is
-restored and a toast notification appears.
+request. In the phase-wide target architecture this applies to later write chunks such as
+triage and blocklist mutation flows, not to the Chunk 3 read-only UI.
 
 ---
 
 ## 7. API Layer
 
 **See also:** [web-control-plane-api-phase1.md](web-control-plane-api-phase1.md) for detailed API endpoint specification, response schemas, and authentication reference.
+
+The current backend exposes these read models directly:
+
+- `HealthResponse` with nested `ServiceStatus` objects.
+- `StagingPage` with `items`, `cursor`, `has_more`, and `total`.
+- `AuditPage` with `events`, `cursor`, and `has_more`.
+- `EffectiveConfig` with redacted `api_token` and explicit `kpi_thresholds` keys.
+- `BlockRuleList` with `rules` entries using the current backend `rule_type` constraints.
 
 ### 7.1 Location and Structure (`src/lib/api/`)
 
@@ -316,9 +331,8 @@ api/
 
 The base client wraps `fetch` with the following behaviours:
 
-- Adds `Authorization: Bearer {token}` header on every request. Token is read from a
-  module-level constant loaded from a build-time environment variable
-  (`PUBLIC_API_TOKEN`) or from a configuration endpoint on first load.
+- Adds `Authorization: Bearer {token}` header on every request. Token handling remains a
+  UI integration concern and must stay aligned with the active backend auth contract.
 - Adds `X-Idempotency-Key` header on mutating requests. The key is generated as a UUID
   v4 per action, stored in the mutation call site.
 - On non-2xx responses, extracts the error body and throws a typed `ApiError` object

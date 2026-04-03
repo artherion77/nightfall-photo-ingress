@@ -1,6 +1,6 @@
 # Integration Plan — Web Control Plane
 
-Status: Proposed — Phase 0 not yet started as of 2026-04-03
+Status: Active planning baseline; Chunk 0 and Chunk 1 implemented, later phases remain planned
 Date: 2026-04-03
 Owner: Systems Engineering
 
@@ -8,8 +8,8 @@ Owner: Systems Engineering
 
 | Phase | Name | Status |
 |-------|------|--------|
-| 0 | Foundation | Not started — no `api/` or `webui/` directories exist |
-| 1 | Read-only API | Not started |
+| 0 | Foundation | Implemented |
+| 1 | Read-only API | Implemented |
 | 2 | Read-only UI | Not started |
 | 3 | Triage write path | Not started |
 | 4 | Blocklist management | Not started |
@@ -17,8 +17,9 @@ Owner: Systems Engineering
 | 6 | Hardening | Not started |
 | 7 | Reverse proxy | Not started |
 
-This plan was written to specify the full web control plane build-out. No implementation work
-has begun. All CLI and ingest pipeline functionality remains independent of this plan.
+This plan specifies the full web control plane build-out. Foundation and the read-only
+API are implemented; later phases remain planned. All CLI and ingest pipeline functionality
+remain independent of the control plane.
 
 ---
 
@@ -129,6 +130,9 @@ HTTP GET request
 
 No domain module is modified. The router and service layers are additive.
 
+Current runtime note: request-scoped dependencies read `AppConfig` and the registry
+connection from `request.app.state`, populated during FastAPI lifespan startup.
+
 ### 4.5 Auth Dependency
 
 All `/api/v1/` routes require a valid `Authorization: Bearer {token}` header.
@@ -142,15 +146,17 @@ access.
 
 - Introduce `blocked_rules` table (for `GET /api/v1/blocklist`).
 - Introduce `ui_action_idempotency` table (for Phase 3).
-- Both migrations are gated behind the existing migration runner and are no-ops if
-  the table already exists.
+- In the current runtime, both are additive optional tables created idempotently by
+  `_ensure_optional_tables()` during `Registry.initialize()`.
+- Standalone files may exist under `src/nightfall_photo_ingress/migrations/`, but there
+  is no active numbered migration runner for these tables.
 
 ### 4.7 Acceptance
 
 - All six read-only endpoints return well-formed JSON with correct HTTP status codes.
 - Auth rejection (missing/invalid token) returns 401.
-- RapiDoc UI loads at `/api/docs` and lists all endpoints.
-- Existing CLI tests still pass (no changes to domain modules).
+- RapiDoc UI loads at `/api/docs` and points to `/api/openapi.json`.
+- Existing CLI and unit tests still pass (no changes to domain modules).
 
 ---
 
@@ -185,8 +191,8 @@ Build components in dependency order (dependencies first):
 - Renders logo, nav tabs (links to `/`, `/staging`, `/audit`, `/blocklist`, `/settings`).
 - Active tab is highlighted using `page.url.pathname` from `$app/state`.
 - Right side: `StatusBadge` for global health, driven by `health` store.
-- Health store is polled every 30 seconds via `setInterval` in the root layout's
-  `onMount`.
+- Health polling is owned by the `health.svelte.js` store via `connect()` /
+  `disconnect()`, called from the root layout.
 
 **AppFooter:**
 - Renders: app version (from `+layout.js` data), last poll timestamp (from health
@@ -206,7 +212,7 @@ Route: /
 
 ```
 Route: /staging
-  load(): fetches GET /api/v1/staging?limit=20&status=pending
+  load(): fetches GET /api/v1/staging?limit=20
   Returns: { items, cursor, total }
   Component: initialises PhotoWheel with items
 ```
@@ -246,6 +252,7 @@ Route: /settings
 - Audit page loads with paginated event list.
 - Settings page shows effective config (tokens redacted server-side).
 - Staging page shows photo wheel with items from the pending queue (no triage yet).
+- Blocklist page is read-only in the Phase 2 read-only UI step.
 - AppHeader health badge updates live.
 - AppFooter last-poll timestamp is accurate.
 - Dark-mode design tokens are applied consistently across all pages.

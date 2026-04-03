@@ -32,8 +32,10 @@ nightfall-photo-ingress/
 ├── api/                            # NEW: FastAPI application
 │   ├── app.py
 │   ├── auth.py
+│   ├── dependencies.py
 │   ├── rate_limit.py
 │   ├── audit_hook.py
+│   ├── rapiddoc.py
 │   ├── routers/
 │   │   ├── health.py
 │   │   ├── staging.py
@@ -43,12 +45,14 @@ nightfall-photo-ingress/
 │   │   ├── config.py
 │   │   └── metadata.py
 │   ├── services/
+│   │   ├── health_service.py
 │   │   ├── staging_service.py
 │   │   ├── triage_service.py
 │   │   ├── audit_service.py
 │   │   ├── blocklist_service.py
 │   │   └── config_service.py
 │   └── schemas/
+│       ├── config.py
 │       ├── staging.py
 │       ├── triage.py
 │       ├── audit.py
@@ -88,6 +92,12 @@ nightfall-photo-ingress/
 ├── install/
 ├── systemd/
 ├── tests/
+│   ├── unit/                       # isolated Python tests; run outside staging environment
+│   ├── integration/                # isolated cross-module tests; run outside staging environment
+│   ├── staging/                    # staging-environment-only tests with runtime/container deps
+│   ├── staging-flow/               # production-flow staging tests against the staging environment
+│   ├── test_api_*.py               # isolated ASGI API contract tests for the web control plane
+│   └── api_test_support.py         # shared ASGI fixtures for web control plane API tests
 ├── conf/
 └── pyproject.toml
 ```
@@ -114,9 +124,11 @@ architecture's clean inward dependency direction.
 | `services/` | Application-level service objects. Translates validated HTTP requests into domain operations. Contains no repository calls; delegates to existing domain services. |
 | `schemas/`  | Pydantic models for request bodies and JSON responses. No domain objects cross the API boundary directly. |
 | `app.py`    | Application factory function and FastAPI lifespan context (connect registry, bind startup/shutdown hooks). |
-| `auth.py`   | Bearer token validation dependency. Reads token from `X-Authorization` header, compares against config value. |
+| `dependencies.py` | Request-based dependency providers that read `AppConfig` and the registry connection from `request.app.state`. |
+| `auth.py`   | Bearer token validation dependency. Reads `Authorization: Bearer` header and compares against config value. |
 | `rate_limit.py` | Sliding window rate-limit dependency. In-process for Phase 1; upgradeable to Redis-backed in Phase 2. |
 | `audit_hook.py` | Decorator/context manager that ensures audit log write precedes state mutation commit. |
+| `rapiddoc.py` | Static HTML route for `/api/docs` plus local RapiDoc asset serving. |
 
 ### 3.2 `webui/` — SvelteKit SPA
 
@@ -142,7 +154,26 @@ documents are modified. New files are:
 - `webui-design-tokens-phase1.md` — Dark-mode design token catalogue.
 - `webui-component-mapping-phase1.md` — Mockup analysis, component mapping, interaction logic.
 
-### 3.4 `planning/` Extensions
+### 3.4 `tests/` Layout and Environment Boundaries
+
+The repository now distinguishes tests by execution environment:
+
+| Test area | Purpose | Environment |
+|-----------|---------|-------------|
+| `tests/unit/` | Fast isolated unit tests | Any local dev environment |
+| `tests/integration/` | Isolated integration tests without staging container dependency | Any local dev environment |
+| `tests/test_api_*.py` | Isolated FastAPI/ASGI contract tests for the web control plane | Any local dev environment |
+| `tests/staging/` | Tests that require the staging environment or runtime package dependencies present there | Staging environment only |
+| `tests/staging-flow/` | Production-flow validation against the staging environment | Staging environment only |
+
+The API contract tests are intentionally separated from `tests/staging/` so they can run
+without container-only dependencies.
+
+Current test harness note: isolated FastAPI API tests use in-process ASGI transport and a
+SQLite connection opened with `check_same_thread=False` so the same test registry can be
+shared safely across the request-handling path exercised by the test client.
+
+### 3.5 `planning/` Extensions
 
 New planning documents capture decisions and integration plans. No existing planning
 documents are modified.

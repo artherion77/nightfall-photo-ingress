@@ -14,7 +14,11 @@ The registry is a SQLite database (`registry.db`) stored on the SSD dataset. It 
 
 ## Schema
 
-**Current schema version:** v3 (Chunk 1 introduces optional additive tables)
+**Current schema version:** v2 (`PRAGMA user_version = 2`)
+
+Chunk 1 introduces web control plane support using additive optional tables created by
+`_ensure_optional_tables()` on `initialize()`. These additions do not increment the
+schema version in the current runtime.
 
 **Core tables (schema version 2 — bootstrapped at first `initialize()` call):**
 
@@ -135,7 +139,7 @@ CREATE TABLE IF NOT EXISTS ingest_terminal_audit (
 CREATE TABLE IF NOT EXISTS blocked_rules (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
     pattern      TEXT UNIQUE NOT NULL,
-    rule_type    TEXT NOT NULL,       -- e.g., 'filename', 'sha256', 'account'
+    rule_type    TEXT NOT NULL,       -- currently 'filename' or 'regex'
     reason       TEXT,
     enabled      INTEGER DEFAULT 1,   -- 0=disabled, 1=enabled
     created_at   TEXT NOT NULL,       -- ISO-8601 UTC
@@ -168,11 +172,11 @@ CREATE TABLE IF NOT EXISTS ui_action_idempotency (
 - **Provenance-tracked**: `file_origins` records the `(account, onedrive_id)` → `sha256` mapping for every file ever encountered, independent of current status.
 - **Advisory hash import**: `external_hash_cache` stores SHA1 hashes imported from `.hashes.sha1` files; `verified_sha256` column is populated after first-download SHA-256 confirmation, converting an advisory hint to a confirmed identity mapping.
 
-### v3 Optional Tables (Chunk 1: Web Control Plane Phase 1)
+### Chunk 1 Optional Tables (Web Control Plane Phase 1)
 
 **blocklist:**
 - Stores operator-definable block rules for file filtering.
-- Each rule has a pattern (glob or regex), type (filename / sha256 / account), human-readable reason, and enabled flag.
+- Each rule has a pattern, type (`filename` or `regex` in the current implementation), human-readable reason, and enabled flag.
 - Allows toggling rules on/off without deletion (audit trail in `updated_at`).
 - Queried by read-only `/api/v1/blocklist` endpoint.
 
@@ -183,7 +187,10 @@ CREATE TABLE IF NOT EXISTS ui_action_idempotency (
 - Rows tagged with `expires_at` for garbage collection (TTL-based cleanup).
 - Not queried by any API endpoint in Phase 1 (unused until Phase 3).
 
-**Migration note:** Chunk 1 introduces these tables as new optional migrations. No upgrade path from v2 to v3 is supported. Fresh databases receive both tables on `initialize()`. Existing v2 databases will fail to run Phase 3+ operations until manually upgraded (out of scope for Phase 1).
+**Migration note:** Chunk 1 introduces these tables as additive optional tables under the
+existing v2 runtime. Fresh databases receive them on `initialize()`, and existing valid
+v2 databases also receive them idempotently on `initialize()`. The current runtime does
+not treat these tables as a v2 -> v3 migration.
 
 ---
 
