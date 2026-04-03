@@ -529,11 +529,10 @@ core operator workflow.
 
 ### 13.3 API Changes
 
-No new API endpoint is required. `GET /api/v1/staging/items` already supports a `type`
-query parameter (defined in the integration plan). In Phase 2, the Dashboard queries
-passing the selected type when a filter is active.
+No new endpoint path is required. Phase 2 extends `GET /api/v1/staging` with an
+optional `type` query parameter for dashboard-scoped filtering.
 
-`GET /api/v1/config` returns an `allowed_types` list so the sidebar options are
+`GET /api/v1/config/effective` returns an `allowed_types` list so the sidebar options are
 dynamic (driven by what the system is configured to process), not hardcoded in the UI.
 
 ### 13.4 Frontend Architecture
@@ -586,7 +585,7 @@ the list, the next cursor page is fetched and appended automatically.
 
 ### 14.3 Migration Approach
 
-The backend API is unchanged. `GET /api/v1/audit-log?cursor=...&limit=...` continues
+The backend API is unchanged. `GET /api/v1/audit-log?after=...&limit=...` continues
 to operate identically. The migration is frontend-only:
 
 1. Replace `<LoadMoreButton>` in `AuditTimeline` with a sentinel `<div>` observed by
@@ -599,9 +598,8 @@ to operate identically. The migration is frontend-only:
 
 ### 14.4 Phase 1 Compatibility
 
-`LoadMoreButton` remains in `src/lib/components/common/` and continues to be used by
-other paginated lists (e.g., blocklist rules). No Phase 1 component is removed during
-this migration.
+`LoadMoreButton` remains in `src/lib/components/common/` and is retained for explicit
+pagination flows. No Phase 1 component is removed during this migration.
 
 ### 14.5 Rollback
 
@@ -615,7 +613,7 @@ Restoring the `LoadMoreButton` variant requires a single component swap in
 ### 15.1 Context
 
 In Phase 1, KPI thresholds (the warning/error boundaries for each metric's status bar
-colour) are served from `GET /api/v1/config` as the `kpi_thresholds` field. They are
+colour) are served from `GET /api/v1/config/effective` as the `kpi_thresholds` field. They are
 read from `photo-ingress.conf` on the server. The operator edits the config file
 directly to change thresholds (Phase 1 behaviour).
 
@@ -637,7 +635,7 @@ Validation rules:
 
 The endpoint updates the running configuration and persists changes to a
 `config_overrides` SQLite table (so file-based config remains the baseline; overrides
-take precedence at runtime). A `GET /api/v1/config` call after a successful PATCH
+take precedence at runtime). A `GET /api/v1/config/effective` call after a successful PATCH
 reflects the updated values immediately.
 
 ### 15.3 Frontend: Settings Page
@@ -652,7 +650,7 @@ The Settings page (`/settings`, already a Phase 1 route) gains a
 
 ### 15.4 Phase 1 Compatibility
 
-`GET /api/v1/config` already returns `kpi_thresholds` in Phase 1 (read-only). Phase 2
+`GET /api/v1/config/effective` already returns `kpi_thresholds` in Phase 1 (read-only). Phase 2
 adds the PATCH endpoint. The GET response shape is unchanged (additive `kpi_thresholds`
 field was already present). No breaking change.
 

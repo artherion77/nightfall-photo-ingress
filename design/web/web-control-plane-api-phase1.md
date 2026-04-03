@@ -17,7 +17,8 @@ All endpoints are read-only in Phase 1. They provide operator access to:
 - Current blocklist rules
 
 All endpoints require bearer token authentication (except docs endpoints).
-Pagination uses cursor-based semantics with SHA-256 identifiers.
+Pagination uses cursor-based semantics: SHA-256 cursors for staging and numeric
+event-id cursors for audit.
 
 ---
 
@@ -130,7 +131,8 @@ curl -H "Authorization: Bearer test-token-12345" \
 | `after` | string | null | Cursor (SHA-256) for pagination; omit for first page |
 
 **Description:** Retrieve paginated list of files with `status='pending'` in the registry.
-Pagination uses SHA-256-based cursor semantics.
+Results are ordered by `sha256` ascending. Pagination uses SHA-256 cursor semantics,
+where `after=<sha256>` returns rows with `sha256 > after`.
 
 **Response schema:**
 
@@ -147,7 +149,7 @@ interface StagingItem {
 
 interface StagingPage {
   items: StagingItem[];     // List of pending items
-  cursor: string | null;    // Next cursor for pagination (sha256 of last item)
+  cursor: string | null;    // Next cursor (sha256 of last returned item)
   has_more: boolean;        // True if more items exist beyond this page
   total: number;            // Total count of pending items
 }
@@ -228,9 +230,9 @@ curl -H "Authorization: Bearer test-token-12345" \
 **Description:** Retrieve paginated audit log entries. Optional action filter to show only
 events of a specific type.
 
-Current implementation stores the audit cursor as a numeric ID string in the response.
-The intended semantics are cursor-based pagination for the audit timeline; any consumer
-must treat the cursor as opaque rather than deriving ordering rules from the value.
+Audit results are ordered by `id DESC` (newest first). The `after` cursor is a numeric
+audit event id encoded as a string, and follow-up pages fetch older records using
+`id < after`.
 
 **Response schema:**
 
@@ -248,7 +250,7 @@ interface AuditEvent {
 
 interface AuditPage {
   events: AuditEvent[];     // List of audit events
-  cursor: string | null;    // Next cursor for pagination
+  cursor: string | null;    // Next cursor (id of last returned event, as string)
   has_more: boolean;        // True if more events exist
 }
 ```
@@ -398,11 +400,20 @@ All list endpoints (`/staging`, `/audit-log`) use cursor-based pagination:
 
 1. **First page:** Omit the `after` parameter.
 2. **Subsequent pages:** Include the `after` parameter with the cursor value from the previous response.
-3. **Cursor format:** SHA-256 hash (for `/staging`) or numeric ID string (for `/audit-log`).
-4. **Consumer rule:** Treat cursors as opaque continuation tokens.
-5. **Termination:** When `has_more` is `false`, no further pages exist.
+3. **`/staging` ordering:** `sha256 ASC`; follow-up pages apply `sha256 > after`.
+4. **`/audit-log` ordering:** `id DESC`; follow-up pages apply `id < after`.
+5. **Cursor format:** SHA-256 hash (for `/staging`) or numeric ID string (for `/audit-log`).
+6. **Consumer rule:** Treat cursors as opaque continuation tokens.
+7. **Termination:** When `has_more` is `false`, no further pages exist.
 
-### 5.2 Limit Parameter
+### 5.2 Load-More behavior for audit timeline
+
+Chunk 3 UI uses explicit load-more pagination on `/audit`:
+- Initial request: `GET /api/v1/audit-log?limit=50`
+- Follow-up request: `GET /api/v1/audit-log?limit=50&after=<cursor>`
+- Append returned events to the existing list in UI order (newest-to-oldest within each page).
+
+### 5.3 Limit Parameter
 
 The `limit` parameter controls page size:
 - Default limit is endpoint-specific (20 for `/staging`, 50 for `/audit-log`).
@@ -541,4 +552,18 @@ Test coverage includes:
 - **Frontend integration:** [webui-architecture-phase1.md](webui-architecture-phase1.md) §7 (API Client Layer)
 - **Database schema:** [design/specs/registry.md](../specs/registry.md)
 - **Implementation roadmap:** [planning/planned/web-control-plane-phase1-implementation-roadmap.md](../../planning/planned/web-control-plane-phase1-implementation-roadmap.md) (Chunk 1 specification)
+
+---
+
+## 12. SPA Static Serving Contract (Chunk 3)
+
+Static SPA assets are served by FastAPI from `webui/build` at `/`.
+
+Fallback behavior for non-API routes is:
+1. Serve requested file when present.
+2. If route is not found, serve `200.html` when available.
+3. If `200.html` is missing, serve `index.html`.
+
+This preserves client-side routing for direct navigation to routes such as `/audit`
+or `/staging`.
 

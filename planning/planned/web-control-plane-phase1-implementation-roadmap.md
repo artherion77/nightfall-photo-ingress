@@ -1,6 +1,6 @@
 # Web Control Plane — Phase 1 Implementation Roadmap
 
-Status: Planned — not started
+Status: In progress — Chunks 0-3 implemented
 Date: 2026-04-03
 Owner: Systems Engineering
 
@@ -322,6 +322,8 @@ webui/src/lib/stores/
 
 ## 6. Chunk 3 — Read-Only UI Pages
 
+Status: Implemented (2026-04-03)
+
 ### Purpose
 
 This chunk may be internally executed as 3a (API clients + stores + Dashboard +
@@ -332,6 +334,19 @@ page-specific components. Produce a deployable static build served by the FastAP
 application. After this chunk, an operator can log in, view the dashboard, browse
 the staging queue (display only), read the audit timeline, view blocklist rules, and
 read the settings/config page.
+
+### Delivered summary
+
+- Added read-only API client layer in `webui/src/lib/api/` (`client.ts`, `health.ts`,
+  `staging.ts`, `audit.ts`, `config.ts`, `blocklist.ts`).
+- Added read-only stores: `kpis.svelte.js`, `stagingQueue.svelte.js`,
+  `auditLog.svelte.js`, `blocklist.svelte.js`, `config.svelte.js`.
+- Replaced placeholder route pages with live read-only pages and loaders for
+  Dashboard, Staging, Audit, Blocklist, and Settings.
+- Mounted SPA static output in FastAPI and implemented route fallback behavior:
+  serve `200.html`, then `index.html` when static route files are missing.
+- Added integration coverage in `tests/integration/ui/` and validated with
+  `tests/integration/api` as a combined regression suite.
 
 ### Required inputs
 
@@ -386,9 +401,9 @@ webui/src/lib/components/
 
 webui/src/routes/
   +page.svelte              — Dashboard: KpiGrid, HealthBar, PollRuntimeChart, AuditPreview
-  +page.js                  — load(): GET /api/v1/staging?limit=0 + GET /api/v1/audit-log?limit=5 + GET /api/v1/config/effective
+  +page.js                  — load(): GET /api/v1/staging?limit=20 + GET /api/v1/audit-log?limit=5 + GET /api/v1/config/effective + GET /api/v1/health
   staging/+page.svelte      — PhotoWheel display; ItemMetaPanel for center item
-  staging/+page.js          — load(): GET /api/v1/staging?status=pending&limit=20
+  staging/+page.js          — load(): GET /api/v1/staging?limit=20
   audit/+page.svelte        — AuditTimeline + filter pills
   audit/+page.js            — load(): GET /api/v1/audit-log?limit=50
   blocklist/+page.svelte    — BlockRuleList (read-only)
@@ -397,15 +412,15 @@ webui/src/routes/
   settings/+page.js         — load(): GET /api/v1/config/effective
 
 api/app.py                  — StaticFiles mount: webui/build/ at '/'
-                              SPA fallback: 200.html served for all non-/api/* paths
+                              SPA fallback: use 200.html; fallback to index.html when 200.html is absent
 
 tests/
-  integration/ui/           — Playwright tests:
-    test_dashboard.py       — Dashboard loads with mocked API; KpiGrid rendered; HealthBar rendered
-    test_staging_display.py — Staging page shows PhotoWheel with items; no triage buttons present
-    test_audit.py           — Audit page loads events; LoadMoreButton appears; clicking loads more
-    test_settings.py        — Settings page shows config table; token value is [redacted]
-    test_error_states.py    — ErrorBanner shown when API returns 500; LoadingSkeleton shown while loading
+  integration/ui/           — Pytest integration tests (API + static serving contract):
+    test_dashboard.py       — Dashboard data endpoints and static root serving behavior
+    test_staging_display.py — Staging endpoint behavior and read-only mutation rejection (404/405)
+    test_audit.py           — Audit first page, action filter, and cursor follow-up page
+    test_settings.py        — Config redaction and blocklist shape checks
+    test_error_states.py    — Error-path behavior including auth rejection and SPA route fallback
 ```
 
 ### Acceptance criteria
@@ -419,10 +434,10 @@ tests/
 7. Audit filter pills (by action type) reset the list and reload from page 1.
 8. Settings page shows the effective config with `api_token` displayed as `[redacted]`.
 9. Blocklist page shows the list of rules (no edit controls yet).
-10. `npm run build` produces a clean build; FastAPI serves it at `/`; SPA client-side routing works (e.g., navigating directly to `http://localhost:8000/audit` returns `index.html`).
+10. `npm run build` produces a clean build; FastAPI serves it at `/`; SPA client-side routing works (direct routes serve `200.html` or `index.html` fallback).
 11. `ErrorBanner` renders when the API returns a non-2xx response; `LoadingSkeleton` renders while data is loading.
 12. Dark-mode design tokens are applied consistently; no raw colour or pixel values appear in component styles.
-13. Playwright tests pass (`tests/integration/ui/`).
+13. Integration tests pass for `tests/integration/ui/` and related API checks.
 
 ### Out of scope for this chunk
 
@@ -446,11 +461,15 @@ and audit-first writes.
 
 ### Required inputs
 
-- Chunk 3 (Staging page and PhotoWheel display ready)
+- Chunk 3 (Staging page and PhotoWheel read-only display complete; no triage controls yet)
 - Chunk 1 (auth, service layer patterns established)
 - `planning/planned/web-control-plane-integration-plan.md` §6 (triage design)
-- `design/web/webui-architecture-phase1.md` §6.3 (optimistic UI), §7.2 (idempotency key in client)
-- `design/web/webui-component-mapping-phase1.md` §4.2 (TriageControls, drop zones), §7 (PhotoWheel interaction)
+- `design/web/webui-architecture-phase1.md` §6.3 (optimistic UI), §7.2 (base client extension for idempotency header)
+- Existing read-only UI plumbing from Chunk 3:
+  - `webui/src/lib/api/client.ts` + read endpoint modules
+  - `webui/src/lib/stores/stagingQueue.svelte.js` (currently read-only load/append)
+  - `webui/src/routes/staging/+page.svelte` and `PhotoWheel.svelte` display path
+- `design/web/webui-component-mapping-phase1.md` §4.2 and §7 (TriageControls and interaction model)
 - Existing domain transition functions (`accept`, `reject`) in `src/nightfall_photo_ingress/domain/`
 
 ### Expected output

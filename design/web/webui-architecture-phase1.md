@@ -1,6 +1,6 @@
 # SvelteKit Web UI Architecture
 
-Status: Implemented (Chunk 2 design system complete)
+Status: Implemented (Chunks 2 and 3)
 Date: 2026-04-03
 Owner: Systems Engineering
 Last Updated: 2026-04-03
@@ -14,9 +14,9 @@ The photo-ingress Web UI is a SvelteKit single-page application (SPA) built with
 backend. There is no server-side rendering (SSR) at runtime — the app is fully
 client-side after the initial asset delivery.
 
-**Phase 1 Chunk 2 Status:** Global design tokens and reset stylesheet fully implemented.
-All components reference tokens exclusively; no raw colour, pixel, or named CSS values
-appear in component styles.
+**Phase 1 Chunk 3 Status:** Global design system and read-only page wiring are
+implemented. Dashboard, staging display, audit timeline, blocklist, and settings are
+live and backed by the read-only API.
 
 This document describes:
 - Design token system and global styling
@@ -150,11 +150,10 @@ The root layout renders:
 2. `{@render children()}` — page slot.
 3. `<AppFooter>` — bottom status band with version, last poll time, and registry status.
 
-The root layout's `+layout.js` loads only version metadata (a static value). It does
-**not** perform a health API call. Health state is owned entirely by the `health.svelte.js`
-store (see §6.1). `+layout.svelte` calls `health.connect()` in `onMount` and
-`health.disconnect()` in `onDestroy`. `AppHeader` and `AppFooter` subscribe to the
-health store directly. This keeps side-effect lifecycle management out of layout files.
+The root layout's `+layout.js` sets `ssr = false` and does not fetch data. Health
+state is owned by `health.svelte.js` (see §6.1). `+layout.svelte` calls
+`health.connect()` and `health.disconnect()` through a Svelte effect lifecycle, and
+`AppHeader` / `AppFooter` subscribe to that store directly.
 
 ### 3.3 No Nested Layouts
 
@@ -170,15 +169,16 @@ src/routes/
   +layout.svelte           — Root layout (header, footer, page slot); calls health.connect()/disconnect()
   +layout.js               — Load: version metadata only (no health API call)
   +page.svelte             — Dashboard (/): KPIs, audit timeline preview
+  +page.js                 — Load: staging page, health, config, and audit preview
   +error.svelte            — Global error boundary
 
   staging/
-    +page.svelte           — Staging Queue: Photo Wheel; write controls added in Chunk 4
-    +page.js               — Load: paginated staging items
+    +page.svelte           — Staging Queue: Photo Wheel + metadata panel (read-only)
+    +page.js               — Load: GET /api/v1/staging
 
   audit/
-    +page.svelte           — Audit Timeline: scrollable event log
-    +page.js               — Load: paginated audit events
+    +page.svelte           — Audit Timeline: filter row + load-more pagination
+    +page.js               — Load: GET /api/v1/audit-log
 
   blocklist/
     +page.svelte           — Blocklist: read-only list in Chunk 3; write controls added in Chunk 5
@@ -193,9 +193,9 @@ src/routes/
 
 | Route       | Responsibility |
 |-------------|----------------|
-| `/`         | Dashboard with health status, KPIs (pending/accepted/rejected counts, poll runtime chart), and recent audit events (last 5). |
+| `/`         | Dashboard with health status, KPI cards, poll runtime card, and recent audit events (last 5). |
 | `/staging`  | Photo Wheel view. Chunk 3 is read-only display; Accept, Reject, and Defer actions arrive in Chunk 4. |
-| `/audit`    | Full paginated audit log with cursor-based pagination. Filter by action type. |
+| `/audit`    | Full audit log with filter by action and explicit load-more pagination (`id DESC`, follow-up uses `after=<last_id>`). |
 | `/blocklist`| List of blocked rules. Chunk 3 is read-only; toggle, add, edit, and delete controls arrive in Chunk 5. |
 | `/settings` | Read-only display of effective runtime config (`GET /api/v1/config/effective`). |
 
@@ -226,12 +226,10 @@ components/
     PollRuntimeChart.svelte  — Sparkline/line chart for 7-day poll runtime
     HealthBar.svelte         — Horizontal coloured gradient bar with status dots
     AuditPreview.svelte      — Recent audit events list (last 5, abbreviated)
-    FilterSidebar.svelte     — Checkbox filter panel (All Files / Images / Videos / Documents)
 
   staging/
     PhotoWheel.svelte        — Carousel: center focus, blurred/scaled neighbors
     PhotoCard.svelte         — Individual photo/file card (thumbnail, filename, metadata)
-    TriageControls.svelte    — Accept / Reject / Defer buttons and drop zones (Chunk 4)
     ItemMetaPanel.svelte     — Detail panel: filename, SHA-256, timestamp, account
 
   audit/
@@ -240,7 +238,6 @@ components/
 
   blocklist/
     BlockRuleList.svelte     — List of block rules; write controls added in Chunk 5
-    BlockRuleForm.svelte     — Add / edit rule form (Chunk 5)
 
   settings/
     ConfigTable.svelte       — Read-only key/value config display
@@ -263,12 +260,12 @@ components/
 
 | Store              | Contents | Update Strategy |
 |--------------------|----------|-----------------|
-| `health.svelte.js` | `{ polling_ok, auth_ok, registry_ok, disk_ok, last_updated }` where each subsystem status is sourced from the API's `ServiceStatus` object shape | Store owns polling lifecycle: exposes `connect()` / `disconnect()`. Polling interval (default 30s) starts on `connect()`, stops on `disconnect()`. `+layout.svelte` calls both. |
-| `kpis.svelte.js`   | `{ pending_count, accepted_today, rejected_today, live_photo_pairs, last_poll_duration_s }` | Loaded by dashboard page load; refreshed on interval |
-| `stagingQueue.svelte.js` | Current page of staging items, cursor, total, loading flag | Updated by staging page load; triage actions arrive in Chunk 4 |
-| `auditLog.svelte.js` | Current page of audit events, cursor, filter, loading flag | Updated by audit page load and pagination actions |
-| `blocklist.svelte.js` | List of block rules, loading flag, last mutation result | Read-only load in Chunk 3; CRUD actions arrive in Chunk 5 |
-| `toast.svelte.js`  | Array of transient notifications `{ id, message, type, expires }` | Appended by error handler; auto-expired |
+| `health.svelte.js` | `{ polling_ok, auth_ok, registry_ok, disk_ok, last_updated_at, error }` with nested `ServiceStatus` values | Store owns polling lifecycle via `connect()` / `disconnect()` with 30s polling. Used by layout header/footer. |
+| `kpis.svelte.js`   | `{ pending_count, accepted_today, rejected_today, live_photo_pairs, last_poll_duration_s, loading, error }` | Loaded from staging total + health details; currently read-only and non-mutating. |
+| `stagingQueue.svelte.js` | `{ items, cursor, total, loading, error }` | Supports page load and append via `loadPage(cursor, limit)`; no write actions in Chunk 3. |
+| `auditLog.svelte.js` | `{ events, cursor, hasMore, filter, loading, error }` | Supports explicit append via `loadMore()` and filter reset via `setFilter(action)`. |
+| `blocklist.svelte.js` | `{ rules, loading, error }` | Read-only `loadRules()` in Chunk 3; CRUD actions deferred to Chunk 5. |
+| `config.svelte.js` | `{ kpi_thresholds, ...effectiveConfig, loading, error }` | Read-only `load()` from `GET /api/v1/config/effective`. |
 
 ### 6.2 Store Design Pattern
 
@@ -279,11 +276,10 @@ writable store pattern. Each store exposes:
 - Action functions that call the API layer and update state.
 - An error field for per-store error display.
 
-Stores are not global singletons used by components directly. Pages load data via
-`+page.js` load functions and pass it as props. Stores are used for:
+Pages load primary data via `+page.js` load functions and pass it as props. Stores are
+used for:
 - Cross-component state (health indicator visible in header and footer simultaneously).
 - Persistent cursor state across paginated views.
-- Toast notification queue (global in the layout).
 
 **Health store lifecycle (architectural note):** The `health.svelte.js` store is the
 exception to the load-function pattern. Because health data must be available at all
@@ -317,14 +313,12 @@ The current backend exposes these read models directly:
 
 ```
 api/
-  client.ts        — Base fetch wrapper (auth header, error handling, idempotency key)
-  health.ts        — GET /health
-  staging.ts       — GET /staging, GET /items/{id}
-  triage.ts        — POST /triage/{id}/accept|reject|defer
-  audit.ts         — GET /audit-log
-  blocklist.ts     — GET/POST/PATCH/DELETE /blocklist, /blocklist/{id}
-  config.ts        — GET /config/effective
-  metadata.ts      — POST /metadata/{id}/sidecar-fetch
+  client.ts        — Base fetch wrapper (bearer header, JSON handling, ApiError)
+  health.ts        — GET /api/v1/health
+  staging.ts       — GET /api/v1/staging, GET /api/v1/items/{id}
+  audit.ts         — GET /api/v1/audit-log
+  blocklist.ts     — GET /api/v1/blocklist
+  config.ts        — GET /api/v1/config/effective
 ```
 
 ### 7.2 Base Client (`client.ts`)
@@ -333,10 +327,9 @@ The base client wraps `fetch` with the following behaviours:
 
 - Adds `Authorization: Bearer {token}` header on every request. Token handling remains a
   UI integration concern and must stay aligned with the active backend auth contract.
-- Adds `X-Idempotency-Key` header on mutating requests. The key is generated as a UUID
-  v4 per action, stored in the mutation call site.
-- On non-2xx responses, extracts the error body and throws a typed `ApiError` object
-  with `{ status, message, correlationId }`.
+- Adds `Content-Type: application/json` by default.
+- On non-2xx responses, extracts JSON or text error details and throws a typed
+  `ApiError` object with `{ status, message, details }`.
 - On network failure, throws an `ApiError` with `status: 0` and a "network unavailable"
   message.
 
@@ -351,16 +344,13 @@ store actions) handle loading states by:
 - Rendering `<LoadingSkeleton>` while loading is true.
 - Rendering `<ErrorBanner>` when an error is set.
 
-### 7.4 Error Handling Strategy
+### 7.4 Error Handling Strategy (Chunk 3)
 
 | Error Source | Handling |
 |-------------|---------|
-| API 4xx (client error) | Display `ErrorBanner` inline on the relevant component; do not push toast. |
-| API 5xx (server error) | Display toast notification; log to console. |
-| Network failure (status 0) | Display full-page `<ErrorBanner>` with retry button; also update health store. |
-| Auth failure (401) | Display toast "Session token rejected" + link to settings. |
-| Rate limit (429) | Display toast "Too many requests"; back off 5s before retry is allowed. |
-| Duplicate idempotency key (200 replay) | Accept silently; apply prior response result. |
+| API non-2xx | `apiFetch` throws `ApiError`; route/page/store sets local error state and renders `ErrorBanner` where applicable. |
+| Network failure (status 0) | `apiFetch` throws `ApiError('network unavailable', 0, ...)`; UI shows component-level error states. |
+| Auth failure (401) | Surfaced as API error to the active view; no dedicated auth-recovery flow in Chunk 3. |
 
 ---
 
@@ -368,9 +358,14 @@ store actions) handle loading states by:
 
 ### 8.1 `svelte.config.js`
 
-- Adapter: `@sveltejs/adapter-static` with `fallback: '200.html'` (SPA fallback).
+- Adapter: `@sveltejs/adapter-static` with `fallback: '200.html'`.
 - No SSR: `ssr: false` in root `+layout.js` via `export const ssr = false`.
 - Paths: no base path prefix (served at `/`).
+
+Runtime serving behavior is implemented in `api/app.py` via `SPAStaticFiles`:
+- Serve matched static files from `webui/build`.
+- For non-`/api/*` misses, serve `200.html` if present.
+- If `200.html` is absent, serve `index.html` as fallback.
 
 ### 8.2 `vite.config.js`
 
@@ -383,7 +378,6 @@ store actions) handle loading states by:
 ### 8.3 `app.html`
 
 - Sets `<meta charset="utf-8">` and `<meta name="viewport">`.
-- Loads inter or system font stack via CSS.
 - Sets `<meta name="color-scheme" content="dark">`.
 - Includes `%sveltekit.head%` and `%sveltekit.body%`.
 
@@ -407,11 +401,10 @@ adapts via CSS alone.
 
 ---
 
-## 10. Accessibility Baseline
+## 10. Accessibility Baseline (Chunk 3)
 
 - All interactive controls have `aria-label` attributes.
-- Photo Wheel supports keyboard navigation: `ArrowLeft` / `ArrowRight` to shift focus;
-  `A` / `R` / `D` as keyboard shortcuts for Accept / Reject / Defer.
+- Photo Wheel presents read-only card navigation controls in UI; triage keyboard
+  shortcuts are deferred to Chunk 4.
 - Color is never the sole indicator of status — icon + color is used throughout.
-- Destructive actions require a confirmation dialog before execution.
-- Focus is returned to the triggering element after a modal dialog closes.
+- Destructive-action confirmation flows are deferred to Chunk 4/5.

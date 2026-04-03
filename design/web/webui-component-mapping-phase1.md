@@ -1,6 +1,6 @@
 # UI Mockup Analysis and Component Mapping
 
-Status: Proposed
+Status: Implemented (Chunk 3 read-only pages)
 Date: 2026-04-03
 Owner: Systems Engineering
 
@@ -146,16 +146,16 @@ Two mockups were analysed:
 | Audit timeline section | `AuditPreview` (dashboard) or `AuditTimeline` (full view) | `events[]`, `onViewAll` |
 | Audit event row | `AuditEvent` | `icon`, `filename`, `action`, `actionColor`, `relativeTime` |
 
-### 4.2 Staging Queue Page → Components
+### 4.2 Staging Queue Page → Components (Chunk 3)
 
 | UI Element | Svelte Component | Props / Slots |
 |------------|-----------------|---------------|
 | Photo Wheel carousel | `PhotoWheel` | `items[]`, `centerIndex`, `onNavigate` |
 | Individual photo card | `PhotoCard` | `item`, `isFocused`, `blurLevel` |
 | Item metadata below photo | `ItemMetaPanel` | `filename`, `hash`, `capturedAt`, `account` |
-| Quick-action buttons (card overlay) | `TriageControls` (compact) | `onAccept`, `onReject`, `onDefer` |
-| Accept drop zone | Part of `TriageControls` (full variant) | `onDrop`, `isHovered` |
-| Reject drop zone | Part of `TriageControls` (full variant) | `onDrop`, `isHovered` |
+
+Chunk 3 is read-only. `TriageControls` and drop-zone interactions are deferred to
+Chunk 4.
 
 ### 4.3 Audit Timeline Page → Components
 
@@ -172,10 +172,9 @@ Two mockups were analysed:
 |------------|-----------------|
 | Rule list | `BlockRuleList` |
 | Individual rule row | `BlockRuleRow` (rendered inside `BlockRuleList`) |
-| Enable/disable toggle | `StatusBadge` + toggle variant |
-| Add rule button | `ActionButton` |
-| Add/edit rule form | `BlockRuleForm` (in a modal via `ConfirmDialog` slot) |
-| Delete confirmation | `ConfirmDialog` |
+
+Chunk 3 is read-only for blocklist. Toggle/add/edit/delete controls are deferred to
+Chunk 5.
 
 ---
 
@@ -263,6 +262,8 @@ card, not inside it.
 
 ### 7.2 Drag and Drop
 
+This section is deferred to Chunk 4 and not implemented in Chunk 3.
+
 Drag source: center card in the Photo Wheel.
 Drop targets: Accept zone (left) or Reject zone (right).
 
@@ -315,15 +316,11 @@ when hovering over a data point. Tooltip appears above the hovered point.
 
 ### 7.5 Blocklist Rules
 
-**Toggle:** Clicking the enabled/disabled toggle for a rule calls
-`PATCH /blocklist/{rule_id}` with `{ enabled: !current }`. Optimistic update;
-reverted on error.
+This section is deferred to Chunk 5 and not implemented in Chunk 3.
 
-**Delete:** Clicking delete opens `ConfirmDialog` with the rule pattern shown for
-confirmation. Confirming calls `DELETE /blocklist/{rule_id}`. 
-
-**Add rule:** Opens `BlockRuleForm` in a dialog. Submitting calls `POST /blocklist`.
-On success, the rule list is invalidated and reloaded.
+Planned Chunk 5 behaviors include toggle, delete confirmation, and add/edit form
+flows. Those mutation interactions are intentionally absent from the current
+read-only Chunk 3 page.
 
 ---
 
