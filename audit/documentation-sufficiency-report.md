@@ -185,7 +185,7 @@ The `external_hash_cache` schema is present and accurate.
 
 The narrative in `design/domain-architecture-overview.md §6.3` describes the sync-import
 → download-avoidance optimization pipeline as if it is a working feature. However,
-`audit/open ponts/module6-external-library-download-avoidance-open-point.md` explicitly
+`audit/open-points/module6-external-library-download-avoidance-open-point.md` explicitly
 states the runtime optimization layer **is intentionally not implemented** and the
 advisory hash has not been connected to the prefilter pipeline.
 
@@ -282,8 +282,8 @@ documentation corpus describes the migration mechanism.
 
 **Reconstruction fidelity: ~20% (implementation details only)** ❌ No threat model
 
-`audit/security-thread-model-md` is empty (0 bytes) and incorrectly named (missing `.md`
-extension). Token cache mode `0600` and URL redaction rules are documented as
+`audit/security-threat-model.md` is empty (0 bytes) and was incorrectly named (missing `.md`
+extension, filename contained "thread" instead of "threat"; renamed as part of housekeeping). Token cache mode `0600` and URL redaction rules are documented as
 implementation details, but these are not a threat model.
 
 **Gaps:**
@@ -293,7 +293,7 @@ implementation details, but these are not a threat model.
 | No threat model document — no trust boundaries, threat actors, attack surface, mitigations by threat category, or security requirements | High |
 | Staging permissions open-point documents an unresolved `0777` security hole in staging directories (world-writable evidence/log paths) with no documented remediation timeline | High |
 | No documentation of the security model for the web control plane bearer token (planned feature) | Medium |
-| `audit/security-thread-model-md` is misnamed and empty — presents an audit gap as if it were a present document | High |
+| `audit/security-threat-model.md` is empty — presents an audit gap as if it were a present document (was previously misnamed; renamed as housekeeping) | High |
 
 ---
 
@@ -463,9 +463,9 @@ These are structural or naming corrections that do not require new content:
 
 | Action | Closes |
 |---|---|
-| Rename `audit/security-thread-model-md` → `audit/security-threat-model.md` | G-05 (partial) |
-| Rename `audit/open ponts/` → `audit/open-points/` | Structural defect |
-| Update all cross-references to `audit/open ponts/` after rename | Consistency |
+| Rename old misnamed security file → `audit/security-threat-model.md` ✅ done | G-05 (partial) |
+| Rename old misnamed open-points dir → `audit/open-points/` ✅ done | Structural defect |
+| Update all cross-references to `audit/open-points/` after rename ✅ done | Consistency |
 
 ---
 

@@ -491,8 +491,8 @@ Total: 18 stopping-point chunks.
 - Implementing any new code (this is documentation work only)
 - Web control plane implementation (no `api/` or `webui/` code)
 - Changing the registry schema or existing migration files
-- Resolving the open points in `audit/open ponts/module6-external-library-download-avoidance-open-point.md`
-  and `audit/open ponts/staging-permissions-security-open-point.md` (these are implementation decisions,
+- Resolving the open points in `audit/open-points/module6-external-library-download-avoidance-open-point.md`
+  and `audit/open-points/staging-permissions-security-open-point.md` (these are implementation decisions,
   not documentation tasks — they produce design inputs, not design outputs)
 
 ---

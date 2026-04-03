@@ -1,6 +1,6 @@
 # Documentation Structure Mapping Implementation Plan
 
-**Status:** Pending execution  
+**Status:** Chunk D complete; Chunks B, A, C pending  
 **Author:** GitHub Copilot  
 **Created:** 2026-04-03  
 **Authoritative source:** `audit/documentation-structure-mapping.md` — Summary and Recommendations  
@@ -45,7 +45,7 @@ that is identified incidentally must be annotated but not performed:
 ## Execution Order
 
 ```
-CHUNK D (housekeeping — no content work) → STOP, await user review
+CHUNK D (housekeeping — no content work) ✅ COMPLETE → commit TBD
     ↓
 CHUNK B (add missing structural categories) → STOP, await user review
     ↓
@@ -73,14 +73,14 @@ and silently mislead tooling. None of these actions require content authoring.
 
 | # | Defect | Location | Required action |
 |---|--------|----------|-----------------|
-| D-1 | `audit/security-thread-model-md` is missing the `.md` extension | `audit/` | Rename to `audit/security-threat-model.md` |
-| D-2 | `audit/security-thread-model-md` filename contains "thread" instead of "threat" | `audit/` | Rename applies the spelling correction simultaneously with D-1 |
-| D-3 | `audit/open ponts/` directory name contains a typo ("ponts" instead of "points") and a space | `audit/` | `git mv` the directory to `audit/open-points/`; update all cross-references |
-| D-4 | `audit/drift-analysis.md` and `audit/review-history.md` are empty 0-byte stubs | `audit/` | Either author stub content (minimal header + status note) or remove; decision deferred to user at execution time |
+| D-1 | `audit/security-threat-model.md` was missing the `.md` extension (old filename misnamed) | `audit/` | ✅ Renamed to `audit/security-threat-model.md` |
+| D-2 | Old filename contained "thread" instead of "threat" | `audit/` | ✅ Rename applied the spelling correction simultaneously with D-1 |
+| D-3 | `audit/open-points/` directory name contained a typo and a space (misnamed) | `audit/` | ✅ Moved to `audit/open-points/`; all cross-references updated |
+| D-4 | `audit/drift-analysis.md` and `audit/review-history.md` were empty 0-byte stubs | `audit/` | ✅ Minimal stub header added to both |
 
 **Notes:**
 - D-1 and D-2 are resolved in a single `git mv` operation.
-- D-3 requires a scan of all markdown files for references to `open ponts` and updating those cross-references after the rename.
+- D-3 required a scan of all markdown files for references to the old misnamed directory name and updating those cross-references after the rename.
 - D-4 is the only action in this chunk that touches content. The scope is limited to adding a minimal front-matter header (title, status: stub, date) to each empty file, not authoring substantive content. If the user decides to delete rather than stub, no content is produced.
 - `audit/security-threat-model.md` is out of scope for content authoring (threat model is excluded from this plan). The rename corrects the filename defect only; the file remains empty after D-1/D-2.
 
@@ -100,17 +100,17 @@ None. This chunk has no dependency on any other chunk or on any other plan.
 
 After Chunk D, the repository will have:
 - `audit/security-threat-model.md` (renamed; content unchanged — empty or minimal stub)
-- `audit/open-points/` (renamed from `audit/open ponts/`; all internal files unchanged)
+- `audit/open-points/` (renamed from old misnamed directory; all internal files unchanged ✅)
 - `audit/drift-analysis.md` (either minimal stub or deleted)
 - `audit/review-history.md` (either minimal stub or deleted)
 - All cross-references to old names updated
 
 ### Acceptance Criteria
 
-- `git ls-files audit/` contains `audit/security-threat-model.md` and no file matching `security-thread-model*`.
-- `git ls-files audit/` contains `audit/open-points/` and no path segment matching `open ponts`.
-- `grep -r "open ponts" .` returns no results in markdown files.
-- `grep -r "security-thread-model" .` returns no results in markdown files.
+- `git ls-files audit/` contains `audit/security-threat-model.md` and no file matching the old misnamed filename.
+- `git ls-files audit/` contains `audit/open-points/` and no path segment matching the old directory name.
+- `grep` for the old misnamed directory name returns no results in markdown files.
+- `grep` for the old security file name returns no results in markdown files.
 - `audit/drift-analysis.md` and `audit/review-history.md` each either have content (≥1 line) or are absent from `git ls-files`.
 - No content has been authored in `audit/security-threat-model.md`.
 
