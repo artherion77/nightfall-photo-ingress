@@ -1,13 +1,43 @@
 # photo-ingress: Architecture Design
 
-**Status:** active  
+**Status:** navigation index — content extracted to topic documents  
 **Date:** 2026-03-31  
 **Updated:** 2026-04-03  
 **Author:** ops/copilot design session
 
+> This document is retained as a navigation index. All major sections have been extracted
+> to focused topic documents under `design/architecture/`, `design/specs/`, `design/domain/`,
+> and `design/rationale/`. Refer to those documents for authoritative content.
+
+---
+
+## Document Map
+
+| Topic | Document |
+|---|---|
+| Naming matrix and glossary | [design/domain/glossary.md](domain/glossary.md) |
+| Design constraints and goals | [design/domain/constraints.md](domain/constraints.md) |
+| High-level pipeline (data flow) | [design/architecture/data-flow.md](architecture/data-flow.md) |
+| Storage topology (ZFS datasets, mount layout) | [design/architecture/storage-topology.md](architecture/storage-topology.md) |
+| Registry schema and properties | [design/specs/registry.md](specs/registry.md) |
+| Ingest spec (poll cycle, sync import) | [design/specs/ingest.md](specs/ingest.md) |
+| Accept flow | [design/specs/accept.md](specs/accept.md) |
+| Reject flow | [design/specs/reject.md](specs/reject.md) |
+| Purge flow | [design/specs/purge.md](specs/purge.md) |
+| Lifecycle journal and crash recovery | [design/architecture/lifecycle.md](architecture/lifecycle.md) |
+| Error taxonomy and resilience | [design/architecture/error-model.md](architecture/error-model.md) |
+| Observability internals | [design/architecture/observability.md](architecture/observability.md) |
+| State machine | [design/architecture/state-machine.md](architecture/state-machine.md) |
+| Live Photo pair lifecycle | [design/architecture/live-photo-pair-lifecycle.md](architecture/live-photo-pair-lifecycle.md) |
+| Schema and migrations | [design/architecture/schema-and-migrations.md](architecture/schema-and-migrations.md) |
+| Tech stack rationale and tradeoffs | [design/rationale/tradeoffs.md](rationale/tradeoffs.md) |
+| Web control plane docs | [design/web/](web/) |
+
+---
+
 ## Related Documents
 
-- [Web Control Plane Architecture Phase 1](webui-architecture-phase1.md)
+- [Web Control Plane Architecture Phase 1](web/webui-architecture-phase1.md)
 - [Web Control Plane Integration Plan](../planning/planned/web-control-plane-integration-plan.md)
 
 ---
@@ -17,6 +47,8 @@
 A fully automated, server-side OneDrive-based photo ingest pipeline that feeds into the nightfall archival system. iOS devices upload photos to OneDrive (treated as an untrusted but reliable transport layer). A Linux server running ZFS storage ("nightfall"), Immich, and custom ingest services pulls those files down, validates them, and manages their lifecycle independently of Immich.
 
 **Immich's role is limited to indexing and viewing permanent library content only.** The ingress service writes new content into a pending queue. Human operators explicitly transition pending content to accepted or rejected. Rejected content is retained on disk until explicit purge.
+
+For the canonical naming matrix, see [design/domain/glossary.md](domain/glossary.md).
 
 ### 1.1 Naming Matrix (Canonical V2)
 
@@ -38,6 +70,8 @@ A fully automated, server-side OneDrive-based photo ingest pipeline that feeds i
 ---
 
 ## 2. High-Level Architecture
+
+> **Extracted** → [design/architecture/data-flow.md](architecture/data-flow.md) and [design/architecture/storage-topology.md](architecture/storage-topology.md)
 
 ```
 iOS Camera Roll
@@ -85,6 +119,8 @@ iOS Camera Roll
 
 ## 3. Design Constraints and Goals
 
+> **Extracted** → [design/domain/constraints.md](domain/constraints.md)
+
 - **Fully automated** — no user behavior assumptions on iOS.
 - **Robust against Immich changes** — the pipeline operates independently; a fresh Immich DB simply rescans the permanent library.
 - **Reject-once, reject-forever** — a rejected SHA-256 is never ingested again regardless of re-uploads.
@@ -99,6 +135,8 @@ iOS Camera Roll
 ---
 
 ## 4. Storage Layout
+
+> **Extracted** → [design/architecture/storage-topology.md](architecture/storage-topology.md)
 
 ```
 ssdpool/photo-ingress  →  /mnt/ssd/photo-ingress/
@@ -127,6 +165,8 @@ zfs create -o mountpoint=/nightfall/media/photo-ingress nightfall/media/photo-in
 ---
 
 ## 5. Hash Registry Design
+
+> **Extracted** → [design/specs/registry.md](specs/registry.md)
 
 ### Schema
 
@@ -255,7 +295,9 @@ CREATE TABLE IF NOT EXISTS ingest_terminal_audit (
 
 ## 6. Pipeline Behavior
 
-### 6.1 Poll Cycle (8-24h production cadence via systemd timer)
+> **Extracted** → [design/specs/ingest.md](specs/ingest.md), [design/specs/accept.md](specs/accept.md), [design/specs/reject.md](specs/reject.md), [design/specs/purge.md](specs/purge.md), [design/architecture/lifecycle.md](architecture/lifecycle.md)
+
+### 6.1 Poll Cycle
 
 1. Acquire OAuth2 token silently (MSAL refresh token flow).
 2. Call Graph API delta endpoint for the configured OneDrive folder.
@@ -356,6 +398,8 @@ nightfall-photo-ingress purge <sha256> [--reason "..."]
 
 ## 7. Edge Cases and Mitigations
 
+> **Extracted** → [design/architecture/error-model.md](architecture/error-model.md)
+
 | Edge case | Mitigation |
 |---|---|
 | OneDrive rename / move | Graph delta reports `deleted` + new `created`; metadata_index hit on `onedrive_id` prevents re-download after rename if size+mtime match |
@@ -373,6 +417,8 @@ nightfall-photo-ingress purge <sha256> [--reason "..."]
 ---
 
 ## 8. Tech Stack
+
+> **Extracted** → [design/rationale/tradeoffs.md](rationale/tradeoffs.md)
 
 | Component | Choice | Justification |
 |---|---|---|
@@ -568,6 +614,8 @@ Key properties:
 
 ## 14. Ingest Lifecycle Journal
 
+> **Extracted** → [design/architecture/lifecycle.md](architecture/lifecycle.md)
+
 The `IngestOperationJournal` (`domain/journal.py`) is a per-operation append-only JSONL
 file that records coarse phase transitions during the staging-to-pending commit path. It
 exists as a crash-boundary recovery mechanism, separate from and complementary to the
@@ -620,6 +668,8 @@ and an audit record is appended. They are never silently discarded.
 ---
 
 ## 15. Error Taxonomy and Resilience
+
+> **Extracted** → [design/architecture/error-model.md](architecture/error-model.md)
 
 The adapter layer defines a structured hierarchy of exceptions, all carrying loggable
 fields without exposing sensitive material.
@@ -687,6 +737,8 @@ Neither bound raises an exception; both result in an orderly, auditable stop.
 ---
 
 ## 16. Observability Internals
+
+> **Extracted** → [design/architecture/observability.md](architecture/observability.md)
 
 ### Structured logging
 

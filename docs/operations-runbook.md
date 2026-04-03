@@ -1,8 +1,29 @@
 # Operations Runbook
 
+**Status:** navigation index — content extracted to topic documents  
+
+> This document is retained as a navigation index. All major sections have been extracted
+> to focused operator documents. Refer to those documents for authoritative content.
+
+---
+
+## Document Map
+
+| Topic | Document |
+|---|---|
+| Routine workflows (accept, reject, purge, sync-import, status) | [docs/operator/operational-playbook.md](operator/operational-playbook.md) |
+| CLI setup (auth, Entra app registration, poll, packaged units) | [docs/operator/cli-guide.md](operator/cli-guide.md) |
+| Failure handling, recovery, troubleshooting | [docs/operator/troubleshooting.md](operator/troubleshooting.md) |
+| Install, runtime layout, environment setup | [docs/deployment/environment-setup.md](deployment/environment-setup.md) |
+| Staging flows (P2 auth, P3 live poll, smoke tests) | [docs/operator/maintenance.md](operator/maintenance.md) |
+
+---
+
 This runbook covers the production operational surface for `nightfall-photo-ingress`: status export, packaged systemd units, install flow, Entra app registration, and staging-container smoke validation.
 
 ## Runtime layout
+
+> **Extracted** → [docs/deployment/environment-setup.md](deployment/environment-setup.md)
 
 - Status snapshot: `/run/nightfall-status.d/photo-ingress.json`
 - Config: `/etc/nightfall/photo-ingress.conf`
@@ -10,6 +31,8 @@ This runbook covers the production operational surface for `nightfall-photo-ingr
 - Logs: journald for systemd units and `/var/log/nightfall` for file outputs if configured
 
 ## Status file contract
+
+> **Extracted** → [docs/operator/operational-playbook.md](operator/operational-playbook.md#status-file-interpretation)
 
 The status file is written atomically by CLI commands and systemd-triggered runs.
 
@@ -43,6 +66,8 @@ jq . /run/nightfall-status.d/photo-ingress.json
 
 ## Packaged units
 
+> **Extracted** → [docs/operator/cli-guide.md](operator/cli-guide.md#packaged-systemd-units)
+
 The packaged unit set is:
 
 - `nightfall-photo-ingress.service`: runs a single poll
@@ -64,6 +89,8 @@ journalctl -u nightfall-photo-ingress-trash.service -n 50 --no-pager
 ```
 
 ## Install and uninstall
+
+> **Extracted** → [docs/deployment/environment-setup.md](deployment/environment-setup.md#install-and-uninstall)
 
 Production deployment targets an LXC container on the host. By default, the installer creates or updates a container named `photo-ingress` using the `ubuntu:24.04` image and the LXD `default` profile only.
 
@@ -121,6 +148,8 @@ sudo ./install/uninstall.sh --container my-photo-ingress
 ```
 
 ## How To: Register Entra App for Graph
+
+> **Extracted** → [docs/operator/cli-guide.md](operator/cli-guide.md#how-to-register-an-entra-app-for-graph)
 
 This service uses delegated Microsoft Graph access with device-code authentication. No client secret is required for the V1 flow.
 
@@ -196,6 +225,8 @@ If auth and permissions are correct, the run should proceed without authenticati
 - OIDC/offline_access behavior: `https://learn.microsoft.com/en-us/entra/identity-platform/scopes-oidc`
 
 ## Registered Application Instance (Tenant: christopherpohlsrvgmail.onmicrosoft.com)
+
+> **Extracted** → [docs/operator/cli-guide.md](operator/cli-guide.md#registered-application-instance)
 
 This section records the live Entra app registration provisioned for this service. It serves as the operator source of truth for the registration identity.
 
@@ -280,6 +311,8 @@ The deletion of a stale legacy service principal (`azure-cli-2021-11-14-15-03-15
 
 ## Failure handling
 
+> **Extracted** → [docs/operator/troubleshooting.md](operator/troubleshooting.md)
+
 If the timer or path unit is not active:
 
 ```bash
@@ -301,6 +334,8 @@ If trash processing does not trigger:
 - Start the processor directly with `systemctl start nightfall-photo-ingress-trash.service` to separate path-watch failures from processor failures.
 
 ## Staging Flow: P2 Interactive Authentication (Device-Code Flow)
+
+> **Extracted** → [docs/operator/maintenance.md](operator/maintenance.md#staging-flow-p2--interactive-authentication-device-code-flow)
 
 The staging test flow validates authentication and polling before production deployment. **P2** tests one-time interactive device-code setup.
 
@@ -368,6 +403,8 @@ User action required: Run P2 again and complete the full sign-in and consent flo
 
 ## Staging Flow: P3 Live Authenticated Poll
 
+> **Extracted** → [docs/operator/maintenance.md](operator/maintenance.md#staging-flow-p3--live-authenticated-poll)
+
 **P3** validates that the cached token works and the application can access OneDrive files.
 
 ### Prerequisites
@@ -425,6 +462,8 @@ Review log files in `/mnt/ssd/staging/photo-ingress/logs/<run-id>` for leaked to
 
 ## Controlled-environment validation
 
+> **Extracted** → [docs/operator/maintenance.md](operator/maintenance.md#controlled-environment-validation)
+
 Live systemd smoke testing must run in the staging container, not on the host. Use the staging workflow:
 
 ```bash
@@ -442,6 +481,8 @@ These smoke checks should validate:
 ---
 
 ## Operator Workflows
+
+> **Extracted** → [docs/operator/operational-playbook.md](operator/operational-playbook.md)
 
 This section covers the routine CLI commands used to manage the ingest service.
 
@@ -526,6 +567,8 @@ nightfall-photo-ingress sync-import --dry-run --path /etc/nightfall/photo-ingres
 
 ## Status File Interpretation
 
+> **Extracted** → [docs/operator/operational-playbook.md](operator/operational-playbook.md#status-file-interpretation)
+
 The status file at `/run/nightfall-status.d/photo-ingress.json` is written atomically after each command run. Each `state` value indicates a specific condition and implies a specific operator action.
 
 | State | Meaning | Operator action |
@@ -550,6 +593,8 @@ If the status file is absent after a run, confirm that `/run/nightfall-status.d/
 ---
 
 ## Staged File Recovery
+
+> **Extracted** → [docs/operator/troubleshooting.md](operator/troubleshooting.md#staged-file-recovery)
 
 If the poll service crashes or is killed mid-run, follow this procedure to return to a consistent state.
 
