@@ -1,15 +1,8 @@
 import { writable } from 'svelte/store';
 
-interface Toast {
-  id: string;
-  message: string;
-  type: 'success' | 'error' | 'warning' | 'info';
-  expires: number; // timestamp
-}
+const { subscribe, set, update } = writable([]);
 
-const { subscribe, set, update } = writable<Toast[]>([]);
-
-function push(message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info', duration = 5000) {
+function push(message, type = 'info', duration = 5000) {
   const id = Math.random().toString(36).substr(2, 9);
   const expires = Date.now() + duration;
 
@@ -26,7 +19,7 @@ function push(message: string, type: 'success' | 'error' | 'warning' | 'info' = 
   return id;
 }
 
-function dismiss(id: string) {
+function dismiss(id) {
   update((toasts) => toasts.filter((t) => t.id !== id));
 }
 

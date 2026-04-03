@@ -1,15 +1,6 @@
 import { writable } from 'svelte/store';
 
-interface HealthState {
-  polling_ok: boolean;
-  auth_ok: boolean;
-  registry_ok: boolean;
-  disk_ok: boolean;
-  last_updated_at?: string;
-  error: string | null;
-}
-
-const initialState: HealthState = {
+const initialState = {
   polling_ok: false,
   auth_ok: false,
   registry_ok: false,
@@ -17,9 +8,9 @@ const initialState: HealthState = {
   error: null
 };
 
-const { subscribe, set, update } = writable(initialState);
+const { subscribe, update } = writable(initialState);
 
-let pollingInterval: number | null = null;
+let pollingInterval = null;
 
 async function fetchHealth() {
   try {

@@ -41,7 +41,8 @@ Current high-level commands:
 - `devctl bootstrap-webui` — install Node/npm and web UI dependencies
 - `devctl run-api` — run API process for development
 - `devctl run-webui` — run Vite dev server with host-accessible URL
-- `devctl reset` — reset disposable dev state
+- `devctl snapshot-refresh` — refresh the `clean-installed` snapshot from current state
+- `devctl reset` — restore container state from `clean-installed` snapshot
 - `devctl destroy` — remove development container
 
 Some commands are scaffolds/placeholders and are explicitly labeled as such by
@@ -55,7 +56,24 @@ the tool output.
 2. bootstrap runtime/toolchains
 3. run API + web UI dev servers
 4. iterate against source changes
-5. reset or destroy when done
+5. use `devctl reset` for fast rollback to `clean-installed`
+6. destroy when done (optional)
+
+### Reset mechanic
+
+Bootstrap commands refresh a `clean-installed` snapshot automatically. The reset
+path restores that snapshot instead of rebuilding the container from scratch.
+
+Typical loop:
+
+```bash
+./dev/devctl create
+./dev/devctl bootstrap-python
+./dev/devctl bootstrap-webui
+
+# iterate ...
+./dev/devctl reset
+```
 
 ---
 
