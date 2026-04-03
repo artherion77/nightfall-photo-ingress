@@ -72,3 +72,11 @@ Implementation notes to carry forward:
   advisory and still require the one-time verification download.
 - The two-tier trust model (authoritative SHA-256 from V2, advisory SHA-1 from V1)
   should be documented in the module design before implementation.
+- When a file is downloaded from OneDrive and written to the registry, the OneDrive
+  Graph API item metadata also carries an advisory SHA-1 hash
+  (`file.hashes.quickXorHash` is the primary; check whether a plain SHA-1 field is
+  also exposed). This advisory SHA-1 should be stored as a dedicated field in the
+  per-file registry schema so that future lookups against `.hashes.sha1` sidecar files
+  can match without re-reading the file. **Cross-check required:** verify whether the
+  current registry schema and ingest path already capture this field; if not, it is a
+  schema gap to fix as part of this work.
