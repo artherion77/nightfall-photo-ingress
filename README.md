@@ -1,5 +1,7 @@
 # nightfall-photo-ingress
 
+![nightfall-photo-ingress](design/logos/abstractflow.png)
+
 An automated photo ingress pipeline for a self-hosted Linux media server. iOS devices
 upload photos to OneDrive; this service polls OneDrive via the Microsoft Graph API,
 downloads new files to a staging area, and queues them for explicit operator review
