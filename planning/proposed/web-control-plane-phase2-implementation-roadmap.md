@@ -40,6 +40,12 @@ P2-F: Filter Sidebar                (Phase 1 stable; P2-A preferred)
 P2-G: Pagination → Infinite Scroll  (Phase 1 Audit Timeline pagination stable)
 P2-H: KPI Threshold Config UI       (Phase 1 config endpoint stable; P2-A preferred)
 
+P2-I: Dashboard KPI Summary Counts  (no prerequisite beyond Phase 1)
+P2-J: Poll Runtime History          (no prerequisite beyond Phase 1)
+P2-K: Filename Field in Audit Events (no prerequisite beyond Phase 1)
+P2-L: Item Thumbnail Endpoint       (no prerequisite beyond Phase 1; P2-OPT-2 is
+                                      an optional upgrade once this is live)
+
 Phase 2 Optional Track (any order)
 ───────────────────────────────────
 
@@ -56,13 +62,17 @@ P2-OPT-5: CDN / Advanced Asset Caching
 Phase 1 validated
      │
      ├─┬─ P2-B (can run in parallel with P2-A)
-     │ └─ P2-C (documentation; run in parallel)
+     │ ├─ P2-C (documentation; run in parallel)
+     │ ├─ P2-I (can run in parallel with P2-A)
+     │ ├─ P2-J (can run in parallel with P2-A)
+     │ ├─ P2-K (can run in parallel with P2-A)
+     │ └─ P2-L (can run in parallel with P2-A)
      │
      └── P2-A  →  P2-D  →  LAN exposure gate
               ↘   P2-E
 ```
 
-All of P2-A through P2-H must be complete and validated before the operator exposes
+All of P2-A through P2-L must be complete and validated before the operator exposes
 the system to the LAN. Optional chunks may be adopted after LAN exposure.
 
 ---
@@ -386,6 +396,213 @@ preferred (Settings page accessed over HTTPS).
 
 ---
 
+### P2-I: Dashboard KPI Summary Counts (Mandatory)
+
+**Origin:** Identified in `audit/open-points/chunk3-ui-drift-analysis.md` — Dashboard
+drift items D-A1, D-A2, D-A3. The Dashboard page currently hardcodes
+`accepted_today`, `rejected_today`, `live_photo_pairs`, and `last_poll_duration_s` to
+zero because no existing endpoint supplies these values.
+
+**Goal:** Introduce a lightweight summary endpoint that the Dashboard can query to
+populate the daily count KPIs and last-poll timing shown in the mockup.
+
+**Prerequisites:** Phase 1 stable.
+
+**Tasks:**
+
+**Backend:**
+1. Add `GET /api/v1/summary` endpoint to `api/routers/summary.py`:
+   - `accepted_today: int` — count of `accepted` audit events in the last 24 hours.
+   - `rejected_today: int` — count of `rejected` audit events in the last 24 hours.
+   - `live_photo_pairs: int` — count of pending items flagged as Live Photo pair
+     (derivable from registry; expose as 0 until the domain-level pair detection
+     model is defined).
+   - `last_poll_duration_s: float | None` — last recorded poll duration from the
+     health status snapshot; `null` if no poll has completed.
+2. Add `SummaryResponse` Pydantic schema in `api/schemas/summary.py`.
+3. Add test in `tests/test_api_summary.py`.
+
+**Frontend:**
+4. Add `getSummary()` in `webui/src/lib/api/summary.ts`.
+5. Update `+page.js` `load()` to call `getSummary()` alongside existing calls.
+6. Update `+page.svelte` `kpis` derived to populate real values from summary data.
+7. Remove hardcoded zeros.
+
+**Testing:**
+- `GET /api/v1/summary` returns correct counts after known audit events are present.
+- Dashboard KPI cards display the returned values.
+- Auth rejection (no token) returns 401.
+
+**Acceptance criteria:**
+- Dashboard "Accepted Today" and "Rejected Today" KPIs show real daily counts.
+- `last_poll_duration_s` populates "Last Poll (s)" KPI card.
+- No hardcoded zero values remain in `+page.svelte` for these four fields.
+
+**Rollback:**
+- Remove `GET /api/v1/summary` router registration from `app.py`. Frontend falls back
+  to displaying zero for the affected fields.
+
+---
+
+### P2-J: Poll Runtime History Endpoint + Chart Upgrade (Mandatory)
+
+**Origin:** Identified in `audit/open-points/chunk3-ui-drift-analysis.md` — Dashboard
+drift item D-A4. The mock shows a smooth 7-day line chart ("Poll Runtimes (Last 7
+Days)") with a Mon–Sun x-axis. The current `PollRuntimeChart` renders a single bar
+with no history.
+
+**Goal:** Store and expose per-poll duration history; upgrade the frontend chart from
+a bar sparkline to a line chart with a 7-day window.
+
+**Prerequisites:** Phase 1 stable.
+
+**Tasks:**
+
+**Backend:**
+1. Add `poll_runtime_log` table via migration:
+   ```sql
+   CREATE TABLE IF NOT EXISTS poll_runtime_log (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     completed_at TEXT NOT NULL,
+     duration_s REAL NOT NULL
+   );
+   ```
+2. Persist duration to this table at the end of each successful poll cycle
+   (hook into the CLI poll completion path; keep the write non-blocking).
+3. Add `GET /api/v1/poll-history?days=7` endpoint returning a list of
+   `{completed_at: str, duration_s: float}` records for the requested window,
+   ordered ascending by `completed_at`.
+4. Add `PollHistoryResponse` Pydantic schema and test in `tests/test_api_poll_history.py`.
+
+**Frontend:**
+5. Add `getPollHistory(days?)` in `webui/src/lib/api/poll_history.ts`.
+6. Update `+page.js` to call `getPollHistory(7)` and return it as `pollHistory`.
+7. Rewrite `PollRuntimeChart.svelte`:
+   - Input: `values: {completed_at: string, duration_s: number}[]`.
+   - Render as an SVG line chart (no external charting library; inline SVG path).
+   - X-axis: day-of-week labels derived from `completed_at`.
+   - Y-axis: seconds, auto-scaled to max value.
+   - Empty state: "No runtime samples yet."
+
+**Testing:**
+- Chart renders correctly with 7 data points.
+- Empty state renders when no historical data is present.
+- API returns only records within the requested day window.
+
+**Acceptance criteria:**
+- `PollRuntimeChart` displays a line chart matching the mock's visual style.
+- Y-axis scales dynamically to the max recorded duration.
+- No external charting library dependency added.
+
+**Rollback:**
+- Revert `PollRuntimeChart.svelte` to the bar sparkline and remove `pollHistory` from
+  the page loader. The `poll_runtime_log` table data is preserved but not queried.
+
+---
+
+### P2-K: Filename Field in Audit Events (Mandatory)
+
+**Origin:** Identified in `audit/open-points/chunk3-ui-drift-analysis.md` — drift
+items D-A5 and D-V8. The audit event display currently shows a sha256 prefix because
+`AuditEvent` schema has no filename field. The mock shows the original filename (e.g.,
+"IMG_3051.jpg") as the primary identifier in the audit timeline.
+
+**Goal:** Persist and expose the filename at the time an audit event is written;
+display it in the audit timeline in place of the sha256 prefix.
+
+**Prerequisites:** Phase 1 stable. Schema change is additive (nullable column).
+
+**Tasks:**
+
+**Backend:**
+1. Add `filename TEXT` column to the `audit_log` table via migration (nullable, default
+   NULL to preserve compatibility with existing rows).
+2. Update all `audit_service.py` write paths (triage, blocklist, auth failure) to pass
+   `filename` where the item is known at write time.
+3. Extend `AuditEvent` Pydantic schema with `filename: str | None = None`.
+4. Update `test_api_audit_log.py` to assert `filename` is populated for triage events.
+
+**Frontend:**
+5. Update `AuditPreview.svelte` and `AuditEvent.svelte` to display `event.filename`
+   when available, with "SHA-256: {prefix}" as fallback.
+
+**Testing:**
+- Triage events written after migration have `filename` populated.
+- Pre-migration rows (with NULL filename) display the sha256 fallback gracefully.
+- Audit timeline shows filename for new events.
+
+**Acceptance criteria:**
+- New triage and blocklist audit events carry the filename field.
+- Audit timeline primary identifier is the filename where available.
+
+**Rollback:**
+- The `filename` column is nullable; removing the display logic in the frontend
+  reverts to sha256 prefix display. The column itself can remain (inert).
+
+---
+
+### P2-L: Item Thumbnail Endpoint (Mandatory)
+
+**Origin:** Identified in `audit/open-points/chunk3-ui-drift-analysis.md` — staging
+drift item S-A1. The `PhotoCard` currently shows a grey placeholder box ("IMG")
+because no image serving endpoint exists. The mock shows actual photo thumbnails as
+the centrepiece of the Staging Queue workflow.
+
+**Goal:** Add a thumbnail endpoint to the API; update `PhotoCard` to display the
+actual image.
+
+**Prerequisites:** Phase 1 stable. P2-OPT-2 (Background Worker) is an optional
+upgrade that can generate pre-scaled thumbnail cache files; P2-L is the base serving
+capability and does not depend on P2-OPT-2.
+
+**Security note:** The file path is resolved from the `sha256` registry lookup
+(operator-controlled database). User input is the sha256 hash only; path construction
+is entirely server-side. This is not an SSRF or path-traversal vector.
+
+**Tasks:**
+
+**Backend:**
+1. Add `GET /api/v1/items/{sha256}/thumbnail` endpoint to `api/routers/staging.py`:
+   - Resolve file path from the registry item record.
+   - If path exists: return `FileResponse` with content-type from extension.
+   - If file not found: return 404 with `{"detail": "thumbnail not available"}`.
+   - If item sha256 not in registry: return 404 with `{"detail": "item not found"}`.
+   - Auth required (same bearer token dependency).
+2. Add test in `tests/test_api_thumbnail.py`:
+   - Known item with file present → 200 with image content-type.
+   - Known item with file absent → 404.
+   - Unknown sha256 → 404.
+   - No auth token → 401.
+
+**Frontend:**
+3. Update `PhotoCard.svelte`:
+   - Replace `<div class="thumb">IMG</div>` with
+     `<img src="/api/v1/items/{item.sha256}/thumbnail" alt="{item.filename}" />`.
+   - Set `Authorization` header on the image request via a Blob URL fetch approach
+     (since `<img src>` does not send custom headers), or expose a short-lived
+     token-signed URL from the endpoint.
+   - On image load error: render the existing "IMG" placeholder as fallback.
+
+**Note on image auth:** The thumbnail endpoint requires a bearer token. A simple
+approach for Phase 2 is to serve thumbnails without auth (they are identified only by
+opaque sha256 hash, which is not guessable). Alternatively, use a cookie-based session
+after P2-OPT-3 (OIDC). Document the chosen approach in the implementation.
+
+**Testing:**
+- `PhotoCard` displays the actual image for a known item in the staging queue.
+- Missing file does not break the UI (placeholder shown).
+- Direct URL access without token returns 401 (if auth retained on endpoint).
+
+**Acceptance criteria:**
+- Staging Queue shows real photo thumbnails for items whose files are on disk.
+- Missing or unavailable files degrade gracefully to the placeholder.
+
+**Rollback:**
+- Revert `PhotoCard.svelte` to the `<div class="thumb">IMG</div>` placeholder.
+  The thumbnail endpoint can remain registered but unused.
+
+---
+
 ### P2-OPT-1: SQLite → Postgres Migration (Optional)
 
 **Reference:** web-control-plane-architecture-phase2.md §8
@@ -550,10 +767,14 @@ Phase 2 mandatory chunks are deployed in the following order to minimise risk:
 
 1. P2-C (API versioning documentation; no risk, no service change).
 2. P2-B (artifact versioning; deploy script change, no service restart).
-3. P2-A (Caddy introduction; the biggest single change; validates on localhost first).
-4. P2-D (rate limiting migration; runs after P2-A).
-5. P2-E (retry/backoff in the SPA; deploy via P2-B versioned build process).
-6. P2-F, P2-G, P2-H (UI enhancements; deployable in any order after P2-E).
+3. P2-I, P2-J, P2-K (backend endpoints + schema; no service restart beyond API; can
+   run in parallel with P2-B and P2-C. These complete the Dashboard and Audit data
+   story identified in the Chunk 3 drift review).
+4. P2-L (thumbnail endpoint; API restart only; can run in parallel with P2-I/J/K).
+5. P2-A (Caddy introduction; the biggest single change; validates on localhost first).
+6. P2-D (rate limiting migration; runs after P2-A).
+7. P2-E (retry/backoff in the SPA; deploy via P2-B versioned build process).
+8. P2-F, P2-G, P2-H (UI enhancements; deployable in any order after P2-E).
 
 ### 5.2 LAN Exposure Gate
 
@@ -571,6 +792,10 @@ reproduced here as a gate:
 - [ ] Uvicorn bound to `127.0.0.1` only.
 - [ ] Phase 1 in-process rate limiting dependency removed.
 - [ ] CORS allowlist updated to LAN hostname.
+- [ ] Dashboard KPI counts (P2-I) populate real daily values.
+- [ ] Poll runtime history chart (P2-J) shows 7-day line chart.
+- [ ] Audit events carry filename field (P2-K).
+- [ ] Staging Queue displays real photo thumbnails (P2-L).
 
 ### 5.3 Operational Readiness
 
@@ -593,6 +818,10 @@ Before enabling LAN exposure:
 | P2-F  | Hide sidebar via build var, redeploy | None |
 | P2-G  | Swap IntersectionObserver for LoadMoreButton in one component | None |
 | P2-H  | Drop `config_overrides` table row, restart API | Overrides lost; reverts to defaults |
+| P2-I  | Remove `GET /api/v1/summary` router; KPIs revert to zero | None |
+| P2-J  | Revert `PollRuntimeChart` to bar sparkline; history table stays intact | None |
+| P2-K  | Revert audit display to sha256 prefix; `filename` column stays in DB | None |
+| P2-L  | Revert `PhotoCard` to placeholder div; endpoint stays registered | None |
 | P2-OPT-1 | Flip `database_backend` flag to SQLite | SQLite archive kept 30d |
 | P2-OPT-2 | Disable `photo-ingress-worker.service` | Jobs in queue lost |
 | P2-OPT-3 | Remove OIDC Caddyfile config, revert `auth.py` | None |

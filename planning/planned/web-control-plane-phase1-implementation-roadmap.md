@@ -444,6 +444,44 @@ tests/
 - Any write action (accept, reject, defer, blocklist CRUD).
 - PhotoWheel keyboard navigation and drag-and-drop (Chunk 4).
 - Blocklist edit/add/delete controls (Chunk 5).
+- API summary counts (accepted_today, rejected_today, live_photo_pairs) — Phase 2 P2-I.
+- 7-day poll runtime history endpoint and line chart — Phase 2 P2-J.
+- Filename field in audit events — Phase 2 P2-K.
+- Item thumbnail endpoint and real image display in PhotoCard — Phase 2 P2-L.
+
+### Known Gaps — Staging Deploy Review (2026-04-03)
+
+The following deviations from the UI mockups were found during Chunk 3 staging
+validation. All are within the defined Chunk 3 scope and should be corrected before
+Chunk 4 work begins. Full analysis in `audit/open-points/chunk3-ui-drift-analysis.md`.
+
+**Two blocking bugs (fixed in the same session — see §2 of audit doc):**
+- `import.meta.env.PUBLIC_API_TOKEN` compiled to `"undefined"` in the Vite bundle;
+  replaced with `$env/static/public` import in `client.ts` and `health.svelte.js`.
+- `+error.svelte` used the SvelteKit v1 prop API (`export let error`); updated to
+  SvelteKit v2 `$page.error` via `$app/stores`.
+
+**Dashboard visual / text corrections needed:**
+- D-V1: `<h1>` text should be "Photo-Ingress Dashboard", not "Dashboard".
+- D-V2: `HealthBar` should appear above `KpiGrid`, not below.
+- D-V3: `HealthBar` labels should use full names: "OneDrive Auth", "Registry Integrity",
+  "Disk Usage" (not "Auth", "Registry", "Disk").
+- D-V4: `KpiCard` should have a colour-coded bottom border driven by threshold state.
+- D-V5: `AuditPreview` heading should be "Audit Timeline" in accent colour.
+- D-V6: Audit event rows should show a colour-coded action badge (`StatusBadge`).
+- D-V7: Audit event timestamps should display as relative time ("25 mins ago").
+- D-V8: Audit event identifier should show filename where available (blocked on P2-K);
+  fall back to "SHA-256: {prefix}" format in the interim.
+
+**Staging visual corrections needed:**
+- S-V1: `PhotoWheel` should use CSS 3D perspective coverflow, not a flat flex row.
+  Cards should visually recede (scale + translateZ) by distance from active index.
+- S-V2: Blur/scale algorithm must use `Math.abs(index - activeIndex)` (distance from
+  active card), not the current `index % 2` even/odd logic.
+- S-V3: `--wheel-blur-near` and `--wheel-blur-far` tokens must be defined in
+  `tokens.css`; the `PhotoWheel` must reference them (not hardcoded values).
+- S-V4: `PhotoCard` SHA field should be prefixed "SHA-256: {hash}".
+- S-V5: `PhotoCard` timestamp should format `first_seen_at` as "Captured at HH:MM".
 
 ---
 
@@ -500,7 +538,11 @@ webui/src/lib/stores/
 
 webui/src/lib/components/staging/
   PhotoWheel.svelte    — Completed: keyboard nav (ArrowLeft/ArrowRight to shift wheel; A/R/D shortcuts for Accept/Reject/Defer)
-  TriageControls.svelte — Accept / Reject / Defer button overlays + drag-and-drop drop zones (teal/red)
+  TriageControls.svelte — Two layers of triage controls matching the UI mock:
+                          1. Inline small Accept / Reject buttons overlaid on the active (centre) card
+                          2. Two large full-width CTA buttons below the wheel (teal Accept, red Reject)
+                             as shown in design/ui-mocks/Astronaut photo review interface.png
+                          Both layers use ActionButton with action-* tokens; Defer available via keyboard only (D key)
                           Generates UUID v4 idempotency key per action
                           On action: call store.triageItem() → optimistic remove → API call → success advances wheel / error restores
 
