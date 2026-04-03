@@ -476,15 +476,15 @@ analysis in `audit/open-points/chunk3-ui-drift-analysis.md`.
 - D-V8: Audit event identifier should show filename where available (blocked on P2-K);
   fall back to "SHA-256: {prefix}" format in the interim.
 
-**Staging visual corrections needed:**
-- S-V1: `PhotoWheel` should use CSS 3D perspective coverflow, not a flat flex row.
-  Cards should visually recede (scale + translateZ) by distance from active index.
-- S-V2: Blur/scale algorithm must use `Math.abs(index - activeIndex)` (distance from
-  active card), not the current `index % 2` even/odd logic.
-- S-V3: `--wheel-blur-near` and `--wheel-blur-far` tokens must be defined in
-  `tokens.css`; the `PhotoWheel` must reference them (not hardcoded values).
-- S-V4: `PhotoCard` SHA field should be prefixed "SHA-256: {hash}".
-- S-V5: `PhotoCard` timestamp should format `first_seen_at` as "Captured at HH:MM".
+**Staging visual corrections — ✅ FIXED in commit `c7dfcf0`:**
+- S-V1: ✅ `PhotoWheel` rewritten with CSS 3D perspective coverflow (`perspective: 600px`);
+  cards scale + `translateZ` by distance band from active index.
+- S-V2: ✅ Distance algorithm now uses `Math.abs(index - activeIndex)` (3 bands: 0, 1, ≥2),
+  replacing the incorrect `index % 2` even/odd logic.
+- S-V3: ✅ `--wheel-blur-center`, `--wheel-blur-near`, `--wheel-blur-far` tokens added to
+  `tokens.css`; `PhotoWheel` references them via `var()` instead of hardcoded values.
+- S-V4: ✅ `PhotoCard` SHA field now prefixed "SHA-256: {hash}".
+- S-V5: ✅ `PhotoCard` `formatTimestamp()` formats `first_seen_at` as "Captured at HH:MM".
 
 ---
 
