@@ -609,7 +609,7 @@ audit-first writes, and structured audit log entries.
 
 ### 4.3 Worker Layer Extensions
 
-The Phase 2 optional background worker (`photo-ingress-worker.service`) is promoted
+The Phase 2 optional background worker (`nightfall-photo-ingress-worker.service`) is promoted
 to Phase 3.0 mandatory foundation. Extensions to the Phase 2 design:
 
 - Job type registry at startup replaces flat if/elif dispatch (§3.1).
@@ -653,18 +653,18 @@ LXC Container: photo-ingress
 │    ↓ /             → webui/current/  (static assets)         │
 │    ↓ /api/         → 127.0.0.1:8000 (Uvicorn)               │
 │                                                              │
-│  photo-ingress-api.service       127.0.0.1:8000              │
+│  nightfall-photo-ingress-api.service       127.0.0.1:8000              │
 │    ↓ FastAPI + Uvicorn                                       │
 │    ↓ Imports domain modules from nightfall_photo_ingress     │
 │    ↓ SQLite registry (WAL mode)                              │
 │                                                              │
-│  photo-ingress-worker.service    (no socket)                 │
+│  nightfall-photo-ingress-worker.service    (no socket)       │
 │    ↓ Polls job queue via JobQueue interface                   │
 │    ↓ Dispatches to registered job type handlers              │
 │    ↓ SQLite registry (WAL mode, shared)              ← Phase 3.0 promoted │
 │                                                              │
-│  photo-ingress-poll.timer        (no socket)                 │
-│  photo-ingress-trash.timer       (no socket)                 │
+│  nightfall-photo-ingress.timer             (no socket)       │
+│  nightfall-photo-ingress-trash.path        (no socket)       │
 │                                                              │
 │  /mnt/ssd/photo-ingress/thumbnails/  ← WebP cache (Phase 3.1) │
 │                                                              │
@@ -845,14 +845,14 @@ All Phase 3 additions maintain the following constraints from Phase 1 and Phase 
   endpoint is renamed, removed, or response-shape-broken.
 - **Auth continuity:** All new Phase 3 endpoints use the static bearer token. The auth
   dependency in `auth.py` is not modified in Phase 3.
-- **CLI timer isolation:** The `photo-ingress-poll` and `photo-ingress-trash` timers
+- **CLI timer isolation:** The `nightfall-photo-ingress` timer and `nightfall-photo-ingress-trash` path unit
   do not interact with the worker's job queue directly. Domain events fired by
   CLI-invoked domain services are consumed by the worker if it is running; if not
   running, they are not buffered (the worker will process the `pending` item on its
   next queue scan regardless).
 - **Schema migration discipline:** All schema changes are additive only, consistent with
   the Phase 2 compatibility guarantee (web-control-plane-architecture-phase2.md §18).
-- **Worker optional fallback:** If `photo-ingress-worker.service` is stopped, the API
+- **Worker optional fallback:** If `nightfall-photo-ingress-worker.service` is stopped, the API
   and CLI continue to function. Items accumulate without sidecar processing. The API
   returns 404 for thumbnail requests and empty arrays for duplicate and metadata
   requests. No degraded mode affects the primary triage workflow.
@@ -878,7 +878,7 @@ may be skipped without blocking later mandatory chunks unless noted.
   per-type retry policy, dead letter routing.
 - Schema migration: extend `sidecar_jobs` with `job_type`, `max_attempts`,
   `attempt_count`, `depends_on_job_id`, `dead_letter` columns.
-- `photo-ingress-worker.service` promoted from optional to required systemd unit.
+- `nightfall-photo-ingress-worker.service` promoted from optional to required systemd unit.
 - Worker API: `GET /api/v1/worker/queue-stats`, `GET /api/v1/worker/dead-letter`,
   `POST /api/v1/worker/dead-letter/{job_id}/retry`.
 
@@ -1039,7 +1039,7 @@ by measurement.
 2. Drain the SQLite job queue: wait for queue depth to reach zero (confirm via
    `/api/v1/worker/queue-stats`).
 3. Switch `queue_backend = redis` in `photo-ingress.conf`.
-4. Restart `photo-ingress-worker.service`.
+4. Restart `nightfall-photo-ingress-worker.service`.
 5. Verify `/api/v1/worker/queue-stats` returns data sourced from Redis.
 
 **Rollback:** Set `queue_backend = sqlite`; restart worker. SQLite job tables are
@@ -1077,7 +1077,7 @@ additions to that guarantee:
 | CLI timer isolation preserved | No CLI code changes; worker shares SQLite WAL with CLI using the same concurrency model as Phase 2 |
 | SQLite schema additive only | All Phase 3 migrations add new tables or new nullable/defaulted columns |
 | Policy auto-triage is additive | Zero rules in `policy_rules` means zero automated actions; manual triage behaviour is unchanged |
-| Worker failure does not block API or CLI | `photo-ingress-api.service` and CLI timers have no runtime dependency on the worker |
+| Worker failure does not block API or CLI | `nightfall-photo-ingress-api.service` and CLI timers have no runtime dependency on the worker |
 | ML classification is opt-in | Feature flag disabled by default; ONNX Runtime is never imported if flag is off |
 | Redis queue has a clean rollback | SQLite job tables always present; Redis is an overlay, never a permanent replacement |
 | Audit trail integrity | Policy-driven actions are indistinguishable in the audit API from manual triage except for the `actor` field prefix; audit log format is unchanged |

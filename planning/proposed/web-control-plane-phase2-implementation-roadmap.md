@@ -536,7 +536,7 @@ After all mandatory chunks are complete, the following system-level tests are ru
 
 ### 4.3 No-Regression Requirement
 
-The CLI ingest timers (`photo-ingress-poll.timer`, `photo-ingress-trash.timer`) must
+The CLI ingest timers (`nightfall-photo-ingress.timer`, `nightfall-photo-ingress-trash.path`) must
 continue to function correctly throughout all Phase 2 changes. These are independent of
 the web layer; no Phase 2 change touches the CLI ingest code path.
 

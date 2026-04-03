@@ -315,8 +315,8 @@ Topics to cover:
 ### Chunk 4.1 — cli-domain-post-audit-next-steps.md: gate status
 
 Tasks:
-- [x] Read `review/module3-module4-integration-suite-compliance-audit-final.md`
-  and `review/module4-cross-module-state-machine-operator-readiness-final.md`
+- [x] Read `audit/archive/module3-module4-integration-suite-compliance-audit-final.md`
+  and `audit/archive/module4-cross-module-state-machine-operator-readiness-final.md`
 - [x] For each checkbox in Gates 1, 2, 3: determine actual status (done / partial /
   still open)
 - [x] Update checkboxes or add a status summary block at the top of the document
@@ -429,11 +429,11 @@ Tasks:
 ### Chunk 7.1 — Naming consistency sweep
 
 Check every design, planning, and docs file for:
-- [ ] `photo-ingress` CLI invocations → should be `nightfall-photo-ingress`
-- [ ] `photo-ingress-poll.*` systemd units → should be `nightfall-photo-ingress.*`
-- [ ] Any reference to old paths: `ssdpool/onedrive-ingress`, `/mnt/ssd/onedrive-ingress`,
+- [x] `photo-ingress` CLI invocations → should be `nightfall-photo-ingress`
+- [x] `photo-ingress-poll.*` systemd units → should be `nightfall-photo-ingress.*`
+- [x] Any reference to old paths: `ssdpool/onedrive-ingress`, `/mnt/ssd/onedrive-ingress`,
   `nightfall/media/onedrive-ingress`
-- [ ] Any reference to old module paths: `nightfall_photo_ingress/onedrive/`,
+- [x] Any reference to old module paths: `nightfall_photo_ingress/onedrive/`,
   `nightfall_photo_ingress/pipeline/`
 
 ### Chunk 7.2 — Cross-layer invariant check
@@ -454,9 +454,9 @@ Verify these invariants hold across all three layers:
 ### Chunk 7.3 — Internal link health check
 
 For each markdown file in `/design/`, `/planning/`, and `/docs/`:
-- [ ] Scan all `[text](path)` references
-- [ ] Confirm each referenced file exists at the stated path
-- [ ] Flag any dead links for repair
+- [x] Scan all `[text](path)` references
+- [x] Confirm each referenced file exists at the stated path
+- [x] Flag any dead links for repair
 
 ---
 
@@ -480,7 +480,7 @@ For each markdown file in `/design/`, `/planning/`, and `/docs/`:
 | 5.1 | Docs: operations-runbook validation + expansion | Yes | ✅ Done — 2026-04-03 |
 | 5.2 | Docs: app-registration-design reclassification | Yes | ✅ Done — 2026-04-03 |
 | 6.1 | Root ARCHITECTURE.md reference fixes | Yes | ✅ Done — 2026-04-03 |
-| 7.1–7.3 | Consistency validation sweep | Yes | |
+| 7.1–7.3 | Consistency validation sweep | Yes | ✅ Done — 2026-04-03 |
 
 Total: 18 stopping-point chunks.
 
@@ -491,8 +491,8 @@ Total: 18 stopping-point chunks.
 - Implementing any new code (this is documentation work only)
 - Web control plane implementation (no `api/` or `webui/` code)
 - Changing the registry schema or existing migration files
-- Resolving the open points in `review/module6-external-library-download-avoidance-open-point.md`
-  and `review/staging-permissions-security-open-point.md` (these are implementation decisions,
+- Resolving the open points in `audit/open ponts/module6-external-library-download-avoidance-open-point.md`
+  and `audit/open ponts/staging-permissions-security-open-point.md` (these are implementation decisions,
   not documentation tasks — they produce design inputs, not design outputs)
 
 ---

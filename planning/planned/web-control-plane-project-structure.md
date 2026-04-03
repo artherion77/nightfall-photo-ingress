@@ -172,16 +172,16 @@ The `photo-ingress` LXC container will host three systemd services after the ext
 
 | Service unit                  | Process              | Listens on           |
 |-------------------------------|----------------------|----------------------|
-| `photo-ingress-poll.service`  | Python CLI poll      | — (background timer) |
-| `photo-ingress-trash.service` | Python CLI trash job | — (background timer) |
-| `photo-ingress-api.service`   | Uvicorn + FastAPI    | `127.0.0.1:8000` (Phase 1) |
+| `nightfall-photo-ingress.service`       | Python CLI poll      | — (background timer) |
+| `nightfall-photo-ingress-trash.service` | Python CLI trash job | — (background timer) |
+| `nightfall-photo-ingress-api.service`   | Uvicorn + FastAPI    | `127.0.0.1:8000` (Phase 1) |
 
 The API service depends on the registry database being available. It does not depend on
 the poll or trash services.
 
 ### 4.2 Static Asset Serving
 
-The SvelteKit build output (`webui/build/`) is owned by the `photo-ingress-api` service.
+The SvelteKit build output (`webui/build/`) is owned by the `nightfall-photo-ingress-api` service.
 FastAPI serves the built static files at the root URL. No separate web server (Nginx,
 Caddy) is required in Phase 1.
 
@@ -200,7 +200,7 @@ Development machine:
 LXC container (deploy target):
   3. rsync webui/build/ → container:/opt/photo-ingress/webui/build/
   4. pip install -e .    → ensures api deps present
-  5. systemctl restart photo-ingress-api
+  5. systemctl restart nightfall-photo-ingress-api
 ```
 
 For initial deployment and ongoing operator use, static assets are considered a

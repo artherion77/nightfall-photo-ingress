@@ -297,7 +297,7 @@ If SSR is adopted:
 
 1. Switch from `@sveltejs/adapter-static` to `@sveltejs/adapter-node`.
 2. The SvelteKit Node.js server process runs as a second systemd service
-   (`photo-ingress-ui.service`) on `127.0.0.1:3000` (or similar port).
+   (`nightfall-photo-ingress-ui.service`) on `127.0.0.1:3000` (or similar port).
 3. Caddy proxies `/` → `127.0.0.1:3000` instead of serving static files directly.
 4. API calls in `+page.server.js` load functions use server-side fetch with the
    bearer token in server environment variable (never exposed to client).
@@ -362,7 +362,7 @@ Both were deferred from the integration-plan Phase 5 scope.
 ### 9.2 Architecture
 
 The background worker runs as a third systemd service
-(`photo-ingress-worker.service`) inside the same LXC container.
+(`nightfall-photo-ingress-worker.service`) inside the same LXC container.
 
 **Job queue:** In the lightweight Phase 2 model, the job queue is a SQLite table
 (`sidecar_jobs`, `thumbnail_jobs`) polled at a configurable interval by the worker
@@ -675,13 +675,13 @@ LXC Container: photo-ingress
 │    ↓ /              → webui/current/ (static files)    │
 │    ↓ /api/          → 127.0.0.1:8000 (Uvicorn)         │
 │                                                        │
-│  photo-ingress-api.service   127.0.0.1:8000            │
+│  nightfall-photo-ingress-api.service   127.0.0.1:8000  │
 │    ↓ FastAPI + Uvicorn                                 │
 │    ↓ Imports domain modules from nightfall_photo_ingress│
 │    ↓ SQLite registry (WAL mode)                        │
 │                                                        │
-│  photo-ingress-poll.timer    (no socket)               │
-│  photo-ingress-trash.timer   (no socket)               │
+│  nightfall-photo-ingress.timer        (no socket)      │
+│  nightfall-photo-ingress-trash.path   (no socket)      │
 │    ↓ CLI processes, read/write SQLite registry         │
 │                                                        │
 │  webui/                                                │
@@ -695,7 +695,7 @@ LXC Container: photo-ingress
 ### 13.2 Service Inventory (Phase 2 Optional — Background Worker)
 
 ```
-│  photo-ingress-worker.service   127.0.0.1 (no socket)  │
+│  nightfall-photo-ingress-worker.service   (no socket)  │
 │    ↓ Poll sidecar_jobs / thumbnail_jobs tables          │
 │    ↓ Executes fetch/generation jobs                    │
 │    ↓ SQLite registry (WAL mode, shared)                │
@@ -715,7 +715,7 @@ LXC Container (deploy):
   6. Symlink: ln -sfn releases/${RELEASE} current
   7. Perform Caddy config reload (if Caddyfile changed)
   8. Run any pending DB migrations: python -m nightfall_photo_ingress.migrations
-  9. Restart photo-ingress-api.service if Python code changed
+  9. Restart nightfall-photo-ingress-api.service if Python code changed
 ```
 
 Rollback:
@@ -755,9 +755,9 @@ Phase 2 Deployment Dependencies
                    (WAL mode)
                         ▲
                         │ read/write
-              [photo-ingress-poll]
-              [photo-ingress-trash]
-              [photo-ingress-worker] (optional)
+              [nightfall-photo-ingress]
+              [nightfall-photo-ingress-trash]
+              [nightfall-photo-ingress-worker] (optional)
 ```
 
 **Build-time dependencies:**
