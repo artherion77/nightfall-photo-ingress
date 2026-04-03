@@ -9,7 +9,7 @@ from typing import Any
 
 import pytest
 
-from nightfall_photo_ingress.config import AccountConfig, AppConfig, CoreConfig, LoggingConfig
+from nightfall_photo_ingress.config import AccountConfig, AppConfig, CoreConfig, LoggingConfig, WebConfig
 from nightfall_photo_ingress.adapters.onedrive.retry import DEFAULT_POLICY
 from nightfall_photo_ingress.adapters.onedrive.client import (
     _incident_state_path,
@@ -121,6 +121,7 @@ def _make_app_config(
         source_path=tmp_path / "photo-ingress.conf",
         core=core,
         logging=LoggingConfig(),
+        web=WebConfig(),
         accounts=accounts,
     )
 

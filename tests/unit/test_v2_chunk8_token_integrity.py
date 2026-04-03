@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from nightfall_photo_ingress.config import AccountConfig, AppConfig, CoreConfig, LoggingConfig
+from nightfall_photo_ingress.config import AccountConfig, AppConfig, CoreConfig, LoggingConfig, WebConfig
 from nightfall_photo_ingress.adapters.onedrive.auth import AuthError, OneDriveAuthClient
 from nightfall_photo_ingress.adapters.onedrive.cache_lock import SingletonLockBusyError
 from nightfall_photo_ingress.adapters.onedrive.client import GraphError, poll_accounts
@@ -87,6 +87,7 @@ def _make_app_config(tmp_path: Path, account: AccountConfig) -> AppConfig:
         source_path=tmp_path / "photo-ingress.conf",
         core=core,
         logging=LoggingConfig(),
+        web=WebConfig(),
         accounts=(account,),
     )
 

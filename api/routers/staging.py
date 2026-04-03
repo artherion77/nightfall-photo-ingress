@@ -1,21 +1,14 @@
 """Staging queue endpoints."""
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status
 import sqlite3
 
+from api.dependencies import get_registry_connection
 from api.auth import verify_api_token
 from api.schemas import StagingPage, StagingItem
 from api.services import StagingService
 
 router = APIRouter(prefix="/api/v1", tags=["staging"])
-
-
-def get_registry_connection(request: Request) -> sqlite3.Connection:
-    """Get registry connection from app state."""
-    import api.app
-    if api.app._registry_conn is None:
-        raise RuntimeError("Registry connection not initialized")
-    return api.app._registry_conn
 
 
 @router.get("/staging", response_model=StagingPage)

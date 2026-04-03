@@ -1,9 +1,15 @@
 """RapiDoc HTML page for API documentation."""
 
+from pathlib import Path
+
 from fastapi import APIRouter
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse
 
 router = APIRouter(tags=["docs"])
+
+_RAPIDOC_ASSET = (
+  Path(__file__).resolve().parent.parent / "webui" / "static" / "rapiddoc" / "rapidoc-min.js"
+)
 
 RAPIDDOC_HTML = """
 <!doctype html>
@@ -28,14 +34,14 @@ RAPIDDOC_HTML = """
   </head>
   <body>
     <rapi-doc
-      spec-url="./openapi.json"
+      spec-url="/api/openapi.json"
       header-color="#1a1a1a"
       primary-color="#007acc"
       load-fonts="false"
       theme="dark"
     ></rapi-doc>
 
-    <script src="https://cdn.jsdelivr.net/npm/rapidoc@9.3.4/dist/rapidoc-min.js"></script>
+    <script src="/api/static/rapiddoc/rapidoc-min.js"></script>
   </body>
 </html>
 """
@@ -45,3 +51,10 @@ RAPIDDOC_HTML = """
 async def get_rapiddoc() -> str:
     """RapiDoc API documentation UI."""
     return RAPIDDOC_HTML
+
+
+@router.get("/api/static/rapiddoc/rapidoc-min.js")
+async def get_rapiddoc_asset() -> FileResponse:
+  """Serve the local RapiDoc bundle without external CDN dependencies."""
+
+  return FileResponse(_RAPIDOC_ASSET, media_type="text/javascript")

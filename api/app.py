@@ -2,85 +2,70 @@
 
 from contextlib import asynccontextmanager
 import sqlite3
-from typing import Generator
 
-from fastapi import FastAPI, Depends
-from nightfall_photo_ingress.config import load_config, AppConfig
+from fastapi import FastAPI
+
+from nightfall_photo_ingress.config import AppConfig, load_config
 from nightfall_photo_ingress.domain.registry import Registry
 
-from api.auth import set_app_config_for_auth
-from api.routers import health, staging, audit_log, config, blocklist
 from api.rapiddoc import router as rapiddoc_router
-
-# Global state
-_app_config: AppConfig | None = None
-_registry_conn: sqlite3.Connection | None = None
+from api.routers import audit_log, blocklist, config, health, staging
 
 
-def get_app_config() -> AppConfig:
-    """Get the application configuration."""
-    if _app_config is None:
-        raise RuntimeError("App config not initialized")
-    return _app_config
-
-
-def get_registry_connection() -> sqlite3.Connection:
-    """Get the registry database connection."""
-    if _registry_conn is None:
-        raise RuntimeError("Registry connection not initialized")
-    return _registry_conn
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Application lifespan: startup and shutdown."""
-    
-    global _app_config, _registry_conn
-    
-    # Startup
-    try:
-        _app_config = load_config("/etc/nightfall/photo-ingress.conf")
-        set_app_config_for_auth(_app_config)
-        
-        # Initialize registry and get connection
-        registry = Registry(_app_config.core.registry_path)
-        registry.initialize()
-        
-        _registry_conn = sqlite3.connect(
-            _app_config.core.registry_path,
-            check_same_thread=False
-        )
-        _registry_conn.row_factory = sqlite3.Row
-        
-    except Exception as e:
-        print(f"Failed to initialize app: {e}")
-        raise
-    
-    yield
-    
-    # Shutdown
-    if _registry_conn:
-        _registry_conn.close()
-
-
-def create_app() -> FastAPI:
+def create_app(
+    *,
+    config_path: str = "/etc/nightfall/photo-ingress.conf",
+    app_config: AppConfig | None = None,
+    registry_conn: sqlite3.Connection | None = None,
+) -> FastAPI:
     """Create and configure the FastAPI application."""
-    
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        """Application lifespan: startup and shutdown."""
+
+        owns_registry_conn = False
+
+        if app_config is not None:
+            app.state.app_config = app_config
+        else:
+            app.state.app_config = load_config(config_path)
+
+        if registry_conn is not None:
+            app.state.registry_conn = registry_conn
+        else:
+            registry = Registry(app.state.app_config.core.registry_path)
+            registry.initialize()
+            conn = sqlite3.connect(
+                app.state.app_config.core.registry_path,
+                check_same_thread=False,
+            )
+            conn.row_factory = sqlite3.Row
+            app.state.registry_conn = conn
+            owns_registry_conn = True
+
+        yield
+
+        if owns_registry_conn:
+            app.state.registry_conn.close()
+
     app = FastAPI(
         title="nightfall-photo-ingress API",
         description="Web control plane for photo ingress pipeline",
         version="0.1.0",
         lifespan=lifespan,
+        docs_url=None,
+        redoc_url=None,
+        openapi_url="/api/openapi.json",
     )
-    
-    # Include routers
+
     app.include_router(health.router)
     app.include_router(staging.router)
     app.include_router(audit_log.router)
     app.include_router(config.router)
     app.include_router(blocklist.router)
     app.include_router(rapiddoc_router)
-    
+
     return app
 
 

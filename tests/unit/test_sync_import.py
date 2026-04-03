@@ -6,7 +6,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from nightfall_photo_ingress.config import AccountConfig, AppConfig, CoreConfig, LoggingConfig
+from nightfall_photo_ingress.config import AccountConfig, AppConfig, CoreConfig, LoggingConfig, WebConfig
 from nightfall_photo_ingress.domain.registry import Registry
 from nightfall_photo_ingress.sync_import import (
     EXTERNAL_HASH_CACHE_SCOPE,
@@ -65,6 +65,7 @@ def _make_app_config(tmp_path: Path) -> AppConfig:
         source_path=tmp_path / "photo-ingress.conf",
         core=core,
         logging=LoggingConfig(log_level="INFO", console_format="json"),
+        web=WebConfig(),
         accounts=(account,),
     )
 

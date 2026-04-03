@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from nightfall_photo_ingress.config import AccountConfig, AppConfig, CoreConfig, LoggingConfig
+from nightfall_photo_ingress.config import AccountConfig, AppConfig, CoreConfig, LoggingConfig, WebConfig
 from nightfall_photo_ingress.adapters.onedrive.client import (
     _split_anomaly_and_diagnostics,
     download_candidates,
@@ -105,6 +105,7 @@ def _make_app_config(tmp_path: Path, account: AccountConfig) -> AppConfig:
         source_path=tmp_path / "photo-ingress.conf",
         core=core,
         logging=LoggingConfig(),
+        web=WebConfig(),
         accounts=(account,),
     )
 

@@ -1,15 +1,18 @@
 """Bearer token authentication dependency for FastAPI."""
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from nightfall_photo_ingress.config import AppConfig
+
+from api.dependencies import get_app_config
 
 _security = HTTPBearer(auto_error=False)
 
 
 async def verify_api_token(
-    app_config: AppConfig = Depends(lambda: getattr(verify_api_token, "_app_config")),
+    request: Request,
+    app_config: AppConfig = Depends(get_app_config),
     credentials: HTTPAuthorizationCredentials | None = Depends(_security),
 ) -> str:
     """Verify bearer token from request header against configured api_token.
@@ -49,9 +52,5 @@ async def verify_api_token(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
+    _ = request
     return credentials.credentials
-
-
-def set_app_config_for_auth(config: AppConfig) -> None:
-    """Store app config in the auth module for dependency resolution."""
-    verify_api_token._app_config = config  # type: ignore

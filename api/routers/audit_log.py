@@ -1,21 +1,14 @@
 """Audit log endpoints."""
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends
 import sqlite3
 
+from api.dependencies import get_registry_connection
 from api.auth import verify_api_token
 from api.schemas import AuditPage
 from api.services import AuditService
 
 router = APIRouter(prefix="/api/v1", tags=["audit"])
-
-
-def get_registry_connection(request: Request) -> sqlite3.Connection:
-    """Get registry connection from app state."""
-    import api.app
-    if api.app._registry_conn is None:
-        raise RuntimeError("Registry connection not initialized")
-    return api.app._registry_conn
 
 
 @router.get("/audit-log", response_model=AuditPage)

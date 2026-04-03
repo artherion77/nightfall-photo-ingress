@@ -9,7 +9,7 @@ from typing import Any
 
 import pytest
 
-from nightfall_photo_ingress.config import AccountConfig, AppConfig, CoreConfig, LoggingConfig
+from nightfall_photo_ingress.config import AccountConfig, AppConfig, CoreConfig, LoggingConfig, WebConfig
 from nightfall_photo_ingress.adapters.onedrive.client import (
     GraphError,
     download_with_retry,
@@ -110,6 +110,7 @@ def _make_app_config(tmp_path: Path, accounts: tuple[AccountConfig, ...]) -> App
         source_path=tmp_path / "photo-ingress.conf",
         core=core,
         logging=LoggingConfig(),
+        web=WebConfig(),
         accounts=accounts,
     )
 
