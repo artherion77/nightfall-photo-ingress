@@ -127,4 +127,9 @@
   --easing-default: cubic-bezier(0.4, 0, 0.2, 1);
   --easing-ease-in: cubic-bezier(0.4, 0, 1, 1);
   --easing-ease-out: cubic-bezier(0, 0, 0.2, 1);
+
+  /* ===== PHOTO WHEEL ===== */
+  --wheel-blur-center: 0px;
+  --wheel-blur-near: 4px;
+  --wheel-blur-far: 8px;
 }

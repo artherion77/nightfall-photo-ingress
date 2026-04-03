@@ -10,14 +10,22 @@
   }
 
   let { item, active = false }: Props = $props();
+
+  function formatTimestamp(ts: string | undefined): string {
+    if (!ts) return '';
+    const d = new Date(ts);
+    const hh = d.getHours().toString().padStart(2, '0');
+    const mm = d.getMinutes().toString().padStart(2, '0');
+    return `Captured at ${hh}:${mm}`;
+  }
 </script>
 
 <article class="photo-card" class:active data-testid="photo-card">
   <div class="thumb">IMG</div>
   <h3>{item.filename}</h3>
-  <p>{item.sha256.slice(0, 16)}...</p>
+  <p>SHA-256: {item.sha256.slice(0, 16)}...</p>
   <p>{item.account ?? 'unknown account'}</p>
-  <p>{item.first_seen_at ?? ''}</p>
+  <p>{formatTimestamp(item.first_seen_at)}</p>
 </article>
 
 <style>

@@ -13,4 +13,5 @@ dist/
 webui/node_modules/
 webui/.svelte-kit/
 webui/build/
+webui/.env
 api/__pycache__/
