@@ -219,7 +219,7 @@ CHUNK A (state-machine.md) ✅ COMPLETE → commit fa18fe6 + state-machine spec
     ↓
 CHUNK B (live-photo-pair-lifecycle.md) ✅ COMPLETE → commit ac89d15 + live-photo-pair-lifecycle spec
     ↓
-CHUNK C (schema-and-migrations.md) ✅ COMPLETE → commit TBD + schema-and-migrations spec
+CHUNK C (schema-and-migrations.md) ✅ COMPLETE → commit 2f12ee8 + schema-and-migrations spec
 ```
 
 Each chunk must be completed and confirmed before the next begins. No cross-chunk work may be performed during a single chunk's execution turn.
