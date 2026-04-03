@@ -79,6 +79,15 @@ class LoggingConfig:
 
 
 @dataclass(frozen=True)
+class WebConfig:
+    """Optional web control plane configuration."""
+
+    api_token: str = ""
+    bind_host: str = "127.0.0.1"
+    bind_port: int = 8000
+
+
+@dataclass(frozen=True)
 class AccountConfig:
     """Configuration for one source account section."""
 
@@ -108,6 +117,7 @@ class AppConfig:
     source_path: Path
     core: CoreConfig
     logging: LoggingConfig
+    web: WebConfig
     accounts: tuple[AccountConfig, ...]
 
     def ordered_enabled_accounts(self) -> tuple[AccountConfig, ...]:
@@ -161,6 +171,7 @@ def load_config(path: Path | str) -> AppConfig:
     errors: list[str] = []
     core = _parse_core(parser, errors)
     logging_cfg = _parse_logging(parser, errors)
+    web_cfg = _parse_web(parser, errors)
     accounts = _parse_accounts(parser, core.max_downloads_per_poll, errors)
     _validate_section_model(parser, errors)
 
@@ -174,6 +185,7 @@ def load_config(path: Path | str) -> AppConfig:
         source_path=cfg_path,
         core=core,
         logging=logging_cfg,
+        web=web_cfg,
         accounts=tuple(accounts),
     )
 
@@ -395,6 +407,20 @@ def _parse_logging(parser: configparser.ConfigParser, errors: list[str]) -> Logg
     )
 
 
+def _parse_web(parser: configparser.ConfigParser, errors: list[str]) -> WebConfig:
+    """Parse optional [web] values and apply defaults."""
+
+    if "web" not in parser:
+        return WebConfig()
+
+    section = parser["web"]
+    return WebConfig(
+        api_token=_get_str(section, "api_token", errors, default=""),
+        bind_host=_get_str(section, "bind_host", errors, default="127.0.0.1"),
+        bind_port=_get_int(section, "bind_port", errors, default=8000),
+    )
+
+
 def _parse_accounts(
     parser: configparser.ConfigParser,
     inherited_max_downloads: int,
@@ -598,7 +624,7 @@ def _validate_section_model(parser: configparser.ConfigParser, errors: list[str]
     """Reject legacy or unsupported section names for canonical v2 config."""
 
     for section_name in parser.sections():
-        if section_name in {"core", "logging"}:
+        if section_name in {"core", "logging", "web"}:
             continue
         if section_name.startswith("account."):
             continue

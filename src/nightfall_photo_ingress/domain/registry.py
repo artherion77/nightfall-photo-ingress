@@ -976,6 +976,28 @@ CREATE TABLE IF NOT EXISTS ingest_terminal_audit (
     actor TEXT NOT NULL,
     ts TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS blocked_rules (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    pattern TEXT NOT NULL UNIQUE,
+    rule_type TEXT NOT NULL CHECK (rule_type IN ('filename', 'regex')),
+    reason TEXT,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS ui_action_idempotency (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    idempotency_key TEXT NOT NULL UNIQUE,
+    action TEXT NOT NULL,
+    item_id TEXT NOT NULL,
+    request_body_json TEXT,
+    response_status INTEGER NOT NULL,
+    response_body_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL
+);
         """
     )
     conn.commit()
