@@ -1,7 +1,7 @@
 # photo-ingress Design Decisions Log
 
 Status: active
-Last Updated (UTC): 2026-03-31 16:03:18 UTC
+Last Updated (UTC): 2026-04-03 00:00:00 UTC
 
 ---
 
@@ -50,7 +50,7 @@ Field notes:
 ## 3. Decision Records
 
 ## DEC-20260331-01: Primary service naming policy
-- Status: accepted
+- Status: superseded
 - Date (UTC): 2026-03-31 16:03:18 UTC
 - Scope: naming
 - Decision:
@@ -70,6 +70,8 @@ Field notes:
   - Config path is `/etc/nightfall/photo-ingress.conf`.
 - Supersedes:
   - none
+- Superseded by:
+  - DEC-20260403-01 (CLI naming portion only; service/data path naming unchanged)
 - References:
   - `design/architecture.md`
   - `design/configspec.md`
@@ -200,3 +202,237 @@ Field notes:
   - `src/nightfall_photo_ingress/reject.py`
   - `src/nightfall_photo_ingress/cli.py`
   - `design/configspec.md`
+
+## DEC-20260403-01: CLI and systemd unit naming finalization
+- Status: accepted
+- Date (UTC): 2026-04-03 00:00:00 UTC
+- Scope: naming
+- Decision:
+  - The installed CLI command is `nightfall-photo-ingress` (not `photo-ingress`).
+  - systemd units use the `nightfall-` prefix throughout:
+    - `nightfall-photo-ingress.service` (poll run, invoked by timer)
+    - `nightfall-photo-ingress.timer` (scheduled activation)
+    - `nightfall-photo-ingress-trash.path` (inotify watch on trash directory)
+    - `nightfall-photo-ingress-trash.service` (processes trash events)
+  - Service-level naming (config path, status file, ZFS dataset) retains `photo-ingress`
+    without the `nightfall-` prefix.
+- Rationale:
+  - Binary names published to `$PATH` carry the `nightfall-` prefix for consistency
+    with all other nightfall tooling (`nightfall-zfs-snapshot-*`,
+    `nightfall-health-report`, etc.) and to avoid collision with any upstream
+    `photo-ingress` package in system package managers.
+  - Config and data paths (`/etc/nightfall/photo-ingress.conf`,
+    `/mnt/ssd/photo-ingress`, `/run/nightfall-status.d/photo-ingress.json`) omit
+    the prefix to keep paths concise and readable in operator workflows.
+- Alternatives Considered:
+  - `photo-ingress` for all names (original DEC-20260331-01 intent).
+  - `nightfall-photo-ingress` for all names including config paths.
+- Consequences:
+  - DEC-20260331-01 is partially superseded: the service-level naming policy
+    (`photo-ingress`) is retained; the CLI/unit naming policy changes to
+    `nightfall-photo-ingress`.
+  - `design/domain-architecture-overview.md` §1.1 is corrected to reflect
+    actual installed names.
+- Implementation Notes:
+  - `pyproject.toml` console_scripts entry:
+    `nightfall-photo-ingress = "nightfall_photo_ingress.cli:main"`
+  - Operator docs must always use `nightfall-photo-ingress` for all
+    invocation examples; never abbreviate to `photo-ingress`.
+- Supersedes:
+  - DEC-20260331-01 (CLI naming portion only; service/data path naming unchanged)
+- References:
+  - `pyproject.toml`
+  - `systemd/nightfall-photo-ingress.service`
+  - `systemd/nightfall-photo-ingress.timer`
+  - `systemd/nightfall-photo-ingress-trash.path`
+  - `systemd/nightfall-photo-ingress-trash.service`
+  - `design/domain-architecture-overview.md` (§1.1)
+
+## DEC-20260403-02: Domain/adapters/runtime module separation
+- Status: accepted
+- Date (UTC): 2026-04-03 00:00:00 UTC
+- Scope: other
+- Decision:
+  - Refactor package layout from monolithic `onedrive/` and `pipeline/` subdirectories
+    into a three-layer structure:
+    - `domain/` — pure business logic; no adapter dependencies
+      (registry, ingest, storage, journal)
+    - `adapters/onedrive/` — Microsoft Graph/MSAL integration; isolated source-adapter
+      (auth, client, retry, cache_lock, errors, safe_logging)
+    - `runtime/` — process lifecycle helpers not specific to any adapter
+      (process_lock)
+  - Top-level CLI modules (`poll.py`, `accept.py`, `reject.py`, `purge.py`,
+    `process_trash.py`, `sync_import.py`, `status_export.py`, `config_check.py`)
+    remain at the package root and are thin orchestrators only.
+- Rationale:
+  - The monolithic layout entangled OneDrive specifics with domain logic, making
+    the boundary opaque and the domain layer difficult to test without mocking
+    adapter internals.
+  - A future source adapter (e.g. local-path, S3) can be added under
+    `adapters/<provider>/` without touching `domain/`.
+  - The `runtime/` layer provides shared lifecycle helpers (process lock) that
+    are not OneDrive-specific.
+- Alternatives Considered:
+  - Continue with monolithic layout and rely on import discipline.
+  - Full hexagonal ports-and-adapters with explicit interface protocols.
+- Consequences:
+  - All domain unit tests can be run without any MSAL/httpx imports.
+  - Adapter integration tests are isolated under `tests/integration/`.
+  - Adding a second source adapter requires only a new `adapters/<provider>/`
+    subtree and CLI orchestration.
+- Implementation Notes:
+  - The domain layer must never import from `adapters/`.
+  - The `DownloadedHandoffCandidate` dataclass (in `adapters/onedrive/client.py`)
+    is the M3→M4 boundary contract; domain `IngestDecisionEngine` accepts it as
+    opaque input.
+- Supersedes:
+  - none
+- References:
+  - `src/nightfall_photo_ingress/domain/`
+  - `src/nightfall_photo_ingress/adapters/onedrive/`
+  - `src/nightfall_photo_ingress/runtime/`
+  - `design/domain-architecture-overview.md` (§9 File Layout)
+  - `ARCHITECTURE.md`
+
+## DEC-20260403-03: Append-only JSONL lifecycle journal for crash recovery
+- Status: accepted
+- Date (UTC): 2026-04-03 00:00:00 UTC
+- Scope: pipeline
+- Decision:
+  - Maintain a separate JSONL append-only journal (`IngestOperationJournal`) alongside
+    the SQLite `audit_log` for crash-boundary operation recovery.
+  - The journal records phase transitions (`download_started`, `hash_computed`,
+    `decision_applied`, `finalized`) for each ingest operation.
+  - Each write is durable: `handle.flush()` + `os.fsync()` before returning.
+  - Journal rotates at `max_bytes` (default 5 MB), renaming to `.1` before restarting.
+  - On startup, `reconcile_interrupted_operations()` reads all journal records and
+    replays any operation that reached `hash_computed` or `decision_applied` but
+    not `finalized`.
+- Rationale:
+  - The SQLite registry cannot detect partially-completed multi-step operations:
+    a file may be moved to `pending_path` but the registry row commit may not
+    have followed due to a crash. The journal provides a lighter-weight phase
+    marker that survives the crash and enables correct replay.
+  - Replay is safe because all downstream registry operations use
+    `ON CONFLICT DO UPDATE` and `INSERT OR IGNORE` guards.
+  - Keeping the journal separate from the audit_log avoids locking the registry
+    database during the recovery scan at startup.
+- Alternatives Considered:
+  - SQLite-only recovery using a `status='in_progress'` sentinel row.
+  - Two-phase commit with a separate `staging_ops` table in the registry.
+- Consequences:
+  - The journal file path must be configured (`journal_path`); if absent, the
+    journal is disabled and crash recovery falls back to manual staging reconciliation.
+  - Zero-byte files discovered during replay are quarantined (not silently discarded)
+    with an audit record written.
+  - The journal is ephemeral crash-boundary state; the audit_log remains the
+    authoritative permanent record.
+- Implementation Notes:
+  - `IngestOperationJournal.append()` is called at each phase boundary.
+  - Each `JournalRecord` carries: `op_id`, `phase`, `ts` (UTC ISO-8601),
+    `account`, `onedrive_id`, `staging_path`, `destination_path`, `sha256`.
+  - The journal file is stored under the staging working directory, not under
+    the permanent library.
+- Supersedes:
+  - none
+- References:
+  - `src/nightfall_photo_ingress/domain/journal.py`
+  - `design/domain-architecture-overview.md` (§14 Ingest Lifecycle Journal)
+
+## DEC-20260403-04: URL and token redaction at all adapter raise sites
+- Status: accepted
+- Date (UTC): 2026-04-03 00:00:00 UTC
+- Scope: security
+- Decision:
+  - All exception raise sites in the OneDrive adapter must call `redact_url()`
+    before attaching a URL to an exception message, `safe_hint`, or log record.
+  - `redact_url()` contract:
+    1. If the URL contains a query string, strip it entirely and append
+       ` [query redacted]` to the base URL.  Pre-authenticated OneDrive download
+       URLs embed bearer tokens in query parameters (`tempauth`, `sig`, `sv`, `sp`,
+       etc.).
+    2. Base URL (netloc+path) is truncated to 80 chars for readability.
+    3. Never raises; returns fixed sentinels `<empty-url>` or `<unparseable-url>`
+       on degenerate input.
+  - Safe (no query string) URLs are passed through up to 120 chars.
+  - `redact_token()` is used for access tokens: shows only the first 6 chars and
+    total length.
+  - `sanitize_extra()` (`adapters/onedrive/safe_logging.py`) strips any `extra=`
+    dict key matching known credential patterns before it reaches the logging
+    handler.
+- Rationale:
+  - Pre-authenticated OneDrive/SharePoint download URLs carry full bearer material
+    in query strings. Any unredacted URL in a log line, exception message, or
+    traceback constitutes a credential leak.
+  - Enforcing redaction at raise sites (not at log-format time) ensures the URL
+    is safe regardless of how the exception is later logged or surfaced.
+- Alternatives Considered:
+  - Log-formatter-level redaction (fragile: depends on all paths routing through
+    the filterer).
+  - Avoid storing URLs in exceptions at all (loses diagnostically useful domain
+    information).
+- Consequences:
+  - Every `GraphError`, `DownloadError`, or `AuthError` raised with a URL must
+    use `redact_url()` before passing the URL.
+  - Code review and testing must verify no raw pre-authenticated URLs appear in
+    exception messages, `str(exc)`, or log output.
+- Implementation Notes:
+  - `redact_url()` and `redact_token()` are defined in
+    `src/nightfall_photo_ingress/adapters/onedrive/errors.py`.
+  - `sanitize_extra()` is defined in
+    `src/nightfall_photo_ingress/adapters/onedrive/safe_logging.py`.
+  - The `_SECRET_PARAMS` regex in `errors.py` enumerates the full set of
+    redaction targets as documentation; the actual redaction strips the entire
+    query string (belt-and-suspenders).
+- Supersedes:
+  - none
+- References:
+  - `src/nightfall_photo_ingress/adapters/onedrive/errors.py`
+  - `src/nightfall_photo_ingress/adapters/onedrive/safe_logging.py`
+  - `design/domain-architecture-overview.md` (§15 Error Taxonomy and Resilience)
+
+## DEC-20260403-05: Per-account singleton lock for concurrent poll safety
+- Status: accepted
+- Date (UTC): 2026-04-03 00:00:00 UTC
+- Scope: security
+- Decision:
+  - A non-blocking advisory file lock (`account_singleton_lock`) is acquired for
+    each account before any MSAL token cache operation.
+  - The lock is stored in a sibling `.runtime.lock` file in the token cache
+    directory, separate from the cache file itself.
+  - If the lock cannot be acquired (another process holds it), a
+    `SingletonLockBusyError` is raised and the account is skipped for that run.
+  - A separate `cache_file_lock` (blocking) serializes reads and writes of the
+    MSAL cache file within a single process.
+- Rationale:
+  - The global process lock (`runtime/process_lock.py`) serialises poll runs
+    within a single scheduled invocation but does not protect against an
+    operator manually running a second poll concurrently in a separate shell.
+  - MSAL's `SerializableTokenCache` is not safe for concurrent writers: two
+    simultaneous writes will corrupt the cache. The per-account singleton lock
+    closes this gap for cross-process scenarios.
+  - A non-blocking acquire (LOCK_NB) is correct here: a busy lock means another
+    process is actively using the account; the current run should skip that
+    account rather than waiting.
+- Alternatives Considered:
+  - Rely solely on the global process lock (insufficient for manual concurrent usage).
+  - Use a database row lock in the registry (adds RTT overhead for an in-process
+    concern).
+- Consequences:
+  - If an operator runs two concurrent poll invocations, the second invocation
+    skips all accounts currently locked by the first; no cache corruption occurs.
+  - The lock is advisory (POSIX `fcntl.flock`): it provides no protection if a
+    rogue process bypasses the lock entirely.
+- Implementation Notes:
+  - `account_singleton_lock(cache_path, lock_name=".runtime.lock")` in
+    `src/nightfall_photo_ingress/adapters/onedrive/cache_lock.py`.
+  - Lock granularity is per-account: accounts sharing no token cache directory
+    do not contend.
+  - Lock files are created automatically; they are never deleted (deletion between
+    lock and use could allow races).
+- Supersedes:
+  - none
+- References:
+  - `src/nightfall_photo_ingress/adapters/onedrive/cache_lock.py`
+  - `src/nightfall_photo_ingress/runtime/process_lock.py`
+  - `design/domain-architecture-overview.md` (§7 Process Model and Concurrency)
