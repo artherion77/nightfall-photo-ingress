@@ -21,5 +21,18 @@ This category covers **web control plane and UI design only**. It is separate fr
 core CLI/pipeline design documents in `design/` (ingest, registry, accept/reject workflows)
 and from the runtime architecture documents in `design/architecture/`.
 
-For the CLI-layer domain architecture, see [`design/domain-architecture-overview.md`](../domain-architecture-overview.md).  
-For the backend API specification, see the backend source and `docs/` operator documents.
+## Related Core Design Documents
+
+| Topic | Document |
+|---|---|
+| Domain model and bounded context | [design/domain/domain-model.md](../domain/domain-model.md) |
+| Registry schema (shared by API and CLI) | [design/specs/registry.md](../specs/registry.md) |
+| Accept / reject / purge flows (API mirrors these) | [design/specs/accept.md](../specs/accept.md), [design/specs/reject.md](../specs/reject.md), [design/specs/purge.md](../specs/purge.md) |
+| System invariants the web layer must preserve | [design/architecture/invariants.md](../architecture/invariants.md) |
+| UI mockup images | [design/ui-mocks/](../ui-mocks/) |
+
+For the CLI-layer domain architecture, see [`design/domain-architecture-overview.md`](../domain-architecture-overview.md).
+
+---
+
+*Parent: [design/README.md](../README.md)*

@@ -1,11 +1,29 @@
-## Module Architecture After Refactoring
+## Module Architecture — Navigation Index
 
-This document explains the new modular structure, designed for extensibility to support multiple data sources (OneDrive, Google Photos, Flickr, etc.).
+> This document is retained as a navigation reference. The authoritative design
+> documentation is in `design/`. Sections that formerly lived here have been extracted
+> to focused topic documents; cross-references are provided below.
 
-For web operator surface and API expansion planning, see:
-- [design/web/web-control-plane-architecture-phase2.md](design/web/web-control-plane-architecture-phase2.md)
-- [design/web/web-control-plane-architecture-phase3.md](design/web/web-control-plane-architecture-phase3.md)
-- [planning/planned/web-control-plane-integration-plan.md](planning/planned/web-control-plane-integration-plan.md)
+---
+
+### Design Document Map
+
+| Topic | Document |
+|---|---|
+| Domain model, entity map, module-layer map | [design/domain/domain-model.md](design/domain/domain-model.md) |
+| Domain constraints and invariants | [design/domain/constraints.md](design/domain/constraints.md) |
+| Naming conventions and glossary | [design/domain/glossary.md](design/domain/glossary.md) |
+| Adapter extensibility rationale | [design/rationale/tradeoffs.md](design/rationale/tradeoffs.md) |
+| Pipeline data flow | [design/architecture/data-flow.md](design/architecture/data-flow.md) |
+| File status state machine | [design/architecture/state-machine.md](design/architecture/state-machine.md) |
+| Ingest lifecycle and crash recovery | [design/architecture/lifecycle.md](design/architecture/lifecycle.md) — overview; full spec: [design/ingest-lifecycle-and-crash-recovery.md](design/ingest-lifecycle-and-crash-recovery.md) |
+| Error taxonomy and resilience | [design/architecture/error-model.md](design/architecture/error-model.md) — overview; full spec: [design/error-taxonomy-and-resilience.md](design/error-taxonomy-and-resilience.md) |
+| Observability internals | [design/architecture/observability.md](design/architecture/observability.md) — overview; full spec: [design/observability.md](design/observability.md) |
+| Configuration specification | [design/cli-config-specification.md](design/cli-config-specification.md) |
+| Auth design | [design/auth-design.md](design/auth-design.md) |
+| Web control plane | [design/web/](design/web/) |
+
+---
 
 ### Directory Structure
 
@@ -41,38 +59,10 @@ src/nightfall_photo_ingress/
 │       └── safe_logging.py  URL/credential redaction for logs
 ```
 
-### Module Responsibilities
-
-#### **domain/** — Core Extensibility Layer
-- **Registry**: ACID-safe system of record for ingested files, audit logs, metadata pre-filters
-- **Storage**: Path templating, cross-pool resilience, durable queue-transition workflows
-- **IngestDecisionEngine**: Hash-based policy matrix (unknown → pending, known → discard)
-- **Journal**: Append-only lifecycle log for crash recovery and idempotency
-
-These modules are **source-agnostic** and work the same way whether data comes from OneDrive, Google Photos, or any future adapter.
-
-#### **adapters/onedrive/** — Pluggable Data Source
-All communication with external systems is isolated here:
-- MSAL OAuth token management
-- Microsoft Graph API deltas and file downloads
-- Provider-specific error handling and retries
-
-Future adapters follow this same pattern:
-```
-adapters/
-├── onedrive/      (existing)
-├── google_photos/ (future)
-├── flickr/        (future)
-└── base.py        (common adapter interface)
-```
-
-#### **runtime/** — Infrastructure
-Currently a placeholder for:
-- Command orchestration
-- Lifecycle management
-- Pluggable runtime adapters (e.g., systemd integration, container runtimes)
-- Process-level singleton lock (`cache_lock.py`) ensuring one poll runs at a time
-- Per-account singleton lock preventing concurrent poll runs from racing on the same account's MSAL token cache
+> **Module responsibilities and entity descriptions** are documented in
+> [design/domain/domain-model.md](design/domain/domain-model.md).  
+> **Adapter extensibility pattern** is documented in
+> [design/rationale/tradeoffs.md](design/rationale/tradeoffs.md).
 
 ---
 
@@ -160,16 +150,9 @@ from nightfall_photo_ingress.adapters import onedrive, google_photos
 
 ### Version Boundary
 
+> The version boundary constraints are defined in
+> [design/domain/constraints.md](design/domain/constraints.md).
+
 - **CLI surface:** includes `accept` and `purge` as first-class human state transitions
 - **State machine:** ingest writes `pending`; only explicit operator accept writes `accepted_records`
 - **Compatibility policy:** v2.0 drops accepted-first config and legacy registry upgrade paths; bootstrap a fresh config and registry for deployment
-
----
-
-### Design Benefits
-
-1. **Separation of Concerns**: Domain logic (what to do with files) is isolated from adapter logic (how to fetch them)
-2. **Testability**: Each layer can be tested independently without mocking entire systems
-3. **Scalability**: Adding a new source requires only a new adapter; core pipeline unchanged
-4. **Maintainability**: Clear module boundaries make code easier to understand and modify
-5. **Reusability**: Domain policies (registry, storage, ingest) can be used by multiple adapters simultaneously

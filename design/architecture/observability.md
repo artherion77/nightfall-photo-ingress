@@ -1,7 +1,8 @@
-# Observability Specification
+# Observability — Overview
 
-**Status:** active  
+**Status:** active — overview  
 **Source:** extracted from `design/domain-architecture-overview.md` §16  
+**Full specification:** [design/observability.md](../observability.md) — complete JSON log field schema, human vs. JSON mode comparison, safe_logging design, and status snapshot writer contract  
 **See also:** [architecture/error-model.md](error-model.md), [architecture/lifecycle.md](lifecycle.md)
 
 ---

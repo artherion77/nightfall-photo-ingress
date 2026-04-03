@@ -1,7 +1,8 @@
-# Ingest Lifecycle and Crash Recovery
+# Ingest Lifecycle and Crash Recovery — Overview
 
-**Status:** active  
+**Status:** active — overview  
 **Source:** extracted from `design/domain-architecture-overview.md` §6.1, §6.1.1, §14  
+**Full specification:** [design/ingest-lifecycle-and-crash-recovery.md](../ingest-lifecycle-and-crash-recovery.md) — complete JSONL record format, phase sequence, recovery action detail, StagingDriftReport classification, and zero-byte policy  
 **See also:** [specs/ingest.md](../specs/ingest.md), [architecture/data-flow.md](data-flow.md), [architecture/state-machine.md](state-machine.md)
 
 ---
