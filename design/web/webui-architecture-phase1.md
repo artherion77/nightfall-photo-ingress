@@ -39,7 +39,7 @@ SSR is **deferred**, not rejected. The Phase 1 rationale for deferral:
 - All data is fetched client-side from the REST API.
 - A running Node.js server process on the LXC host is an unnecessary Phase 1 dependency.
 
-SSR remains a viable future upgrade path. See `design/web-control-plane-architecture-phase2.md` §7 for the conditions under which SSR adoption is warranted and the migration steps to `@sveltejs/adapter-node`.
+SSR remains a viable future upgrade path. See `design/web/web-control-plane-architecture-phase2.md` §7 for the conditions under which SSR adoption is warranted and the migration steps to `@sveltejs/adapter-node`.
 
 ---
 

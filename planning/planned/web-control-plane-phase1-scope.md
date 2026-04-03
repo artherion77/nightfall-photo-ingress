@@ -4,9 +4,9 @@ Status: Decided
 Date: 2026-04-03 (rev 2: 2026-04-03)
 Owner: Systems Engineering
 Supersedes: Relevant sections of planning/planned/web-control-plane-integration-plan.md (Phase 7),
-            design/webui-architecture-phase1.md (§2, §3.2, §6),
-            design/webui-design-tokens-phase1.md (§11),
-            design/webui-component-mapping-phase1.md (§3.1, §4.1, §6.1, §7.1, §7.3)
+            design/web/webui-architecture-phase1.md (§2, §3.2, §6),
+            design/web/webui-design-tokens-phase1.md (§11),
+            design/web/webui-component-mapping-phase1.md (§3.1, §4.1, §6.1, §7.1, §7.3)
 
 ---
 
@@ -379,7 +379,7 @@ The following table defines what is and is not in Phase 1 after the re-evaluatio
 
 | Document | Sections affected | Nature of change |
 |----------|------------------|-----------------|
-| `design/webui-architecture-phase1.md` | §2, §3.2, §6.1, §6.2 | SSR framing (C1); health polling ownership (C3) |
+| `design/web/webui-architecture-phase1.md` | §2, §3.2, §6.1, §6.2 | SSR framing (C1); health polling ownership (C3) |
 | `planning/planned/web-control-plane-integration-plan.md` | Phase table, Phase 7 | Phase 7 reclassified via this document; no direct edit required |
-| `design/webui-design-tokens-phase1.md` | §11, new §13 | KPI threshold table removed, config-API note added (C11); Photo-Wheel blur tokens added (C12) |
-| `design/webui-component-mapping-phase1.md` | §3.1, §4.1, §6.1, §7.1, §7.3 | Filter Sidebar deferred to Phase 2 (C9); blur tokenization (C12); LoadMoreButton pagination (C10) |
+| `design/web/webui-design-tokens-phase1.md` | §11, new §13 | KPI threshold table removed, config-API note added (C11); Photo-Wheel blur tokens added (C12) |
+| `design/web/webui-component-mapping-phase1.md` | §3.1, §4.1, §6.1, §7.1, §7.3 | Filter Sidebar deferred to Phase 2 (C9); blur tokenization (C12); LoadMoreButton pagination (C10) |

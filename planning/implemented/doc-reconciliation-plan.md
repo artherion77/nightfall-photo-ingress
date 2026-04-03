@@ -74,7 +74,7 @@ planning/web-control-plane-implementation-roadmap.md
 ```
 
 Neither file exists under those paths. The correct paths are:
-- `design/web-control-plane-architecture-phase2.md` (and phase3)
+- `design/web/web-control-plane-architecture-phase2.md` (and phase3)
 - `planning/planned/web-control-plane-integration-plan.md`
 
 ### F4 — Planning: Gate status for post-audit next steps is unknown
@@ -412,8 +412,8 @@ Tasks:
 
 Tasks:
 - [x] Replace `design/web-control-plane-architecture-extension.md` reference with
-  correct paths: `design/web-control-plane-architecture-phase2.md` and
-  `design/web-control-plane-architecture-phase3.md`
+  correct paths: `design/web/web-control-plane-architecture-phase2.md` and
+  `design/web/web-control-plane-architecture-phase3.md`
 - [x] Replace `planning/web-control-plane-implementation-roadmap.md` reference with
   `planning/planned/web-control-plane-integration-plan.md`
 - [x] Review the module responsibilities table and verify it is consistent with the

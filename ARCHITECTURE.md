@@ -3,8 +3,8 @@
 This document explains the new modular structure, designed for extensibility to support multiple data sources (OneDrive, Google Photos, Flickr, etc.).
 
 For web operator surface and API expansion planning, see:
-- [design/web-control-plane-architecture-phase2.md](design/web-control-plane-architecture-phase2.md)
-- [design/web-control-plane-architecture-phase3.md](design/web-control-plane-architecture-phase3.md)
+- [design/web/web-control-plane-architecture-phase2.md](design/web/web-control-plane-architecture-phase2.md)
+- [design/web/web-control-plane-architecture-phase3.md](design/web/web-control-plane-architecture-phase3.md)
 - [planning/planned/web-control-plane-integration-plan.md](planning/planned/web-control-plane-integration-plan.md)
 
 ### Directory Structure

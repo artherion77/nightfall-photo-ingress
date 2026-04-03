@@ -1,6 +1,6 @@
 # Documentation Structure Mapping Implementation Plan
 
-**Status:** Chunk D complete; Chunks B, A, C pending  
+**Status:** Chunks D and B complete; Chunks A and C pending  
 **Author:** GitHub Copilot  
 **Created:** 2026-04-03  
 **Authoritative source:** `audit/documentation-structure-mapping.md` — Summary and Recommendations  
@@ -45,9 +45,9 @@ that is identified incidentally must be annotated but not performed:
 ## Execution Order
 
 ```
-CHUNK D (housekeeping — no content work) ✅ COMPLETE → commit TBD
+CHUNK D (housekeeping — no content work) ✅ COMPLETE → commit 6a4ee6a
     ↓
-CHUNK B (add missing structural categories) → STOP, await user review
+CHUNK B (add missing structural categories) ✅ COMPLETE → commit TBD
     ↓
 CHUNK A (decompose composite documents) → STOP, await user review
     ↓

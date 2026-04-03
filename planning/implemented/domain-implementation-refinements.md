@@ -8,8 +8,8 @@ Implementation status:
 - This document was the implementation guide for CLI/domain Modules 0–4.
 - Items A–F (configuration, registry, pipeline, observability, CLI, security) are reflected
   in the current codebase under `src/nightfall_photo_ingress/`.
-- Web control plane refinements (API, UI) are addressed by `design/webui-architecture-phase1.md`,
-  `design/web-control-plane-architecture-phase2.md`, and `design/web-control-plane-architecture-phase3.md`.
+- Web control plane refinements (API, UI) are addressed by `design/web/webui-architecture-phase1.md`,
+  `design/web/web-control-plane-architecture-phase2.md`, and `design/web/web-control-plane-architecture-phase3.md`.
 - This document is retained as the authoritative requirements record for the implemented domain layer.
 
 ---

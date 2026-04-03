@@ -6,8 +6,8 @@ Owner: Systems Engineering
 
 Superseded note:
 - This document is the original scoping sketch for the Web Control Plane extension.
-- Superseded by `design/webui-architecture-phase1.md` (Phase 1 SvelteKit architecture) and
-  `design/web-control-plane-architecture-phase2.md` (Phase 2 architecture), which expand on all
+- Superseded by `design/web/webui-architecture-phase1.md` (Phase 1 SvelteKit architecture) and
+  `design/web/web-control-plane-architecture-phase2.md` (Phase 2 architecture), which expand on all
   sections with greater specificity. Retained as the original scoping record.
 
 ## 1. Intent

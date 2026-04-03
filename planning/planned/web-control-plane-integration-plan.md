@@ -165,7 +165,7 @@ build. Dashboard and audit pages are fully functional.
 
 Build components in dependency order (dependencies first):
 
-1. **Design tokens** — `tokens.css` with all tokens from `design/webui-design-tokens-phase1.md`.
+1. **Design tokens** — `tokens.css` with all tokens from `design/web/webui-design-tokens-phase1.md`.
 2. **Common primitives** — `StatusBadge`, `KpiCard`, `LoadingSkeleton`, `ErrorBanner`,
    `EmptyState`, `ActionButton`.
 3. **Layout components** — `AppHeader`, `AppFooter`.
@@ -397,9 +397,9 @@ To maintain visual consistency across all phases:
    component `<style>` blocks.
 2. **New pages follow the pattern:** `+page.svelte` renders only layout-level composition
    of components from `$lib/components/`. No ad-hoc styles in page files.
-3. **New components register in `design/webui-architecture-phase1.md`.** Before creating a new
+3. **New components register in `design/web/webui-architecture-phase1.md`.** Before creating a new
    component, check if an existing one can be composed. Document additions.
-4. **New design tokens are added to `design/webui-design-tokens-phase1.md` first.** No new custom
+4. **New design tokens are added to `design/web/webui-design-tokens-phase1.md` first.** No new custom
    property is introduced in component code without first being defined in the token
    catalogue.
 
