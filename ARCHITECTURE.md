@@ -17,8 +17,8 @@
 | Pipeline data flow | [design/architecture/data-flow.md](design/architecture/data-flow.md) |
 | File status state machine | [design/architecture/state-machine.md](design/architecture/state-machine.md) |
 | Ingest lifecycle and crash recovery | [design/architecture/lifecycle.md](design/architecture/lifecycle.md) — overview; full spec: [design/architecture/ingest-lifecycle-and-crash-recovery.md](design/architecture/ingest-lifecycle-and-crash-recovery.md) |
-| Error taxonomy and resilience | [design/architecture/error-model.md](design/architecture/error-model.md) — overview; full spec: [design/architecture/error-taxonomy-and-resilience.md](design/architecture/error-taxonomy-and-resilience.md) |
-| Observability internals | [design/architecture/observability-overview.md](design/architecture/observability-overview.md) — overview; full spec: [design/architecture/observability.md](design/architecture/observability.md) |
+| Error taxonomy and resilience | [design/architecture/error-taxonomy-and-resilience.md](design/architecture/error-taxonomy-and-resilience.md) |
+| Observability internals | [design/architecture/observability.md](design/architecture/observability.md) |
 | Configuration specification | [design/cli-config-specification.md](design/cli-config-specification.md) |
 | Auth design | [design/auth-design.md](design/auth-design.md) |
 | Web control plane | [design/web/](design/web/) |

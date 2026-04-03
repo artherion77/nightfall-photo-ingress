@@ -35,6 +35,19 @@ all output is structured and can be forwarded to a log aggregator or queried wit
 In JSON mode, each log record is a single-line JSON object written to stderr. Field
 order is sorted alphabetically (via `json.dumps(sort_keys=True)`).
 
+Example record:
+
+```json
+{
+  "account": "christopher",
+  "level": "INFO",
+  "logger": "nightfall_photo_ingress.adapters.onedrive.client",
+  "message": "poll complete",
+  "run_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "ts": "2026-04-03T12:00:00.000000+00:00"
+}
+```
+
 ### 3.1 Guaranteed Base Fields
 
 | Field | Type | Description |
@@ -224,3 +237,9 @@ through `_RedactingFormatter` before writing.
 
 This flag is intended only for development and support diagnostics; it must never be
 set in production systemd units.
+
+---
+
+*For error categories and retry policy, see [error-taxonomy-and-resilience.md](error-taxonomy-and-resilience.md).*  
+*For per-operation journal and crash recovery, see [lifecycle.md](lifecycle.md).*  
+*For operator status file interpretation, see [docs/operator/operational-playbook.md](../../docs/operator/operational-playbook.md).*

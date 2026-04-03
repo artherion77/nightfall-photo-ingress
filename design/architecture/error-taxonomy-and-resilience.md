@@ -289,3 +289,26 @@ Before each new account is polled, the remaining budget is checked. If the budge
 exhausted, `_runtime_budget_exhausted_result()` is returned for that account without
 starting a poll — the account is not partially polled. The status snapshot reflects
 `scheduler_runtime_budget_exhausted` in the anomaly counts.
+
+---
+
+## 8. Edge Cases and Mitigations
+
+| Edge case | Mitigation |
+|---|---|
+| OneDrive rename / move | Graph delta reports `deleted` + new `created`; metadata_index hit on `onedrive_id` prevents re-download after rename if size+mtime match |
+| Partial / in-progress upload | Delta API only returns complete items; items without `file.hashes` or missing `@microsoft.graph.downloadUrl` are skipped |
+| Name collision in pending/accepted/rejected | Template rendering + collision-safe suffixing preserves uniqueness |
+| Delta cursor loss | Fall back to `?token=latest` (last 30 days) or full folder scan; registry idempotency prevents re-ingesting known files |
+| Cross-pool atomic move | Ingest and accept transitions choose rename vs copy-verify-unlink based on filesystem topology |
+| Concurrent poll runs | Explicit global process lock serializes full poll runs across CLI and timer paths; `Type=oneshot` is a secondary defense |
+| Auth token expiry | MSAL handles refresh transparently; auth failure threshold triggers status snapshot `auth_failed` after repeated failures |
+| Operator manually moves accepted files away | `accepted_records` table preserves acceptance truth independent of current file location |
+| Rejected retention and purge safety | Rejected artifacts remain in `rejected/` until explicit purge; purge rejects out-of-root paths |
+| Immich DB purge or upgrade | Pipeline is Immich-independent; permanent library remains the viewer source of truth |
+| HDD spin-up discipline | Staging, hashing, and registry all on SSD; HDD writes occur on pending/accept/reject transitions only |
+
+---
+
+*For observability and diagnostic counters, see [observability.md](observability.md).*  
+*For crash recovery and lifecycle journal, see [lifecycle.md](lifecycle.md).*
