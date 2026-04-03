@@ -1,6 +1,6 @@
 # Critical Architecture Completion Plan
 
-**Status:** Pending execution  
+**Status:** Chunk A complete; Chunk B and C pending  
 **Author:** GitHub Copilot (reverse-engineered from implementation)  
 **Created:** 2026-04-03  
 **Scope:** Address the three Critical gaps identified in `audit/documentation-sufficiency-report.md` (G-01, G-02, G-03) that prevent a third-party AI model from reconstructing the system correctly.
@@ -215,7 +215,7 @@ This plan defines how to close all three gaps. Each gap becomes one execution ch
 ```
 PHASE 0 (this document) → STOP, await user approval
     ↓
-CHUNK A (state-machine.md) → STOP, await user review and steering
+CHUNK A (state-machine.md) ✅ COMPLETE → commit fa18fe6 + state-machine spec
     ↓
 CHUNK B (live-photo-pair-lifecycle.md) → STOP, await user review and steering
     ↓
