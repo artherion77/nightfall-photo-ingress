@@ -1,12 +1,12 @@
 {
   "projectName": "nightfall++photo-ingress",
-  "commitSha": "7582510",
-  "commitFull": "7582510188b24be6c4c1bf5edab56161bbef529c",
-  "runId": "module6-20260404T135144-1",
-  "lastRunAt": "2026-04-04T13:51:44.343934+00:00",
-  "coveragePercent": null,
-  "hasCoverage": false,
-  "sparklinePoints": "0.00,0.00 90.00,42.00 180.00,0.00",
+  "commitSha": "20271cc",
+  "commitFull": "20271cc58a9c7b84a69da9870f905522cc63f56c",
+  "runId": "module6-20260404T141709-1",
+  "lastRunAt": "2026-04-04T14:17:25.112084+00:00",
+  "coveragePercent": 80.11625090821022,
+  "hasCoverage": true,
+  "sparklinePoints": "0.00,39.53 30.00,35.37 60.00,42.00 90.00,35.37 120.00,28.74 150.00,6.63 180.00,0.00",
   "locBreakdown": {
     "python": "26.2k",
     "tsjs": "8.5k",
@@ -20,15 +20,15 @@
   "backendCoverageBars": [
     {
       "label": "Unit",
-      "value": 0
+      "value": 80.11625090821022
     },
     {
       "label": "Integration",
-      "value": 0
+      "value": 74.11625090821022
     },
     {
       "label": "Flow",
-      "value": 0
+      "value": 71.11625090821022
     }
   ],
   "complexityMix": {
@@ -687,6 +687,30 @@
     "executor": "chris"
   },
   "trendRows": [
+    {
+      "runId": "coverage-check-local2",
+      "severity": "warning",
+      "warningChecks": 2,
+      "failedChecks": 0,
+      "deltaItems": 14,
+      "generatedAt": "2026-04-04T14:15:10.988968+00:00"
+    },
+    {
+      "runId": "coverage-check-local",
+      "severity": "critical",
+      "warningChecks": 2,
+      "failedChecks": 2,
+      "deltaItems": 14,
+      "generatedAt": "2026-04-04T14:13:29.563004+00:00"
+    },
+    {
+      "runId": "module6-20260404T135144-1",
+      "severity": "warning",
+      "warningChecks": 9,
+      "failedChecks": 0,
+      "deltaItems": 11,
+      "generatedAt": "2026-04-04T13:51:44.343934+00:00"
+    },
     {
       "runId": "module6-20260404T134947-1",
       "severity": "warning",
