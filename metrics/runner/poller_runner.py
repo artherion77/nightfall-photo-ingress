@@ -335,7 +335,19 @@ def _copy_tree(src: Path, dst: Path) -> None:
 
 
 def _commit_if_needed(repo_root: Path, worktree: Path, message: str) -> tuple[bool, str | None]:
-    _run_git(repo_root, ["-C", str(worktree), "add", "dashboard", "reports", "artifacts/metrics/latest", "artifacts/metrics/history"])
+    _run_git(
+        repo_root,
+        [
+            "-C",
+            str(worktree),
+            "add",
+            "dashboard",
+            "reports",
+            "artifacts/metrics/latest",
+            "artifacts/metrics/history",
+            ".github/workflows/static.yml",
+        ],
+    )
     status = _run_git(repo_root, ["-C", str(worktree), "status", "--porcelain"], check=False)
     if not status.stdout.strip():
         return False, None
@@ -581,6 +593,8 @@ def publish_metrics(repo_root: Path) -> dict[str, Any]:
     _copy_tree(repo_root / "reports", worktree / "reports")
     _copy_tree(repo_root / "artifacts" / "metrics" / "latest", worktree / "artifacts" / "metrics" / "latest")
     _copy_tree(history_run_dir, worktree / "artifacts" / "metrics" / "history" / run_id)
+    # Keep the Pages workflow present on the publication branch so metrics pushes can deploy.
+    _copy_tree(repo_root / ".github" / "workflows" / "static.yml", worktree / ".github" / "workflows" / "static.yml")
 
     commit_message = f"metrics publish: {run_id} {commit_sha[:12]}"
     committed, publication_commit = _commit_if_needed(repo_root, worktree, commit_message)
