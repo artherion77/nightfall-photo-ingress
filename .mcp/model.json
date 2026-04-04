@@ -47,16 +47,14 @@
     "backend": {
       "test.unit": [
         "./dev/devctl setup",
-        "./dev/devctl bootstrap-python",
-        "./dev/devctl snapshot-create",
         "./dev/devctl assert-cached-ready",
+        "./dev/devctl reset",
         "./.venv/bin/python -m pytest tests/unit"
       ],
       "test.integration": [
         "./dev/devctl setup",
-        "./dev/devctl bootstrap-python",
-        "./dev/devctl snapshot-create",
         "./dev/devctl assert-cached-ready",
+        "./dev/devctl reset",
         "./.venv/bin/python -m pytest tests/integration"
       ],
       "build": [
@@ -76,10 +74,8 @@
     "web": {
       "test.unit": [
         "./dev/devctl setup",
-        "./dev/devctl bootstrap-webui",
-        "./dev/devctl bootstrap-playwright",
-        "./dev/devctl snapshot-create",
         "./dev/devctl assert-cached-ready",
+        "./dev/devctl reset",
         "./dev/devctl test-web-typecheck",
         "./dev/devctl test-web-unit"
       ],
@@ -187,24 +183,20 @@
     ],
     "backend.test.unit": [
       "./dev/devctl setup",
-      "./dev/devctl bootstrap-python",
-      "./dev/devctl snapshot-create",
       "./dev/devctl assert-cached-ready",
+      "./dev/devctl reset",
       "./.venv/bin/python -m pytest tests/unit"
     ],
     "backend.test.integration": [
       "./dev/devctl setup",
-      "./dev/devctl bootstrap-python",
-      "./dev/devctl snapshot-create",
       "./dev/devctl assert-cached-ready",
+      "./dev/devctl reset",
       "./.venv/bin/python -m pytest tests/integration"
     ],
     "web.test.unit": [
       "./dev/devctl setup",
-      "./dev/devctl bootstrap-webui",
-      "./dev/devctl bootstrap-playwright",
-      "./dev/devctl snapshot-create",
       "./dev/devctl assert-cached-ready",
+      "./dev/devctl reset",
       "./dev/devctl test-web-typecheck",
       "./dev/devctl test-web-unit"
     ],
@@ -228,17 +220,14 @@
     "unit": {
       "backend": [
         "./dev/devctl setup",
-        "./dev/devctl bootstrap-python",
-        "./dev/devctl snapshot-create",
         "./dev/devctl assert-cached-ready",
+        "./dev/devctl reset",
         "./.venv/bin/python -m pytest tests/unit"
       ],
       "web": [
         "./dev/devctl setup",
-        "./dev/devctl bootstrap-webui",
-        "./dev/devctl bootstrap-playwright",
-        "./dev/devctl snapshot-create",
         "./dev/devctl assert-cached-ready",
+        "./dev/devctl reset",
         "./dev/devctl test-web-typecheck",
         "./dev/devctl test-web-unit"
       ]
@@ -246,9 +235,8 @@
     "integration": {
       "backend": [
         "./dev/devctl setup",
-        "./dev/devctl bootstrap-python",
-        "./dev/devctl snapshot-create",
         "./dev/devctl assert-cached-ready",
+        "./dev/devctl reset",
         "./.venv/bin/python -m pytest tests/integration"
       ],
       "web": [
