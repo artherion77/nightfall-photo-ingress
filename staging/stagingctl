@@ -122,7 +122,9 @@ cmd_create() {
     local tmpfs_host_base
     tmpfs_host_base="$(_resolve_tmpfs_host_base)"
     mkdir -p "$tmpfs_host_base/tmp" "$tmpfs_host_base/var-tmp" "$tmpfs_host_base/nightfall-cache"
-    chmod 777 "$tmpfs_host_base/tmp" "$tmpfs_host_base/var-tmp" "$tmpfs_host_base/nightfall-cache"
+    # tmp/var-tmp require sticky-bit semantics; cache dir is plain writable.
+    chmod 1777 "$tmpfs_host_base/tmp" "$tmpfs_host_base/var-tmp"
+    chmod 777 "$tmpfs_host_base/nightfall-cache"
 
     _info "Launching container $CONTAINER (ubuntu:24.04, profiles: default+staging) ..."
     lxc launch ubuntu:24.04 "$CONTAINER" -p "$PROFILE_DEFAULT" -p "$PROFILE_STAGING"
@@ -151,7 +153,7 @@ cmd_create() {
     # Enforce standard world-writable sticky semantics for tmp directories.
     # Host tmpfs sources may default to restrictive mode/uid, which breaks
     # systemd services that rely on PrivateTmp.
-    lxc exec "$CONTAINER" -- chmod 1777 /tmp /var/tmp
+    lxc exec "$CONTAINER" -- chmod 1777 /tmp /var/tmp || true
 
     _info "Attaching bind-mounts ..."
     lxc config device add "$CONTAINER" evidence disk \
