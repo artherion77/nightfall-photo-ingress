@@ -137,6 +137,23 @@ Specify 2-3 highest-value Playwright scenarios with deterministic test contracts
 
 ## Chunk 4: CI and MCP Rollout Plan
 
+Status: Completed (2026-04-04)
+
+Delivered summary:
+- Finalized phased rollout policy for browser smoke:
+	- Phase 1: non-blocking on PRs, blocking on nightly/main.
+	- Phase 2: PR merge-blocking after objective stability/promotion criteria are satisfied.
+- Finalized promotion criteria with measurable thresholds (flakiness, runtime, defect/risk signal, tooling incident status).
+- Finalized bounded artifact policy:
+	- Failure-only trace/screenshot retention,
+	- constrained video retention,
+	- explicit retention windows and storage guardrail.
+- Finalized MCP output requirements for artifact discoverability:
+	- deterministic `E2E_ARTIFACT_PATH` marker,
+	- phase and blocking-mode context,
+	- final exit code presence in failed-run logs.
+- Confirmed chunk boundary discipline: policy documented without CI pipeline edits or browser execution changes.
+
 ### Goal
 Define staged rollout for browser tests with clear blocking policy and artifact handling.
 

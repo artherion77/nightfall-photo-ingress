@@ -174,3 +174,34 @@ Chunk 3 delivery note (Minimal Initial Browser Suite Definition):
 
 Implementation guard for scenario 3:
 - The current web layout does not mount a toast renderer, so the implementation turn must first provide a deterministic visible error surface (for example route-level `ErrorBanner` bound to store error or a dedicated toast viewport) before adding the Playwright assertion.
+
+Chunk 4 delivery note (CI and MCP Rollout Plan):
+- Rollout phase 1 finalized (adoption/stabilization):
+	- PR pipelines: browser smoke remains non-blocking, but always executes when web UI changes are detected.
+	- Nightly and `main` branch validation: browser smoke is blocking.
+	- Required smoke scope in phase 1 is limited to the three Chunk 3 scenarios only.
+- Rollout phase 2 finalized (promotion to merge gate):
+	- PR browser smoke becomes merge-blocking only after all promotion criteria are met for two consecutive evaluation windows.
+	- Promotion criteria:
+		- Flaky failure ratio <= 2 percent over the evaluation window.
+		- Median browser smoke runtime <= 6 minutes in CI.
+		- At least one browser-only defect detected or a documented risk-review confirming continued coverage value.
+		- No unresolved Severity 1 tooling incidents in Playwright/devctl/MCP path.
+- Artifact retention policy finalized:
+	- On pass: no trace/video/screenshot artifacts retained.
+	- On fail: retain trace + screenshot bundles; retain video only for failed retries.
+	- Retention window: 14 days for PR artifacts, 30 days for nightly/main artifacts.
+	- Storage guardrail: if weekly artifact growth exceeds policy budget, reduce retained media to trace + one screenshot per failed test.
+- MCP task output requirements finalized for artifact discoverability:
+	- `web.test.e2e` and `web.test.integration` task outputs must include a deterministic artifact marker line:
+		- `E2E_ARTIFACT_PATH=<absolute-or-workspace-relative-path>`
+	- On failed runs, MCP status/log payload must include:
+		- task id,
+		- phase (`phase1` or `phase2`),
+		- blocking mode (`blocking` or `non_blocking`),
+		- artifact path marker,
+		- final exit code.
+	- On successful runs, MCP output must still emit `E2E_ARTIFACT_PATH` (or explicit `E2E_ARTIFACT_PATH=none`) to keep parsing deterministic.
+
+Rollout boundary rule:
+- Chunk 4 defines policy only; CI pipeline file edits and execution enablement remain implementation work for a later chunk.
