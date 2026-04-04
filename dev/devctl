@@ -13,6 +13,7 @@ PROFILE_DEV="staging"
 SNAPSHOT_CLEAN="clean-installed"
 DEV_TMP_DIR="/root/dev-photo-ingress-tmp"
 DEV_WEBUI_ROOT="/opt/nightfall-webui"
+DEV_METRICS_DASHBOARD_ROOT="/opt/nightfall-metrics-dashboard"
 DEV_VENV_ROOT="/opt/ingress"
 DEV_WEBUI_PORT="${DEV_WEBUI_PORT:-5173}"
 DEV_WEBUI_PROXY_DEVICE="dev-webui-proxy"
@@ -41,7 +42,7 @@ _fail() { nf_log_fail "devctl" "$*"; }
 _is_stateful_command() {
     local cmd="$1"
     case "$cmd" in
-        setup|create|destroy|reset|snapshot-create|snapshot-refresh|bootstrap-python|bootstrap-webui|bootstrap-playwright|assert-cached-ready|run-api|run-webui|test-web-typecheck|test-web-unit|test-web-e2e)
+        setup|create|destroy|reset|snapshot-create|snapshot-refresh|bootstrap-python|bootstrap-webui|bootstrap-playwright|assert-cached-ready|run-api|run-webui|test-web-typecheck|test-metrics-dashboard-typecheck|test-web-unit|test-web-e2e)
             return 0
             ;;
         *)
@@ -230,6 +231,16 @@ _sync_webui_manifests() {
 
     tar -C "$PROJECT_ROOT/webui" -czf - package.json \
         | lxc exec "$CONTAINER" -- tar -xzf - -C "$DEV_WEBUI_ROOT"
+}
+
+_sync_metrics_dashboard_sources() {
+    lxc exec "$CONTAINER" -- mkdir -p "$DEV_METRICS_DASHBOARD_ROOT"
+    tar -C "$PROJECT_ROOT" \
+        --exclude='metrics/dashboard/node_modules' \
+        --exclude='metrics/dashboard/.svelte-kit' \
+        --exclude='metrics/dashboard/build' \
+        -czf - metrics/dashboard \
+        | lxc exec "$CONTAINER" -- tar -xzf - -C "$DEV_METRICS_DASHBOARD_ROOT" --strip-components=2
 }
 
 cmd_create() {
@@ -457,6 +468,25 @@ npm exec -- svelte-check --fail-on-warnings
     _ok "test-web-typecheck completed successfully."
 }
 
+cmd_test_metrics_dashboard_typecheck() {
+    nf_require_container_running "$CONTAINER" "devctl setup" "devctl"
+    if ! lxc exec "$CONTAINER" -- test -f "$MARKER_WEBUI"; then
+        _fail "Web UI bootstrap marker missing. Run: devctl bootstrap-webui && devctl snapshot-create"
+    fi
+
+    _sync_metrics_dashboard_sources
+
+    lxc exec "$CONTAINER" -- bash -lc "
+set -euo pipefail
+cd '$DEV_METRICS_DASHBOARD_ROOT'
+npm install
+npx svelte-kit sync
+npm exec -- svelte-check --fail-on-warnings
+"
+
+    _ok "test-metrics-dashboard-typecheck completed successfully."
+}
+
 cmd_test_web_e2e() {
     local artifact_dir="${DEVCTL_E2E_ARTIFACT_DIR:-test-results/playwright}"
     local contract_root
@@ -556,7 +586,8 @@ Commands:
   assert-cached-ready Ensure cache mounts and clean snapshot are available for MCP test flow.
   run-api             API run scaffold (placeholder for upcoming implementation).
   run-webui           Sync webui source and run Vite dev server in container.
-    test-web-typecheck  Run Svelte/TypeScript typecheck in dev container.
+    test-web-typecheck  Run webui Svelte/TypeScript typecheck in dev container.
+    test-metrics-dashboard-typecheck Run metrics dashboard frame typecheck in dev container.
   test-web-unit       Run Vitest unit/component tests in dev container.
     test-web-e2e        Run Playwright e2e browser tests in dev container.
   status              Show container, snapshot, and cache mount status.
@@ -588,6 +619,7 @@ main() {
         run-api) cmd_run_api "$@" ;;
         run-webui) cmd_run_webui "$@" ;;
         test-web-typecheck) cmd_test_web_typecheck "$@" ;;
+        test-metrics-dashboard-typecheck) cmd_test_metrics_dashboard_typecheck "$@" ;;
         test-web-unit) cmd_test_web_unit "$@" ;;
         test-web-e2e) cmd_test_web_e2e "$@" ;;
         status) cmd_status "$@" ;;

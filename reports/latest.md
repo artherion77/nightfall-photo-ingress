@@ -1,6 +1,6 @@
 # Nightfall Metrics Executive Summary
 
-- Run ID: module4-bootstrap
+- Run ID: module5b-static-data
 - Generated At: 2026-04-04T12:28:57.924234+00:00
 - Branch: main
 - Commit: 831aeb4cf21e7ce3e72948f4005a49187078de74
@@ -32,4 +32,4 @@
 
 ## Trend Snippets
 
-- No historical trend data available yet.
+- module4-bootstrap: severity=warning, status=partial, warnings=3, failures=0, delta_items=11

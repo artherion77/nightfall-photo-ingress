@@ -31,6 +31,7 @@ def test_web_test_unit_mapping_uses_reset_fast_loop() -> None:
     assert "./dev/devctl reset" in commands
     assert "./dev/devctl assert-cached-ready" in commands
     assert "./dev/devctl test-web-typecheck" in commands
+    assert "./dev/devctl test-metrics-dashboard-typecheck" in commands
     assert "./dev/devctl snapshot-create" not in commands
 
 

@@ -1,4 +1,16 @@
-import adapter from '@sveltejs/adapter-static';
+let adapter = () => ({
+  name: 'adapter-static-missing',
+  adapt: async () => {
+    throw new Error('adapter-static not installed; run npm install in metrics/dashboard');
+  },
+});
+
+try {
+  const mod = await import('@sveltejs/adapter-static');
+  adapter = mod.default ?? mod;
+} catch {
+  // Keep fallback for local environments without node modules.
+}
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {

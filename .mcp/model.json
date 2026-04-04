@@ -77,6 +77,7 @@
         "./dev/devctl assert-cached-ready",
         "./dev/devctl reset",
         "./dev/devctl test-web-typecheck",
+        "./dev/devctl test-metrics-dashboard-typecheck",
         "./dev/devctl test-web-unit"
       ],
       "test.integration": [
@@ -113,6 +114,7 @@
       "run-api",
       "run-webui",
       "test-web-typecheck",
+      "test-metrics-dashboard-typecheck",
       "test-web-unit",
       "test-web-e2e",
       "status",
@@ -198,6 +200,7 @@
       "./dev/devctl assert-cached-ready",
       "./dev/devctl reset",
       "./dev/devctl test-web-typecheck",
+      "./dev/devctl test-metrics-dashboard-typecheck",
       "./dev/devctl test-web-unit"
     ],
     "web.test.integration": [
@@ -244,6 +247,7 @@
         "./dev/devctl assert-cached-ready",
         "./dev/devctl reset",
         "./dev/devctl test-web-typecheck",
+        "./dev/devctl test-metrics-dashboard-typecheck",
         "./dev/devctl test-web-unit"
       ]
     },

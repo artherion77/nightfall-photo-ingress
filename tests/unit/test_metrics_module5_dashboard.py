@@ -11,7 +11,7 @@ def _write_json(path: Path, payload: dict) -> None:
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
-def test_module5_dashboard_generation_from_artifacts_only(tmp_path: Path, monkeypatch) -> None:
+def test_module5_dashboard_generation_from_artifacts_only(tmp_path: Path) -> None:
     latest = tmp_path / "artifacts" / "metrics" / "latest"
     history = tmp_path / "artifacts" / "metrics" / "history" / "module4-bootstrap"
 
@@ -79,31 +79,32 @@ def test_module5_dashboard_generation_from_artifacts_only(tmp_path: Path, monkey
         },
     )
 
-    (tmp_path / "metrics" / "dashboard").mkdir(parents=True, exist_ok=True)
-
-    def _fake_build(repo_root: Path) -> None:
-        (repo_root / "dashboard").mkdir(parents=True, exist_ok=True)
-        (repo_root / "dashboard" / "index.html").write_text("<html>svelte-build</html>", encoding="utf-8")
-
-    monkeypatch.setattr(dashboard_generator, "_build_svelte_dashboard", _fake_build)
+    (tmp_path / "dashboard").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "dashboard" / "index.html").write_text("<html>static-frame</html>", encoding="utf-8")
 
     result = dashboard_generator.run_dashboard_generation(tmp_path, run_id="module5-bootstrap")
 
     dashboard_path = tmp_path / "dashboard" / "index.html"
+    dashboard_data_path = tmp_path / "dashboard" / "__data.json"
     report_path = tmp_path / "reports" / "latest.md"
     staged_dashboard = tmp_path / "metrics" / "output" / "dashboard" / "module5-bootstrap" / "index.html"
+    staged_dashboard_data = tmp_path / "metrics" / "output" / "dashboard" / "module5-bootstrap" / "__data.json"
     staged_report = tmp_path / "metrics" / "output" / "reports" / "module5-bootstrap" / "latest.md"
 
     assert dashboard_path.exists()
+    assert dashboard_data_path.exists()
     assert report_path.exists()
     assert staged_dashboard.exists()
+    assert staged_dashboard_data.exists()
     assert staged_report.exists()
     assert result["dashboard"] == "dashboard/index.html"
     assert result["report"] == "reports/latest.md"
 
     dashboard_html = dashboard_path.read_text(encoding="utf-8")
+    dashboard_data = json.loads(dashboard_data_path.read_text(encoding="utf-8"))
     report_md = report_path.read_text(encoding="utf-8")
 
-    assert "svelte-build" in dashboard_html
+    assert "static-frame" in dashboard_html
+    assert dashboard_data["runId"] == "module4-bootstrap"
     assert "Nightfall Metrics Executive Summary" in report_md
     assert "Artifact Links" in report_md

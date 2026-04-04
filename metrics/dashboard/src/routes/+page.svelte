@@ -1,36 +1,68 @@
-<script lang="ts">
-  export let data: {
-    projectName: string;
-    commitSha: string;
-    commitFull: string;
-    runId: string;
-    lastRunAt: string;
-    coveragePercent: number | null;
-    hasCoverage: boolean;
-    sparklinePoints: string;
-    locBreakdown: { python: string; tsjs: string; svelte: string };
-    complexityCard: { cyclomatic: unknown; maintainability: unknown };
-    frontendComplexity: unknown;
-    backendCoverageBars: Array<{ label: string; value: number }>;
-    complexityMix: { low: number; moderate: number; high: number };
-    frontendLocRows: Array<{ name: string; lines: number }>;
-    heatmap: number[][];
-    backendGraph: { nodes: Array<{ x: number; y: number; r: number }>; edges: Array<{ a: number; b: number }> };
-    frontendGraph: { nodes: Array<{ x: number; y: number; r: number }>; edges: Array<{ a: number; b: number }> };
-    system: { apiSurface: { endpoints: number; schemas: number }; bundleSizeKb: number | null; openapiScore: number | null };
-    footer: { host: string; python: string; git: string; executor: string };
-    trendRows: Array<{ runId: string; severity: string; warningChecks: number; failedChecks: number; deltaItems: number; generatedAt: string }>;
+<script>
+  import { onMount } from 'svelte';
+
+  const defaultData = {
+    projectName: 'nightfall++photo-ingress',
+    commitSha: 'unknown',
+    commitFull: 'unknown',
+    runId: 'unknown',
+    lastRunAt: 'unknown',
+    coveragePercent: null,
+    hasCoverage: false,
+    sparklinePoints: '0,36 180,36',
+    locBreakdown: { python: '0', tsjs: '0', svelte: '0' },
+    complexityCard: { cyclomatic: null, maintainability: null },
+    frontendComplexity: null,
+    backendCoverageBars: [
+      { label: 'Unit', value: 0 },
+      { label: 'Integration', value: 0 },
+      { label: 'Flow', value: 0 },
+    ],
+    complexityMix: { low: 0, moderate: 0, high: 0 },
+    frontendLocRows: [],
+    heatmap: Array.from({ length: 8 }, () => Array.from({ length: 14 }, () => 0)),
+    backendGraph: { nodes: [], edges: [] },
+    frontendGraph: { nodes: [], edges: [] },
+    system: { apiSurface: { endpoints: 0, schemas: 0 }, bundleSizeKb: null, openapiScore: null },
+    footer: { host: 'unknown', python: 'unknown', git: 'unknown', executor: 'unknown' },
+    trendRows: [],
   };
 
-  const complexityTotal = data.complexityMix.low + data.complexityMix.moderate + data.complexityMix.high;
-  const donutParts = [
+  let data = defaultData;
+  let complexityTotal = 0;
+  let donutParts = [];
+  let donut = [];
+  let maxFrontendLoc = 1;
+  let coverageText = 'N/A';
+  let cyclomaticText = 'N/A';
+  let maintainabilityText = 'N/A';
+  let frontendComplexityText = 'N/A';
+
+  onMount(async () => {
+    try {
+      const response = await fetch('./__data.json', { cache: 'no-store' });
+      if (!response.ok) {
+        return;
+      }
+      const payload = await response.json();
+      data = {
+        ...defaultData,
+        ...payload,
+      };
+    } catch {
+      data = defaultData;
+    }
+  });
+
+  $: complexityTotal = data.complexityMix.low + data.complexityMix.moderate + data.complexityMix.high;
+  $: donutParts = [
     { key: 'low', label: 'Low', value: data.complexityMix.low, color: '#53b676' },
     { key: 'moderate', label: 'Moderate', value: data.complexityMix.moderate, color: '#f0b443' },
     { key: 'high', label: 'High', value: data.complexityMix.high, color: '#e15f6b' },
   ];
 
-  function arcPath(startAngle: number, endAngle: number, radius: number, inner: number): string {
-    const polar = (angle: number, r: number) => {
+  function arcPath(startAngle, endAngle, radius, inner) {
+    const polar = (angle, r) => {
       const a = (angle - 90) * (Math.PI / 180);
       return { x: 150 + r * Math.cos(a), y: 150 + r * Math.sin(a) };
     };
@@ -48,30 +80,32 @@
     ].join(' ');
   }
 
-  let runningAngle = 0;
-  const donut = donutParts.map((part) => {
-    const span = complexityTotal > 0 ? (part.value / complexityTotal) * 360 : 0;
-    const start = runningAngle;
-    const end = runningAngle + span;
-    runningAngle = end;
-    return {
-      ...part,
-      d: arcPath(start, end, 118, 72),
-    };
-  });
+  $: {
+    let runningAngle = 0;
+    donut = donutParts.map((part) => {
+      const span = complexityTotal > 0 ? (part.value / complexityTotal) * 360 : 0;
+      const start = runningAngle;
+      const end = runningAngle + span;
+      runningAngle = end;
+      return {
+        ...part,
+        d: arcPath(start, end, 118, 72),
+      };
+    });
+  }
 
-  const maxFrontendLoc = Math.max(...data.frontendLocRows.map((row) => row.lines), 1);
+  $: maxFrontendLoc = Math.max(...data.frontendLocRows.map((row) => row.lines), 1);
 
-  const coverageText = data.hasCoverage && data.coveragePercent !== null ? `${Math.round(data.coveragePercent)}%` : 'N/A';
-  const cyclomaticText = typeof data.complexityCard.cyclomatic === 'number' ? data.complexityCard.cyclomatic.toFixed(1) : 'N/A';
-  const maintainabilityText = typeof data.complexityCard.maintainability === 'number'
+  $: coverageText = data.hasCoverage && data.coveragePercent !== null ? `${Math.round(data.coveragePercent)}%` : 'N/A';
+  $: cyclomaticText = typeof data.complexityCard.cyclomatic === 'number' ? data.complexityCard.cyclomatic.toFixed(1) : 'N/A';
+  $: maintainabilityText = typeof data.complexityCard.maintainability === 'number'
     ? String(Math.round(data.complexityCard.maintainability))
     : 'N/A';
-  const frontendComplexityText = typeof data.frontendComplexity === 'number'
+  $: frontendComplexityText = typeof data.frontendComplexity === 'number'
     ? data.frontendComplexity.toFixed(1)
     : 'N/A';
 
-  function heatColor(value: number): string {
+  function heatColor(value) {
     if (value >= 18) return '#cc3f38';
     if (value >= 14) return '#db7b2a';
     if (value >= 10) return '#d8b33f';
