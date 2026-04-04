@@ -144,3 +144,33 @@ Chunk 2 delivery note (Directory and Naming Conventions):
 	- Keep reusable browser fixtures in `webui/tests/e2e/fixtures/` and name them by scope (`app.fixture.ts`, `api.fixture.ts`, `auth.fixture.ts`).
 - Test file metadata header conventions are finalized as:
 	- Include a short header with `scope`, `risk_class`, and `owner` for traceability.
+
+Chunk 3 delivery note (Minimal Initial Browser Suite Definition):
+- Scenario 1 finalized: staging triage keyboard path (`staging.keyboard-triage.spec.ts`).
+	- Preconditions: route `/staging` with seeded queue of at least 3 items; first item active; network stub for triage endpoints enabled.
+	- Assertions:
+		- `ArrowRight` moves active card to index 1, `ArrowLeft` returns to index 0.
+		- `A`, `R`, and `D` each trigger exactly one POST to accept/reject/defer endpoint for the active item.
+		- After each successful action, item count decreases by 1 and active index remains bounded.
+	- Teardown: restore network routing and clear seeded queue fixture.
+	- Pass/fail outcome: fail on missing request, duplicate request, wrong endpoint, or index/count mismatch.
+- Scenario 2 finalized: blocklist delete confirm and cancel semantics (`blocklist.delete-confirm.spec.ts`).
+	- Preconditions: route `/blocklist` with one deterministic rule visible in list; delete button reachable from rule row.
+	- Assertions:
+		- Clicking Delete opens confirm dialog with expected title and rule pattern text.
+		- Clicking Cancel closes dialog and emits no delete request.
+		- Re-open dialog and click Confirm emits exactly one delete request and removes rule row from list.
+		- Clicking dialog overlay closes dialog; clicking inside dialog content does not close it.
+	- Teardown: reset rule fixture and clear request interceptors.
+	- Pass/fail outcome: fail on any request count mismatch, unexpected close behavior, or missing row removal.
+- Scenario 3 finalized: forced API failure with visible error feedback (`blocklist.delete-error-feedback.spec.ts`).
+	- Preconditions: route `/blocklist`, delete dialog open for seeded rule, delete API forced to return deterministic `500` with message body.
+	- Assertions:
+		- Confirm action keeps rule in list after failed request (optimistic update rollback verified through visible row).
+		- A visible error feedback element is shown with the API message text.
+		- Error feedback is operator-discoverable within 2 seconds and remains visible long enough for assertion.
+	- Teardown: restore API mock and clear error feedback state.
+	- Pass/fail outcome: fail if request does not fail as configured, rollback is not visible, or no visible error feedback appears.
+
+Implementation guard for scenario 3:
+- The current web layout does not mount a toast renderer, so the implementation turn must first provide a deterministic visible error surface (for example route-level `ErrorBanner` bound to store error or a dedicated toast viewport) before adding the Playwright assertion.

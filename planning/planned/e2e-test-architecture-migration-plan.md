@@ -97,6 +97,18 @@ Define stable repository structure and naming conventions for Vitest and Playwri
 
 ## Chunk 3: Minimal Initial Browser Suite Definition
 
+Status: Completed (2026-04-04)
+
+Delivered summary:
+- Finalized exactly 3 Playwright scenario contracts with deterministic scope and pass/fail semantics:
+	- `staging.keyboard-triage.spec.ts`
+	- `blocklist.delete-confirm.spec.ts`
+	- `blocklist.delete-error-feedback.spec.ts`
+- Captured deterministic preconditions for each scenario (seeded fixtures, route state, network stubs/mocks).
+- Captured deterministic assertions for keyboard navigation/action dispatch, dialog confirm/cancel/overlay semantics, and rollback on forced API failure.
+- Captured deterministic teardown requirements for mock reset and fixture cleanup.
+- Recorded implementation guard for scenario 3: provide a mounted visible error surface before writing browser assertion.
+
 ### Goal
 Specify 2-3 highest-value Playwright scenarios with deterministic test contracts.
 
