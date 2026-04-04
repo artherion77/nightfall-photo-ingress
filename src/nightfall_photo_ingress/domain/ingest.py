@@ -7,7 +7,9 @@ pending queue storage without touching the permanent library.
 
 from __future__ import annotations
 
+import fnmatch
 import hashlib
+import re
 import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -544,6 +546,52 @@ class IngestDecisionEngine:
             candidate=candidate,
             sha256=file_hash,
         )
+
+        blocked_match = self._match_block_rule(candidate.original_filename)
+        if blocked_match is not None:
+            path.unlink(missing_ok=True)
+            reason = f"block_rule:{blocked_match[0]}:{blocked_match[1]}"
+            self._registry.create_or_update_file(
+                sha256=file_hash,
+                size_bytes=actual_size,
+                status="rejected",
+                original_filename=candidate.original_filename,
+                current_path=None,
+            )
+            self._registry.upsert_metadata_index(
+                account=candidate.account_name,
+                onedrive_id=candidate.onedrive_id,
+                size_bytes=actual_size,
+                modified_time=candidate.modified_time,
+                sha256=file_hash,
+            )
+            self._registry.upsert_file_origin(
+                sha256=file_hash,
+                account=candidate.account_name,
+                onedrive_id=candidate.onedrive_id,
+                path_hint=candidate.relative_path,
+            )
+            self._registry.append_audit_event(
+                sha256=file_hash,
+                action="rejected",
+                reason=reason,
+                actor="ingest_pipeline",
+            )
+            self._journal_append(
+                op_id=op_id,
+                phase="registry_persisted",
+                candidate=candidate,
+                sha256=file_hash,
+            )
+            return IngestOutcome(
+                account_name=candidate.account_name,
+                onedrive_id=candidate.onedrive_id,
+                action="discard_rejected",
+                sha256=file_hash,
+                destination_path=None,
+                prefilter_hit=False,
+            )
+
         record = self._registry.get_file(sha256=file_hash)
 
         if record is None:
@@ -662,6 +710,31 @@ class IngestDecisionEngine:
         if status not in {"pending", "accepted", "rejected", "purged"}:
             return None
         return status, sha256
+
+    def _match_block_rule(self, filename: str) -> tuple[str, str] | None:
+        """Return matching enabled blocklist rule as (rule_type, pattern)."""
+
+        db_path = self._registry.db_path
+        if not db_path.exists():
+            return None
+
+        with sqlite3.connect(db_path) as conn:
+            rows = conn.execute(
+                "SELECT rule_type, pattern FROM blocked_rules WHERE enabled = 1 ORDER BY id"
+            ).fetchall()
+
+        for row in rows:
+            rule_type = str(row[0])
+            pattern = str(row[1])
+            if rule_type == "filename" and fnmatch.fnmatch(filename, pattern):
+                return rule_type, pattern
+            if rule_type == "regex":
+                try:
+                    if re.search(pattern, filename):
+                        return rule_type, pattern
+                except re.error:
+                    continue
+        return None
 
     def _validate_batch_contract(
         self,
