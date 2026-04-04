@@ -76,7 +76,7 @@ Important safety rule:
 ## Start MCP Server
 
 ```bash
-python mcp_server.py --host 0.0.0.0 --port 8765 --workspace . --model .mcp/model.json
+python mcp_server.py --host 127.0.0.1 --port 8765 --workspace . --model .mcp/model.json
 ```
 
 Remote endpoint format:

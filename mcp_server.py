@@ -381,7 +381,7 @@ def make_handler(state: MCPServerState):
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Nightfall MCP orchestrator server")
-    parser.add_argument("--host", default=os.environ.get("MCP_HOST", "0.0.0.0"))
+    parser.add_argument("--host", default=os.environ.get("MCP_HOST", "127.0.0.1"))
     parser.add_argument("--port", type=int, default=int(os.environ.get("MCP_PORT", "8765")))
     parser.add_argument("--workspace", default=os.environ.get("MCP_WORKSPACE", "."))
     parser.add_argument("--model", default=os.environ.get("MCP_MODEL_PATH", ".mcp/model.json"))
