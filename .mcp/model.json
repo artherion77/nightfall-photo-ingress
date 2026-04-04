@@ -1,0 +1,177 @@
+{
+  "version": "1.0",
+  "metadata": {
+    "name": "nightfall-photo-ingress-mcp-model",
+    "description": "Canonical MCP task model for remote SSH workspace orchestration",
+    "workspaceRoot": ".",
+    "policy": "prefer_mcp_first"
+  },
+  "domains": {
+    "backend": {
+      "test.unit": [
+        "pytest tests/unit"
+      ],
+      "test.integration": [
+        "pytest tests/integration"
+      ],
+      "build": [
+        "python -m build"
+      ],
+      "deploy.dev": [
+        "./dev/devctl create",
+        "./dev/devctl bootstrap-python",
+        "./dev/devctl run-api"
+      ],
+      "deploy.staging": [
+        "./staging/stagingctl install"
+      ],
+      "e2e": [
+        "./staging/stagingctl smoke"
+      ]
+    },
+    "web": {
+      "test.unit": [
+        "echo \"No dedicated web unit test script configured yet\""
+      ],
+      "test.integration": [
+        "echo \"No dedicated web integration test script configured yet\""
+      ],
+      "build": [
+        "npm --prefix webui run build"
+      ],
+      "deploy.dev": [
+        "./dev/devctl create",
+        "./dev/devctl bootstrap-webui",
+        "./dev/devctl run-webui"
+      ],
+      "deploy.staging": [
+        "./dev/devctl install webui"
+      ],
+      "e2e": [
+        "echo \"Playwright E2E is expected from external suite; no in-repo script configured\""
+      ]
+    }
+  },
+  "devctl": {
+    "path": "./dev/devctl",
+    "commands": [
+      "create",
+      "destroy",
+      "reset",
+      "snapshot-refresh",
+      "bootstrap-python",
+      "bootstrap-webui",
+      "run-api",
+      "run-webui",
+      "status",
+      "shell"
+    ]
+  },
+  "stagectl": {
+    "path": "./staging/stagingctl",
+    "commands": [
+      "create",
+      "install",
+      "uninstall",
+      "reset",
+      "smoke",
+      "auth-setup",
+      "discover-paths",
+      "smoke-live",
+      "evidence"
+    ],
+    "compatibility": {
+      "setup": "create",
+      "deploy": "install",
+      "teardown": "uninstall"
+    }
+  },
+  "devcontainer": {
+    "build": [
+      "./dev/devctl create",
+      "./dev/devctl bootstrap-python",
+      "./dev/devctl bootstrap-webui"
+    ],
+    "run": [
+      "./dev/devctl status",
+      "./dev/devctl shell"
+    ]
+  },
+  "staging": {
+    "urls": {
+      "api": "https://staging.example.invalid/api",
+      "web": "https://staging.example.invalid"
+    },
+    "access": {
+      "method": "token_or_ssh",
+      "tokenEnv": "STAGING_TOKEN_PLACEHOLDER",
+      "ssh": "ssh user@staging-host"
+    }
+  },
+  "mappings": {
+    "backend.test.unit": [
+      "pytest tests/unit"
+    ],
+    "backend.test.integration": [
+      "pytest tests/integration"
+    ],
+    "backend.build": [
+      "python -m build"
+    ],
+    "backend.deploy.dev": [
+      "./dev/devctl create",
+      "./dev/devctl bootstrap-python",
+      "./dev/devctl run-api"
+    ],
+    "backend.deploy.staging": [
+      "./staging/stagingctl install"
+    ],
+    "backend.e2e": [
+      "./staging/stagingctl smoke"
+    ],
+    "web.test.unit": [
+      "echo \"No dedicated web unit test script configured yet\""
+    ],
+    "web.test.integration": [
+      "echo \"No dedicated web integration test script configured yet\""
+    ],
+    "web.build": [
+      "npm --prefix webui run build"
+    ],
+    "web.deploy.dev": [
+      "./dev/devctl create",
+      "./dev/devctl bootstrap-webui",
+      "./dev/devctl run-webui"
+    ],
+    "web.deploy.staging": [
+      "./dev/devctl install webui"
+    ],
+    "web.e2e": [
+      "echo \"Playwright E2E is expected from external suite; no in-repo script configured\""
+    ]
+  },
+  "verifications": {
+    "unit": {
+      "backend": [
+        "pytest tests/unit"
+      ],
+      "web": [
+        "echo \"No dedicated web unit test script configured yet\""
+      ],
+      "staging": [
+        "./staging/stagingctl smoke"
+      ]
+    },
+    "smoke": {
+      "backend": [
+        "./staging/stagingctl smoke"
+      ],
+      "web": [
+        "echo \"Web smoke checks are external to this repository\""
+      ],
+      "staging": [
+        "./staging/stagingctl smoke"
+      ]
+    }
+  }
+}
