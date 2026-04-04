@@ -3,6 +3,7 @@
   "frequency_minutes": 60,
   "metrics_branch": "metrics",
   "dashboard_relative_path": "/dashboard/",
+  "max_history_runs": 120,
   "configured_at": "2026-04-04T12:35:23.641963+00:00",
   "installed": false,
   "enabled": false,

@@ -10,6 +10,7 @@ from metrics.runner.backend_collector import run_backend_collection
 from metrics.runner.dashboard_generator import run_dashboard_generation
 from metrics.runner.frontend_collector import run_frontend_collection
 from metrics.runner.module1_init import initialize_module1
+from metrics.runner.module8_ops import apply_retention_policy, ensure_ops_state
 from metrics.runner.poller_runner import (
     install_poller,
     poller_status,
@@ -101,14 +102,22 @@ def cmd_generate_dashboard(args: argparse.Namespace) -> int:
 
 def cmd_install(args: argparse.Namespace) -> int:
     root = _repo_root()
-    payload = install_poller(repo_root=root, frequency_minutes=args.frequency_minutes)
+    payload = install_poller(
+        repo_root=root,
+        frequency_minutes=args.frequency_minutes,
+        max_history_runs=args.max_history_runs,
+    )
     print(json.dumps(payload, indent=2))
     return 0
 
 
 def cmd_reconfigure(args: argparse.Namespace) -> int:
     root = _repo_root()
-    payload = reconfigure_poller(repo_root=root, frequency_minutes=args.frequency_minutes)
+    payload = reconfigure_poller(
+        repo_root=root,
+        frequency_minutes=args.frequency_minutes,
+        max_history_runs=args.max_history_runs,
+    )
     print(json.dumps(payload, indent=2))
     return 0
 
@@ -159,6 +168,25 @@ def cmd_publish(_: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_retention_prune(args: argparse.Namespace) -> int:
+    root = _repo_root()
+    ensure_ops_state(root)
+    payload = apply_retention_policy(repo_root=root, max_history_runs=args.max_history_runs)
+    print(json.dumps(payload, indent=2))
+    return 0
+
+
+def cmd_extensions_status(_: argparse.Namespace) -> int:
+    root = _repo_root()
+    paths = ensure_ops_state(root)
+    payload = {
+        "paths": paths,
+        "extensions": json.loads((root / paths["extensions_path"]).read_text(encoding="utf-8")),
+    }
+    print(json.dumps(payload, indent=2))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Nightfall metrics administrative entrypoint")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -193,10 +221,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     install_parser = sub.add_parser("install", help="Install Module 6 poller runtime and systemd units")
     install_parser.add_argument("--frequency-minutes", type=int, default=60)
+    install_parser.add_argument("--max-history-runs", type=int, default=120)
     install_parser.set_defaults(func=cmd_install)
 
     reconfigure_parser = sub.add_parser("reconfigure", help="Reconfigure Module 6 poller frequency")
     reconfigure_parser.add_argument("--frequency-minutes", type=int, default=60)
+    reconfigure_parser.add_argument("--max-history-runs", type=int, default=120)
     reconfigure_parser.set_defaults(func=cmd_reconfigure)
 
     start_parser = sub.add_parser("start", help="Enable Module 6 poller runtime")
@@ -218,6 +248,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     publish_parser = sub.add_parser("publish", help="Trigger publication action for Module 7 surface")
     publish_parser.set_defaults(func=cmd_publish)
+
+    retention_parser = sub.add_parser("retention-prune", help="Apply Module 8 history retention policy")
+    retention_parser.add_argument("--max-history-runs", type=int, default=120)
+    retention_parser.set_defaults(func=cmd_retention_prune)
+
+    extensions_parser = sub.add_parser("extensions-status", help="Show Module 8 optional collector configuration")
+    extensions_parser.set_defaults(func=cmd_extensions_status)
 
     return parser
 

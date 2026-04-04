@@ -17,6 +17,13 @@ from metrics.runner.aggregator import run_aggregation
 from metrics.runner.backend_collector import run_backend_collection
 from metrics.runner.dashboard_generator import run_dashboard_generation
 from metrics.runner.frontend_collector import run_frontend_collection
+from metrics.runner.module8_ops import (
+    append_event_log,
+    apply_retention_policy,
+    classify_failure,
+    ensure_ops_state,
+    run_optional_collectors,
+)
 from metrics.runner.module1_init import _git_branch, _git_head_sha, _git_version
 from metrics.runner.schema_contract import validate_manifest_payload
 
@@ -75,6 +82,7 @@ def _runtime_defaults() -> dict[str, Any]:
         "frequency_minutes": 60,
         "metrics_branch": "metrics",
         "dashboard_relative_path": "/dashboard/",
+        "max_history_runs": 120,
         "installed": False,
         "enabled": False,
         "retry_max_retries": 1,
@@ -137,14 +145,17 @@ def _timer_unit_content(frequency_minutes: int) -> str:
     )
 
 
-def install_poller(repo_root: Path, frequency_minutes: int = 60) -> dict[str, Any]:
+def install_poller(repo_root: Path, frequency_minutes: int = 60, max_history_runs: int = 120) -> dict[str, Any]:
     if frequency_minutes <= 0:
         raise ValueError("frequency_minutes must be > 0")
+    if max_history_runs <= 0:
+        raise ValueError("max_history_runs must be > 0")
     paths = _paths(repo_root)
     config = _load_runtime_config(repo_root)
     config.update(
         {
             "frequency_minutes": int(frequency_minutes),
+            "max_history_runs": int(max_history_runs),
             "installed": True,
             "enabled": True,
             "configured_at": _utc_now_iso(),
@@ -157,8 +168,8 @@ def install_poller(repo_root: Path, frequency_minutes: int = 60) -> dict[str, An
     return config
 
 
-def reconfigure_poller(repo_root: Path, frequency_minutes: int) -> dict[str, Any]:
-    return install_poller(repo_root=repo_root, frequency_minutes=frequency_minutes)
+def reconfigure_poller(repo_root: Path, frequency_minutes: int, max_history_runs: int = 120) -> dict[str, Any]:
+    return install_poller(repo_root=repo_root, frequency_minutes=frequency_minutes, max_history_runs=max_history_runs)
 
 
 def start_poller(repo_root: Path) -> dict[str, Any]:
@@ -336,6 +347,7 @@ def _commit_if_needed(repo_root: Path, worktree: Path, message: str) -> tuple[bo
 def run_now(repo_root: Path, max_retries: int = 1, timeout_seconds: int = 1800) -> dict[str, Any]:
     paths = _paths(repo_root)
     config = _load_runtime_config(repo_root)
+    ensure_ops_state(repo_root)
     commit_sha = _git_head_sha(repo_root)
     branch = _git_branch(repo_root)
     last_processed = _read_text(paths.last_processed_commit)
@@ -350,6 +362,17 @@ def run_now(repo_root: Path, max_retries: int = 1, timeout_seconds: int = 1800) 
             "updated_at": _utc_now_iso(),
         }
         _write_status(repo_root, status)
+        append_event_log(
+            repo_root,
+            {
+                "event": "run_now",
+                "timestamp": _utc_now_iso(),
+                "status": "skipped_unchanged",
+                "branch": branch,
+                "commit_sha": commit_sha,
+                "run_id": None,
+            },
+        )
         return status
 
     paths.lock_file.parent.mkdir(parents=True, exist_ok=True)
@@ -366,6 +389,17 @@ def run_now(repo_root: Path, max_retries: int = 1, timeout_seconds: int = 1800) 
                 "updated_at": _utc_now_iso(),
             }
             _write_status(repo_root, status)
+            append_event_log(
+                repo_root,
+                {
+                    "event": "run_now",
+                    "timestamp": _utc_now_iso(),
+                    "status": "concurrent_run",
+                    "branch": branch,
+                    "commit_sha": commit_sha,
+                    "run_id": None,
+                },
+            )
             return status
 
         attempts = int(max_retries) + 1
@@ -393,11 +427,19 @@ def run_now(repo_root: Path, max_retries: int = 1, timeout_seconds: int = 1800) 
                 _enforce_timeout(deadline, "collect_frontend")
                 run_frontend_collection(repo_root=repo_root, run_id=run_id)
 
+                _enforce_timeout(deadline, "collect_optional")
+                run_optional_collectors(repo_root=repo_root, run_id=run_id)
+
                 _enforce_timeout(deadline, "aggregate")
                 run_aggregation(repo_root=repo_root, run_id=run_id)
 
                 _enforce_timeout(deadline, "generate_dashboard")
                 run_dashboard_generation(repo_root=repo_root, run_id=run_id)
+
+                retention_result = apply_retention_policy(
+                    repo_root=repo_root,
+                    max_history_runs=int(config.get("max_history_runs", 120)),
+                )
 
                 paths.last_processed_commit.write_text(commit_sha, encoding="utf-8")
                 result = {
@@ -408,13 +450,26 @@ def run_now(repo_root: Path, max_retries: int = 1, timeout_seconds: int = 1800) 
                     "last_processed_commit": commit_sha,
                     "branch": branch,
                     "frequency_minutes": config.get("frequency_minutes", 60),
+                    "retention": retention_result,
                     "updated_at": _utc_now_iso(),
                 }
                 _write_status(repo_root, result)
+                append_event_log(
+                    repo_root,
+                    {
+                        "event": "run_now",
+                        "timestamp": _utc_now_iso(),
+                        "status": "success",
+                        "branch": branch,
+                        "commit_sha": commit_sha,
+                        "run_id": run_id,
+                    },
+                )
                 return result
             except Exception as exc:
                 finished_at = _utc_now_iso()
                 duration = time.time() - started
+                classification = classify_failure(repo_root=repo_root, error_message=str(exc))
                 _write_failure_manifest(
                     repo_root=repo_root,
                     run_id=run_id,
@@ -423,7 +478,7 @@ def run_now(repo_root: Path, max_retries: int = 1, timeout_seconds: int = 1800) 
                     started_at=started_at,
                     finished_at=finished_at,
                     duration_seconds=duration,
-                    failure_message=str(exc),
+                    failure_message=f"[{classification['code']}] {exc}",
                 )
                 if attempt >= attempts:
                     result = {
@@ -434,9 +489,23 @@ def run_now(repo_root: Path, max_retries: int = 1, timeout_seconds: int = 1800) 
                         "last_processed_commit": last_processed,
                         "branch": branch,
                         "error": str(exc),
+                        "failure_code": classification["code"],
                         "updated_at": _utc_now_iso(),
                     }
                     _write_status(repo_root, result)
+                    append_event_log(
+                        repo_root,
+                        {
+                            "event": "run_now",
+                            "timestamp": _utc_now_iso(),
+                            "status": "failed",
+                            "branch": branch,
+                            "commit_sha": commit_sha,
+                            "run_id": run_id,
+                            "failure_code": classification["code"],
+                            "message": str(exc),
+                        },
+                    )
                     return result
         return {
             "status": "failed",
@@ -451,6 +520,7 @@ def run_now(repo_root: Path, max_retries: int = 1, timeout_seconds: int = 1800) 
 def publish_metrics(repo_root: Path) -> dict[str, Any]:
     paths = _paths(repo_root)
     runtime = _load_runtime_config(repo_root)
+    ensure_ops_state(repo_root)
     branch = str(runtime.get("metrics_branch", "metrics"))
 
     latest_manifest_path = repo_root / "artifacts" / "metrics" / "latest" / "manifest.json"
@@ -464,6 +534,7 @@ def publish_metrics(repo_root: Path) -> dict[str, Any]:
             "metrics_branch": branch,
         }
         _write_json(paths.publication_json, payload)
+        append_event_log(repo_root, {"event": "publish", "timestamp": _utc_now_iso(), "status": payload["status"]})
         return payload
 
     manifest = _read_json(latest_manifest_path)
@@ -478,6 +549,7 @@ def publish_metrics(repo_root: Path) -> dict[str, Any]:
             "last_exit_state": exit_state,
         }
         _write_json(paths.publication_json, payload)
+        append_event_log(repo_root, {"event": "publish", "timestamp": _utc_now_iso(), "status": payload["status"], "run_id": run_id})
         return payload
 
     commit_sha = str(manifest.get("source", {}).get("commit_sha", ""))
@@ -490,6 +562,7 @@ def publish_metrics(repo_root: Path) -> dict[str, Any]:
             "run_id": run_id,
         }
         _write_json(paths.publication_json, payload)
+        append_event_log(repo_root, {"event": "publish", "timestamp": _utc_now_iso(), "status": payload["status"], "run_id": run_id})
         return payload
 
     worktree = _ensure_publication_worktree(repo_root, branch)
@@ -512,12 +585,23 @@ def publish_metrics(repo_root: Path) -> dict[str, Any]:
         "worktree_path": str(worktree.relative_to(repo_root)),
     }
     _write_json(paths.publication_json, payload)
+    append_event_log(
+        repo_root,
+        {
+            "event": "publish",
+            "timestamp": _utc_now_iso(),
+            "status": payload["status"],
+            "run_id": run_id,
+            "commit_sha": commit_sha,
+        },
+    )
     return payload
 
 
 def poller_status(repo_root: Path) -> dict[str, Any]:
     paths = _paths(repo_root)
     runtime = _load_runtime_config(repo_root)
+    ops_paths = ensure_ops_state(repo_root)
     last_processed = _read_text(paths.last_processed_commit)
     latest_manifest = repo_root / "artifacts" / "metrics" / "latest" / "manifest.json"
     latest_summary = repo_root / "artifacts" / "metrics" / "latest" / "summary.json"
@@ -541,6 +625,7 @@ def poller_status(repo_root: Path) -> dict[str, Any]:
         "latest_manifest_path": str(latest_manifest.relative_to(repo_root)),
         "latest_summary_path": str(latest_summary.relative_to(repo_root)),
         "last_publication_result": publication,
+        "ops": ops_paths,
         "runtime": run_state,
         "updated_at": _utc_now_iso(),
     }
@@ -554,6 +639,7 @@ def parse_args() -> argparse.Namespace:
         choices=["install", "reconfigure", "start", "stop", "status", "run-now", "uninstall", "publish"],
     )
     parser.add_argument("--frequency-minutes", type=int, default=60)
+    parser.add_argument("--max-history-runs", type=int, default=120)
     parser.add_argument("--max-retries", type=int, default=1)
     parser.add_argument("--timeout-seconds", type=int, default=1800)
     return parser.parse_args()
@@ -563,9 +649,9 @@ def main() -> None:
     args = parse_args()
     repo_root = Path(args.repo_root).resolve()
     if args.command == "install":
-        print(json.dumps(install_poller(repo_root, args.frequency_minutes), indent=2))
+        print(json.dumps(install_poller(repo_root, args.frequency_minutes, args.max_history_runs), indent=2))
     elif args.command == "reconfigure":
-        print(json.dumps(reconfigure_poller(repo_root, args.frequency_minutes), indent=2))
+        print(json.dumps(reconfigure_poller(repo_root, args.frequency_minutes, args.max_history_runs), indent=2))
     elif args.command == "start":
         print(json.dumps(start_poller(repo_root), indent=2))
     elif args.command == "stop":

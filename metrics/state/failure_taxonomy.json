@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "rules": [
+    {
+      "match": "timeout",
+      "code": "timeout",
+      "severity": "high"
+    },
+    {
+      "match": "lock",
+      "code": "concurrency",
+      "severity": "medium"
+    },
+    {
+      "match": "coverage",
+      "code": "collector_coverage",
+      "severity": "medium"
+    },
+    {
+      "match": "pytest",
+      "code": "collector_test",
+      "severity": "medium"
+    },
+    {
+      "match": "git",
+      "code": "publication_git",
+      "severity": "high"
+    }
+  ],
+  "default": {
+    "code": "unknown",
+    "severity": "medium"
+  },
+  "updated_at": "2026-04-04T00:00:00+00:00"
+}

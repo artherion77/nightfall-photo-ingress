@@ -97,3 +97,19 @@ Module 7 writes:
 - `metrics/state/last_publication.json` (published/no-change/skip state)
 - `metrics/output/publication/metrics-branch-worktree/...` (published branch worktree)
 
+Module 8 adds operations, audit, and extensibility responsibilities:
+
+- failure taxonomy classification for run and publication errors
+- retention pruning policy for historical run artifacts
+- append-only event logging with field policy
+- extension registry for optional collectors and explicit deferred states
+- aggregation compatibility with schema extension module slots
+
+Module 8 writes:
+
+- `metrics/state/failure_taxonomy.json`
+- `metrics/state/log_policy.json`
+- `metrics/state/extensions.json`
+- `metrics/output/logs/metrics-events.ndjson`
+- `metrics/output/extensions/<run-id>/optional_collectors.json`
+

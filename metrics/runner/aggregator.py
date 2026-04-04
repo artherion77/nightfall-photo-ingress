@@ -246,11 +246,15 @@ def run_aggregation(repo_root: Path, run_id: str) -> dict[str, Any]:
         raise FileNotFoundError("latest metrics.json missing; run collectors first")
 
     current_metrics = _read_json(latest_metrics_path)
-    modules = current_metrics.get("modules", {})
-    backend = modules.get("backend", {"status": "not_available", "metrics": {}})
-    frontend = modules.get("frontend", {"status": "not_available", "metrics": {}})
+    modules = dict(current_metrics.get("modules", {}))
+    modules.setdefault("backend", {"status": "not_available", "metrics": {}})
+    modules.setdefault("frontend", {"status": "not_available", "metrics": {}})
 
-    statuses = {backend.get("status"), frontend.get("status")}
+    statuses = {
+        module.get("status")
+        for module in modules.values()
+        if isinstance(module, dict)
+    }
     if "failed" in statuses:
         collection_status = "failed"
     elif "partial" in statuses or "not_available" in statuses:
@@ -260,16 +264,14 @@ def run_aggregation(repo_root: Path, run_id: str) -> dict[str, Any]:
 
     warnings: list[str] = []
     failures: list[str] = []
-    _collect_status_annotations("modules.backend", backend, warnings, failures)
-    _collect_status_annotations("modules.frontend", frontend, warnings, failures)
+    for name, module_payload in modules.items():
+        if isinstance(module_payload, dict):
+            _collect_status_annotations(f"modules.{name}", module_payload, warnings, failures)
 
     previous_run_id, previous_metrics = _find_previous_successful_run(repo_root, run_id)
     delta = _compute_delta(
         current_metrics={
-            "modules": {
-                "backend": backend,
-                "frontend": frontend,
-            }
+            "modules": modules
         },
         previous_metrics=previous_metrics,
         previous_run_id=previous_run_id,
@@ -283,10 +285,7 @@ def run_aggregation(repo_root: Path, run_id: str) -> dict[str, Any]:
             "branch": branch,
         },
         "collection_status": collection_status,
-        "modules": {
-            "backend": backend,
-            "frontend": frontend,
-        },
+        "modules": modules,
         "delta": delta,
     }
 

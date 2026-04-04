@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "collectors": [
+    {
+      "name": "bundle_size",
+      "enabled": false,
+      "optional": true
+    },
+    {
+      "name": "openapi_complexity",
+      "enabled": false,
+      "optional": true
+    },
+    {
+      "name": "api_surface_diff",
+      "enabled": false,
+      "optional": true
+    },
+    {
+      "name": "vitest_coverage",
+      "enabled": false,
+      "optional": true
+    },
+    {
+      "name": "playwright_coverage",
+      "enabled": false,
+      "optional": true
+    }
+  ],
+  "updated_at": "2026-04-04T00:00:00+00:00"
+}
