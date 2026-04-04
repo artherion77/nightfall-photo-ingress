@@ -1,33 +1,37 @@
 {
-  "version": "1.0",
+  "version": "1.1",
   "metadata": {
     "name": "nightfall-photo-ingress-mcp-model",
     "description": "Canonical MCP task model for remote SSH workspace orchestration",
     "workspaceRoot": ".",
     "policy": "prefer_mcp_first",
-    "testToolchain": {
-      "backend_unit": "pytest + pytest-asyncio + httpx.AsyncClient(ASGITransport)",
-      "backend_integration": "pytest integration suite (+ optional testcontainers-python for external dependencies)",
-      "web_unit": "vitest + @testing-library/svelte",
-      "web_e2e": "playwright"
+    "hostInstallPolicy": "explicit_user_approval_required",
+    "design": {
+      "cacheStrategy": "lxc_snapshot_reuse_plus_bind_mount_caches",
+      "baseImageLayering": "documentation_only_future_option"
     }
   },
   "domains": {
     "backend": {
       "test.unit": [
-        "if command -v lxc >/dev/null 2>&1 && timeout 5 lxc info dev-photo-ingress >/dev/null 2>&1; then ./dev/devctl bootstrap-python; fi",
+        "./dev/devctl setup",
+        "./dev/devctl bootstrap-python",
+        "./dev/devctl snapshot-create",
+        "./dev/devctl assert-cached-ready",
         "./.venv/bin/python -m pytest tests/unit"
       ],
       "test.integration": [
-        "if command -v lxc >/dev/null 2>&1 && timeout 5 lxc info dev-photo-ingress >/dev/null 2>&1; then ./dev/devctl bootstrap-python; fi",
+        "./dev/devctl setup",
+        "./dev/devctl bootstrap-python",
+        "./dev/devctl snapshot-create",
+        "./dev/devctl assert-cached-ready",
         "./.venv/bin/python -m pytest tests/integration"
       ],
       "build": [
         "python -m build"
       ],
       "deploy.dev": [
-        "./dev/devctl create",
-        "./dev/devctl bootstrap-python",
+        "./dev/devctl setup",
         "./dev/devctl run-api"
       ],
       "deploy.staging": [
@@ -39,54 +43,55 @@
     },
     "web": {
       "test.unit": [
-        "if command -v lxc >/dev/null 2>&1 && timeout 5 lxc info dev-photo-ingress >/dev/null 2>&1; then lxc exec dev-photo-ingress -- bash -lc 'cd /opt/nightfall-webui && npm install --save-dev vitest @testing-library/svelte @testing-library/jest-dom jsdom >/dev/null 2>&1 || true'; lxc exec dev-photo-ingress -- bash -lc 'cd /opt/nightfall-webui && npx vitest run || echo \"Vitest script/config pending in webui; placeholder pass\"'; else echo \"web.test.unit placeholder: devcontainer not running\"; fi"
+        "./dev/devctl setup",
+        "./dev/devctl bootstrap-webui",
+        "./dev/devctl bootstrap-playwright",
+        "./dev/devctl snapshot-create",
+        "./dev/devctl assert-cached-ready",
+        "./dev/devctl test-web-unit"
       ],
       "test.integration": [
-        "echo \"Web integration tests are covered by component and E2E workflow in this project\""
+        "echo \"Web integration is validated through web.e2e and staging smoke flow\""
       ],
       "build": [
         "npm --prefix webui run build"
       ],
       "deploy.dev": [
-        "./dev/devctl create",
-        "./dev/devctl bootstrap-webui",
+        "./dev/devctl setup",
         "./dev/devctl run-webui"
       ],
       "deploy.staging": [
-        "./dev/devctl install webui"
+        "./dev/devctl setup"
       ],
       "e2e": [
-        "if command -v lxc >/dev/null 2>&1 && timeout 5 lxc info dev-photo-ingress >/dev/null 2>&1; then lxc exec dev-photo-ingress -- bash -lc 'cd /opt/nightfall-webui && npm install --save-dev @playwright/test playwright >/dev/null 2>&1 || true'; lxc exec dev-photo-ingress -- bash -lc 'cd /opt/nightfall-webui && npx playwright install --with-deps chromium'; echo \"Playwright dependencies prepared in devcontainer\"; else echo \"web.e2e bootstrap placeholder: devcontainer not running\"; fi"
+        "./staging/stagingctl smoke"
       ]
     }
   },
   "devctl": {
     "path": "./dev/devctl",
     "commands": [
+      "setup",
       "create",
       "destroy",
-      "reset",
-      "snapshot-refresh",
       "bootstrap-python",
       "bootstrap-webui",
+      "bootstrap-playwright",
+      "snapshot-create",
+      "snapshot-refresh",
+      "reset",
+      "assert-cached-ready",
       "run-api",
       "run-webui",
+      "test-web-unit",
       "status",
-      "shell",
-      "bootstrap-python-tests",
-      "bootstrap-web-tests",
-      "install-playwright-browsers"
+      "shell"
     ],
-    "equivalentMappings": {
-      "bootstrap-python-tests": [
-        "if command -v lxc >/dev/null 2>&1 && timeout 5 lxc info dev-photo-ingress >/dev/null 2>&1; then ./dev/devctl bootstrap-python && lxc exec dev-photo-ingress -- bash -lc '/opt/ingress/bin/pip install -U pytest pytest-asyncio httpx testcontainers >/dev/null 2>&1 || true'; else echo \"devcontainer unavailable; python test bootstrap skipped\"; fi"
-      ],
-      "bootstrap-web-tests": [
-        "if command -v lxc >/dev/null 2>&1 && timeout 5 lxc info dev-photo-ingress >/dev/null 2>&1; then ./dev/devctl bootstrap-webui && lxc exec dev-photo-ingress -- bash -lc 'cd /opt/nightfall-webui && npm install --save-dev vitest @testing-library/svelte @testing-library/jest-dom jsdom >/dev/null 2>&1 || true'; else echo \"devcontainer unavailable; web test bootstrap skipped\"; fi"
-      ],
-      "install-playwright-browsers": [
-        "if command -v lxc >/dev/null 2>&1 && timeout 5 lxc info dev-photo-ingress >/dev/null 2>&1; then lxc exec dev-photo-ingress -- bash -lc 'cd /opt/nightfall-webui && npm install --save-dev @playwright/test playwright >/dev/null 2>&1 || true && npx playwright install --with-deps chromium'; else echo \"devcontainer unavailable; playwright browser install skipped\"; fi"
-      ]
+    "cacheMounts": {
+      "npm_home": "~/.npm -> /root/.npm",
+      "npm_cache": "~/.cache/npm -> /root/.cache/npm",
+      "pip_cache": "~/.cache/pip -> /root/.cache/pip",
+      "playwright_cache": "~/.cache/ms-playwright -> /root/.cache/ms-playwright"
     }
   },
   "stagectl": {
@@ -101,32 +106,22 @@
       "discover-paths",
       "smoke-live",
       "evidence"
-    ],
-    "compatibility": {
-      "setup": "create",
-      "deploy": "install",
-      "teardown": "uninstall"
-    }
+    ]
   },
   "devcontainer": {
-    "setup": [
-      "./dev/devctl create",
+    "prepare": [
+      "./dev/devctl setup",
       "./dev/devctl bootstrap-python",
-      "./dev/devctl bootstrap-webui"
+      "./dev/devctl bootstrap-webui",
+      "./dev/devctl bootstrap-playwright",
+      "./dev/devctl snapshot-create",
+      "./dev/devctl assert-cached-ready",
+      "./dev/devctl status"
     ],
-    "build": [
-      "./dev/devctl create",
-      "./dev/devctl bootstrap-python",
-      "./dev/devctl bootstrap-webui"
-    ],
-    "run": [
-      "./dev/devctl status",
-      "./dev/devctl shell"
-    ],
-    "testBootstrap": [
-      "if command -v lxc >/dev/null 2>&1 && timeout 5 lxc info dev-photo-ingress >/dev/null 2>&1; then lxc exec dev-photo-ingress -- bash -lc '/opt/ingress/bin/pip install -U pytest pytest-asyncio httpx testcontainers >/dev/null 2>&1 || true'; fi",
-      "if command -v lxc >/dev/null 2>&1 && timeout 5 lxc info dev-photo-ingress >/dev/null 2>&1; then lxc exec dev-photo-ingress -- bash -lc 'cd /opt/nightfall-webui && npm install --save-dev vitest @testing-library/svelte @testing-library/jest-dom jsdom @playwright/test playwright >/dev/null 2>&1 || true'; fi",
-      "if command -v lxc >/dev/null 2>&1 && timeout 5 lxc info dev-photo-ingress >/dev/null 2>&1; then lxc exec dev-photo-ingress -- bash -lc 'cd /opt/nightfall-webui && npx playwright install --with-deps chromium'; fi"
+    "reset": [
+      "./dev/devctl reset",
+      "./dev/devctl assert-cached-ready",
+      "./dev/devctl status"
     ]
   },
   "staging": {
@@ -141,81 +136,77 @@
     }
   },
   "mappings": {
+    "devcontainer.prepare": [
+      "./dev/devctl setup",
+      "./dev/devctl bootstrap-python",
+      "./dev/devctl bootstrap-webui",
+      "./dev/devctl bootstrap-playwright",
+      "./dev/devctl snapshot-create",
+      "./dev/devctl assert-cached-ready",
+      "./dev/devctl status"
+    ],
+    "devcontainer.reset": [
+      "./dev/devctl reset",
+      "./dev/devctl assert-cached-ready",
+      "./dev/devctl status"
+    ],
     "backend.test.unit": [
-      "if command -v lxc >/dev/null 2>&1 && timeout 5 lxc info dev-photo-ingress >/dev/null 2>&1; then ./dev/devctl bootstrap-python; fi",
+      "./dev/devctl setup",
+      "./dev/devctl bootstrap-python",
+      "./dev/devctl snapshot-create",
+      "./dev/devctl assert-cached-ready",
       "./.venv/bin/python -m pytest tests/unit"
     ],
     "backend.test.integration": [
-      "if command -v lxc >/dev/null 2>&1 && timeout 5 lxc info dev-photo-ingress >/dev/null 2>&1; then ./dev/devctl bootstrap-python; fi",
+      "./dev/devctl setup",
+      "./dev/devctl bootstrap-python",
+      "./dev/devctl snapshot-create",
+      "./dev/devctl assert-cached-ready",
       "./.venv/bin/python -m pytest tests/integration"
     ],
-    "backend.build": [
-      "python -m build"
-    ],
-    "backend.deploy.dev": [
-      "./dev/devctl create",
-      "./dev/devctl bootstrap-python",
-      "./dev/devctl run-api"
-    ],
-    "backend.deploy.staging": [
-      "./staging/stagingctl install"
-    ],
-    "backend.e2e": [
-      "./staging/stagingctl smoke"
-    ],
-    "devctl.bootstrap-python-tests": [
-      "if command -v lxc >/dev/null 2>&1 && timeout 5 lxc info dev-photo-ingress >/dev/null 2>&1; then ./dev/devctl bootstrap-python && lxc exec dev-photo-ingress -- bash -lc '/opt/ingress/bin/pip install -U pytest pytest-asyncio httpx testcontainers >/dev/null 2>&1 || true'; else echo \"devcontainer unavailable; python test bootstrap skipped\"; fi"
-    ],
-    "devctl.bootstrap-web-tests": [
-      "if command -v lxc >/dev/null 2>&1 && timeout 5 lxc info dev-photo-ingress >/dev/null 2>&1; then ./dev/devctl bootstrap-webui && lxc exec dev-photo-ingress -- bash -lc 'cd /opt/nightfall-webui && npm install --save-dev vitest @testing-library/svelte @testing-library/jest-dom jsdom >/dev/null 2>&1 || true'; else echo \"devcontainer unavailable; web test bootstrap skipped\"; fi"
-    ],
-    "devctl.install-playwright-browsers": [
-      "if command -v lxc >/dev/null 2>&1 && timeout 5 lxc info dev-photo-ingress >/dev/null 2>&1; then lxc exec dev-photo-ingress -- bash -lc 'cd /opt/nightfall-webui && npm install --save-dev @playwright/test playwright >/dev/null 2>&1 || true && npx playwright install --with-deps chromium'; else echo \"devcontainer unavailable; playwright browser install skipped\"; fi"
-    ],
     "web.test.unit": [
-      "if command -v lxc >/dev/null 2>&1 && timeout 5 lxc info dev-photo-ingress >/dev/null 2>&1; then lxc exec dev-photo-ingress -- bash -lc 'cd /opt/nightfall-webui && npm install --save-dev vitest @testing-library/svelte @testing-library/jest-dom jsdom >/dev/null 2>&1 || true'; lxc exec dev-photo-ingress -- bash -lc 'cd /opt/nightfall-webui && npx vitest run || echo \"Vitest script/config pending in webui; placeholder pass\"'; else echo \"web.test.unit placeholder: devcontainer not running\"; fi"
+      "./dev/devctl setup",
+      "./dev/devctl bootstrap-webui",
+      "./dev/devctl bootstrap-playwright",
+      "./dev/devctl snapshot-create",
+      "./dev/devctl assert-cached-ready",
+      "./dev/devctl test-web-unit"
     ],
     "web.test.integration": [
-      "echo \"Web integration tests are covered by component and E2E workflow in this project\""
-    ],
-    "web.build": [
-      "npm --prefix webui run build"
-    ],
-    "web.deploy.dev": [
-      "./dev/devctl create",
-      "./dev/devctl bootstrap-webui",
-      "./dev/devctl run-webui"
-    ],
-    "web.deploy.staging": [
-      "./dev/devctl install webui"
+      "echo \"Web integration is validated through web.e2e and staging smoke flow\""
     ],
     "web.e2e": [
-      "if command -v lxc >/dev/null 2>&1 && timeout 5 lxc info dev-photo-ingress >/dev/null 2>&1; then lxc exec dev-photo-ingress -- bash -lc 'cd /opt/nightfall-webui && npm install --save-dev @playwright/test playwright >/dev/null 2>&1 || true'; lxc exec dev-photo-ingress -- bash -lc 'cd /opt/nightfall-webui && npx playwright install --with-deps chromium'; echo \"Playwright dependencies prepared in devcontainer\"; else echo \"web.e2e bootstrap placeholder: devcontainer not running\"; fi"
+      "./staging/stagingctl smoke"
     ]
   },
   "verifications": {
     "unit": {
       "backend": [
-        "if command -v lxc >/dev/null 2>&1 && timeout 5 lxc info dev-photo-ingress >/dev/null 2>&1; then ./dev/devctl bootstrap-python; fi",
+        "./dev/devctl setup",
+        "./dev/devctl bootstrap-python",
+        "./dev/devctl snapshot-create",
+        "./dev/devctl assert-cached-ready",
         "./.venv/bin/python -m pytest tests/unit"
       ],
       "web": [
-        "if command -v lxc >/dev/null 2>&1 && timeout 5 lxc info dev-photo-ingress >/dev/null 2>&1; then lxc exec dev-photo-ingress -- bash -lc 'cd /opt/nightfall-webui && npm install --save-dev vitest @testing-library/svelte @testing-library/jest-dom jsdom >/dev/null 2>&1 || true'; lxc exec dev-photo-ingress -- bash -lc 'cd /opt/nightfall-webui && npx vitest run || echo \"Vitest script/config pending in webui; placeholder pass\"'; else echo \"web.unit verify placeholder: devcontainer not running\"; fi"
-      ],
-      "staging": [
-        "./staging/stagingctl smoke"
+        "./dev/devctl setup",
+        "./dev/devctl bootstrap-webui",
+        "./dev/devctl bootstrap-playwright",
+        "./dev/devctl snapshot-create",
+        "./dev/devctl assert-cached-ready",
+        "./dev/devctl test-web-unit"
       ]
     },
     "integration": {
       "backend": [
-        "if command -v lxc >/dev/null 2>&1 && timeout 5 lxc info dev-photo-ingress >/dev/null 2>&1; then ./dev/devctl bootstrap-python; fi",
+        "./dev/devctl setup",
+        "./dev/devctl bootstrap-python",
+        "./dev/devctl snapshot-create",
+        "./dev/devctl assert-cached-ready",
         "./.venv/bin/python -m pytest tests/integration"
       ],
       "web": [
-        "echo \"Web integration is validated through web.e2e in this model\""
-      ],
-      "staging": [
-        "./staging/stagingctl smoke"
+        "echo \"Web integration is validated through web.e2e and staging smoke flow\""
       ]
     },
     "e2e": {
@@ -223,9 +214,6 @@
         "./staging/stagingctl smoke"
       ],
       "web": [
-        "if command -v lxc >/dev/null 2>&1 && timeout 5 lxc info dev-photo-ingress >/dev/null 2>&1; then lxc exec dev-photo-ingress -- bash -lc 'cd /opt/nightfall-webui && npm install --save-dev @playwright/test playwright >/dev/null 2>&1 || true'; lxc exec dev-photo-ingress -- bash -lc 'cd /opt/nightfall-webui && npx playwright install --with-deps chromium'; echo \"Playwright dependencies prepared in devcontainer\"; else echo \"web.e2e verify placeholder: devcontainer not running\"; fi"
-      ],
-      "staging": [
         "./staging/stagingctl smoke"
       ]
     }

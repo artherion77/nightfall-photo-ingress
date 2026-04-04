@@ -2,195 +2,105 @@
 
 ## Purpose
 
-This repository now includes a project-specific MCP model and a minimal orchestration
-server so that LLMs (including Claude-like and Copilot-like MCP clients) can operate
-through a deterministic, auditable interface instead of issuing ad-hoc shell commands.
+This repository uses an MCP model plus a local MCP server so LLM workflows execute deterministic, auditable actions through mapped tasks.
 
 Policy: prefer to use MCP endpoints first, over ad-hoc shell commands.
 
-Policy: Host installations require explicit user approval; Devcontainer installations may be performed by the MCP agent for development convenience. Any such installations will be reported in the MCP task summary.
+Policy: Host-installations only with explicit user approval. Dev-container installations are allowed and every installation is reported in the task summary.
 
-## Why this design
+## Design Decision
 
-- Model location choice: `.mcp/model.json`
-  - `.mcp/` is tooling-neutral and can be shared by multiple clients.
-  - Keeps model, logs, and task history colocated under one repo-local control folder.
-  - Avoids coupling to one vendor namespace (`.claude` or `.copilot`).
-- Server stack choice: Python standard library HTTP server (`mcp_server.py`)
-  - No additional runtime dependency required for remote SSH bootstrap.
-  - Works with existing Python-centric repo workflow.
-  - Easy to run in constrained environments and easy to inspect.
+Implemented strategy:
+- LXC snapshot reuse + bind-mount caches (standard).
 
-## Test Toolchain Review
+Why this choice:
+- Faster repeated bootstrap/reset cycles for Python, npm, and Playwright artifacts.
+- Deterministic clean-state recovery via one canonical snapshot.
+- Lower operational complexity than custom image pipelines.
 
-### Option: FastAPI testing with pytest + pytest-asyncio + httpx ASGI transport
-
-Short description:
-- Standard async Python testing stack for FastAPI that executes app-level tests quickly without launching a full external HTTP server.
-
-Pros for this repo:
-- Fast local and CI runtime for unit and most integration paths.
-- Works naturally with the existing Python + pytest setup.
-- Good debuggability in regular pytest output and IDE workflows.
-
-Cons for this repo:
-- External dependency realism (DB/services) requires extra setup.
-
-Devcontainer/devctl integration effort:
-- Python deps: `pytest`, `pytest-asyncio`, `httpx`.
-- Optional for service-backed integration: `testcontainers`.
-
-### Option: Svelte testing with Vitest + @testing-library/svelte
-
-Short description:
-- Modern Vite-native test runner and component testing utilities for Svelte, optimized for speed and watch/debug cycles.
-
-Pros for this repo:
-- Fast startup and execution in Vite/Svelte ecosystems.
-- Good developer experience in devcontainer and CI.
-- Aligns with existing Vite build tooling.
-
-Cons for this repo:
-- Requires adding test scripts/config in web UI package when not yet present.
-
-Devcontainer/devctl integration effort:
-- Node deps: `vitest`, `@testing-library/svelte`, `@testing-library/jest-dom`, `jsdom`.
-
-### Option: Browser E2E with Playwright
-
-Short description:
-- Headless-capable browser automation with strong CI support, trace tooling, and deterministic execution.
-
-Pros for this repo:
-- Better CI ergonomics and parallelization than Selenium-heavy stacks.
-- Rich debugging artifacts (traces/screenshots/videos).
-- Well-suited for containerized execution.
-
-Cons for this repo:
-- Browser binaries increase bootstrap time.
-
-Devcontainer/devctl integration effort:
-- Node deps: `@playwright/test`, `playwright`.
-- Browser install: `npx playwright install --with-deps chromium`.
-
-### Alternative: Cypress
-
-Short description:
-- Browser E2E framework with interactive runner and strong UI-focused DX.
-
-Pros for this repo:
-- Excellent local debugging UI.
-
-Cons for this repo:
-- Heavier CI/runtime footprint than Playwright for this setup.
-- Less aligned with desired lightweight remote-shell/bootstrap path.
-
-Devcontainer/devctl integration effort:
-- Node deps: `cypress` (+ optional system deps).
-
-### Alternative: Jest (instead of Vitest)
-
-Short description:
-- General-purpose JS test runner with broad ecosystem support.
-
-Pros for this repo:
-- Mature ecosystem and many examples.
-
-Cons for this repo:
-- Slower and less Vite-native for Svelte projects than Vitest.
-
-Devcontainer/devctl integration effort:
-- Node deps: `jest`, `ts-jest` or Babel config, DOM test libs.
-
-### Alternative: Selenium (not recommended)
-
-Short description:
-- Browser automation via WebDriver stack.
-
-Pros for this repo:
-- Broad cross-browser history and legacy ecosystem coverage.
-
-Cons for this repo:
-- Highest operational complexity and lowest velocity for this workflow.
-
-Devcontainer/devctl integration effort:
-- Selenium package + browser drivers/grid runtime management.
-
-## Final Toolchain Choice
-
-- Backend unit tests: `pytest + pytest-asyncio + httpx.AsyncClient(ASGITransport)`
-- Backend integration tests: `pytest` integration suite (+ optional `testcontainers` where external service realism is required)
-- Web unit/component tests: `vitest + @testing-library/svelte`
-- Web E2E tests: `playwright`
-
-Rationale (concise):
-- Best fit with existing Python/Vite stack and current repository tooling.
-- Fastest end-to-end feedback loop in devcontainer and CI contexts.
-- Strong debug capability (pytest traces + Playwright traces).
-- Lowest complexity increase while preserving realistic integration/E2E paths.
+Future option (documentation-only):
+- Base image layering can be evaluated later, but is intentionally not implemented in this repository workflow.
 
 ## Files
 
-- Model: `.mcp/model.json`
-- Server: `mcp_server.py`
-- Runtime logs: `.mcp/logs/<taskId>.log`
-- Task history: `.mcp/tasks/history.json`
+- Model: .mcp/model.json
+- Server: mcp_server.py
+- Runtime logs: .mcp/logs/<taskId>.log
+- Task history: .mcp/tasks/history.json
 
-## Start server in remote SSH workspace
+## LXC Cache Mounts
 
-Run from repository root:
+The dev container setup configures these bind-mount caches:
+- npm home: ~/.npm -> /root/.npm
+- npm cache: ~/.cache/npm -> /root/.cache/npm
+- pip cache: ~/.cache/pip -> /root/.cache/pip
+- Playwright cache: ~/.cache/ms-playwright -> /root/.cache/ms-playwright
+
+## devctl Commands (Cached Install Flow)
+
+- ./dev/devctl setup
+- ./dev/devctl bootstrap-python
+- ./dev/devctl bootstrap-webui
+- ./dev/devctl bootstrap-playwright
+- ./dev/devctl snapshot-create
+- ./dev/devctl reset
+- ./dev/devctl assert-cached-ready
+- ./dev/devctl status
+
+Typical flow:
+
+```bash
+./dev/devctl setup
+./dev/devctl bootstrap-python
+./dev/devctl bootstrap-webui
+./dev/devctl bootstrap-playwright
+./dev/devctl snapshot-create
+./dev/devctl reset
+./dev/devctl status
+```
+
+## MCP Tasks (devctl-first)
+
+Canonical MCP tasks now use devctl orchestration for environment prepare/reset.
+
+- devcontainer.prepare
+- devcontainer.reset
+- backend.test.unit
+- backend.test.integration
+- web.test.unit
+
+Important safety rule:
+- MCP must not run arbitrary install commands directly.
+- Install actions are executed via devctl bootstrap commands only.
+
+## Start MCP Server
 
 ```bash
 python mcp_server.py --host 0.0.0.0 --port 8765 --workspace . --model .mcp/model.json
 ```
 
-Recommended remote endpoint format:
+Remote endpoint format:
+- http://<remote-ssh-host>:8765
 
-- `http://<remote-ssh-host>:8765`
+## MCP Usage Examples
 
-Requirements for remote access:
-
-- SSH access to the host where this workspace is located.
-- Network path to selected host/port (or SSH tunnel forwarding).
-- Execute permission for `dev/devctl` and `staging/stagingctl` when using mapped tasks.
-
-## Endpoint usage examples
-
-Run a mapped task:
+Prepare container + caches + snapshot:
 
 ```bash
 curl -sS -X POST http://<server>/mcp/exec \
   -H 'Content-Type: application/json' \
-  -d '{"task":"web.test.unit"}'
+  -d '{"task":"devcontainer.prepare"}'
 ```
 
-Check task status:
+Reset to clean snapshot:
 
 ```bash
-curl -sS http://<server>/mcp/status/<id>
-```
-
-Read task log:
-
-```bash
-curl -sS http://<server>/mcp/log/<id>
-```
-
-Run verification:
-
-```bash
-curl -sS -X POST http://<server>/mcp/verify \
+curl -sS -X POST http://<server>/mcp/exec \
   -H 'Content-Type: application/json' \
-  -d '{"verify":"unit","target":"backend"}'
+  -d '{"task":"devcontainer.reset"}'
 ```
 
-Read canonical runtime context first:
-
-```bash
-curl -sS http://<server>/mcp/context
-```
-
-Run backend unit tests via MCP:
+Run backend unit tests:
 
 ```bash
 curl -sS -X POST http://<server>/mcp/exec \
@@ -198,15 +108,7 @@ curl -sS -X POST http://<server>/mcp/exec \
   -d '{"task":"backend.test.unit"}'
 ```
 
-Run backend integration tests via MCP:
-
-```bash
-curl -sS -X POST http://<server>/mcp/exec \
-  -H 'Content-Type: application/json' \
-  -d '{"task":"backend.test.integration"}'
-```
-
-Run web unit/component tests via MCP:
+Run web unit tests:
 
 ```bash
 curl -sS -X POST http://<server>/mcp/exec \
@@ -214,67 +116,30 @@ curl -sS -X POST http://<server>/mcp/exec \
   -d '{"task":"web.test.unit"}'
 ```
 
-Run web E2E bootstrap/validation via MCP:
+Inspect status/log/context:
 
 ```bash
-curl -sS -X POST http://<server>/mcp/exec \
-  -H 'Content-Type: application/json' \
-  -d '{"task":"web.e2e"}'
+curl -sS http://<server>/mcp/status/<id>
+curl -sS http://<server>/mcp/log/<id>
+curl -sS http://<server>/mcp/context
 ```
 
-## MCP Test Flow (Canonical Tasks)
+## Security and Policy
 
-- `backend.test.unit`
-  - Uses pytest unit suite.
-  - If devcontainer exists, runs Python bootstrap prerequisite first.
-- `backend.test.integration`
-  - Uses pytest integration suite.
-  - Optional containerized dependency support via testcontainers package bootstrap.
-- `web.test.unit`
-  - Uses Vitest + Testing Library in devcontainer when available.
-  - Falls back to a documented placeholder message when devcontainer is not running.
-- `web.e2e`
-  - Uses Playwright setup in devcontainer and installs Chromium browser dependencies.
-
-Additional devctl-equivalent MCP tasks:
-
-- `devctl.bootstrap-python-tests`
-- `devctl.bootstrap-web-tests`
-- `devctl.install-playwright-browsers`
-
-These are modeled in `.mcp/model.json` as deterministic command sequences because
-the current `dev/devctl` script does not yet expose those exact subcommands.
-
-## Model extension guidance
-
-Edit `.mcp/model.json` and keep these rules:
-
-- Add new deterministic command lists under `mappings`.
-- Add domain-level documentation under `domains`.
-- Add verification recipes under `verifications`.
-- Never place secrets in the model; only placeholders and env var names.
-- Keep task keys stable (for example: `backend.test.unit`, `web.deploy.staging`).
-- Keep install steps idempotent and constrained to devcontainer operations by default.
-
-## Security model
-
-- The server rejects arbitrary command requests.
-- Only tasks explicitly defined in `.mcp/model.json` can be executed.
-- `cwd` is constrained to stay inside this workspace.
-- For test orchestration, host package installation is forbidden unless explicitly approved by the user.
+- Host installations require explicit user approval.
+- Dev-container installations are allowed for development convenience.
+- Any installation performed by MCP orchestration is reported in task results.
+- MCP server accepts only mapped tasks from .mcp/model.json; no arbitrary command execution.
 
 ## Troubleshooting
 
-- Devcontainer not running:
-  - Use `./dev/devctl status`, then `./dev/devctl create` as needed.
-- Devcontainer test dependencies:
-  - Trigger MCP task `devctl.bootstrap-python-tests` and `devctl.bootstrap-web-tests`.
-  - Trigger MCP task `devctl.install-playwright-browsers` for browser binaries.
-- `devctl` missing or not executable:
-  - Ensure `dev/devctl` exists and has execute bit (`chmod +x dev/devctl`).
-- `stagectl` command mismatch:
-  - This repo uses `staging/stagingctl`; compatibility aliases are documented in the model.
-- Remote SSH access issues:
-  - Verify host firewall/port forwarding or use SSH local forwarding.
-- Endpoint returns unknown task:
-  - Confirm key exists in `.mcp/model.json` under `mappings`.
+- Container missing:
+  - Run ./dev/devctl setup
+- Cache mounts missing:
+  - Run ./dev/devctl setup and then ./dev/devctl status
+- Snapshot missing:
+  - Run ./dev/devctl snapshot-create
+- Reset fails:
+  - Ensure clean snapshot exists and run ./dev/devctl assert-cached-ready
+- Test task unavailable:
+  - Verify task key exists in .mcp/model.json under mappings

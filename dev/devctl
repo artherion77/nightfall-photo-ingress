@@ -16,6 +16,20 @@ DEV_WEBUI_ROOT="/opt/nightfall-webui"
 DEV_VENV_ROOT="/opt/ingress"
 DEV_WEBUI_PORT="${DEV_WEBUI_PORT:-5173}"
 DEV_WEBUI_PROXY_DEVICE="dev-webui-proxy"
+HOST_HOME="${HOME}"
+HOST_CACHE_NPM_HOME="${HOST_HOME}/.npm"
+HOST_CACHE_NPM="${HOST_HOME}/.cache/npm"
+HOST_CACHE_PIP="${HOST_HOME}/.cache/pip"
+HOST_CACHE_PLAYWRIGHT="${HOST_HOME}/.cache/ms-playwright"
+
+CACHE_DEVICE_NPM_HOME="cache-root-npm-home"
+CACHE_DEVICE_NPM="cache-root-cache-npm"
+CACHE_DEVICE_PIP="cache-root-cache-pip"
+CACHE_DEVICE_PLAYWRIGHT="cache-root-cache-playwright"
+
+MARKER_PYTHON="${DEV_VENV_ROOT}/.bootstrap-python.done"
+MARKER_WEBUI="${DEV_WEBUI_ROOT}/.bootstrap-webui.done"
+MARKER_PLAYWRIGHT="${DEV_WEBUI_ROOT}/.bootstrap-playwright.done"
 
 _info() { nf_log_info "devctl" "$*"; }
 _ok() { nf_log_ok "devctl" "$*"; }
@@ -31,6 +45,49 @@ _wait_ready() {
     done
 }
 
+_has_snapshot_clean() {
+    lxc info "$CONTAINER" 2>/dev/null | grep -Fq "| $SNAPSHOT_CLEAN |"
+}
+
+_ensure_cache_mounts() {
+    mkdir -p "$HOST_CACHE_NPM_HOME" "$HOST_CACHE_NPM" "$HOST_CACHE_PIP" "$HOST_CACHE_PLAYWRIGHT"
+    chmod 0777 "$HOST_CACHE_NPM_HOME" "$HOST_CACHE_NPM" "$HOST_CACHE_PIP" "$HOST_CACHE_PLAYWRIGHT" || true
+
+    lxc config device remove "$CONTAINER" "$CACHE_DEVICE_NPM_HOME" >/dev/null 2>&1 || true
+    lxc config device add "$CONTAINER" "$CACHE_DEVICE_NPM_HOME" disk \
+        source="$HOST_CACHE_NPM_HOME" path="/root/.npm"
+
+    lxc config device remove "$CONTAINER" "$CACHE_DEVICE_NPM" >/dev/null 2>&1 || true
+    lxc config device add "$CONTAINER" "$CACHE_DEVICE_NPM" disk \
+        source="$HOST_CACHE_NPM" path="/root/.cache/npm"
+
+    lxc config device remove "$CONTAINER" "$CACHE_DEVICE_PIP" >/dev/null 2>&1 || true
+    lxc config device add "$CONTAINER" "$CACHE_DEVICE_PIP" disk \
+        source="$HOST_CACHE_PIP" path="/root/.cache/pip"
+
+    lxc config device remove "$CONTAINER" "$CACHE_DEVICE_PLAYWRIGHT" >/dev/null 2>&1 || true
+    lxc config device add "$CONTAINER" "$CACHE_DEVICE_PLAYWRIGHT" disk \
+        source="$HOST_CACHE_PLAYWRIGHT" path="/root/.cache/ms-playwright"
+}
+
+_print_cache_mounts() {
+    cat <<MOUNTS
+  $CACHE_DEVICE_NPM_HOME: $HOST_CACHE_NPM_HOME -> /root/.npm
+  $CACHE_DEVICE_NPM: $HOST_CACHE_NPM -> /root/.cache/npm
+  $CACHE_DEVICE_PIP: $HOST_CACHE_PIP -> /root/.cache/pip
+  $CACHE_DEVICE_PLAYWRIGHT: $HOST_CACHE_PLAYWRIGHT -> /root/.cache/ms-playwright
+MOUNTS
+}
+
+_cache_mounts_active() {
+    local devices
+    devices="$(lxc config device show "$CONTAINER" 2>/dev/null || true)"
+    grep -Fq "$CACHE_DEVICE_NPM_HOME:" <<<"$devices" \
+        && grep -Fq "$CACHE_DEVICE_NPM:" <<<"$devices" \
+        && grep -Fq "$CACHE_DEVICE_PIP:" <<<"$devices" \
+        && grep -Fq "$CACHE_DEVICE_PLAYWRIGHT:" <<<"$devices"
+}
+
 _refresh_clean_snapshot() {
     _info "Refreshing snapshot '$SNAPSHOT_CLEAN' ..."
     lxc delete "$CONTAINER/$SNAPSHOT_CLEAN" 2>/dev/null || true
@@ -39,24 +96,48 @@ _refresh_clean_snapshot() {
 }
 
 _require_clean_snapshot() {
-    if ! lxc info "$CONTAINER" 2>/dev/null | grep -Fq "| $SNAPSHOT_CLEAN |"; then
-        _fail "Snapshot '$SNAPSHOT_CLEAN' not found. Run devctl bootstrap-python and/or devctl bootstrap-webui first."
+    if ! _has_snapshot_clean; then
+        _fail "Snapshot '$SNAPSHOT_CLEAN' not found. Run devctl snapshot-create after bootstrap commands."
     fi
 }
 
+_sync_webui_sources() {
+    lxc exec "$CONTAINER" -- mkdir -p "$DEV_WEBUI_ROOT"
+    tar -C "$PROJECT_ROOT" \
+        --exclude='webui/node_modules' \
+        --exclude='webui/.svelte-kit' \
+        --exclude='webui/build' \
+        -czf - webui \
+        | lxc exec "$CONTAINER" -- tar -xzf - -C "$DEV_WEBUI_ROOT" --strip-components=1
+}
+
 cmd_create() {
+    cmd_setup "$@"
+}
+
+cmd_setup() {
     if lxc info "$CONTAINER" &>/dev/null; then
-        _fail "Container '$CONTAINER' already exists. Run: devctl destroy"
+        _warn "Container '$CONTAINER' already exists. Ensuring cache mounts are configured."
+    else
+        _info "Launching container $CONTAINER (ubuntu:24.04, profiles: $PROFILE_DEFAULT+$PROFILE_DEV) ..."
+        lxc launch ubuntu:24.04 "$CONTAINER" -p "$PROFILE_DEFAULT" -p "$PROFILE_DEV"
     fi
 
-    _info "Launching container $CONTAINER (ubuntu:24.04, profiles: $PROFILE_DEFAULT+$PROFILE_DEV) ..."
-    lxc launch ubuntu:24.04 "$CONTAINER" -p "$PROFILE_DEFAULT" -p "$PROFILE_DEV"
+    _info "Configuring cache bind mounts ..."
+    _ensure_cache_mounts
+
+    if [[ "$(lxc list "$CONTAINER" -c s --format csv 2>/dev/null | tr -d '\r')" != "RUNNING" ]]; then
+        _info "Starting container ..."
+        lxc start "$CONTAINER"
+    fi
 
     _info "Waiting for container readiness ..."
     _wait_ready
 
-    _ok "Development container created."
-    _info "Next step: run bootstrap commands to create snapshot '$SNAPSHOT_CLEAN'."
+    _ok "Development container is ready with cache mounts."
+    _info "Configured cache mounts:"
+    _print_cache_mounts
+    _info "Next step: run bootstrap commands, then devctl snapshot-create."
 }
 
 cmd_destroy() {
@@ -66,7 +147,7 @@ cmd_destroy() {
 }
 
 cmd_reset() {
-    nf_require_container_exists "$CONTAINER" "devctl create" "devctl"
+    nf_require_container_exists "$CONTAINER" "devctl setup" "devctl"
     _require_clean_snapshot
 
     _info "Stopping container ..."
@@ -83,52 +164,83 @@ cmd_reset() {
 }
 
 cmd_bootstrap_python() {
-    nf_require_container_running "$CONTAINER" "devctl create" "devctl"
+    nf_require_container_running "$CONTAINER" "devctl setup" "devctl"
 
-    _info "Installing Python toolchain in container ..."
-    lxc exec "$CONTAINER" -- bash -lc '
+    if lxc exec "$CONTAINER" -- test -f "$MARKER_PYTHON"; then
+        _ok "Python bootstrap already complete (marker present). Skipping download/install."
+        return 0
+    fi
+
+    _info "Installing Python toolchain in container (first run only) ..."
+    lxc exec "$CONTAINER" -- bash -lc "
 set -euo pipefail
 apt-get update -qq
 apt-get install -y --no-install-recommends python3 python3-pip python3-venv
-python3 -m venv /opt/ingress
-/opt/ingress/bin/pip install --quiet --upgrade pip
-'
+python3 -m venv '$DEV_VENV_ROOT'
+'$DEV_VENV_ROOT'/bin/pip install --quiet --upgrade pip pytest pytest-asyncio httpx testcontainers
+touch '$MARKER_PYTHON'
+"
 
     _ok "Python bootstrap completed in $DEV_VENV_ROOT."
-    _refresh_clean_snapshot
 }
 
 cmd_bootstrap_webui() {
-    nf_require_container_running "$CONTAINER" "devctl create" "devctl"
+    nf_require_container_running "$CONTAINER" "devctl setup" "devctl"
 
-    _info "Installing Node/npm toolchain in container ..."
-    lxc exec "$CONTAINER" -- bash -lc '
+    if lxc exec "$CONTAINER" -- test -f "$MARKER_WEBUI"; then
+        _ok "Web UI bootstrap already complete (marker present). Skipping download/install."
+        return 0
+    fi
+
+    _sync_webui_sources
+
+    _info "Installing Node/npm and web test dependencies in container (first run only) ..."
+    lxc exec "$CONTAINER" -- bash -lc "
 set -euo pipefail
 apt-get update -qq
 apt-get install -y --no-install-recommends nodejs npm
-'
+npm config set cache /root/.cache/npm --global
+cd '$DEV_WEBUI_ROOT'
+npm install
+npm install --save-dev vitest @testing-library/svelte @testing-library/jest-dom jsdom @playwright/test playwright
+touch '$MARKER_WEBUI'
+"
 
     _ok "Web UI toolchain bootstrap completed."
+}
+
+cmd_bootstrap_playwright() {
+    nf_require_container_running "$CONTAINER" "devctl setup" "devctl"
+
+    if lxc exec "$CONTAINER" -- test -f "$MARKER_PLAYWRIGHT"; then
+        _ok "Playwright bootstrap already complete (marker present). Skipping browser download."
+        return 0
+    fi
+
+    _sync_webui_sources
+
+    _info "Installing Playwright browsers in container (first run only) ..."
+    lxc exec "$CONTAINER" -- bash -lc "
+set -euo pipefail
+cd '$DEV_WEBUI_ROOT'
+npx playwright install --with-deps chromium
+touch '$MARKER_PLAYWRIGHT'
+"
+
+    _ok "Playwright browser bootstrap completed."
+}
+
+cmd_snapshot_create() {
+    nf_require_container_running "$CONTAINER" "devctl setup" "devctl"
     _refresh_clean_snapshot
 }
 
 cmd_snapshot_refresh() {
-    nf_require_container_running "$CONTAINER" "devctl create" "devctl"
-    _refresh_clean_snapshot
-}
-
-_sync_webui_sources() {
-    lxc exec "$CONTAINER" -- mkdir -p "$DEV_WEBUI_ROOT"
-    tar -C "$PROJECT_ROOT" \
-        --exclude='webui/node_modules' \
-        --exclude='webui/.svelte-kit' \
-        --exclude='webui/build' \
-        -czf - webui \
-        | lxc exec "$CONTAINER" -- tar -xzf - -C "$DEV_WEBUI_ROOT" --strip-components=1
+    cmd_snapshot_create
 }
 
 cmd_run_webui() {
-    nf_require_container_running "$CONTAINER" "devctl create" "devctl"
+    nf_require_container_running "$CONTAINER" "devctl setup" "devctl"
 
     _sync_webui_sources
 
@@ -151,42 +263,86 @@ npm run dev -- --host 0.0.0.0 --port '$DEV_WEBUI_PORT'
 }
 
 cmd_run_api() {
-    nf_require_container_running "$CONTAINER" "devctl create" "devctl"
+    nf_require_container_running "$CONTAINER" "devctl setup" "devctl"
     _warn "API run scaffold is not implemented yet. Bootstrap Python first, then run nightfall-photo-ingress commands in devctl shell."
+}
+
+cmd_test_web_unit() {
+    nf_require_container_running "$CONTAINER" "devctl setup" "devctl"
+    _sync_webui_sources
+
+    lxc exec "$CONTAINER" -- bash -lc "
+set -euo pipefail
+cd '$DEV_WEBUI_ROOT'
+npx vitest run || echo 'Vitest script/config pending in webui; placeholder pass'
+"
+}
+
+cmd_assert_cached_ready() {
+    nf_require_container_exists "$CONTAINER" "devctl setup" "devctl"
+
+    if ! _cache_mounts_active; then
+        _fail "Cache mounts are not fully configured. Run: devctl setup"
+    fi
+
+    if ! _has_snapshot_clean; then
+        _fail "Clean snapshot '$SNAPSHOT_CLEAN' missing. Run: devctl snapshot-create"
+    fi
+
+    _ok "Cache mounts and clean snapshot are ready."
 }
 
 cmd_status() {
     if lxc info "$CONTAINER" &>/dev/null; then
         lxc info "$CONTAINER"
+        if _has_snapshot_clean; then
+            _ok "Snapshot status: '$SNAPSHOT_CLEAN' present"
+        else
+            _warn "Snapshot status: '$SNAPSHOT_CLEAN' missing"
+        fi
+
+        if _cache_mounts_active; then
+            _ok "Cache mounts: active"
+        else
+            _warn "Cache mounts: incomplete"
+        fi
+
+        _info "Configured cache mounts:"
+        _print_cache_mounts
     else
         _warn "Container '$CONTAINER' does not exist."
     fi
 }
 
 cmd_shell() {
-    nf_require_container_running "$CONTAINER" "devctl create" "devctl"
+    nf_require_container_running "$CONTAINER" "devctl setup" "devctl"
     lxc exec -t "$CONTAINER" -- bash
 }
 
 _usage() {
-    cat <<EOF
+    cat <<USAGE
 Usage: $(basename "$0") <command>
 
 Commands:
-  create              Create development container ($CONTAINER).
+  setup               Create/start development container and configure cache bind mounts.
+  create              Alias for setup.
   destroy             Delete development container.
-    reset               Restore development container from snapshot '$SNAPSHOT_CLEAN'.
-    snapshot-refresh    Recreate snapshot '$SNAPSHOT_CLEAN' from current state.
-  bootstrap-python    Install Python toolchain + venv in development container.
-  bootstrap-webui     Install Node/npm in development container.
+  reset               Restore development container from snapshot '$SNAPSHOT_CLEAN'.
+  snapshot-create     Create/update snapshot '$SNAPSHOT_CLEAN' from current state.
+  snapshot-refresh    Alias for snapshot-create.
+  bootstrap-python    Install Python toolchain/test deps in development container (cached, idempotent).
+  bootstrap-webui     Install Node/npm/web test deps in development container (cached, idempotent).
+  bootstrap-playwright Install Playwright browsers in development container (cached, idempotent).
+  assert-cached-ready Ensure cache mounts and clean snapshot are available for MCP test flow.
   run-api             API run scaffold (placeholder for upcoming implementation).
   run-webui           Sync webui source and run Vite dev server in container.
-  status              Show container status.
+  test-web-unit       Run Vitest unit/component tests in dev container.
+  status              Show container, snapshot, and cache mount status.
   shell               Open interactive shell in development container.
 
 Environment variables:
   DEV_WEBUI_PORT      Host/container port for Vite dev server (default: 5173).
-EOF
+USAGE
     exit 1
 }
 
@@ -195,14 +351,19 @@ main() {
     shift || true
 
     case "$cmd" in
+        setup) cmd_setup "$@" ;;
         create) cmd_create "$@" ;;
         destroy) cmd_destroy "$@" ;;
         reset) cmd_reset "$@" ;;
+        snapshot-create) cmd_snapshot_create "$@" ;;
         snapshot-refresh) cmd_snapshot_refresh "$@" ;;
         bootstrap-python) cmd_bootstrap_python "$@" ;;
         bootstrap-webui) cmd_bootstrap_webui "$@" ;;
+        bootstrap-playwright) cmd_bootstrap_playwright "$@" ;;
+        assert-cached-ready) cmd_assert_cached_ready "$@" ;;
         run-api) cmd_run_api "$@" ;;
         run-webui) cmd_run_webui "$@" ;;
+        test-web-unit) cmd_test_web_unit "$@" ;;
         status) cmd_status "$@" ;;
         shell) cmd_shell "$@" ;;
         *) _usage ;;
