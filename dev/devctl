@@ -21,6 +21,8 @@ HOST_CACHE_NPM_HOME="${HOST_HOME}/.npm"
 HOST_CACHE_NPM="${HOST_HOME}/.cache/npm"
 HOST_CACHE_PIP="${HOST_HOME}/.cache/pip"
 HOST_CACHE_PLAYWRIGHT="${HOST_HOME}/.cache/ms-playwright"
+DEVCTL_LOCK_FILE="${DEVCTL_LOCK_FILE:-/tmp/nightfall-devctl.lock}"
+DEVCTL_LOCK_TIMEOUT_SEC="${DEVCTL_LOCK_TIMEOUT_SEC:-300}"
 
 CACHE_DEVICE_NPM_HOME="cache-root-npm-home"
 CACHE_DEVICE_NPM="cache-root-cache-npm"
@@ -35,6 +37,38 @@ _info() { nf_log_info "devctl" "$*"; }
 _ok() { nf_log_ok "devctl" "$*"; }
 _warn() { nf_log_warn "devctl" "$*"; }
 _fail() { nf_log_fail "devctl" "$*"; }
+
+_is_stateful_command() {
+    local cmd="$1"
+    case "$cmd" in
+        setup|create|destroy|reset|snapshot-create|snapshot-refresh|bootstrap-python|bootstrap-webui|bootstrap-playwright|assert-cached-ready|run-api|run-webui|test-web-typecheck|test-web-unit|test-web-e2e)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+_acquire_command_lock() {
+    local cmd="$1"
+
+    if ! _is_stateful_command "$cmd"; then
+        return 0
+    fi
+
+    if ! command -v flock >/dev/null 2>&1; then
+        _fail "flock is required for safe serialized devctl operations"
+    fi
+
+    mkdir -p "$(dirname "$DEVCTL_LOCK_FILE")"
+    exec 9>"$DEVCTL_LOCK_FILE"
+    if ! flock -w "$DEVCTL_LOCK_TIMEOUT_SEC" 9; then
+        _fail "Timed out waiting for devctl lock ($DEVCTL_LOCK_FILE). Another stateful devctl command is running."
+    fi
+
+    _info "Acquired devctl lock: $DEVCTL_LOCK_FILE"
+}
 
 _wait_ready() {
     local i=0
@@ -512,6 +546,8 @@ USAGE
 main() {
     local cmd="${1:-}"
     shift || true
+
+    _acquire_command_lock "$cmd"
 
     case "$cmd" in
         setup) cmd_setup "$@" ;;

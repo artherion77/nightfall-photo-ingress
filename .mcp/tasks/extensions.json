@@ -1,0 +1,24 @@
+[
+  {
+    "proposalId": "939c0890-afe7-4eca-b142-62c5e5dfd427",
+    "createdAt": "2026-04-04T09:21:59.226962+00:00",
+    "source": "post_significant_task_review",
+    "relatedTaskId": "e90fc1ce-bd63-4549-854d-905109579fce",
+    "task": "web.test.unit",
+    "recommendation": "Add sequential task chaining (depends_on) to MCP to prevent concurrent devctl setup conflicts",
+    "status": "implemented",
+    "implementedAt": "2026-04-04T11:31:00+00:00",
+    "implementationSummary": "Added /mcp/exec dependsOn support with wait/fail dependency handling in mcp_server.py and added devctl stateful-command lock serialization using flock in dev/devctl."
+  },
+  {
+    "proposalId": "a9f8722e-f2cf-4e11-a793-f58013d2fbf0",
+    "createdAt": "2026-04-04T11:31:00+00:00",
+    "source": "post_significant_task_review",
+    "relatedTaskId": null,
+    "task": "mcp.status",
+    "recommendation": "Normalize MCP terminal status handling to include success as terminal in polling examples/docs",
+    "status": "implemented",
+    "implementedAt": "2026-04-04T11:31:00+00:00",
+    "implementationSummary": "Added normalizedStatus and terminal fields to /mcp/status plus runtime.statusModel metadata with preferredPollingTerminalStatuses=[success,failed]."
+  }
+]

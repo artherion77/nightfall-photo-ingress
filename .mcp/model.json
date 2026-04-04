@@ -22,6 +22,25 @@
     "design": {
       "cacheStrategy": "lxc_snapshot_reuse_plus_bind_mount_caches",
       "baseImageLayering": "documentation_only_future_option"
+    },
+    "execContract": {
+      "optionalFields": [
+        "args",
+        "env",
+        "cwd",
+        "dependsOn",
+        "significantTask",
+        "extensionRecommendation"
+      ],
+      "dependsOn": "array of prior taskIds; task waits until all dependencies succeed",
+      "statusTerminal": [
+        "success",
+        "failed"
+      ],
+      "statusLegacyTerminal": [
+        "completed",
+        "failed"
+      ]
     }
   },
   "domains": {

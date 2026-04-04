@@ -7,6 +7,7 @@ import os
 import shutil
 import subprocess
 import threading
+import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -30,6 +31,7 @@ class TaskRecord:
     finishedAt: str | None
     cwd: str
     args: list[str]
+    dependsOn: list[str]
     significantTask: bool
     extensionRecommendation: str | None
 
@@ -43,9 +45,28 @@ class TaskRecord:
             "finishedAt": self.finishedAt,
             "cwd": self.cwd,
             "args": self.args,
+            "dependsOn": self.dependsOn,
             "significantTask": self.significantTask,
             "extensionRecommendation": self.extensionRecommendation,
         }
+
+
+TERMINAL_STATUSES = {"success", "failed", "completed"}
+SUCCESS_STATUSES = {"success", "completed"}
+
+
+def normalize_status(status: str) -> str:
+    if status in SUCCESS_STATUSES:
+        return "success"
+    if status == "failed":
+        return "failed"
+    if status in {"queued", "running", "waiting"}:
+        return status
+    return status
+
+
+def is_terminal_status(status: str) -> bool:
+    return status in TERMINAL_STATUSES
 
 
 class MCPServerState:
@@ -100,6 +121,7 @@ class MCPServerState:
                 finishedAt=item.get("finishedAt"),
                 cwd=str(item.get("cwd", str(self.workspace_root))),
                 args=list(item.get("args", [])),
+                dependsOn=list(item.get("dependsOn", [])),
                 significantTask=bool(item.get("significantTask", False)),
                 extensionRecommendation=(
                     str(item.get("extensionRecommendation"))
@@ -145,6 +167,7 @@ class MCPServerState:
         args: list[str] | None,
         env: dict[str, str] | None,
         cwd: str | None,
+        depends_on: list[str] | None,
         significant_task: bool = False,
         extension_recommendation: str | None = None,
     ) -> str:
@@ -157,6 +180,17 @@ class MCPServerState:
         if not str(cwd_path).startswith(str(self.workspace_root.resolve())):
             raise ValueError("cwd must stay inside workspace root")
 
+        validated_dependencies: list[str] = []
+        for dep_task_id in depends_on or []:
+            if not isinstance(dep_task_id, str) or not dep_task_id.strip():
+                raise ValueError("dependsOn entries must be non-empty strings")
+            dep = self.tasks.get(dep_task_id)
+            if dep is None:
+                raise ValueError(f"dependsOn taskId not found: {dep_task_id}")
+            if dep_task_id == task_id:
+                raise ValueError("dependsOn cannot include the current task")
+            validated_dependencies.append(dep_task_id)
+
         record = TaskRecord(
             taskId=task_id,
             task=task_name,
@@ -166,6 +200,7 @@ class MCPServerState:
             finishedAt=None,
             cwd=str(cwd_path),
             args=args or [],
+            dependsOn=validated_dependencies,
             significantTask=significant_task,
             extensionRecommendation=extension_recommendation.strip() if extension_recommendation else None,
         )
@@ -185,8 +220,9 @@ class MCPServerState:
         log_path = self.logs_dir / f"{task_id}.log"
         with self.lock:
             record = self.tasks[task_id]
-            record.status = "running"
-            record.startedAt = utc_now_iso()
+            record.status = "waiting" if record.dependsOn else "running"
+            if not record.dependsOn:
+                record.startedAt = utc_now_iso()
         self._persist_history()
 
         merged_env = os.environ.copy()
@@ -196,7 +232,61 @@ class MCPServerState:
 
         exit_code = 0
         with log_path.open("a", encoding="utf-8") as log_file:
-            log_file.write(f"[{utc_now_iso()}] task={record.task} status=running\n")
+            if record.dependsOn:
+                deps = ",".join(record.dependsOn)
+                log_file.write(f"[{utc_now_iso()}] task={record.task} status=waiting dependsOn={deps}\n")
+            else:
+                log_file.write(f"[{utc_now_iso()}] task={record.task} status=running\n")
+
+            if record.dependsOn:
+                wait_failure: str | None = None
+                while True:
+                    with self.lock:
+                        dep_records = [(dep_id, self.tasks.get(dep_id)) for dep_id in record.dependsOn]
+                    missing = [dep_id for dep_id, dep_record in dep_records if dep_record is None]
+                    if missing:
+                        wait_failure = f"Dependency missing: {missing[0]}"
+                        break
+
+                    failed_dep = next(
+                        (
+                            dep_id
+                            for dep_id, dep_record in dep_records
+                            if dep_record is not None and normalize_status(dep_record.status) == "failed"
+                        ),
+                        None,
+                    )
+                    if failed_dep is not None:
+                        wait_failure = f"Dependency failed: {failed_dep}"
+                        break
+
+                    all_done = all(
+                        dep_record is not None and normalize_status(dep_record.status) == "success"
+                        for _, dep_record in dep_records
+                    )
+                    if all_done:
+                        break
+
+                    time.sleep(0.25)
+
+                if wait_failure is not None:
+                    exit_code = 1
+                    log_file.write(f"{wait_failure}\n")
+                    with self.lock:
+                        record = self.tasks[task_id]
+                        record.exitCode = exit_code
+                        record.status = "failed"
+                        record.finishedAt = utc_now_iso()
+                    self._persist_history()
+                    return
+
+                with self.lock:
+                    record = self.tasks[task_id]
+                    record.status = "running"
+                    record.startedAt = utc_now_iso()
+                self._persist_history()
+                log_file.write(f"[{utc_now_iso()}] dependencies satisfied; task={record.task} status=running\n")
+
             for command in commands:
                 log_file.write(f"$ {command}\n")
                 log_file.flush()
@@ -241,6 +331,8 @@ class MCPServerState:
             return {
                 "taskId": record.taskId,
                 "status": record.status,
+                "normalizedStatus": normalize_status(record.status),
+                "terminal": is_terminal_status(record.status),
                 "exitCode": record.exitCode,
                 "startedAt": record.startedAt,
                 "finishedAt": record.finishedAt,
@@ -316,6 +408,10 @@ class MCPServerState:
                 "enabled": True,
                 "extensionsBacklogCount": len(self.extensions),
                 "extensionsBacklogPath": str(self.extensions_file),
+            },
+            "statusModel": {
+                "terminalStatuses": ["success", "failed", "completed"],
+                "preferredPollingTerminalStatuses": ["success", "failed"],
             },
         }
         return {"model": self.model, "runtime": runtime}
@@ -410,6 +506,7 @@ def make_handler(state: MCPServerState):
                 args = payload.get("args")
                 env = payload.get("env")
                 cwd = payload.get("cwd")
+                depends_on = payload.get("dependsOn")
                 significant_task = payload.get("significantTask", False)
                 extension_recommendation = payload.get("extensionRecommendation")
 
@@ -425,6 +522,10 @@ def make_handler(state: MCPServerState):
                 if cwd is not None and not isinstance(cwd, str):
                     json_response(self, HTTPStatus.BAD_REQUEST, {"error": "cwd must be a string or null"})
                     return
+                if depends_on is not None:
+                    if not isinstance(depends_on, list) or not all(isinstance(item, str) for item in depends_on):
+                        json_response(self, HTTPStatus.BAD_REQUEST, {"error": "dependsOn must be an array of taskId strings"})
+                        return
                 if not isinstance(significant_task, bool):
                     json_response(self, HTTPStatus.BAD_REQUEST, {"error": "significantTask must be a boolean"})
                     return
@@ -438,6 +539,7 @@ def make_handler(state: MCPServerState):
                         args,
                         env,
                         cwd,
+                        depends_on,
                         significant_task=significant_task,
                         extension_recommendation=extension_recommendation,
                     )
