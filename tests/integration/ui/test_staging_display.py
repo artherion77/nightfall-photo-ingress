@@ -17,10 +17,10 @@ async def test_staging_queue_returns_pending_items_for_display(api_client, api_t
 
 
 @pytest.mark.anyio
-async def test_staging_chunk_is_read_only_no_triage_endpoint(api_client, api_token) -> None:
+async def test_staging_chunk_exposes_triage_endpoint_with_idempotency_requirement(api_client, api_token) -> None:
     response = await api_client.post(
         "/api/v1/triage/abc123def456/accept",
         headers=auth_headers(api_token),
         json={},
     )
-    assert response.status_code in (404, 405)
+    assert response.status_code == 422

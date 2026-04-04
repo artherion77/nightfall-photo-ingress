@@ -12,9 +12,10 @@
   interface Props {
     items: Item[];
     activeIndex?: number;
+    onSelect?: (index: number) => void;
   }
 
-  let { items, activeIndex = 0 }: Props = $props();
+  let { items, activeIndex = 0, onSelect }: Props = $props();
 
   function slotStyle(index: number): string {
     const dist = Math.abs(index - activeIndex);
@@ -49,7 +50,20 @@
   {:else}
     <div class="track">
       {#each items as item, index}
-        <div class="slot" style={slotStyle(index)}>
+        <div
+          class="slot"
+          class:is-active={index === activeIndex}
+          style={slotStyle(index)}
+          role="button"
+          tabindex="0"
+          onclick={() => onSelect?.(index)}
+          onkeydown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              onSelect?.(index);
+            }
+          }}
+        >
           <PhotoCard item={item} active={index === activeIndex} />
         </div>
       {/each}
@@ -77,9 +91,15 @@
 
   .slot {
     flex-shrink: 0;
+    cursor: pointer;
     transition:
       transform var(--duration-slow) var(--easing-default),
       opacity var(--duration-slow) var(--easing-default),
       filter var(--duration-slow) var(--easing-default);
+  }
+
+  .slot.is-active {
+    outline: 1px solid var(--action-primary);
+    border-radius: var(--radius-md);
   }
 </style>

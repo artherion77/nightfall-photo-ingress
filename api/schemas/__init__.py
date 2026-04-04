@@ -5,6 +5,7 @@ from api.schemas.blocklist import BlockRule, BlockRuleList
 from api.schemas.config import EffectiveConfig
 from api.schemas.health import HealthResponse, ServiceStatus
 from api.schemas.staging import StagingItem, StagingPage
+from api.schemas.triage import TriageRequest, TriageResponse
 
 __all__ = [
     "AuditEvent",
@@ -16,4 +17,6 @@ __all__ = [
     "ServiceStatus",
     "StagingItem",
     "StagingPage",
+    "TriageRequest",
+    "TriageResponse",
 ]

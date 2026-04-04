@@ -5,6 +5,7 @@ from api.services.blocklist_service import BlocklistService
 from api.services.config_service import ConfigService
 from api.services.health_service import HealthService
 from api.services.staging_service import StagingService
+from api.services.triage_service import TriageService
 
 __all__ = [
     "AuditService",
@@ -12,4 +13,5 @@ __all__ = [
     "ConfigService",
     "HealthService",
     "StagingService",
+    "TriageService",
 ]

@@ -1,11 +1,14 @@
 import { writable } from 'svelte/store';
 
 import { getStagingPage } from '$lib/api/staging';
+import { postAccept, postDefer, postReject } from '$lib/api/triage';
+import { toast } from '$lib/stores/toast.svelte';
 
 const initial = {
   items: [],
   cursor: null,
   total: 0,
+  activeIndex: 0,
   loading: false,
   error: null
 };
@@ -21,6 +24,7 @@ async function loadPage(cursor = null, limit = 20) {
       items: cursor ? [...state.items, ...(page.items ?? [])] : (page.items ?? []),
       cursor: page.cursor ?? null,
       total: page.total ?? state.total,
+      activeIndex: cursor ? state.activeIndex : 0,
       loading: false,
       error: null
     }));
@@ -33,4 +37,90 @@ function clearQueue() {
   set(initial);
 }
 
-export const stagingQueue = { subscribe, loadPage, clearQueue };
+function hydrate(items = []) {
+  update((state) => ({
+    ...state,
+    items,
+    total: items.length,
+    activeIndex: 0,
+    error: null
+  }));
+}
+
+function setActiveIndex(index) {
+  update((state) => {
+    if (state.items.length === 0) {
+      return { ...state, activeIndex: 0 };
+    }
+    const next = Math.max(0, Math.min(index, state.items.length - 1));
+    return { ...state, activeIndex: next };
+  });
+}
+
+function shiftActive(delta) {
+  update((state) => {
+    if (state.items.length === 0) {
+      return state;
+    }
+    const raw = state.activeIndex + delta;
+    const next = Math.max(0, Math.min(raw, state.items.length - 1));
+    return { ...state, activeIndex: next };
+  });
+}
+
+async function triageItem(action, itemId) {
+  let snapshot = null;
+
+  update((state) => {
+    snapshot = state;
+    const removedIndex = state.items.findIndex((item) => item.sha256 === itemId);
+    if (removedIndex === -1) {
+      return state;
+    }
+
+    const items = state.items.filter((item) => item.sha256 !== itemId);
+    const activeIndex = Math.min(state.activeIndex, Math.max(items.length - 1, 0));
+
+    return {
+      ...state,
+      items,
+      total: Math.max(0, state.total - 1),
+      activeIndex,
+      error: null
+    };
+  });
+
+  try {
+    if (action === 'accept') {
+      await postAccept(itemId);
+      return;
+    }
+    if (action === 'reject') {
+      await postReject(itemId);
+      return;
+    }
+    if (action === 'defer') {
+      await postDefer(itemId);
+      return;
+    }
+    throw new Error(`Unsupported triage action: ${action}`);
+  } catch (error) {
+    if (snapshot) {
+      set(snapshot);
+    }
+    const message = error instanceof Error ? error.message : 'Triage action failed';
+    update((state) => ({ ...state, error: message }));
+    toast.push(message, 'error');
+    throw error;
+  }
+}
+
+export const stagingQueue = {
+  subscribe,
+  loadPage,
+  clearQueue,
+  hydrate,
+  setActiveIndex,
+  shiftActive,
+  triageItem
+};
