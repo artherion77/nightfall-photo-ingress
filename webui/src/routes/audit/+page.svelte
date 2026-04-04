@@ -1,7 +1,7 @@
 <script lang="ts">
 	import AuditTimeline from '$lib/components/audit/AuditTimeline.svelte';
 	import { getAuditLog } from '$lib/api/audit';
-        import type { AuditEvent, AuditPage } from '$lib/api/audit';
+        import type { AuditEvent as ApiAuditEvent, AuditPage } from '$lib/api/audit';
 
         interface PageData {
                 audit?: AuditPage;
@@ -9,7 +9,7 @@
 
         let { data }: { data: PageData } = $props();
 
-        let events = $state<AuditEvent[]>([]);
+		let events = $state<ApiAuditEvent[]>([]);
         let cursor = $state<string | null>(null);
         let hasMore = $state(false);
         let loading = $state(false);

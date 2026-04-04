@@ -1,10 +1,11 @@
 <script lang="ts">
   import LoadMoreButton from '$lib/components/common/LoadMoreButton.svelte';
   import EmptyState from '$lib/components/common/EmptyState.svelte';
-  import AuditEvent from './AuditEvent.svelte';
+  import AuditEventItem from './AuditEvent.svelte';
+  import type { AuditEvent as ApiAuditEvent } from '$lib/api/audit';
 
   interface Props {
-    events: Array<{ id: number; action: string; ts: string; actor?: string; sha256?: string | null }>;
+    events: ApiAuditEvent[];
     loading?: boolean;
     hasMore: boolean;
     onLoadMore: () => void;
@@ -19,7 +20,7 @@
   {:else}
     <ul>
       {#each events as event}
-        <AuditEvent {event} />
+        <AuditEventItem {event} />
       {/each}
     </ul>
     <LoadMoreButton {loading} {hasMore} onLoadMore={onLoadMore} />

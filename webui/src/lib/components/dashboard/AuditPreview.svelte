@@ -1,10 +1,5 @@
 <script lang="ts">
-  interface EventItem {
-    id: number;
-    action: string;
-    ts: string;
-    sha256?: string;
-  }
+  import type { AuditEvent as EventItem } from '$lib/api/audit';
 
   interface Props {
     events: EventItem[];

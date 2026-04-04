@@ -1,12 +1,8 @@
 <script lang="ts">
+  import type { AuditEvent as ApiAuditEvent } from '$lib/api/audit';
+
   interface Props {
-    event: {
-      id: number;
-      action: string;
-      ts: string;
-      actor?: string;
-      sha256?: string | null;
-    };
+    event: ApiAuditEvent;
   }
 
   let { event }: Props = $props();
