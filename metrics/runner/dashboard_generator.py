@@ -4,6 +4,7 @@ import argparse
 import json
 import shutil
 import subprocess
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -209,6 +210,64 @@ def _origin_repo_url(repo_root: Path) -> str | None:
     return normalized
 
 
+def _strip_semver_prefix(raw: str) -> str:
+    value = raw.strip()
+    while value and value[0] in "^~<>= ":
+        value = value[1:]
+    return value
+
+
+def _typescript_version(repo_root: Path) -> str | None:
+    pkg = repo_root / "metrics" / "dashboard" / "package.json"
+    if not pkg.exists():
+        return None
+    try:
+        payload = _read_json(pkg)
+    except Exception:
+        return None
+    deps = payload.get("devDependencies") if isinstance(payload, dict) else None
+    if not isinstance(deps, dict):
+        return None
+    raw = deps.get("typescript")
+    if not isinstance(raw, str) or not raw.strip():
+        return None
+    return _strip_semver_prefix(raw)
+
+
+def _probe_python_version(executable: str | None) -> str | None:
+    if not executable:
+        return None
+    try:
+        proc = subprocess.run(
+            [executable, "--version"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=3,
+        )
+    except Exception:
+        return None
+    version_out = (proc.stdout or proc.stderr or "").strip()
+    if not version_out:
+        return None
+    return version_out
+
+
+def _footer_python_text(manifest: dict[str, Any], backend_coverage: dict[str, Any]) -> str:
+    tools = manifest.get("tools") if isinstance(manifest, dict) else {}
+    if isinstance(tools, dict):
+        value = tools.get("python")
+        if isinstance(value, str) and value and value != "unknown":
+            return value
+
+    exe = backend_coverage.get("python_executable") if isinstance(backend_coverage, dict) else None
+    probed = _probe_python_version(str(exe)) if isinstance(exe, str) and exe else None
+    if probed:
+        return probed
+
+    return f"Python {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+
+
 def _dashboard_payload(repo_root: Path, manifest: dict[str, Any], metrics: dict[str, Any], summary: dict[str, Any], trends: list[dict[str, Any]]) -> dict[str, Any]:
     modules = metrics.get("modules", {})
     backend = modules.get("backend", {}) if isinstance(modules, dict) else {}
@@ -266,6 +325,12 @@ def _dashboard_payload(repo_root: Path, manifest: dict[str, Any], metrics: dict[
     repo_url = _origin_repo_url(repo_root)
     repo_head_url = f"{repo_url}/tree/{source_branch}" if repo_url else None
     repo_commit_url = f"{repo_url}/commit/{commit_full}" if repo_url and commit_full else None
+    execution = manifest.get("execution") if isinstance(manifest, dict) else {}
+    started_at = str((execution or {}).get("started_at", "")) if isinstance(execution, dict) else ""
+    finished_at = str((execution or {}).get("finished_at", "")) if isinstance(execution, dict) else ""
+    duration_seconds = (execution or {}).get("duration_seconds") if isinstance(execution, dict) else None
+    typescript_version = _typescript_version(repo_root)
+    python_version = _footer_python_text(manifest, backend_coverage)
     api_surface = {
         "endpoints": len([key for key in per_file_backend.keys() if "/routers/" in key]) if isinstance(per_file_backend, dict) else 0,
         "schemas": len([key for key in per_file_backend.keys() if "/schemas/" in key]) if isinstance(per_file_backend, dict) else 0,
@@ -281,6 +346,17 @@ def _dashboard_payload(repo_root: Path, manifest: dict[str, Any], metrics: dict[
         "repoUrl": repo_url,
         "repoHeadUrl": repo_head_url,
         "repoCommitUrl": repo_commit_url,
+        "runMeta": {
+            "startedAt": started_at,
+            "finishedAt": finished_at,
+            "durationSeconds": float(duration_seconds) if isinstance(duration_seconds, (int, float)) else None,
+            "runId": str(summary.get("run_id", "unknown")),
+            "branch": source_branch,
+        },
+        "versions": {
+            "python": python_version,
+            "typescript": typescript_version,
+        },
         "coveragePercent": coverage_percent,
         "hasCoverage": coverage_percent is not None,
         "sparklinePoints": _sparkline(list(reversed(trend_series)) if len(trend_series) > 1 else [0.0, 0.0]),
@@ -317,7 +393,7 @@ def _dashboard_payload(repo_root: Path, manifest: dict[str, Any], metrics: dict[
         },
         "footer": {
             "host": str((manifest.get("execution") or {}).get("hostname", "unknown")),
-            "python": str((manifest.get("tools") or {}).get("python", "unknown")),
+            "python": python_version,
             "git": str((manifest.get("tools") or {}).get("git", "unknown")),
             "executor": str((manifest.get("execution") or {}).get("executor_identity", "unknown")),
         },

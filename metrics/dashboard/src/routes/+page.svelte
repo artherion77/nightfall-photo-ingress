@@ -30,6 +30,8 @@
     repoUrl: null,
     repoHeadUrl: null,
     repoCommitUrl: null,
+    runMeta: { startedAt: null, finishedAt: null, durationSeconds: null, runId: 'unknown', branch: 'main' },
+    versions: { python: null, typescript: null },
   };
 
   let data = defaultData;
@@ -43,6 +45,12 @@
   let frontendComplexityText = 'N/A';
   let repoLabel = 'unknown';
   let commitHref = null;
+  let footerCommitHref = null;
+  let lastRunDisplay = 'unknown';
+  let lastRunDetail = '';
+  let tsjsLabelDetail = 'TypeScript / JavaScript';
+  let pythonLocDetail = 'Python';
+  let metricsFolderHref = null;
 
   onMount(async () => {
     try {
@@ -112,10 +120,80 @@
     : 'N/A';
 
   $: repoLabel = typeof data.repoUrl === 'string' && data.repoUrl
-    ? data.repoUrl.replace(/^https?:\/\//, '')
+    ? (() => {
+      const match = data.repoUrl.match(/^https?:\/\/[^/]+\/(.+?)\/(.+?)\/?$/);
+      if (!match) {
+        return data.repoUrl.replace(/^https?:\/\//, '');
+      }
+      const owner = match[1] || 'repo';
+      const repo = match[2] || 'unknown';
+      const compactRepo = repo.length > 10 ? `${repo.slice(0, 2)}...` : repo;
+      return `@${owner}/${compactRepo}`;
+    })()
     : 'unknown';
 
   $: commitHref = data.repoCommitUrl || data.repoHeadUrl || data.repoUrl || null;
+  $: footerCommitHref = commitHref;
+  $: metricsFolderHref = data.repoHeadUrl ? `${data.repoHeadUrl}/metrics` : null;
+
+  $: {
+    if (typeof data.lastRunAt !== 'string' || !data.lastRunAt || data.lastRunAt === 'unknown') {
+      lastRunDisplay = 'unknown';
+      lastRunDetail = '';
+    } else {
+      const parsed = new Date(data.lastRunAt);
+      if (Number.isNaN(parsed.getTime())) {
+        lastRunDisplay = data.lastRunAt;
+        lastRunDetail = '';
+      } else {
+        const weekday = parsed.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' });
+        const yyyy = String(parsed.getUTCFullYear());
+        const mm = String(parsed.getUTCMonth() + 1).padStart(2, '0');
+        const dd = String(parsed.getUTCDate()).padStart(2, '0');
+        const hh = String(parsed.getUTCHours()).padStart(2, '0');
+        const min = String(parsed.getUTCMinutes()).padStart(2, '0');
+        lastRunDisplay = `${weekday}, ${yyyy}-${mm}-${dd} ${hh}:${min} UTC`;
+
+        const parts = [];
+        parts.push(`Run: ${data.runId}`);
+        parts.push(`Branch: ${data.sourceBranch}`);
+        if (data.commitFull && data.commitFull !== 'unknown') {
+          parts.push(`Commit: ${data.commitFull}`);
+        }
+        if (data.runMeta?.durationSeconds !== null && data.runMeta?.durationSeconds !== undefined) {
+          parts.push(`Duration: ${Number(data.runMeta.durationSeconds).toFixed(2)}s`);
+        }
+        if (data.footer?.host) {
+          parts.push(`Host: ${data.footer.host}`);
+        }
+        if (data.footer?.executor) {
+          parts.push(`Executor: ${data.footer.executor}`);
+        }
+        if (data.footer?.git) {
+          parts.push(data.footer.git);
+        }
+        if (data.footer?.python && data.footer.python !== 'unknown') {
+          parts.push(`Python: ${data.footer.python}`);
+        }
+        lastRunDetail = parts.join(' | ');
+      }
+    }
+  }
+
+  $: {
+    tsjsLabelDetail = 'TypeScript / JavaScript';
+    if (data.versions?.typescript) {
+      tsjsLabelDetail = `${tsjsLabelDetail} (TypeScript ${data.versions.typescript})`;
+    }
+  }
+
+  $: {
+    pythonLocDetail = 'Python';
+    if (data.versions?.python) {
+      const cleaned = String(data.versions.python).replace(/^Python\s+/i, '').trim();
+      pythonLocDetail = cleaned ? `Python ${cleaned}` : 'Python';
+    }
+  }
 
   function heatColor(value) {
     if (value >= 18) return '#cc3f38';
@@ -150,7 +228,12 @@
             <span>Repo: {repoLabel}</span>
           </div>
         {/if}
-        <div class="meta-pill">Last Run: {data.lastRunAt}</div>
+        <div class="meta-pill tip-anchor" tabindex="0" role="button" aria-label="Show run metadata">
+          <span>Last Run: {lastRunDisplay}</span>
+          {#if lastRunDetail}
+            <span class="tip-bubble">{lastRunDetail}</span>
+          {/if}
+        </div>
       </div>
     </header>
 
@@ -166,9 +249,29 @@
       <article class="card metric-card">
         <h2>LOC Breakdown</h2>
         <dl class="kv">
-          <div><dt>Python</dt><dd>{data.locBreakdown.python}</dd></div>
-          <div><dt>TS / JS</dt><dd>{data.locBreakdown.tsjs}</dd></div>
-          <div><dt>Svelte</dt><dd>{data.locBreakdown.svelte}</dd></div>
+          <div>
+            <dt><span class="tip-anchor">
+              Python
+              <span class="tip-bubble">{pythonLocDetail}</span>
+            </span></dt>
+            <dd>{data.locBreakdown.python}</dd>
+          </div>
+          <div>
+            <dt><span class="tip-anchor">
+              TS / JS
+              <span class="tip-bubble">{tsjsLabelDetail}</span>
+            </span></dt>
+            <dd>{data.locBreakdown.tsjs}</dd>
+          </div>
+          <div>
+            <dt>
+              <a class="tip-anchor loc-link" href="https://www.svelte.dev" target="_blank" rel="noreferrer" aria-label="Open Svelte website">
+                Svelte
+                <span class="tip-bubble">web development for the rest of us</span>
+              </a>
+            </dt>
+            <dd>{data.locBreakdown.svelte}</dd>
+          </div>
         </dl>
       </article>
 
@@ -196,6 +299,8 @@
           {/if}
           <svg viewBox="0 0 320 220" class="chart">
             {#each data.backendCoverageBars as bar, idx}
+              {@const suitePath = idx === 0 ? 'tests/unit' : idx === 1 ? 'tests/integration' : 'testspecs'}
+              {@const suiteHref = data.repoHeadUrl ? `${data.repoHeadUrl}/${suitePath}` : null}
               <g transform={`translate(${48 + idx * 88}, 20)`}>
                 <rect x="0" y={170 - bar.value * 1.45} width="44" height={bar.value * 1.45} rx="3" fill={`url(#barGrad${idx})`} />
                 <text x="22" y="194" text-anchor="middle" class="axis-label">{bar.label}</text>
@@ -207,6 +312,19 @@
                   </linearGradient>
                 </defs>
               </g>
+              <foreignObject x={32 + idx * 88} y="24" width="84" height="160">
+                <div xmlns="http://www.w3.org/1999/xhtml" class="bar-hover tip-anchor" tabindex="0" role="button" aria-label={`Coverage details for ${bar.label}`}>
+                  <span class="tip-bubble">
+                    {bar.label}: {bar.value.toFixed(1)}%<br />
+                    Source: pytest-cov aggregate<br />
+                    Suite path: {suitePath}
+                    {#if suiteHref}
+                      <br />
+                      <a href={suiteHref} target="_blank" rel="noreferrer">Open in repo</a>
+                    {/if}
+                  </span>
+                </div>
+              </foreignObject>
             {/each}
           </svg>
         </article>
@@ -256,10 +374,11 @@
           {/if}
           <div class="loc-bars">
             {#each data.frontendLocRows as row}
+              {@const pctOfMax = maxFrontendLoc > 0 ? (row.lines / maxFrontendLoc) * 100 : 0}
               <div class="loc-row tip-anchor" tabindex="0" role="button" aria-label="Show LOC row details">
                 <span>{row.name.split('/').at(-1)}</span>
                 <div class="bar"><i style={`width:${(row.lines / maxFrontendLoc) * 100}%`}></i></div>
-                <span class="tip-bubble">{row.name} | {row.lines} LOC</span>
+                <span class="tip-bubble loc-tip">Path: {row.name}<br />LOC: {row.lines}<br />Bar share: {pctOfMax.toFixed(1)}%</span>
               </div>
             {/each}
           </div>
@@ -323,10 +442,25 @@
     </section>
 
     <footer class="footer card">
-      <span>{data.commitSha} on {data.footer.host}</span>
-      <span>Python {data.footer.python}</span>
+      {#if footerCommitHref}
+        <a class="tip-anchor footer-link" href={footerCommitHref} target="_blank" rel="noreferrer" aria-label="Open commit">
+          <span>{data.commitSha} on {data.footer.host}</span>
+          <span class="tip-bubble">Open source commit {data.commitFull}</span>
+        </a>
+      {:else}
+        <span>{data.commitSha} on {data.footer.host}</span>
+      {/if}
+      <span>{data.footer.python}</span>
       <span>{data.footer.git}</span>
       <span>executor {data.footer.executor}</span>
+      <span class="footer-credit">
+        {#if metricsFolderHref}
+          <a class="footer-inline-link" href={metricsFolderHref} target="_blank" rel="noreferrer">metrrics runner on {data.footer.host}</a>, created by
+        {:else}
+          metrrics runner on {data.footer.host}, created by
+        {/if}
+        <a class="footer-inline-link" href="https://github.com/copilot/" target="_blank" rel="noreferrer">GitHub CoPilot</a>
+      </span>
     </footer>
   </main>
 </div>
