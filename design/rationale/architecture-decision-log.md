@@ -1,7 +1,7 @@
 # photo-ingress Design Decisions Log
 
 Status: active
-Last Updated (UTC): 2026-04-03 00:00:00 UTC
+Last Updated (UTC): 2026-04-04 00:00:00 UTC
 
 ---
 
@@ -48,6 +48,38 @@ Field notes:
 ---
 
 ## 3. Decision Records
+
+## ADL-20260404-01: E2E test architecture consolidation (Variant B)
+- Status: accepted
+- Date (UTC): 2026-04-04 00:00:00 UTC
+- Scope: testing
+- Decision:
+  - Adopt Variant B: keep pytest as the primary backend/API/domain test layer and add a selective Playwright browser layer with a minimal Vitest component layer.
+  - Maintain the analytical baseline in [design/rationale/e2e-test-architecture-consolidation.md](e2e-test-architecture-consolidation.md), Sections 1-3.
+  - Move executable migration work (former Sections 4-5) to a dedicated chunk-oriented plan in [planning/planned/e2e-test-architecture-migration-plan.md](../../planning/planned/e2e-test-architecture-migration-plan.md).
+- Rationale:
+  - Current pytest coverage is broad and fast, but browser-only interaction gaps remain (keyboard, focus, dialog, overlay, and feedback semantics).
+  - A selective Playwright layer adds targeted browser realism without replacing stable pytest contracts.
+  - Existing devctl/MCP/cache scaffolding reduces adoption complexity.
+  - Separating rationale from execution planning reduces ambiguity and improves deterministic turn-by-turn delivery.
+- Alternatives Considered:
+  - Variant A: pytest-only consolidation.
+  - Variant C: Playwright-first UI strategy.
+- Consequences:
+  - Test architecture becomes explicitly layered by defect class and execution cost.
+  - Browser layer introduction is gated by measurable Go/No-Go criteria.
+  - Migration is executed through small deterministic chunks rather than a single broad implementation.
+- Implementation Notes:
+  - No immediate code/toolchain implementation is implied by this ADL.
+  - Host-level installs remain subject to explicit user approval.
+  - Devcontainer/LXC path is the default execution environment for browser tooling.
+- Supersedes:
+  - none
+- References:
+  - [design/rationale/e2e-test-architecture-consolidation.md](e2e-test-architecture-consolidation.md)
+  - [planning/planned/e2e-test-architecture-migration-plan.md](../../planning/planned/e2e-test-architecture-migration-plan.md)
+  - `dev/devctl`
+  - `.mcp/model.json`
 
 ## DEC-20260331-01: Primary service naming policy
 - Status: superseded
