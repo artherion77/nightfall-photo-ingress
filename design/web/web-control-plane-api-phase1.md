@@ -1,6 +1,6 @@
 # Phase 1 REST API Specification
 
-**Status:** Implemented (Chunk 1)  
+**Status:** Implemented (Chunks 1 and 4)  
 **Date:** 2026-04-03  
 **Owner:** Systems Engineering
 
@@ -9,16 +9,20 @@
 ## 1. Overview
 
 This document specifies the Phase 1 REST API for the photo-ingress web control plane.
-All endpoints are read-only in Phase 1. They provide operator access to:
+Chunks 1 and 4 provide read models plus triage write endpoints. They provide operator access to:
 - System health and status
 - Pending ingestion queue with pagination
 - Audit log with action filtering
 - Effective runtime configuration
 - Current blocklist rules
+- Triage write actions (accept, reject, defer)
 
 All endpoints require bearer token authentication (except docs endpoints).
 Pagination uses cursor-based semantics: SHA-256 cursors for staging and numeric
 event-id cursors for audit.
+
+Write-path idempotency uses `X-Idempotency-Key` with response replay from
+`ui_action_idempotency`.
 
 ---
 
@@ -366,7 +370,62 @@ curl -H "Authorization: Bearer test-token-12345" \
 
 ---
 
-### 4.7 API Documentation
+### 4.7 Triage Mutations
+
+**Auth:** Required
+
+**Paths:**
+
+- `POST /api/v1/triage/{item_id}/accept`
+- `POST /api/v1/triage/{item_id}/reject`
+- `POST /api/v1/triage/{item_id}/defer`
+
+**Required headers:**
+
+- `Authorization: Bearer <token>`
+- `X-Idempotency-Key: <string>`
+
+**Request schema:**
+
+```typescript
+interface TriageRequest {
+  reason?: string | null;
+}
+```
+
+**Response schema:**
+
+```typescript
+interface TriageResponse {
+  action_correlation_id: string;
+  item_id: string;
+  state: 'accepted' | 'rejected' | 'pending';
+}
+```
+
+**Action mapping:**
+
+- `accept` -> `accepted`
+- `reject` -> `rejected`
+- `defer` -> `pending`
+
+**Status codes:**
+
+- `200` - mutation success or idempotent replay
+- `404` - item id not found
+- `409` - idempotency key reused with conflicting action/item
+- `422` - required header/body validation failure
+- `500` - unexpected mutation failure
+
+**Audit-first semantics:**
+
+- pre-event: `triage_<action>_requested`
+- success event: `triage_<action>_applied`
+- error event (inside mutation block): `triage_<action>_compensating`
+
+---
+
+### 4.8 API Documentation
 
 **Path:** `GET /api/docs`
 
@@ -379,7 +438,7 @@ This is a self-contained HTML page with embedded OpenAPI spec.
 
 ---
 
-### 4.8 OpenAPI Schema
+### 4.9 OpenAPI Schema
 
 **Path:** `GET /api/openapi.json`
 
@@ -432,6 +491,8 @@ The `limit` parameter controls page size:
 | 400 | Bad Request | Invalid query parameter |
 | 401 | Unauthorized | Missing or invalid auth token |
 | 404 | Not Found | Item ID does not exist |
+| 409 | Conflict | Idempotency key reused with different item/action |
+| 422 | Validation Error | Missing required `X-Idempotency-Key` on triage mutation |
 | 500 | Server Error | Unexpected internal error |
 
 ### 6.2 Error Response Format
@@ -477,7 +538,7 @@ The Phase 1 API requires the following tables in the registry SQLite database:
 | `audit_log` | Existing: all state transitions | v2 schema |
 | `file_origins` | Existing: account/onedrive mappings | v2 schema |
 | `blocked_rules` | New: blocklist patterns and rules | v3 (Chunk 1) |
-| `ui_action_idempotency` | New: idempotency key tracking (Phase 3 write path) | v3 (Chunk 1) |
+| `ui_action_idempotency` | New: idempotency key tracking and replay for triage write path | v3 (Chunk 1) |
 
 See [design/specs/registry.md](../specs/registry.md) for full schema details.
 

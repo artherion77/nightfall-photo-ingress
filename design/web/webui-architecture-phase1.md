@@ -1,9 +1,9 @@
 # SvelteKit Web UI Architecture
 
-Status: Implemented (Chunks 2 and 3)
+Status: Implemented (Chunks 2, 3, and 4)
 Date: 2026-04-03
 Owner: Systems Engineering
-Last Updated: 2026-04-03
+Last Updated: 2026-04-04
 
 ---
 
@@ -14,9 +14,9 @@ The photo-ingress Web UI is a SvelteKit single-page application (SPA) built with
 backend. There is no server-side rendering (SSR) at runtime — the app is fully
 client-side after the initial asset delivery.
 
-**Phase 1 Chunk 3 Status:** Global design system and read-only page wiring are
-implemented. Dashboard, staging display, audit timeline, blocklist, and settings are
-live and backed by the read-only API.
+**Phase 1 Chunk 4 Status:** Global design system, read-only pages, and staging triage
+interaction wiring are implemented. Dashboard, staging, audit timeline, blocklist, and
+settings are live; staging now includes accept/reject/defer actions.
 
 This document describes:
 - Design token system and global styling
@@ -173,7 +173,7 @@ src/routes/
   +error.svelte            — Global error boundary
 
   staging/
-    +page.svelte           — Staging Queue: Photo Wheel + metadata panel (read-only)
+    +page.svelte           — Staging Queue: Photo Wheel + triage controls + metadata panel
     +page.js               — Load: GET /api/v1/staging
 
   audit/
@@ -194,7 +194,7 @@ src/routes/
 | Route       | Responsibility |
 |-------------|----------------|
 | `/`         | Dashboard with health status, KPI cards, poll runtime card, and recent audit events (last 5). |
-| `/staging`  | Photo Wheel view. Chunk 3 is read-only display; Accept, Reject, and Defer actions arrive in Chunk 4. |
+| `/staging`  | Photo Wheel triage view with keyboard and button-driven accept/reject/defer actions. |
 | `/audit`    | Full audit log with filter by action and explicit load-more pagination (`id DESC`, follow-up uses `after=<last_id>`). |
 | `/blocklist`| List of blocked rules. Chunk 3 is read-only; toggle, add, edit, and delete controls arrive in Chunk 5. |
 | `/settings` | Read-only display of effective runtime config (`GET /api/v1/config/effective`). |
@@ -262,7 +262,7 @@ components/
 |--------------------|----------|-----------------|
 | `health.svelte.js` | `{ polling_ok, auth_ok, registry_ok, disk_ok, last_updated_at, error }` with nested `ServiceStatus` values | Store owns polling lifecycle via `connect()` / `disconnect()` with 30s polling. Used by layout header/footer. |
 | `kpis.svelte.js`   | `{ pending_count, accepted_today, rejected_today, live_photo_pairs, last_poll_duration_s, loading, error }` | Loaded from staging total + health details; currently read-only and non-mutating. |
-| `stagingQueue.svelte.js` | `{ items, cursor, total, loading, error }` | Supports page load and append via `loadPage(cursor, limit)`; no write actions in Chunk 3. |
+| `stagingQueue.svelte.js` | `{ items, cursor, total, activeIndex, loading, error }` | Supports page load/append plus triage actions (`triageItem`), optimistic removal, and rollback on failure. |
 | `auditLog.svelte.js` | `{ events, cursor, hasMore, filter, loading, error }` | Supports explicit append via `loadMore()` and filter reset via `setFilter(action)`. |
 | `blocklist.svelte.js` | `{ rules, loading, error }` | Read-only `loadRules()` in Chunk 3; CRUD actions deferred to Chunk 5. |
 | `config.svelte.js` | `{ kpi_thresholds, ...effectiveConfig, loading, error }` | Read-only `load()` from `GET /api/v1/config/effective`. |
@@ -289,11 +289,17 @@ error backoff are internal to the store. No component or layout file contains
 `setInterval` or fetch calls related to health — all of that is encapsulated in the
 store module.
 
-### 6.3 Optimistic UI
+### 6.3 Optimistic UI (Chunk 4)
 
-Optimistic updates are applied only where an idempotency key is supplied with the
-request. In the phase-wide target architecture this applies to later write chunks such as
-triage and blocklist mutation flows, not to the Chunk 3 read-only UI.
+Staging triage uses optimistic UI in `stagingQueue.svelte.js`:
+
+- On `triageItem(action, itemId)`, the selected item is removed from local state before
+  API completion.
+- On success, optimistic state is retained.
+- On failure, a pre-action snapshot is restored, `error` is set, and a toast is pushed.
+
+This behavior is verified by server-side integration tests. Toast rendering assertions are
+deferred until browser-level tests are introduced.
 
 ---
 
@@ -301,13 +307,14 @@ triage and blocklist mutation flows, not to the Chunk 3 read-only UI.
 
 **See also:** [web-control-plane-api-phase1.md](web-control-plane-api-phase1.md) for detailed API endpoint specification, response schemas, and authentication reference.
 
-The current backend exposes these read models directly:
+The current backend exposes read models plus triage mutation responses:
 
 - `HealthResponse` with nested `ServiceStatus` objects.
 - `StagingPage` with `items`, `cursor`, `has_more`, and `total`.
 - `AuditPage` with `events`, `cursor`, and `has_more`.
 - `EffectiveConfig` with redacted `api_token` and explicit `kpi_thresholds` keys.
 - `BlockRuleList` with `rules` entries using the current backend `rule_type` constraints.
+- `TriageResponse` with `action_correlation_id`, `item_id`, and target `state`.
 
 ### 7.1 Location and Structure (`src/lib/api/`)
 
@@ -319,6 +326,7 @@ api/
   audit.ts         — GET /api/v1/audit-log
   blocklist.ts     — GET /api/v1/blocklist
   config.ts        — GET /api/v1/config/effective
+  triage.ts        — POST /api/v1/triage/{item_id}/accept|reject|defer
 ```
 
 ### 7.2 Base Client (`client.ts`)
@@ -344,13 +352,14 @@ store actions) handle loading states by:
 - Rendering `<LoadingSkeleton>` while loading is true.
 - Rendering `<ErrorBanner>` when an error is set.
 
-### 7.4 Error Handling Strategy (Chunk 3)
+### 7.4 Error Handling Strategy (Chunks 3 and 4)
 
 | Error Source | Handling |
 |-------------|---------|
 | API non-2xx | `apiFetch` throws `ApiError`; route/page/store sets local error state and renders `ErrorBanner` where applicable. |
 | Network failure (status 0) | `apiFetch` throws `ApiError('network unavailable', 0, ...)`; UI shows component-level error states. |
 | Auth failure (401) | Surfaced as API error to the active view; no dedicated auth-recovery flow in Chunk 3. |
+| Triage mutation failure (500/409/404) | `stagingQueue.triageItem()` restores prior queue snapshot and emits toast through `toast.svelte.js`. |
 
 ---
 
@@ -404,7 +413,6 @@ adapts via CSS alone.
 ## 10. Accessibility Baseline (Chunk 3)
 
 - All interactive controls have `aria-label` attributes.
-- Photo Wheel presents read-only card navigation controls in UI; triage keyboard
-  shortcuts are deferred to Chunk 4.
+- Staging triage keyboard controls are active: `ArrowLeft`, `ArrowRight`, `A`, `R`, `D`.
 - Color is never the sole indicator of status — icon + color is used throughout.
-- Destructive-action confirmation flows are deferred to Chunk 4/5.
+- Destructive-action confirmation dialogs remain deferred to Chunk 5 (blocklist CRUD).

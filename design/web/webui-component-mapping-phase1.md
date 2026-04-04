@@ -1,6 +1,6 @@
 # UI Mockup Analysis and Component Mapping
 
-Status: Implemented (Chunk 3 read-only pages)
+Status: Implemented (Chunk 3 read-only pages + Chunk 4 triage write interactions)
 Date: 2026-04-03
 Owner: Systems Engineering
 
@@ -154,16 +154,22 @@ Two mockups were analysed:
 | Audit timeline section | `AuditPreview` (dashboard) or `AuditTimeline` (full view) | `events[]`, `onViewAll` |
 | Audit event row | `AuditEvent` | `icon`, `filename`, `action`, `actionColor`, `relativeTime` |
 
-### 4.2 Staging Queue Page → Components (Chunk 3)
+### 4.2 Staging Queue Page -> Components (Chunk 4)
 
 | UI Element | Svelte Component | Props / Slots |
 |------------|-----------------|---------------|
-| Photo Wheel carousel | `PhotoWheel` | `items[]`, `centerIndex`, `onNavigate` |
-| Individual photo card | `PhotoCard` | `item`, `isFocused`, `blurLevel` |
-| Item metadata below photo | `ItemMetaPanel` | `filename`, `hash`, `capturedAt`, `account` |
+| Photo Wheel carousel | `PhotoWheel` | `items[]`, `activeIndex`, `onSelect(index)` |
+| Individual photo card | `PhotoCard` | `item`, `active` |
+| Item metadata panel | `ItemMetaPanel` | `item|null` |
+| Triage controls | `TriageControls` | `disabled`, `onAccept`, `onReject` |
 
-Chunk 3 is read-only. `TriageControls` and drop-zone interactions are deferred to
-Chunk 4.
+Chunk 4 implementation details:
+
+- `TriageControls` renders two control rows:
+  - inline `Accept` / `Reject`
+  - CTA `Accept Selected` / `Reject Selected`
+- Defer is keyboard-only (`D`) on staging page.
+- Drag-and-drop zones are not implemented in Chunk 4.
 
 ### 4.3 Audit Timeline Page → Components
 
@@ -247,11 +253,9 @@ detection is used in Svelte component logic.
 ### 7.1 Photo Wheel
 
 **Navigation:**
-- Mouse wheel scroll: rotate items in wheel. Clockwise → advance to next item.
-  Counter-clockwise → back to previous item.
-- Arrow keys (`ArrowLeft`, `ArrowRight`): same as mouse wheel.
-- Clicking a non-center card: advances or retreats the wheel to bring that card to
-  center focus.
+- Arrow keys (`ArrowLeft`, `ArrowRight`) shift `activeIndex` on the staging page.
+- Clicking a card sets `activeIndex` via `onSelect(index)`.
+- Keyboard `Enter` / `Space` on focused card selects that card.
 
 **Visual transform rules (per card position relative to center):**
 
@@ -265,30 +269,28 @@ detection is used in Svelte component logic.
 for the snap-to-center animation.
 
 **Center card metadata:** Appears only on the center card. Hidden on all other cards.
-Quick-action buttons (Accept / Reject) appear as an overlay to the right of the center
-card, not inside it.
+Quick actions are provided by a separate `TriageControls` component below the wheel.
 
-### 7.2 Drag and Drop
+### 7.2 Triage Interaction
 
-This section is deferred to Chunk 4 and not implemented in Chunk 3.
+Chunk 4 ships keyboard/button triage, not drag-and-drop.
 
-Drag source: center card in the Photo Wheel.
-Drop targets: Accept zone (left) or Reject zone (right).
+Active controls:
 
-**Drag states:**
-- Drag start: center card gains slight upward translate and increased `--shadow-lg`.
-- Hovering over Accept zone: zone background transitions to `--action-accept-surface`;
-  border gains `--shadow-accept-glow`. All transitions use `--duration-default`.
-- Hovering over Reject zone: zone background transitions to `--action-reject-surface`;
-  border gains `--shadow-reject-glow`.
-- Drop on zone: fires the corresponding triage action (accept or reject) with an
-  idempotency key. Wheel advances to next item. The triage action is optimistic:
-  item is removed from wheel immediately; error restores it with a toast.
-- Drop cancelled (drag released outside zones): card snaps back to center position.
+- Buttons: Accept / Reject (inline + CTA rows)
+- Keyboard shortcuts on staging page:
+  - `A` -> accept selected item
+  - `R` -> reject selected item
+  - `D` -> defer selected item
 
-**Mobile fallback:** Drag and drop is not the primary interaction on mobile. Action
-buttons below the card serve as the primary tap targets. Drag behaviour may be
-suppressed on touch devices.
+Optimistic and rollback semantics:
+
+- On action: selected item is removed from queue immediately.
+- On API failure: queue snapshot is restored and a toast is pushed.
+
+Future work:
+
+- Drag-and-drop zones remain deferred and are not part of delivered Chunk 4 behavior.
 
 ### 7.3 Audit Timeline
 
@@ -329,6 +331,21 @@ This section is deferred to Chunk 5 and not implemented in Chunk 3.
 Planned Chunk 5 behaviors include toggle, delete confirmation, and add/edit form
 flows. Those mutation interactions are intentionally absent from the current
 read-only Chunk 3 page.
+
+---
+
+## 11. Chunk 4 Test Strategy Drift Resolution
+
+Chunk 4 validation is integration-first with pytest, not Playwright.
+
+- API tests: `tests/integration/api/test_api_triage.py`
+- UI-flow simulation tests: `tests/integration/ui/test_triage.py`
+- Error recovery regression: `tests/integration/ui/test_triage_error_recovery.py`
+
+Naming convention:
+
+- API module is named `test_api_triage.py` to avoid pytest import collisions with
+  `tests/integration/ui/test_triage.py`.
 
 ---
 

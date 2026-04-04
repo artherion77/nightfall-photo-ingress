@@ -325,3 +325,30 @@ transition that moves the file. It is set to `NULL` only at `rejected → purged
 - **Operator workflows:** [`docs/operations-runbook.md`](../../docs/operations-runbook.md) — CLI invocations for accept, reject, purge, and trash-watch setup.
 - **Schema definition:** [`design/architecture/schema-and-migrations.md`](schema-and-migrations.md) — full DDL for the `files` table including the `CHECK` constraint.
 - **Domain overview:** [`design/domain-architecture-overview.md`](../domain-architecture-overview.md) — §6 Pipeline Behaviour describes the accept/reject/purge flows in narrative form.
+
+---
+
+## 11. Chunk 4 Web Triage Mutation Path
+
+Chunk 4 introduced API triage write endpoints in `api/routers/triage.py` and
+`api/services/triage_service.py`.
+
+Implemented action mapping:
+
+- `accept` -> `files.status = 'accepted'`
+- `reject` -> `files.status = 'rejected'`
+- `defer` -> `files.status = 'pending'`
+
+Implementation note:
+
+- This path currently updates `files.status` directly in SQL and appends triage audit
+  events (`triage_<action>_requested`, `triage_<action>_applied`, optional
+  `triage_<action>_compensating`) via `api/audit_hook.py`.
+- The triage API path is registry-only in Chunk 4; it does not perform file-system
+  move operations.
+
+Design drift recorded:
+
+- Unlike CLI accept/reject/purge flows, Chunk 4 triage does not yet enforce detailed
+  source-status guards before transition. Hardening this parity is deferred and should
+  be addressed in a future refinement chunk.
