@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
 import os
 import shutil
@@ -15,6 +16,9 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
+
+
+REPO_LOCK_FILE = "/tmp/nightfall-repo.lock"
 
 
 def utc_now_iso() -> str:
@@ -229,6 +233,7 @@ class MCPServerState:
         for key, value in env.items():
             if isinstance(key, str) and isinstance(value, str):
                 merged_env[key] = value
+        merged_env["DEVCTL_GLOBAL_LOCK_HELD"] = "1"
 
         exit_code = 0
         with log_path.open("a", encoding="utf-8") as log_file:
@@ -290,19 +295,22 @@ class MCPServerState:
             for command in commands:
                 log_file.write(f"$ {command}\n")
                 log_file.flush()
-                proc = subprocess.Popen(
-                    command,
-                    shell=True,
-                    cwd=cwd,
-                    env=merged_env,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                )
-                assert proc.stdout is not None
-                for line in proc.stdout:
-                    log_file.write(line)
-                proc.wait()
+                os.makedirs(os.path.dirname(REPO_LOCK_FILE), exist_ok=True)
+                with open(REPO_LOCK_FILE, "w", encoding="utf-8") as lock_handle:
+                    fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX)
+                    proc = subprocess.Popen(
+                        command,
+                        shell=True,
+                        cwd=cwd,
+                        env=merged_env,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                    )
+                    assert proc.stdout is not None
+                    for line in proc.stdout:
+                        log_file.write(line)
+                    proc.wait()
                 if proc.returncode != 0:
                     exit_code = proc.returncode
                     log_file.write(f"Command failed with exit code {exit_code}\n")

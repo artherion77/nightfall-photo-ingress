@@ -6,24 +6,25 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 source "$PROJECT_ROOT/lib/container-common.sh"
+source "$SCRIPT_DIR/devctl_helpers.sh"
 
 CONTAINER="dev-photo-ingress"
 PROFILE_DEFAULT="default"
 PROFILE_DEV="staging"
 SNAPSHOT_CLEAN="clean-installed"
-DEV_TMP_DIR="/root/dev-photo-ingress-tmp"
+
 DEV_WEBUI_ROOT="/opt/nightfall-webui"
 DEV_METRICS_DASHBOARD_ROOT="/opt/nightfall-metrics-dashboard"
+DEV_MANIFEST_DIR="/opt/nightfall-manifest"
 DEV_VENV_ROOT="/opt/ingress"
 DEV_WEBUI_PORT="${DEV_WEBUI_PORT:-5173}"
 DEV_WEBUI_PROXY_DEVICE="dev-webui-proxy"
+
 HOST_HOME="${HOME}"
 HOST_CACHE_NPM_HOME="${HOST_HOME}/.npm"
 HOST_CACHE_NPM="${HOST_HOME}/.cache/npm"
 HOST_CACHE_PIP="${HOST_HOME}/.cache/pip"
 HOST_CACHE_PLAYWRIGHT="${HOST_HOME}/.cache/ms-playwright"
-DEVCTL_LOCK_FILE="${DEVCTL_LOCK_FILE:-/tmp/nightfall-devctl.lock}"
-DEVCTL_LOCK_TIMEOUT_SEC="${DEVCTL_LOCK_TIMEOUT_SEC:-300}"
 
 CACHE_DEVICE_NPM_HOME="cache-root-npm-home"
 CACHE_DEVICE_NPM="cache-root-cache-npm"
@@ -31,8 +32,6 @@ CACHE_DEVICE_PIP="cache-root-cache-pip"
 CACHE_DEVICE_PLAYWRIGHT="cache-root-cache-playwright"
 
 MARKER_PYTHON="${DEV_VENV_ROOT}/.bootstrap-python.done"
-MARKER_WEBUI="${DEV_WEBUI_ROOT}/.bootstrap-webui.done"
-MARKER_PLAYWRIGHT="${DEV_WEBUI_ROOT}/.bootstrap-playwright.done"
 
 _info() { nf_log_info "devctl" "$*"; }
 _ok() { nf_log_ok "devctl" "$*"; }
@@ -42,7 +41,7 @@ _fail() { nf_log_fail "devctl" "$*"; }
 _is_stateful_command() {
     local cmd="$1"
     case "$cmd" in
-        setup|create|destroy|reset|snapshot-create|snapshot-refresh|bootstrap-python|bootstrap-webui|bootstrap-playwright|assert-cached-ready|run-api|run-webui|test-web-typecheck|test-metrics-dashboard-typecheck|test-web-unit|test-web-e2e)
+        setup|create|destroy|reset|snapshot-create|snapshot-refresh|assert-cached-ready|run-api|run-webui|test-web-typecheck|test-metrics-dashboard-typecheck|test-web-unit|test-web-e2e|bootstrap-python|bootstrap-webui|bootstrap-playwright|ensure-stack-ready)
             return 0
             ;;
         *)
@@ -58,17 +57,13 @@ _acquire_command_lock() {
         return 0
     fi
 
-    if ! command -v flock >/dev/null 2>&1; then
-        _fail "flock is required for safe serialized devctl operations"
+    if [[ "${DEVCTL_GLOBAL_LOCK_HELD:-0}" == "1" ]]; then
+        _info "Using existing global repo lock context."
+        return 0
     fi
 
-    mkdir -p "$(dirname "$DEVCTL_LOCK_FILE")"
-    exec 9>"$DEVCTL_LOCK_FILE"
-    if ! flock -w "$DEVCTL_LOCK_TIMEOUT_SEC" 9; then
-        _fail "Timed out waiting for devctl lock ($DEVCTL_LOCK_FILE). Another stateful devctl command is running."
-    fi
-
-    _info "Acquired devctl lock: $DEVCTL_LOCK_FILE"
+    acquire_repo_lock
+    _info "Acquired global repo lock: $REPO_LOCK_FILE"
 }
 
 _wait_ready() {
@@ -89,20 +84,16 @@ _ensure_cache_mounts() {
     chmod 0777 "$HOST_CACHE_NPM_HOME" "$HOST_CACHE_NPM" "$HOST_CACHE_PIP" "$HOST_CACHE_PLAYWRIGHT" || true
 
     lxc config device remove "$CONTAINER" "$CACHE_DEVICE_NPM_HOME" >/dev/null 2>&1 || true
-    lxc config device add "$CONTAINER" "$CACHE_DEVICE_NPM_HOME" disk \
-        source="$HOST_CACHE_NPM_HOME" path="/root/.npm"
+    lxc config device add "$CONTAINER" "$CACHE_DEVICE_NPM_HOME" disk source="$HOST_CACHE_NPM_HOME" path="/root/.npm"
 
     lxc config device remove "$CONTAINER" "$CACHE_DEVICE_NPM" >/dev/null 2>&1 || true
-    lxc config device add "$CONTAINER" "$CACHE_DEVICE_NPM" disk \
-        source="$HOST_CACHE_NPM" path="/root/.cache/npm"
+    lxc config device add "$CONTAINER" "$CACHE_DEVICE_NPM" disk source="$HOST_CACHE_NPM" path="/root/.cache/npm"
 
     lxc config device remove "$CONTAINER" "$CACHE_DEVICE_PIP" >/dev/null 2>&1 || true
-    lxc config device add "$CONTAINER" "$CACHE_DEVICE_PIP" disk \
-        source="$HOST_CACHE_PIP" path="/root/.cache/pip"
+    lxc config device add "$CONTAINER" "$CACHE_DEVICE_PIP" disk source="$HOST_CACHE_PIP" path="/root/.cache/pip"
 
     lxc config device remove "$CONTAINER" "$CACHE_DEVICE_PLAYWRIGHT" >/dev/null 2>&1 || true
-    lxc config device add "$CONTAINER" "$CACHE_DEVICE_PLAYWRIGHT" disk \
-        source="$HOST_CACHE_PLAYWRIGHT" path="/root/.cache/ms-playwright"
+    lxc config device add "$CONTAINER" "$CACHE_DEVICE_PLAYWRIGHT" disk source="$HOST_CACHE_PLAYWRIGHT" path="/root/.cache/ms-playwright"
 }
 
 _print_cache_mounts() {
@@ -130,86 +121,6 @@ _refresh_clean_snapshot() {
     _ok "Snapshot '$SNAPSHOT_CLEAN' refreshed."
 }
 
-_require_clean_snapshot() {
-    if ! _has_snapshot_clean; then
-        _fail "Snapshot '$SNAPSHOT_CLEAN' not found. Run devctl snapshot-create after bootstrap commands."
-    fi
-}
-
-_contract_mode_web_root() {
-    if [[ -n "${DEVCTL_CONTRACT_TEST_ROOT:-}" ]]; then
-        printf "%s" "$DEVCTL_CONTRACT_TEST_ROOT"
-        return 0
-    fi
-    return 1
-}
-
-_require_web_tests() {
-    local web_root="$1"
-    local mode="$2"
-    local pattern="$3"
-    local count
-
-    if [[ ! -d "$web_root/$mode" ]]; then
-        _fail "Missing $mode directory in $web_root"
-    fi
-
-    count="$(find "$web_root/$mode" -type f \( -name "$pattern" -o -name "*.test.ts" -o -name "*.test.js" -o -name "*.spec.ts" -o -name "*.spec.js" \) | wc -l | tr -d '[:space:]')"
-    if [[ "$count" == "0" ]]; then
-        _fail "No $mode test files found under $web_root/$mode"
-    fi
-
-    _info "Discovered $count $mode test file(s)."
-}
-
-_run_test_runner() {
-    local web_root="$1"
-    local runner_env_name="$2"
-    local default_cmd="$3"
-    local runner="${!runner_env_name:-$default_cmd}"
-
-    _info "Running test command: $runner"
-    (
-        cd "$web_root"
-        bash -lc "$runner"
-    )
-}
-
-_default_web_unit_runner() {
-    # Node 18 in dev containers is incompatible with Vitest 4's rolldown dependency.
-    printf "%s" "npm install --save-dev --no-audit --no-fund vitest@1.6.1 jsdom@22.1.0 @testing-library/svelte@5.2.8 @testing-library/jest-dom@6.9.1 && npm exec -- vitest run"
-}
-
-_run_typecheck_runner() {
-    local web_root="$1"
-    local runner="${DEVCTL_TEST_WEB_TYPECHECK_RUNNER:-npm exec -- svelte-check --fail-on-warnings}"
-
-    _info "Running typecheck command: $runner"
-    (
-        cd "$web_root"
-        bash -lc "$runner"
-    )
-}
-
-_ensure_web_test_dependencies() {
-    local web_root="$1"
-    local install_cmd="npm install --save-dev --no-audit --no-fund vitest@1.6.1 jsdom@22.1.0 @testing-library/svelte@5.2.8 @testing-library/jest-dom@6.9.1"
-
-    if ! command -v npm >/dev/null 2>&1; then
-        if [[ -n "${DEVCTL_TEST_WEB_TYPECHECK_RUNNER:-}" || -n "${DEVCTL_TEST_WEB_UNIT_RUNNER:-}" || -n "${DEVCTL_TEST_WEB_E2E_RUNNER:-}" ]]; then
-            _warn "npm not found; skipping web dependency install because contract-mode runners are overridden."
-            return 0
-        fi
-        _fail "npm is required to install web test dependencies"
-    fi
-
-    _info "Ensuring web unit test dependencies are installed."
-    (
-        cd "$web_root"
-        bash -lc "$install_cmd"
-    )
-}
-
 _sync_webui_sources() {
     lxc exec "$CONTAINER" -- mkdir -p "$DEV_WEBUI_ROOT"
     tar -C "$PROJECT_ROOT" \
@@ -220,20 +131,7 @@ _sync_webui_sources() {
         | lxc exec "$CONTAINER" -- tar -xzf - -C "$DEV_WEBUI_ROOT" --strip-components=1
 }
 
-_sync_webui_manifests() {
-    lxc exec "$CONTAINER" -- mkdir -p "$DEV_WEBUI_ROOT"
-
-    if [[ -f "$PROJECT_ROOT/webui/package-lock.json" ]]; then
-        tar -C "$PROJECT_ROOT/webui" -czf - package.json package-lock.json \
-            | lxc exec "$CONTAINER" -- tar -xzf - -C "$DEV_WEBUI_ROOT"
-        return 0
-    fi
-
-    tar -C "$PROJECT_ROOT/webui" -czf - package.json \
-        | lxc exec "$CONTAINER" -- tar -xzf - -C "$DEV_WEBUI_ROOT"
-}
-
-_sync_metrics_dashboard_sources() {
+_sync_dashboard_sources() {
     lxc exec "$CONTAINER" -- mkdir -p "$DEV_METRICS_DASHBOARD_ROOT"
     tar -C "$PROJECT_ROOT" \
         --exclude='metrics/dashboard/node_modules' \
@@ -243,33 +141,230 @@ _sync_metrics_dashboard_sources() {
         | lxc exec "$CONTAINER" -- tar -xzf - -C "$DEV_METRICS_DASHBOARD_ROOT" --strip-components=2
 }
 
+_host_manifest_hash() {
+    local stack="$1"
+    local hash_file="$2"
+
+    if [[ "$stack" == "webui" ]]; then
+        compute_manifest_hash "$PROJECT_ROOT/webui" "$hash_file"
+    else
+        compute_manifest_hash "$PROJECT_ROOT/metrics/dashboard" "$hash_file"
+    fi
+}
+
+_container_manifest_file() {
+    local stack="$1"
+    if [[ "$stack" == "webui" ]]; then
+        printf "%s" "$DEV_MANIFEST_DIR/webui.hash"
+    else
+        printf "%s" "$DEV_MANIFEST_DIR/dashboard.hash"
+    fi
+}
+
+_install_node_exact() {
+    local node_version="$1"
+
+    lxc exec "$CONTAINER" -- bash -lc "
+set -euo pipefail
+apt-get update -qq
+apt-get install -y --no-install-recommends curl ca-certificates
+export NVM_DIR=/root/.nvm
+if [[ ! -s \"\$NVM_DIR/nvm.sh\" ]]; then
+  curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+fi
+. \"\$NVM_DIR/nvm.sh\"
+nvm install '$node_version'
+nvm alias default '$node_version'
+nvm use '$node_version'
+ln -sf \"\$NVM_DIR/versions/node/v$node_version/bin/node\" /usr/local/bin/node
+ln -sf \"\$NVM_DIR/versions/node/v$node_version/bin/npm\" /usr/local/bin/npm
+ln -sf \"\$NVM_DIR/versions/node/v$node_version/bin/npx\" /usr/local/bin/npx
+"
+
+    local actual
+    actual="$(lxc exec "$CONTAINER" -- node --version | tr -d 'v\r\n')"
+    if [[ "$actual" != "$node_version" ]]; then
+        _fail "Node version mismatch: required $node_version, got $actual"
+    fi
+}
+
+_install_python_toolchain() {
+    if lxc exec "$CONTAINER" -- test -f "$MARKER_PYTHON"; then
+        _ok "Python toolchain already installed."
+        return 0
+    fi
+
+    lxc exec "$CONTAINER" -- bash -lc "
+set -euo pipefail
+apt-get update -qq
+apt-get install -y --no-install-recommends python3 python3-pip python3-venv
+python3 -m venv '$DEV_VENV_ROOT'
+'$DEV_VENV_ROOT'/bin/pip install --quiet --upgrade pip pytest pytest-asyncio httpx testcontainers
+touch '$MARKER_PYTHON'
+"
+
+    _ok "Python toolchain installed."
+}
+
+_install_stack() {
+    local stack="$1"
+    local stack_root
+    local manifest_file
+
+    if [[ "$stack" == "webui" ]]; then
+        _sync_webui_sources
+        stack_root="$DEV_WEBUI_ROOT"
+    else
+        _sync_dashboard_sources
+        stack_root="$DEV_METRICS_DASHBOARD_ROOT"
+    fi
+
+    manifest_file="$(_container_manifest_file "$stack")"
+    lxc exec "$CONTAINER" -- bash -lc "
+set -euo pipefail
+mkdir -p '$DEV_MANIFEST_DIR'
+cd '$stack_root'
+rm -rf node_modules .svelte-kit
+npm ci
+cat package.json package-lock.json | sha256sum | awk '{print \$1}' > '$manifest_file'
+"
+}
+
+_assert_node_matches_or_fix() {
+    local node_version="$1"
+    local actual
+
+    actual="$(lxc exec "$CONTAINER" -- node --version 2>/dev/null | tr -d 'v\r\n' || true)"
+    if [[ "$actual" == "$node_version" ]]; then
+        return 0
+    fi
+
+    _warn "Node drift detected (required=$node_version current=${actual:-missing}). Reinstalling both stacks."
+    _install_node_exact "$node_version"
+    _install_stack webui
+    _install_stack dashboard
+}
+
+_assert_node_matches_strict() {
+    local node_version="$1"
+    local actual
+
+    actual="$(lxc exec "$CONTAINER" -- node --version 2>/dev/null | tr -d 'v\r\n' || true)"
+    [[ "$actual" == "$node_version" ]] || _fail "Node drift detected (required=$node_version current=${actual:-missing}). Snapshot creation blocked."
+}
+
+_drift_check_stack() {
+    local stack="$1"
+    local host_hash_file
+    local container_manifest
+    local container_hash
+
+    host_hash_file="$(mktemp)"
+    _host_manifest_hash "$stack" "$host_hash_file"
+
+    container_manifest="$(_container_manifest_file "$stack")"
+    container_hash="$(lxc exec "$CONTAINER" -- bash -lc "cat '$container_manifest' 2>/dev/null || true" | tr -d '[:space:]')"
+
+    if [[ "$(read_hash_file "$host_hash_file")" != "$container_hash" ]]; then
+        _warn "$stack manifest drift detected. Reinstalling only $stack stack."
+        _install_stack "$stack"
+        _ok "$stack stack reinstalled."
+    else
+        _ok "$stack stack is drift-free."
+    fi
+
+    rm -f "$host_hash_file"
+}
+
+_assert_stack_no_drift() {
+    local stack="$1"
+    local host_hash_file
+    local container_manifest
+    local container_hash
+
+    host_hash_file="$(mktemp)"
+    _host_manifest_hash "$stack" "$host_hash_file"
+
+    container_manifest="$(_container_manifest_file "$stack")"
+    container_hash="$(lxc exec "$CONTAINER" -- bash -lc "cat '$container_manifest' 2>/dev/null || true" | tr -d '[:space:]')"
+
+    if [[ "$(read_hash_file "$host_hash_file")" != "$container_hash" ]]; then
+        rm -f "$host_hash_file"
+        _fail "$stack drift detected. Snapshot creation blocked. Run a stack-using command or 'devctl ensure-stack-ready $stack' first."
+    fi
+
+    rm -f "$host_hash_file"
+}
+
+_ensure_stack_ready() {
+    local stack="$1"
+    local node_version
+
+    node_version="$(get_node_version)"
+    [[ -n "$node_version" ]] || _fail "Missing .nvmrc or .node-version in project root."
+
+    assert_web_stack_major_consistency || _fail "SvelteKit/Vite major mismatch across web stacks."
+
+    _assert_node_matches_or_fix "$node_version"
+
+    case "$stack" in
+        webui)
+            _drift_check_stack webui
+            ;;
+        dashboard)
+            _drift_check_stack dashboard
+            ;;
+        all)
+            _drift_check_stack webui
+            _drift_check_stack dashboard
+            ;;
+        *)
+            _fail "Unknown stack '$stack' (expected: webui|dashboard|all)"
+            ;;
+    esac
+}
+
 cmd_create() {
     cmd_setup "$@"
 }
 
 cmd_setup() {
+    local node_version
+    local web_hash dashboard_hash
+
+    assert_web_stack_major_consistency || _fail "SvelteKit/Vite major mismatch across web stacks."
+
+    node_version="$(get_node_version)"
+    [[ -n "$node_version" ]] || _fail "Missing .nvmrc or .node-version in project root."
+
     if lxc info "$CONTAINER" &>/dev/null; then
-        _warn "Container '$CONTAINER' already exists. Ensuring cache mounts are configured."
+        _warn "Container '$CONTAINER' already exists. Re-applying deterministic bootstrap."
     else
         _info "Launching container $CONTAINER (ubuntu:24.04, profiles: $PROFILE_DEFAULT+$PROFILE_DEV) ..."
         lxc launch ubuntu:24.04 "$CONTAINER" -p "$PROFILE_DEFAULT" -p "$PROFILE_DEV"
     fi
 
-    _info "Configuring cache bind mounts ..."
     _ensure_cache_mounts
 
     if [[ "$(lxc list "$CONTAINER" -c s --format csv 2>/dev/null | tr -d '\r')" != "RUNNING" ]]; then
-        _info "Starting container ..."
         lxc start "$CONTAINER"
     fi
-
-    _info "Waiting for container readiness ..."
     _wait_ready
 
-    _ok "Development container is ready with cache mounts."
-    _info "Configured cache mounts:"
-    _print_cache_mounts
-    _info "Next step: run bootstrap commands, then devctl snapshot-create."
+    _install_node_exact "$node_version"
+    _install_python_toolchain
+    _install_stack webui
+    _install_stack dashboard
+
+    _refresh_clean_snapshot
+
+    web_hash="$(lxc exec "$CONTAINER" -- bash -lc "cat '$DEV_MANIFEST_DIR/webui.hash'")"
+    dashboard_hash="$(lxc exec "$CONTAINER" -- bash -lc "cat '$DEV_MANIFEST_DIR/dashboard.hash'")"
+
+    _ok "Atomic bootstrap complete."
+    _info "Node version: $node_version"
+    _info "webui.hash: $web_hash"
+    _info "dashboard.hash: $dashboard_hash"
 }
 
 cmd_destroy() {
@@ -280,115 +375,69 @@ cmd_destroy() {
 
 cmd_reset() {
     nf_require_container_exists "$CONTAINER" "devctl setup" "devctl"
-    _require_clean_snapshot
+    _has_snapshot_clean || _fail "Snapshot '$SNAPSHOT_CLEAN' not found. Run: devctl setup or devctl snapshot-create"
 
-    _info "Stopping container ..."
     lxc stop "$CONTAINER" --force 2>/dev/null || true
-
-    _info "Restoring snapshot '$SNAPSHOT_CLEAN' ..."
     lxc restore "$CONTAINER" "$SNAPSHOT_CLEAN"
-
-    _info "Starting container ..."
     lxc start "$CONTAINER"
     _wait_ready
 
-    _ok "Development container restored to '$SNAPSHOT_CLEAN'."
+    _ok "Container restored to '$SNAPSHOT_CLEAN'."
 }
 
 cmd_bootstrap_python() {
     nf_require_container_running "$CONTAINER" "devctl setup" "devctl"
-
-    if lxc exec "$CONTAINER" -- test -f "$MARKER_PYTHON"; then
-        _ok "Python bootstrap already complete (marker present). Skipping download/install."
-        return 0
-    fi
-
-    _info "Installing Python toolchain in container (first run only) ..."
-    lxc exec "$CONTAINER" -- bash -lc "
-set -euo pipefail
-apt-get update -qq
-apt-get install -y --no-install-recommends python3 python3-pip python3-venv
-python3 -m venv '$DEV_VENV_ROOT'
-'$DEV_VENV_ROOT'/bin/pip install --quiet --upgrade pip pytest pytest-asyncio httpx testcontainers
-touch '$MARKER_PYTHON'
-"
-
-    _ok "Python bootstrap completed in $DEV_VENV_ROOT."
+    _install_python_toolchain
 }
 
 cmd_bootstrap_webui() {
     nf_require_container_running "$CONTAINER" "devctl setup" "devctl"
-
-    if lxc exec "$CONTAINER" -- test -f "$MARKER_WEBUI"; then
-        _ok "Web UI bootstrap already complete (marker present). Skipping download/install."
-        return 0
-    fi
-
-    _sync_webui_manifests
-
-    _info "Installing Node/npm and web test dependencies in container (first run only) ..."
-    lxc exec "$CONTAINER" -- bash -lc "
-set -euo pipefail
-apt-get update -qq
-apt-get install -y --no-install-recommends nodejs npm
-npm config set cache /root/.cache/npm --global
-cd '$DEV_WEBUI_ROOT'
-npm install
-npm install --save-dev vitest@1.6.1 @testing-library/svelte@5.2.8 @testing-library/jest-dom@6.9.1 jsdom@22.1.0 @playwright/test@1.55.0 playwright
-touch '$MARKER_WEBUI'
-"
-
-    _ok "Web UI toolchain bootstrap completed."
+    _ensure_stack_ready webui
 }
 
 cmd_bootstrap_playwright() {
+    _warn "bootstrap-playwright is deprecated. Playwright deps must come from webui/package.json and are installed by npm ci only."
+}
+
+cmd_ensure_stack_ready() {
     nf_require_container_running "$CONTAINER" "devctl setup" "devctl"
-
-    if lxc exec "$CONTAINER" -- test -f "$MARKER_PLAYWRIGHT"; then
-        _ok "Playwright bootstrap already complete (marker present). Skipping browser download."
-        return 0
-    fi
-
-    lxc exec "$CONTAINER" -- mkdir -p "$DEV_WEBUI_ROOT"
-
-    _info "Installing Playwright browsers in container (first run only) ..."
-    lxc exec "$CONTAINER" -- bash -lc "
-set -euo pipefail
-cd '$DEV_WEBUI_ROOT'
-npx playwright install --with-deps chromium
-touch '$MARKER_PLAYWRIGHT'
-"
-
-    _ok "Playwright browser bootstrap completed."
+    local stack="${1:-all}"
+    _ensure_stack_ready "$stack"
 }
 
 cmd_snapshot_create() {
+    local node_version
+
     nf_require_container_running "$CONTAINER" "devctl setup" "devctl"
+    node_version="$(get_node_version)"
+    [[ -n "$node_version" ]] || _fail "Missing .nvmrc or .node-version in project root."
+
+    _assert_node_matches_strict "$node_version"
+    _assert_stack_no_drift webui
+    _assert_stack_no_drift dashboard
     _refresh_clean_snapshot
 }
 
 cmd_snapshot_refresh() {
-    cmd_snapshot_create
+    cmd_snapshot_create "$@"
 }
 
 cmd_run_webui() {
     nf_require_container_running "$CONTAINER" "devctl setup" "devctl"
 
+    _ensure_stack_ready webui
     _sync_webui_sources
 
-    _info "Configuring host loopback proxy for Vite: 127.0.0.1:$DEV_WEBUI_PORT"
     lxc config device remove "$CONTAINER" "$DEV_WEBUI_PROXY_DEVICE" >/dev/null 2>&1 || true
     lxc config device add "$CONTAINER" "$DEV_WEBUI_PROXY_DEVICE" proxy \
         listen="tcp:127.0.0.1:$DEV_WEBUI_PORT" \
         connect="tcp:127.0.0.1:$DEV_WEBUI_PORT"
 
     _ok "Dev web UI URL: http://127.0.0.1:$DEV_WEBUI_PORT/"
-    _info "Starting Vite dev server in container (Ctrl+C to stop)."
 
     lxc exec -t "$CONTAINER" -- bash -lc "
 set -euo pipefail
 cd '$DEV_WEBUI_ROOT'
-npm install
 npx svelte-kit sync
 npm run dev -- --host 0.0.0.0 --port '$DEV_WEBUI_PORT'
 "
@@ -396,67 +445,12 @@ npm run dev -- --host 0.0.0.0 --port '$DEV_WEBUI_PORT'
 
 cmd_run_api() {
     nf_require_container_running "$CONTAINER" "devctl setup" "devctl"
-    _warn "API run scaffold is not implemented yet. Bootstrap Python first, then run nightfall-photo-ingress commands in devctl shell."
-}
-
-cmd_test_web_unit() {
-    local contract_root
-    if contract_root="$(_contract_mode_web_root)"; then
-        _info "Contract test mode enabled (local web root: $contract_root)."
-        if [[ ! -f "$contract_root/package.json" ]]; then
-            _fail "Missing package.json in contract test root: $contract_root"
-        fi
-        _require_web_tests "$contract_root" "tests/component" "*.test.ts"
-        _ensure_web_test_dependencies "$contract_root"
-        _run_typecheck_runner "$contract_root"
-        _run_test_runner "$contract_root" "DEVCTL_TEST_WEB_UNIT_RUNNER" "$(_default_web_unit_runner)"
-        _ok "test-web-unit completed successfully."
-        return 0
-    fi
-
-    nf_require_container_running "$CONTAINER" "devctl setup" "devctl"
-    if ! lxc exec "$CONTAINER" -- test -f "$MARKER_WEBUI"; then
-        _fail "Web UI bootstrap marker missing. Run: devctl bootstrap-webui && devctl snapshot-create"
-    fi
-    _sync_webui_sources
-
-    lxc exec "$CONTAINER" -- bash -lc "
-set -euo pipefail
-cd '$DEV_WEBUI_ROOT'
-if [[ ! -d tests/component ]]; then
-  echo '[devctl] Missing tests/component directory in $DEV_WEBUI_ROOT' >&2
-  exit 1
-fi
-count=\$(find tests/component -type f \( -name '*.test.ts' -o -name '*.test.js' -o -name '*.spec.ts' -o -name '*.spec.js' \) | wc -l | tr -d '[:space:]')
-if [[ "\$count" == "0" ]]; then
-  echo '[devctl] No tests/component test files found' >&2
-  exit 1
-fi
-echo \"[devctl] Discovered \$count tests/component test file(s).\"
-npm exec -- svelte-check --fail-on-warnings
-$(_default_web_unit_runner)
-"
-
-    _ok "test-web-unit completed successfully."
+    _warn "API run scaffold is not implemented yet."
 }
 
 cmd_test_web_typecheck() {
-    local contract_root
-    if contract_root="$(_contract_mode_web_root)"; then
-        _info "Contract test mode enabled (local web root: $contract_root)."
-        if [[ ! -f "$contract_root/package.json" ]]; then
-            _fail "Missing package.json in contract test root: $contract_root"
-        fi
-        _ensure_web_test_dependencies "$contract_root"
-        _run_typecheck_runner "$contract_root"
-        _ok "test-web-typecheck completed successfully."
-        return 0
-    fi
-
     nf_require_container_running "$CONTAINER" "devctl setup" "devctl"
-    if ! lxc exec "$CONTAINER" -- test -f "$MARKER_WEBUI"; then
-        _fail "Web UI bootstrap marker missing. Run: devctl bootstrap-webui && devctl snapshot-create"
-    fi
+    _ensure_stack_ready webui
     _sync_webui_sources
 
     lxc exec "$CONTAINER" -- bash -lc "
@@ -468,18 +462,55 @@ npm exec -- svelte-check --fail-on-warnings
     _ok "test-web-typecheck completed successfully."
 }
 
+cmd_test_web_unit() {
+    nf_require_container_running "$CONTAINER" "devctl setup" "devctl"
+    _ensure_stack_ready webui
+    _sync_webui_sources
+
+    lxc exec "$CONTAINER" -- bash -lc "
+set -euo pipefail
+cd '$DEV_WEBUI_ROOT'
+if [[ ! -d tests/component ]]; then
+  echo '[devctl] Missing tests/component directory' >&2
+  exit 1
+fi
+npm exec -- svelte-check --fail-on-warnings
+npx vitest run
+"
+
+    _ok "test-web-unit completed successfully."
+}
+
+cmd_test_web_e2e() {
+    local artifact_dir="${DEVCTL_E2E_ARTIFACT_DIR:-test-results/playwright}"
+
+    nf_require_container_running "$CONTAINER" "devctl setup" "devctl"
+    _ensure_stack_ready webui
+    _sync_webui_sources
+
+    lxc exec "$CONTAINER" -- bash -lc "
+set -euo pipefail
+cd '$DEV_WEBUI_ROOT'
+if [[ ! -d tests/e2e ]]; then
+  echo '[devctl] Missing tests/e2e directory' >&2
+  exit 1
+fi
+mkdir -p '$artifact_dir'
+echo 'E2E_ARTIFACT_PATH=$DEV_WEBUI_ROOT/$artifact_dir'
+npx playwright test --reporter=line
+"
+
+    _ok "test-web-e2e completed successfully."
+}
+
 cmd_test_metrics_dashboard_typecheck() {
     nf_require_container_running "$CONTAINER" "devctl setup" "devctl"
-    if ! lxc exec "$CONTAINER" -- test -f "$MARKER_WEBUI"; then
-        _fail "Web UI bootstrap marker missing. Run: devctl bootstrap-webui && devctl snapshot-create"
-    fi
-
-    _sync_metrics_dashboard_sources
+    _ensure_stack_ready dashboard
+    _sync_dashboard_sources
 
     lxc exec "$CONTAINER" -- bash -lc "
 set -euo pipefail
 cd '$DEV_METRICS_DASHBOARD_ROOT'
-npm install
 npx svelte-kit sync
 npm exec -- svelte-check --fail-on-warnings
 "
@@ -487,57 +518,11 @@ npm exec -- svelte-check --fail-on-warnings
     _ok "test-metrics-dashboard-typecheck completed successfully."
 }
 
-cmd_test_web_e2e() {
-    local artifact_dir="${DEVCTL_E2E_ARTIFACT_DIR:-test-results/playwright}"
-    local contract_root
-
-    if contract_root="$(_contract_mode_web_root)"; then
-        _info "Contract test mode enabled (local web root: $contract_root)."
-        if [[ ! -f "$contract_root/package.json" ]]; then
-            _fail "Missing package.json in contract test root: $contract_root"
-        fi
-        _require_web_tests "$contract_root" "tests/e2e" "*.spec.ts"
-        mkdir -p "$contract_root/$artifact_dir"
-        echo "E2E_ARTIFACT_PATH=$contract_root/$artifact_dir"
-        _run_test_runner "$contract_root" "DEVCTL_TEST_WEB_E2E_RUNNER" "npx playwright test --reporter=line"
-        _ok "test-web-e2e completed successfully."
-        return 0
-    fi
-
-    nf_require_container_running "$CONTAINER" "devctl setup" "devctl"
-    _sync_webui_sources
-
-    lxc exec "$CONTAINER" -- bash -lc "
-set -euo pipefail
-cd '$DEV_WEBUI_ROOT'
-if [[ ! -d tests/e2e ]]; then
-  echo '[devctl] Missing tests/e2e directory in $DEV_WEBUI_ROOT' >&2
-  exit 1
-fi
-count=\$(find tests/e2e -type f \( -name '*.spec.ts' -o -name '*.spec.js' \) | wc -l | tr -d '[:space:]')
-if [[ "\$count" == "0" ]]; then
-  echo '[devctl] No tests/e2e spec files found' >&2
-  exit 1
-fi
-echo \"[devctl] Discovered \$count tests/e2e spec file(s).\"
-mkdir -p '$artifact_dir'
-echo "E2E_ARTIFACT_PATH=$DEV_WEBUI_ROOT/$artifact_dir"
-npx playwright test --reporter=line
-"
-
-    _ok "test-web-e2e completed successfully."
-}
-
 cmd_assert_cached_ready() {
     nf_require_container_exists "$CONTAINER" "devctl setup" "devctl"
 
-    if ! _cache_mounts_active; then
-        _fail "Cache mounts are not fully configured. Run: devctl setup"
-    fi
-
-    if ! _has_snapshot_clean; then
-        _fail "Clean snapshot '$SNAPSHOT_CLEAN' missing. Run: devctl snapshot-create"
-    fi
+    _cache_mounts_active || _fail "Cache mounts are incomplete. Run: devctl setup"
+    _has_snapshot_clean || _fail "Snapshot '$SNAPSHOT_CLEAN' missing. Run: devctl setup or devctl snapshot-create"
 
     _ok "Cache mounts and clean snapshot are ready."
 }
@@ -545,19 +530,8 @@ cmd_assert_cached_ready() {
 cmd_status() {
     if lxc info "$CONTAINER" &>/dev/null; then
         lxc info "$CONTAINER"
-        if _has_snapshot_clean; then
-            _ok "Snapshot status: '$SNAPSHOT_CLEAN' present"
-        else
-            _warn "Snapshot status: '$SNAPSHOT_CLEAN' missing"
-        fi
-
-        if _cache_mounts_active; then
-            _ok "Cache mounts: active"
-        else
-            _warn "Cache mounts: incomplete"
-        fi
-
-        _info "Configured cache mounts:"
+        _has_snapshot_clean && _ok "Snapshot '$SNAPSHOT_CLEAN' present" || _warn "Snapshot '$SNAPSHOT_CLEAN' missing"
+        _cache_mounts_active && _ok "Cache mounts: active" || _warn "Cache mounts: incomplete"
         _print_cache_mounts
     else
         _warn "Container '$CONTAINER' does not exist."
@@ -574,27 +548,28 @@ _usage() {
 Usage: $(basename "$0") <command>
 
 Commands:
-  setup               Create/start development container and configure cache bind mounts.
+  setup               Create/start container and run atomic bootstrap.
   create              Alias for setup.
   destroy             Delete development container.
-  reset               Restore development container from snapshot '$SNAPSHOT_CLEAN'.
-  snapshot-create     Create/update snapshot '$SNAPSHOT_CLEAN' from current state.
+  reset               Restore from snapshot '$SNAPSHOT_CLEAN'.
+  snapshot-create     Create/update '$SNAPSHOT_CLEAN' only if no drift is detected.
   snapshot-refresh    Alias for snapshot-create.
-  bootstrap-python    Install Python toolchain/test deps in development container (cached, idempotent).
-  bootstrap-webui     Install Node/npm/web test deps in development container (cached, idempotent).
-  bootstrap-playwright Install Playwright browsers in development container (cached, idempotent).
-  assert-cached-ready Ensure cache mounts and clean snapshot are available for MCP test flow.
-  run-api             API run scaffold (placeholder for upcoming implementation).
-  run-webui           Sync webui source and run Vite dev server in container.
-    test-web-typecheck  Run webui Svelte/TypeScript typecheck in dev container.
-    test-metrics-dashboard-typecheck Run metrics dashboard frame typecheck in dev container.
-  test-web-unit       Run Vitest unit/component tests in dev container.
-    test-web-e2e        Run Playwright e2e browser tests in dev container.
+  bootstrap-python    Install Python toolchain in container.
+  bootstrap-webui     Ensure webui stack is installed and drift-free.
+  bootstrap-playwright Deprecated (playwright deps come from npm ci only).
+  ensure-stack-ready  Drift-check/reinstall stack: webui|dashboard|all (default: all).
+  assert-cached-ready Ensure cache mounts and clean snapshot are available.
+  run-api             API run scaffold (placeholder).
+  run-webui           Drift-check webui, sync sources, run Vite in container.
+  test-web-typecheck  Drift-check webui, then run svelte-check in container.
+  test-metrics-dashboard-typecheck Drift-check dashboard, then run svelte-check in container.
+  test-web-unit       Drift-check webui, then run Vitest in container.
+  test-web-e2e        Drift-check webui, then run Playwright in container.
   status              Show container, snapshot, and cache mount status.
-  shell               Open interactive shell in development container.
+  shell               Open interactive shell in container.
 
 Environment variables:
-  DEV_WEBUI_PORT      Host/container port for Vite dev server (default: 5173).
+  DEV_WEBUI_PORT      Port for webui Vite server (default: 5173).
 USAGE
     exit 1
 }
@@ -615,6 +590,7 @@ main() {
         bootstrap-python) cmd_bootstrap_python "$@" ;;
         bootstrap-webui) cmd_bootstrap_webui "$@" ;;
         bootstrap-playwright) cmd_bootstrap_playwright "$@" ;;
+        ensure-stack-ready) cmd_ensure_stack_ready "$@" ;;
         assert-cached-ready) cmd_assert_cached_ready "$@" ;;
         run-api) cmd_run_api "$@" ;;
         run-webui) cmd_run_webui "$@" ;;

@@ -107,6 +107,7 @@
       "bootstrap-python",
       "bootstrap-webui",
       "bootstrap-playwright",
+      "ensure-stack-ready",
       "snapshot-create",
       "snapshot-refresh",
       "reset",
@@ -144,10 +145,6 @@
   "devcontainer": {
     "prepare": [
       "./dev/devctl setup",
-      "./dev/devctl bootstrap-python",
-      "./dev/devctl bootstrap-webui",
-      "./dev/devctl bootstrap-playwright",
-      "./dev/devctl snapshot-create",
       "./dev/devctl assert-cached-ready",
       "./dev/devctl status"
     ],
@@ -171,10 +168,6 @@
   "mappings": {
     "devcontainer.prepare": [
       "./dev/devctl setup",
-      "./dev/devctl bootstrap-python",
-      "./dev/devctl bootstrap-webui",
-      "./dev/devctl bootstrap-playwright",
-      "./dev/devctl snapshot-create",
       "./dev/devctl assert-cached-ready",
       "./dev/devctl status"
     ],

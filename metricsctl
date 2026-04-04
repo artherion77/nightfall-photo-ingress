@@ -2,7 +2,11 @@
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
+import os
+import subprocess
+from contextlib import contextmanager
 from pathlib import Path
 
 from metrics.runner.aggregator import run_aggregation
@@ -23,6 +27,35 @@ from metrics.runner.poller_runner import (
     uninstall_poller,
 )
 from metrics.runner.schema_contract import manifest_schema, metrics_schema, validate_manifest_payload, validate_metrics_payload
+
+
+REPO_LOCK_FILE = "/tmp/nightfall-repo.lock"
+
+
+@contextmanager
+def _repo_lock() -> object:
+    Path(REPO_LOCK_FILE).parent.mkdir(parents=True, exist_ok=True)
+    with open(REPO_LOCK_FILE, "w", encoding="utf-8") as handle:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        try:
+            yield handle
+        finally:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
+def _devctl_dashboard_drift_preflight(repo_root: Path) -> None:
+    devctl_path = repo_root / "dev" / "devctl"
+    if not devctl_path.exists():
+        raise RuntimeError(f"Missing devctl at {devctl_path}")
+
+    env = os.environ.copy()
+    env["DEVCTL_GLOBAL_LOCK_HELD"] = "1"
+    subprocess.run(
+        [str(devctl_path), "ensure-stack-ready", "dashboard"],
+        cwd=str(repo_root),
+        env=env,
+        check=True,
+    )
 
 
 def _repo_root() -> Path:
@@ -93,10 +126,12 @@ def cmd_aggregate(args: argparse.Namespace) -> int:
 
 def cmd_generate_dashboard(args: argparse.Namespace) -> int:
     root = _repo_root()
-    run_dashboard_generation(
-        repo_root=root,
-        run_id=args.run_id,
-    )
+    with _repo_lock():
+        _devctl_dashboard_drift_preflight(root)
+        run_dashboard_generation(
+            repo_root=root,
+            run_id=args.run_id,
+        )
     print(f"module5 dashboard generation complete run_id={args.run_id}")
     return 0
 
