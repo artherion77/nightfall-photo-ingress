@@ -64,7 +64,7 @@ Once purged:
 - The physical file is deleted from `rejected/`.
 - The SHA-256 record in `files` shows `status = 'purged'`.
 - All prior `audit_log` rows for that file (pending, rejected, purged) remain intact.
-- Future polls that encounter the same SHA-256 will classify it as `rejected_duplicate` and skip it, because the registry still has a record for the SHA-256 (status `purged`) and the ingest engine blocks re-ingestion of any known-rejected-or-purged hash.
+- Future polls that encounter the same SHA-256 will classify it as `discard_purged` and skip it, because the registry still has a record for the SHA-256 (status `purged`) and the ingest engine blocks re-ingestion of any known hash.
 
 ---
 

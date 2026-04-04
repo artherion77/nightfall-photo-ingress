@@ -218,10 +218,10 @@ CREATE TABLE IF NOT EXISTS audit_log (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
     sha256       TEXT,
     account_name TEXT,
-    action       TEXT NOT NULL,       -- e.g. 'pending', 'accepted', 'rejected', 'purged', 'duplicate_skipped'
+    action       TEXT NOT NULL,       -- e.g. 'pending', 'accepted', 'rejected', 'purged', 'discard_accepted'
     reason       TEXT,
     details_json TEXT,
-    actor        TEXT NOT NULL,       -- 'pipeline', 'cli', 'trash_watch'
+    actor        TEXT NOT NULL,       -- runtime actor label, e.g. 'ingest_pipeline', 'cli', 'trash_watch', 'api'
     ts           TEXT NOT NULL        -- ISO-8601 UTC
 );
 
@@ -307,11 +307,14 @@ CREATE TABLE IF NOT EXISTS ingest_terminal_audit (
    c. Rename `.tmp` → `{onedrive_id}.{ext}` on success.
    c1. Each downloaded file is wrapped in a `DownloadedHandoffCandidate` record (the production-owned M3→M4 boundary contract: `account_name`, `onedrive_id`, `original_filename`, `relative_path`, `modified_time`, `size_bytes`, `staging_path`). The ingest engine processes these immediately within the same poll run.
    d. **Compute SHA-256** (streaming 64 KB chunks; never loads full file into memory). The lifecycle journal (`IngestOperationJournal`) records phase transitions (`download_started`, `hash_computed`, `decision_applied`, `finalized`) for crash-boundary recovery.
-   e. **Registry lookup**:
-      - `rejected` → delete from staging; append `rejected_duplicate` to `audit_log`.
-      - `pending`  → delete from staging; append `discard_pending` to `audit_log`.
-      - `accepted` → delete from staging; append `duplicate_skipped` to `audit_log`.
-      - `unknown` → move to `pending/YYYY/MM/{filename}`; insert `files` row as `pending`; insert `metadata_index` row; append `pending` to `audit_log`.
+    e. **Blocklist enforcement (Chunk 5)**:
+        - enabled blocklist match (`filename` glob or `regex`) → delete from staging; persist file as `rejected`; append `rejected` with reason `block_rule:<type>:<pattern>`.
+    f. **Registry lookup** (if not blocklist-rejected):
+        - `rejected` → delete from staging; append `discard_rejected` to `audit_log`.
+        - `pending`  → delete from staging; append `discard_pending` to `audit_log`.
+        - `accepted` → delete from staging; append `discard_accepted` to `audit_log`.
+        - `purged`   → delete from staging; append `discard_purged` to `audit_log`.
+        - `unknown` → move to `pending/YYYY/MM/{filename}`; insert `files` row as `pending`; insert `metadata_index` row; append `pending` to `audit_log`.
 4. Persist cursor checkpoints with a commit-gated streaming sequence per page:
    - fetch one page,
    - evaluate prefilter and ingest outcomes for that page,
@@ -593,7 +596,7 @@ Key properties:
 4. Re-run poll; confirm file NOT downloaded again (metadata_index hit)
 5. `nightfall-photo-ingress accept <sha256>` transitions pending to accepted; file moves to `accepted/`
 6. Move accepted file to `trash/`; confirm it is removed from `accepted/` and registry status = `rejected`
-7. Re-upload same photo to OneDrive; run poll; confirm file is silently discarded (audit_log entry: `rejected_duplicate`)
+7. Re-upload same photo to OneDrive; run poll; confirm file is silently discarded (audit_log entry: `discard_rejected`)
 8. `nightfall-photo-ingress reject <sha256>` runs idempotently (no error if already rejected)
 9. `nightfall-photo-ingress purge <sha256>` only purges within rejected root and marks status `purged`
 10. Move accepted files manually to `/nightfall/media/pictures/...`; confirm no re-download on future polls

@@ -16,6 +16,7 @@ registry schema looks like. These are the implementation contracts.
 | [reject.md](reject.md) | active | Reject flow: trash-directory trigger (path unit → service) and CLI `reject` command; idempotency; audit entry |
 | [purge.md](purge.md) | active | Purge flow: preconditions (must be `rejected`), root-containment safety check, physical deletion, status transition |
 | [triage.md](triage.md) | active | Web API triage write path (`accept`/`reject`/`defer`), idempotency replay (`ui_action_idempotency`), audit-first semantics, and error model |
+| [blocklist.md](blocklist.md) | active | Blocklist write path (`POST`/`PATCH`/`DELETE`), idempotency replay semantics, conflict handling, and ingest enforcement behavior |
 
 ---
 
@@ -37,11 +38,12 @@ To understand a complete operator workflow:
 2. [registry.md](registry.md) — how they are tracked
 3. [accept.md](accept.md) + [reject.md](reject.md) + [purge.md](purge.md) — what an operator does with them
 4. [triage.md](triage.md) — how the web control plane applies triage mutations
+5. [blocklist.md](blocklist.md) — how blocklist CRUD and ingest enforcement behave
 
-## Chunk 4 Testing Note
+## Chunk 4/5 Testing Note
 
-Chunk 4 triage uses pytest integration tests (API + UI-flow simulation) as the active
-test strategy. Playwright coverage for the same flow is deferred.
+Chunk 4 triage and Chunk 5 blocklist CRUD use pytest integration tests (API + UI-flow
+simulation) as the active test strategy. Playwright coverage for these flows is deferred.
 
 ---
 

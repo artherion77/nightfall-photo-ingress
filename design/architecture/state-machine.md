@@ -352,3 +352,21 @@ Design drift recorded:
 - Unlike CLI accept/reject/purge flows, Chunk 4 triage does not yet enforce detailed
   source-status guards before transition. Hardening this parity is deferred and should
   be addressed in a future refinement chunk.
+
+## 12. Chunk 5 Blocklist Ingest Enforcement
+
+Chunk 5 adds an ingest-time transition path for blocklist matches:
+
+- Evaluation point: after SHA-256 computation, before unknown-file `pending` persistence.
+- Rule source: enabled `blocked_rules` entries (`filename` glob and `regex`).
+- On match:
+  - staged file is removed,
+  - `files` row is created/updated with `status = 'rejected'`,
+  - audit event `action='rejected'` is appended with reason `block_rule:<rule_type>:<pattern>`,
+  - ingest outcome is `discard_rejected`.
+
+Behavioral result:
+
+- Blocked files are persisted as rejected tombstones and therefore skip pending review.
+- Subsequent replays of the same hash continue through known-hash discard semantics and
+  do not re-enter pending.

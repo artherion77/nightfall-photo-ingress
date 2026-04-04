@@ -1,6 +1,6 @@
 # Phase 1 REST API Specification
 
-**Status:** Implemented (Chunks 1 and 4)  
+**Status:** Implemented (Chunks 1, 4, and 5)  
 **Date:** 2026-04-03  
 **Owner:** Systems Engineering
 
@@ -9,13 +9,14 @@
 ## 1. Overview
 
 This document specifies the Phase 1 REST API for the photo-ingress web control plane.
-Chunks 1 and 4 provide read models plus triage write endpoints. They provide operator access to:
+Chunks 1, 4, and 5 provide read models plus triage and blocklist write endpoints. They provide operator access to:
 - System health and status
 - Pending ingestion queue with pagination
 - Audit log with action filtering
 - Effective runtime configuration
 - Current blocklist rules
 - Triage write actions (accept, reject, defer)
+- Blocklist write actions (create, update, delete)
 
 All endpoints require bearer token authentication (except docs endpoints).
 Pagination uses cursor-based semantics: SHA-256 cursors for staging and numeric
@@ -370,7 +371,74 @@ curl -H "Authorization: Bearer test-token-12345" \
 
 ---
 
-### 4.7 Triage Mutations
+### 4.7 Blocklist Mutations
+
+**Auth:** Required
+
+**Paths:**
+
+- `POST /api/v1/blocklist`
+- `PATCH /api/v1/blocklist/{rule_id}`
+- `DELETE /api/v1/blocklist/{rule_id}`
+
+**Required headers:**
+
+- `Authorization: Bearer <token>`
+- `X-Idempotency-Key: <string>`
+
+**Request schemas:**
+
+```typescript
+interface BlockRuleCreate {
+  pattern: string;
+  rule_type: string; // current implementation accepts 'filename' or 'regex'
+  reason?: string | null;
+  enabled?: boolean; // defaults to true
+}
+
+interface BlockRuleUpdate {
+  pattern?: string | null;
+  rule_type?: string | null;
+  reason?: string | null;
+  enabled?: boolean | null;
+}
+```
+
+**Response schemas:**
+
+```typescript
+interface BlockRuleDeleteResponse {
+  id: number;
+  deleted: boolean;
+}
+```
+
+`POST` and `PATCH` return `BlockRule`; `DELETE` returns `BlockRuleDeleteResponse`.
+
+**Status codes:**
+
+- `201` - create success or idempotent replay of create
+- `200` - update/delete success, or idempotent replay of update/delete
+- `404` - update/delete target rule not found
+- `409` - idempotency key reuse conflict, or uniqueness/constraint conflict
+- `422` - required header/body validation failure
+
+**Idempotency replay semantics (`ui_action_idempotency`):**
+
+- Each write persists `{action, item_id, response_status, response_body_json}`.
+- A duplicate request with the same key and matching action/item replays the stored response body and status.
+- A duplicate key reused with a different action or item returns `409` (`Idempotency key reuse conflict`).
+- `expires_at` is persisted as `created_at + 24h`; cleanup is out of scope for this chunk.
+
+**Conflict handling details:**
+
+- `POST /blocklist`: duplicate pattern or invalid rule_type constraints surface as `409`.
+- `PATCH /blocklist/{rule_id}`: uniqueness or constraint violations surface as `409`.
+- `DELETE /blocklist/{rule_id}`: no-op replay is returned only via idempotency replay; non-existent rule is `404`.
+
+---
+
+### 4.8 Triage Mutations
 
 **Auth:** Required
 
@@ -425,7 +493,7 @@ interface TriageResponse {
 
 ---
 
-### 4.8 API Documentation
+### 4.9 API Documentation
 
 **Path:** `GET /api/docs`
 
@@ -438,7 +506,7 @@ This is a self-contained HTML page with embedded OpenAPI spec.
 
 ---
 
-### 4.9 OpenAPI Schema
+### 4.10 OpenAPI Schema
 
 **Path:** `GET /api/openapi.json`
 
@@ -492,8 +560,17 @@ The `limit` parameter controls page size:
 | 401 | Unauthorized | Missing or invalid auth token |
 | 404 | Not Found | Item ID does not exist |
 | 409 | Conflict | Idempotency key reused with different item/action |
-| 422 | Validation Error | Missing required `X-Idempotency-Key` on triage mutation |
+| 422 | Validation Error | Missing required `X-Idempotency-Key` on triage/blocklist mutation |
 | 500 | Server Error | Unexpected internal error |
+
+### 6.3 Ingest Enforcement Note (Chunk 5)
+
+Blocklist rules are now enforced by the ingest engine before unknown-file persistence:
+
+- `src/nightfall_photo_ingress/domain/ingest.py` loads enabled rules from `blocked_rules`.
+- Matching files are persisted as `rejected` with `action='rejected'` and reason `block_rule:<rule_type>:<pattern>`.
+- Outcome is returned as `discard_rejected`, and the staged file is removed.
+- Replays of the same content hash continue to follow known-hash discard semantics and do not re-enter `pending`.
 
 ### 6.2 Error Response Format
 

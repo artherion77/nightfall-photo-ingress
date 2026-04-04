@@ -68,10 +68,10 @@ CREATE TABLE IF NOT EXISTS audit_log (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
     sha256       TEXT,
     account_name TEXT,
-    action       TEXT NOT NULL,       -- e.g. 'pending', 'accepted', 'rejected', 'purged', 'duplicate_skipped'
+    action       TEXT NOT NULL,       -- e.g. 'pending', 'accepted', 'rejected', 'purged', 'discard_accepted'
     reason       TEXT,
     details_json TEXT,
-    actor        TEXT NOT NULL,       -- 'pipeline', 'cli', 'trash_watch'
+    actor        TEXT NOT NULL,       -- runtime actor label, e.g. 'ingest_pipeline', 'cli', 'trash_watch', 'api'
     ts           TEXT NOT NULL        -- ISO-8601 UTC
 );
 
@@ -149,7 +149,7 @@ CREATE TABLE IF NOT EXISTS blocked_rules (
 CREATE TABLE IF NOT EXISTS ui_action_idempotency (
     id                  INTEGER PRIMARY KEY AUTOINCREMENT,
     idempotency_key     TEXT UNIQUE NOT NULL,
-    action              TEXT NOT NULL,       -- e.g., 'accept', 'reject', 'defer'
+    action              TEXT NOT NULL,       -- e.g., 'triage_accept', 'blocklist_create', 'blocklist_update'
     item_id             TEXT NOT NULL,       -- SHA-256 or file identifier
     request_body_json   TEXT,                -- Full request body for audit/replay
     response_status     INTEGER NOT NULL,   -- HTTP status returned
@@ -172,20 +172,21 @@ CREATE TABLE IF NOT EXISTS ui_action_idempotency (
 - **Provenance-tracked**: `file_origins` records the `(account, onedrive_id)` → `sha256` mapping for every file ever encountered, independent of current status.
 - **Advisory hash import**: `external_hash_cache` stores SHA1 hashes imported from `.hashes.sha1` files; `verified_sha256` column is populated after first-download SHA-256 confirmation, converting an advisory hint to a confirmed identity mapping.
 
-### Chunk 1 Optional Tables (Web Control Plane Phase 1)
+### Chunk 1/4/5 Optional Tables (Web Control Plane Phase 1)
 
 **blocklist:**
 - Stores operator-definable block rules for file filtering.
 - Each rule has a pattern, type (`filename` or `regex` in the current implementation), human-readable reason, and enabled flag.
 - Allows toggling rules on/off without deletion (audit trail in `updated_at`).
-- Queried by read-only `/api/v1/blocklist` endpoint.
+- Queried and mutated by `/api/v1/blocklist` GET/POST/PATCH/DELETE endpoints.
+- Enforced by ingest in `domain/ingest.py` before unknown-file pending persistence.
 
 **ui_action_idempotency:**
-- Tracks write-path action idempotency keys (introduced in Phase 3 triage write path).
-- Enables exactly-once semantics for triage operations (accept / reject / defer).
+- Tracks write-path action idempotency keys (introduced in Chunk 4 triage and extended in Chunk 5 blocklist writes).
+- Enables replay-safe semantics for triage operations and blocklist CRUD operations.
 - Stores request body, response status, and response body for replay on duplicate key.
 - Rows tagged with `expires_at` for garbage collection (TTL-based cleanup).
-- Not queried by any API endpoint in Phase 1 (unused until Phase 3).
+- Accessed by write services for replay/conflict checks; not exposed as a public API endpoint.
 
 **Migration note:** Chunk 1 introduces these tables as additive optional tables under the
 existing v2 runtime. Fresh databases receive them on `initialize()`, and existing valid
@@ -198,13 +199,14 @@ not treat these tables as a v2 -> v3 migration.
 
 | Action | Actor | Trigger |
 |---|---|---|
-| `pending` | `pipeline` | New file first ingested to pending queue |
+| `pending` | `ingest_pipeline` | New file first ingested to pending queue |
 | `accepted` | `cli` | Operator explicit accept |
-| `rejected` | `cli` or `trash_watch` | Operator explicit reject or trash flow |
+| `rejected` | `cli` or `trash_watch` or `ingest_pipeline` | Operator explicit reject, trash flow, or blocklist ingest match |
 | `purged` | `cli` | Operator explicit purge |
-| `duplicate_skipped` | `pipeline` | File already `accepted`; discarded from staging |
-| `discard_pending` | `pipeline` | File already `pending`; discarded from staging |
-| `rejected_duplicate` | `pipeline` | File already `rejected`; discarded from staging |
+| `discard_accepted` | `ingest_pipeline` | File already `accepted`; discarded from staging |
+| `discard_pending` | `ingest_pipeline` | File already `pending`; discarded from staging |
+| `discard_rejected` | `ingest_pipeline` | File already `rejected` or blocklist-matched ingest; discarded from staging |
+| `discard_purged` | `ingest_pipeline` | File already `purged`; discarded from staging |
 
 ---
 

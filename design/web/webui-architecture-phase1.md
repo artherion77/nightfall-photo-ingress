@@ -1,6 +1,6 @@
 # SvelteKit Web UI Architecture
 
-Status: Implemented (Chunks 2, 3, and 4)
+Status: Implemented (Chunks 2, 3, 4, and 5)
 Date: 2026-04-03
 Owner: Systems Engineering
 Last Updated: 2026-04-04
@@ -14,9 +14,9 @@ The photo-ingress Web UI is a SvelteKit single-page application (SPA) built with
 backend. There is no server-side rendering (SSR) at runtime — the app is fully
 client-side after the initial asset delivery.
 
-**Phase 1 Chunk 4 Status:** Global design system, read-only pages, and staging triage
-interaction wiring are implemented. Dashboard, staging, audit timeline, blocklist, and
-settings are live; staging now includes accept/reject/defer actions.
+**Phase 1 Chunk 5 Status:** Global design system, read-only pages, staging triage
+interactions, and blocklist CRUD interactions are implemented. Dashboard, staging,
+audit timeline, blocklist, and settings are live.
 
 This document describes:
 - Design token system and global styling
@@ -33,7 +33,7 @@ multiple roadmap chunks. Chunk boundaries still apply:
 - Chunk 2 covers global tokens, reset styles, base components, and shared stores.
 - Chunk 3 covers read-only page wiring.
 - Chunk 4 adds staging triage interactions.
-- Chunk 5 adds blocklist write controls.
+- Chunk 5 adds blocklist write controls and optimistic CRUD handling.
 
 ---
 
@@ -181,7 +181,7 @@ src/routes/
     +page.js               — Load: GET /api/v1/audit-log
 
   blocklist/
-    +page.svelte           — Blocklist: read-only list in Chunk 3; write controls added in Chunk 5
+    +page.svelte           — Blocklist CRUD: create/edit form, list controls, confirm delete dialog
     +page.js               — Load: blocklist rules
 
   settings/
@@ -196,7 +196,7 @@ src/routes/
 | `/`         | Dashboard with health status, KPI cards, poll runtime card, and recent audit events (last 5). |
 | `/staging`  | Photo Wheel triage view with keyboard and button-driven accept/reject/defer actions. |
 | `/audit`    | Full audit log with filter by action and explicit load-more pagination (`id DESC`, follow-up uses `after=<last_id>`). |
-| `/blocklist`| List of blocked rules. Chunk 3 is read-only; toggle, add, edit, and delete controls arrive in Chunk 5. |
+| `/blocklist`| Blocklist CRUD view: create/edit form, enable/disable toggle, and confirm-before-delete behavior. |
 | `/settings` | Read-only display of effective runtime config (`GET /api/v1/config/effective`). |
 
 ---
@@ -237,7 +237,8 @@ components/
     AuditEvent.svelte        — Single audit event row (icon, filename, action, time)
 
   blocklist/
-    BlockRuleList.svelte     — List of block rules; write controls added in Chunk 5
+    BlockRuleList.svelte     — List of block rules with toggle/edit/delete controls
+    BlockRuleForm.svelte     — Create/edit form for pattern, rule_type, reason, enabled
 
   settings/
     ConfigTable.svelte       — Read-only key/value config display
@@ -264,7 +265,7 @@ components/
 | `kpis.svelte.js`   | `{ pending_count, accepted_today, rejected_today, live_photo_pairs, last_poll_duration_s, loading, error }` | Loaded from staging total + health details; currently read-only and non-mutating. |
 | `stagingQueue.svelte.js` | `{ items, cursor, total, activeIndex, loading, error }` | Supports page load/append plus triage actions (`triageItem`), optimistic removal, and rollback on failure. |
 | `auditLog.svelte.js` | `{ events, cursor, hasMore, filter, loading, error }` | Supports explicit append via `loadMore()` and filter reset via `setFilter(action)`. |
-| `blocklist.svelte.js` | `{ rules, loading, error }` | Read-only `loadRules()` in Chunk 3; CRUD actions deferred to Chunk 5. |
+| `blocklist.svelte.js` | `{ rules, loading, error }` | `hydrate()` plus CRUD actions with optimistic updates and rollback on API errors. |
 | `config.svelte.js` | `{ kpi_thresholds, ...effectiveConfig, loading, error }` | Read-only `load()` from `GET /api/v1/config/effective`. |
 
 ### 6.2 Store Design Pattern
@@ -301,13 +302,24 @@ Staging triage uses optimistic UI in `stagingQueue.svelte.js`:
 This behavior is verified by server-side integration tests. Toast rendering assertions are
 deferred until browser-level tests are introduced.
 
+### 6.4 Optimistic UI (Chunk 5 Blocklist)
+
+Blocklist CRUD uses optimistic state transitions in `blocklist.svelte.js`:
+
+- `createRule(payload)` appends an optimistic temp row, then replaces it with API response.
+- `updateRule(id, payload)` patches the row optimistically, then reconciles with API response.
+- `deleteRule(id)` removes the row optimistically before API completion.
+- On any API failure, a snapshot rollback restores pre-action state, `error` is set, and a toast is pushed.
+
+`X-Idempotency-Key` values are generated per mutation in store actions (`crypto.randomUUID()` with time/random fallback).
+
 ---
 
 ## 7. API Layer
 
 **See also:** [web-control-plane-api-phase1.md](web-control-plane-api-phase1.md) for detailed API endpoint specification, response schemas, and authentication reference.
 
-The current backend exposes read models plus triage mutation responses:
+The current backend exposes read models plus triage and blocklist mutation responses:
 
 - `HealthResponse` with nested `ServiceStatus` objects.
 - `StagingPage` with `items`, `cursor`, `has_more`, and `total`.
@@ -315,6 +327,7 @@ The current backend exposes read models plus triage mutation responses:
 - `EffectiveConfig` with redacted `api_token` and explicit `kpi_thresholds` keys.
 - `BlockRuleList` with `rules` entries using the current backend `rule_type` constraints.
 - `TriageResponse` with `action_correlation_id`, `item_id`, and target `state`.
+- `BlockRule` and `BlockRuleDeleteResponse` for create/update/delete flows.
 
 ### 7.1 Location and Structure (`src/lib/api/`)
 
@@ -324,7 +337,7 @@ api/
   health.ts        — GET /api/v1/health
   staging.ts       — GET /api/v1/staging, GET /api/v1/items/{id}
   audit.ts         — GET /api/v1/audit-log
-  blocklist.ts     — GET /api/v1/blocklist
+  blocklist.ts     — GET/POST/PATCH/DELETE /api/v1/blocklist
   config.ts        — GET /api/v1/config/effective
   triage.ts        — POST /api/v1/triage/{item_id}/accept|reject|defer
 ```
@@ -360,6 +373,7 @@ store actions) handle loading states by:
 | Network failure (status 0) | `apiFetch` throws `ApiError('network unavailable', 0, ...)`; UI shows component-level error states. |
 | Auth failure (401) | Surfaced as API error to the active view; no dedicated auth-recovery flow in Chunk 3. |
 | Triage mutation failure (500/409/404) | `stagingQueue.triageItem()` restores prior queue snapshot and emits toast through `toast.svelte.js`. |
+| Blocklist mutation failure (409/404/network) | `blocklist.svelte.js` restores prior snapshot and emits toast through `toast.svelte.js`. |
 
 ---
 
@@ -415,4 +429,18 @@ adapts via CSS alone.
 - All interactive controls have `aria-label` attributes.
 - Staging triage keyboard controls are active: `ArrowLeft`, `ArrowRight`, `A`, `R`, `D`.
 - Color is never the sole indicator of status — icon + color is used throughout.
-- Destructive-action confirmation dialogs remain deferred to Chunk 5 (blocklist CRUD).
+- Destructive-action confirmation dialog is implemented on the Blocklist page for delete actions.
+
+## 11. Chunk 5 Test Strategy Drift Resolution
+
+Chunk 5 validation uses pytest integration tests, not Playwright.
+
+- API tests: `tests/integration/api/test_blocklist.py`
+- UI-flow simulation tests: `tests/integration/ui/test_blocklist_crud.py`
+
+Implemented confirm/cancel validation without DOM harness:
+
+- Confirm path is represented by executing DELETE and verifying rule removal.
+- Cancel path is represented by intentionally not executing DELETE and verifying rule remains.
+
+This pattern matches current repository strategy and avoids introducing browser harness overhead mid-phase.

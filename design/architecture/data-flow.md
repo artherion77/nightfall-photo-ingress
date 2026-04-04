@@ -27,6 +27,7 @@ iOS Camera Roll
 │       ▼                                 │
 │  registry.db (SQLite, SSD)              │  ← authoritative content ledger
 │       │                                 │
+│       ├─ blocklist match → reject+discard│
 │       ├─ rejected → delete from staging │
 │       ├─ pending  → delete from staging │
 │       ├─ accepted → delete from staging │
@@ -59,7 +60,7 @@ iOS Camera Roll
 | **Upload** | iOS → OneDrive | iOS background upload over cellular/WiFi; service has no control or visibility here |
 | **Delta Poll** | GraphClient | Enumerates changes since last cursor via Microsoft Graph delta API; metadata pre-filter skips known files |
 | **Staging Download** | GraphClient / storage | Streaming download to SSD staging as `{onedrive_id}.tmp`; renamed on completion |
-| **Hash + Ingest Decision** | IngestDecisionEngine | SHA-256 computed; registry looked up; decision applied (pending/discard/duplicate) |
+| **Hash + Ingest Decision** | IngestDecisionEngine | SHA-256 computed; blocklist rules evaluated first; registry looked up; decision applied (pending/discard/rejected) |
 | **Queue Boundary** | storage | Unknown files moved to `pending/YYYY/MM/`; known files discarded from staging |
 | **Operator Transitions** | CLI / trash path unit | Explicit `accept`, `reject`, `purge`; trash directory used for filesystem-triggered rejection |
 | **Permanent Library** | Manual / operator | Accepted files manually moved to `/nightfall/media/pictures/` for Immich indexing |

@@ -18,7 +18,7 @@
 - **English-only** — all inline comments, logs, and documentation are in English.
 - **Auditable** — every state transition is recorded in an immutable `audit_log` table.
 - **Idempotent** — re-running the pipeline at any point produces the same end state.
-- **Idempotent UI writes** — web triage mutation retries must be replay-safe via `X-Idempotency-Key`.
+- **Idempotent UI writes** — web triage and blocklist mutation retries must be replay-safe via `X-Idempotency-Key`.
 
 ---
 
@@ -35,7 +35,8 @@ These invariants follow directly from the constraints above and are enforced by 
 | `audit_log` rows can never be updated or deleted | SQL triggers (`trg_audit_log_no_update`, `trg_audit_log_no_delete`) enforced at DB layer |
 | All write paths use `BEGIN IMMEDIATE` transactions | SQLite WAL mode; no partial writes |
 | Purge strictly requires prior `rejected` status | `purge` fails on non-rejected files |
-| Triage retries do not duplicate state transitions | `ui_action_idempotency` replay in `api/services/triage_service.py` |
+| Triage and blocklist retries do not duplicate state transitions | `ui_action_idempotency` replay in `api/services/triage_service.py` and `api/services/blocklist_service.py` |
+| Enabled blocklist matches never enter pending queue | Ingest evaluates `blocked_rules` and persists matches as `rejected` with discard semantics |
 
 ## Chunk 4 Note
 

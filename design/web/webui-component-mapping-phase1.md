@@ -1,6 +1,6 @@
 # UI Mockup Analysis and Component Mapping
 
-Status: Implemented (Chunk 3 read-only pages + Chunk 4 triage write interactions)
+Status: Implemented (Chunk 3 read-only pages + Chunk 4 triage + Chunk 5 blocklist write interactions)
 Date: 2026-04-03
 Owner: Systems Engineering
 
@@ -180,15 +180,26 @@ Chunk 4 implementation details:
 | Filter tabs / action type filter | Inline tab bar (no separate component needed) |
 | Load-more / pagination | `LoadMoreButton` (shared common component) |
 
-### 4.4 Blocklist Page → Components
+### 4.4 Blocklist Page -> Components (Chunk 5)
 
 | UI Element | Svelte Component |
 |------------|-----------------|
 | Rule list | `BlockRuleList` |
-| Individual rule row | `BlockRuleRow` (rendered inside `BlockRuleList`) |
+| Add / edit form | `BlockRuleForm` |
+| Delete confirmation | `ConfirmDialog` (shared common component) |
 
-Chunk 3 is read-only for blocklist. Toggle/add/edit/delete controls are deferred to
-Chunk 5.
+Chunk 5 implementation details:
+
+- `BlockRuleList` row controls:
+  - `Enable` / `Disable` button toggles `enabled` via PATCH.
+  - `Edit` button opens edit-mode `BlockRuleForm`.
+  - `Delete` button opens `ConfirmDialog` (no immediate delete).
+- `BlockRuleForm` supports both `create` and `edit` modes:
+  - fields: `pattern`, `rule_type` (`filename|regex`), `reason`, `enabled`.
+- `blocklist/+page.svelte` wiring:
+  - Always-rendered create form.
+  - Conditional edit form while a rule is selected.
+  - Confirm dialog for delete; confirm executes delete action; cancel closes dialog with no mutation.
 
 ---
 
@@ -324,13 +335,29 @@ in a future iteration. This is not a Phase 1 requirement.
 **Chart interaction:** The `Poll Runtimes` chart shows a tooltip with the exact value
 when hovering over a data point. Tooltip appears above the hovered point.
 
-### 7.5 Blocklist Rules
+### 7.5 Blocklist Rules (Implemented in Chunk 5)
 
-This section is deferred to Chunk 5 and not implemented in Chunk 3.
+Interaction semantics:
 
-Planned Chunk 5 behaviors include toggle, delete confirmation, and add/edit form
-flows. Those mutation interactions are intentionally absent from the current
-read-only Chunk 3 page.
+- Create:
+  - Submit `BlockRuleForm` in create mode.
+  - UI appends optimistic temp row; API success replaces with persisted row.
+- Edit:
+  - Click `Edit`, form opens with current values.
+  - Submit updates row optimistically; API response reconciles canonical values.
+  - Cancel edit closes form with no mutation.
+- Toggle enabled:
+  - `Enable`/`Disable` button issues PATCH `{enabled: !enabled}`.
+  - Badge state updates optimistically; rollback on API failure.
+- Delete:
+  - Click `Delete` opens `ConfirmDialog`.
+  - `Confirm` executes DELETE and removes row optimistically.
+  - `Cancel` executes no API call and preserves rule.
+
+Validation notes:
+
+- Integration tests validate CRUD behavior through API-backed UI flow simulation.
+- Confirm/cancel semantics are validated via action/no-action paths rather than DOM click harness assertions.
 
 ---
 

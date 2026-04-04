@@ -1,6 +1,6 @@
 # Web Control Plane — Phase 1 Implementation Roadmap
 
-Status: In progress — Chunks 0-4 implemented; Chunk 4 design-sync in progress
+Status: In progress — Chunks 0-5 implemented; Chunk 5 design-sync complete
 Date: 2026-04-03
 Owner: Systems Engineering
 
@@ -611,10 +611,35 @@ tests/integration/ui/
 
 ## 8. Chunk 5 — Blocklist Management Write Path
 
+Status: Implemented (2026-04-04)
+
 ### Purpose
 
 Add blocklist mutation endpoints (create, update, delete) to the API and wire the
 Blocklist page to provide a complete CRUD operator interface.
+
+### Delivered summary
+
+- Added backend blocklist write endpoints in `api/routers/blocklist.py`:
+  - `POST /api/v1/blocklist`
+  - `PATCH /api/v1/blocklist/{rule_id}`
+  - `DELETE /api/v1/blocklist/{rule_id}`
+- Added write service behavior in `api/services/blocklist_service.py`:
+  - create/update/delete operations
+  - `ui_action_idempotency` replay and conflict handling
+- Extended schemas in `api/schemas/blocklist.py`:
+  - `BlockRuleCreate`, `BlockRuleUpdate`, `BlockRuleDeleteResponse`
+- Implemented UI blocklist CRUD wiring:
+  - `webui/src/lib/api/blocklist.ts`
+  - `webui/src/lib/stores/blocklist.svelte.js` (optimistic create/update/delete + rollback)
+  - `webui/src/lib/components/blocklist/BlockRuleForm.svelte`
+  - `webui/src/lib/components/blocklist/BlockRuleList.svelte`
+  - `webui/src/routes/blocklist/+page.svelte` (create/edit forms + confirm delete dialog)
+- Added ingest enforcement parity in `src/nightfall_photo_ingress/domain/ingest.py`:
+  - enabled blocklist rules now persist matching files as `rejected` and return `discard_rejected`.
+- Added integration coverage:
+  - `tests/integration/api/test_blocklist.py`
+  - `tests/integration/ui/test_blocklist_crud.py`
 
 ### Required inputs
 
@@ -628,6 +653,11 @@ Blocklist page to provide a complete CRUD operator interface.
 
 UI verification remains pytest integration-first in the current repository. Chunk 5 UI
 tests should follow this pattern unless a dedicated Playwright harness is introduced.
+
+Implemented outcome:
+
+- Chunk 5 followed pytest integration-first strategy.
+- Playwright references for Chunk 5 are deferred and non-blocking.
 
 ### Consistency and Drift Resolution (Chunk 4)
 
@@ -711,6 +741,13 @@ for localhost-only operator use. No new user-visible functionality is added.
 - `planning/planned/web-control-plane-integration-plan.md` §9 (hardening checklist)
 - `planning/planned/web-control-plane-phase1-scope.md` §4.1 (in-scope items: rate limiting, CORS, headers, auth-failure audit, input validation)
 - Targeted OWASP checklist limited to Phase-1-relevant concerns
+
+### Prerequisite state snapshot (post Chunk 5)
+
+- Blocklist write path is live and covered by integration tests.
+- Ingest now enforces enabled blocklist rules before pending persistence.
+- UI mutation paths (triage + blocklist) both use idempotency replay patterns.
+- UI integration validation remains pytest-based (API-backed simulation), not Playwright.
 
 ### Expected output
 

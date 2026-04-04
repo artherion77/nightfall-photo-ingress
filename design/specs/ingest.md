@@ -16,10 +16,14 @@
    c. Rename `.tmp` → `{onedrive_id}.{ext}` on success.
    c1. Each downloaded file is wrapped in a `DownloadedHandoffCandidate` record (the production-owned M3→M4 boundary contract: `account_name`, `onedrive_id`, `original_filename`, `relative_path`, `modified_time`, `size_bytes`, `staging_path`). The ingest engine processes these immediately within the same poll run.
    d. **Compute SHA-256** (streaming 64 KB chunks; never loads full file into memory). The lifecycle journal (`IngestOperationJournal`) records phase transitions (`download_started`, `hash_computed`, `decision_applied`, `finalized`) for crash-boundary recovery.
-   e. **Registry lookup**:
-      - `rejected` → delete from staging; append `rejected_duplicate` to `audit_log`.
+   e. **Blocklist enforcement (Chunk 5):**
+      - evaluate enabled rules in `blocked_rules` (`filename` glob and `regex` patterns).
+      - on match: delete staged file; persist file as `rejected`; append `rejected` audit event with reason `block_rule:<rule_type>:<pattern>`; return ingest outcome `discard_rejected`.
+   f. **Registry lookup** (if not blocklist-rejected):
+      - `rejected` → delete from staging; append `discard_rejected` to `audit_log`.
       - `pending`  → delete from staging; append `discard_pending` to `audit_log`.
-      - `accepted` → delete from staging; append `duplicate_skipped` to `audit_log`.
+      - `accepted` → delete from staging; append `discard_accepted` to `audit_log`.
+      - `purged`   → delete from staging; append `discard_purged` to `audit_log`.
       - `unknown` → move to `pending/YYYY/MM/{filename}`; insert `files` row as `pending`; insert `metadata_index` row; append `pending` to `audit_log`.
 4. Persist cursor checkpoints with a commit-gated streaming sequence per page:
    - fetch one page,
@@ -46,10 +50,15 @@ The streaming page-commit model is authoritative. Cursor advancement is a commit
 
 | Registry state | Action |
 |---|---|
-| `rejected` | Delete from staging; append `rejected_duplicate` to `audit_log` |
+| `blocked_match` | Delete from staging; persist as `rejected`; append `rejected` with block-rule reason |
+| `rejected` | Delete from staging; append `discard_rejected` to `audit_log` |
 | `pending` | Delete from staging; append `discard_pending` to `audit_log` |
-| `accepted` | Delete from staging; append `duplicate_skipped` to `audit_log` |
+| `accepted` | Delete from staging; append `discard_accepted` to `audit_log` |
+| `purged` | Delete from staging; append `discard_purged` to `audit_log` |
 | `unknown` | Move to `pending/YYYY/MM/{filename}`; insert `files`; insert `metadata_index`; append `pending` to `audit_log` |
+
+Blocklist-matched outcomes are persisted as rejected records, so replayed ingest of the
+same content continues to follow known-hash discard behavior and skips pending.
 
 ---
 

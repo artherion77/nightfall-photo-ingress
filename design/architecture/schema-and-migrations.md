@@ -369,8 +369,12 @@ Implementation notes:
 ### 7.4 `ui_action_idempotency`
 
 `ui_action_idempotency` is also created idempotently by `_ensure_optional_tables()`.
-It is actively used by Chunk 4 triage write endpoints for idempotency replay storage
-(`POST /api/v1/triage/{item_id}/accept|reject|defer`).
+It is actively used by Chunk 4 and Chunk 5 write endpoints for idempotency replay storage:
+
+- `POST /api/v1/triage/{item_id}/accept|reject|defer`
+- `POST /api/v1/blocklist`
+- `PATCH /api/v1/blocklist/{rule_id}`
+- `DELETE /api/v1/blocklist/{rule_id}`
 
 Current runtime behavior:
 
@@ -378,6 +382,7 @@ Current runtime behavior:
     `idempotency_key`.
 - Duplicate request with same key + same action + same item replays stored response.
 - Reuse of the key for a different action/item returns conflict (`409`) at API layer.
+- Replay returns the originally persisted status/body pair (for both triage and blocklist writes).
 
 ### 7.5 Current Role of `src/nightfall_photo_ingress/migrations/`
 

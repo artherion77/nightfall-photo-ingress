@@ -54,7 +54,7 @@ nightfall-photo-ingress reject <sha256> [--reason "..."] --path /etc/nightfall/p
 ## Reject-Once, Reject-Forever
 
 The reject state is permanent and cross-account:
-- A future poll that encounters the same SHA-256 from OneDrive will classify it as `rejected_duplicate` and discard it from staging without writing to the queue.
+- A future poll that encounters the same SHA-256 from OneDrive will classify it as `discard_rejected` and discard it from staging without writing to the queue.
 - This applies regardless of which OneDrive account re-uploads the file.
 
 ---
