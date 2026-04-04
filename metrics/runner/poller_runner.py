@@ -334,6 +334,40 @@ def _copy_tree(src: Path, dst: Path) -> None:
         shutil.copy2(src, dst)
 
 
+def cleanup_runtime_artifacts(repo_root: Path, include_history: bool = False) -> dict[str, Any]:
+    paths = _paths(repo_root)
+    removed: list[str] = []
+
+    def _remove(path: Path) -> None:
+        if not path.exists():
+            return
+        if path.is_dir():
+            shutil.rmtree(path)
+        else:
+            path.unlink()
+        removed.append(str(path.relative_to(repo_root)))
+
+    # Ephemeral state files that should not be required for the next run.
+    _remove(paths.last_processed_commit)
+    _remove(paths.publication_json)
+    _remove(paths.status_json)
+    _remove(paths.lock_file)
+
+    # Generated runtime artifacts.
+    _remove(repo_root / "metrics" / "output")
+    _remove(repo_root / "artifacts" / "metrics" / "latest")
+
+    if include_history:
+        _remove(repo_root / "artifacts" / "metrics" / "history")
+
+    return {
+        "status": "cleaned",
+        "removed": sorted(removed),
+        "include_history": bool(include_history),
+        "updated_at": _utc_now_iso(),
+    }
+
+
 def _commit_if_needed(repo_root: Path, worktree: Path, message: str) -> tuple[bool, str | None]:
     _run_git(
         repo_root,
@@ -589,8 +623,20 @@ def publish_metrics(repo_root: Path) -> dict[str, Any]:
     run_dashboard_generation(repo_root=repo_root, run_id=run_id)
 
     worktree = _ensure_publication_worktree(repo_root, branch)
+    generated_dashboard_data = repo_root / "metrics" / "output" / "dashboard" / "latest" / "__data.json"
+    generated_report = repo_root / "metrics" / "output" / "reports" / "latest.md"
+
     _copy_tree(repo_root / "dashboard", worktree / "dashboard")
-    _copy_tree(repo_root / "reports", worktree / "reports")
+    if generated_dashboard_data.exists():
+        _copy_tree(generated_dashboard_data, worktree / "dashboard" / "__data.json")
+    else:
+        _copy_tree(repo_root / "dashboard" / "__data.json", worktree / "dashboard" / "__data.json")
+
+    if generated_report.exists():
+        _copy_tree(generated_report, worktree / "reports" / "latest.md")
+    else:
+        _copy_tree(repo_root / "reports", worktree / "reports")
+
     _copy_tree(repo_root / "artifacts" / "metrics" / "latest", worktree / "artifacts" / "metrics" / "latest")
     _copy_tree(history_run_dir, worktree / "artifacts" / "metrics" / "history" / run_id)
     # Keep the Pages workflow present on the publication branch so metrics pushes can deploy.
@@ -668,12 +714,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--repo-root", default=str(Path(__file__).resolve().parents[2]))
     parser.add_argument(
         "command",
-        choices=["install", "reconfigure", "start", "stop", "status", "run-now", "uninstall", "publish"],
+        choices=["install", "reconfigure", "start", "stop", "status", "run-now", "uninstall", "publish", "cleanup-runtime"],
     )
     parser.add_argument("--frequency-minutes", type=int, default=60)
     parser.add_argument("--max-history-runs", type=int, default=120)
     parser.add_argument("--max-retries", type=int, default=1)
     parser.add_argument("--timeout-seconds", type=int, default=1800)
+    parser.add_argument("--include-history", action="store_true")
     return parser.parse_args()
 
 
@@ -696,6 +743,8 @@ def main() -> None:
         print(json.dumps(uninstall_poller(repo_root), indent=2))
     elif args.command == "publish":
         print(json.dumps(publish_metrics(repo_root), indent=2))
+    elif args.command == "cleanup-runtime":
+        print(json.dumps(cleanup_runtime_artifacts(repo_root, include_history=args.include_history), indent=2))
 
 
 if __name__ == "__main__":

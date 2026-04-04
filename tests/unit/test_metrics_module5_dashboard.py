@@ -85,8 +85,8 @@ def test_module5_dashboard_generation_from_artifacts_only(tmp_path: Path) -> Non
     result = dashboard_generator.run_dashboard_generation(tmp_path, run_id="module5-bootstrap")
 
     dashboard_path = tmp_path / "dashboard" / "index.html"
-    dashboard_data_path = tmp_path / "dashboard" / "__data.json"
-    report_path = tmp_path / "reports" / "latest.md"
+    dashboard_data_path = tmp_path / "metrics" / "output" / "dashboard" / "latest" / "__data.json"
+    report_path = tmp_path / "metrics" / "output" / "reports" / "latest.md"
     staged_dashboard = tmp_path / "metrics" / "output" / "dashboard" / "module5-bootstrap" / "index.html"
     staged_dashboard_data = tmp_path / "metrics" / "output" / "dashboard" / "module5-bootstrap" / "__data.json"
     staged_report = tmp_path / "metrics" / "output" / "reports" / "module5-bootstrap" / "latest.md"
@@ -98,7 +98,7 @@ def test_module5_dashboard_generation_from_artifacts_only(tmp_path: Path) -> Non
     assert staged_dashboard_data.exists()
     assert staged_report.exists()
     assert result["dashboard"] == "dashboard/index.html"
-    assert result["report"] == "reports/latest.md"
+    assert result["report"] == "metrics/output/reports/latest.md"
 
     dashboard_html = dashboard_path.read_text(encoding="utf-8")
     dashboard_data = json.loads(dashboard_data_path.read_text(encoding="utf-8"))

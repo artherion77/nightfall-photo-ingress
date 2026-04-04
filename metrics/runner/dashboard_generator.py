@@ -424,14 +424,17 @@ def run_dashboard_generation(repo_root: Path, run_id: str) -> dict[str, Any]:
     dashboard_data = _dashboard_payload(repo_root=repo_root, manifest=manifest, metrics=metrics, summary=summary, trends=trends)
 
     dashboard_dir = repo_root / "dashboard"
-    dashboard_data_path = dashboard_dir / "__data.json"
-    report_path = repo_root / "reports" / "latest.md"
+    output_dashboard_latest = repo_root / "metrics" / "output" / "dashboard" / "latest"
+    output_reports_latest = repo_root / "metrics" / "output" / "reports"
+    dashboard_data_path = output_dashboard_latest / "__data.json"
+    report_path = output_reports_latest / "latest.md"
     staged_dashboard_dir = repo_root / "metrics" / "output" / "dashboard" / run_id
     staged_report = repo_root / "metrics" / "output" / "reports" / run_id / "latest.md"
 
     _write_text(dashboard_data_path, json.dumps(dashboard_data, indent=2) + "\n")
     _write_text(report_path, executive_md)
     _copy_tree(dashboard_dir, staged_dashboard_dir)
+    _write_text(staged_dashboard_dir / "__data.json", json.dumps(dashboard_data, indent=2) + "\n")
     _write_text(staged_report, executive_md)
 
     return {

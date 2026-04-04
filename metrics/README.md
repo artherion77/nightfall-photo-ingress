@@ -65,8 +65,8 @@ Module 5 adds dashboard generation responsibilities:
 
 Module 5 writes:
 
-- `dashboard/index.html`
-- `reports/latest.md`
+- `metrics/output/dashboard/latest/__data.json`
+- `metrics/output/reports/latest.md`
 - `metrics/output/dashboard/<run-id>/index.html` (staged transient output)
 - `metrics/output/reports/<run-id>/latest.md` (staged transient output)
 

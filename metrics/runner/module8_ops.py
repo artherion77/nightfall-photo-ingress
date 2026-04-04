@@ -147,6 +147,7 @@ def append_event_log(repo_root: Path, payload: dict[str, Any]) -> None:
 def _bundle_size_metrics(repo_root: Path) -> dict[str, Any]:
     targets = [
         repo_root / "dashboard" / "index.html",
+        repo_root / "metrics" / "output" / "reports" / "latest.md",
         repo_root / "reports" / "latest.md",
         repo_root / "artifacts" / "metrics" / "latest" / "manifest.json",
         repo_root / "artifacts" / "metrics" / "latest" / "metrics.json",

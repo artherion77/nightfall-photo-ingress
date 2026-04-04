@@ -21,3 +21,28 @@ api/__pycache__/
 # MCP runtime artifacts
 .mcp/logs/
 .mcp/tasks/history.json
+
+# Metrics runtime ephemeral state
+metrics/state/last_processed_commit
+metrics/state/last_publication.json
+metrics/state/poller_status.json
+metrics/state/poller.lock
+
+# Metrics generated runtime artifacts
+dashboard/__data.json
+reports/latest.md
+artifacts/metrics/latest/
+artifacts/metrics/history/*
+!artifacts/metrics/history/module1-bootstrap/
+!artifacts/metrics/history/module1-bootstrap/manifest.json
+!artifacts/metrics/history/module1-bootstrap/metrics.json
+!artifacts/metrics/history/module2-bootstrap/
+!artifacts/metrics/history/module2-bootstrap/manifest.json
+!artifacts/metrics/history/module2-bootstrap/metrics.json
+!artifacts/metrics/history/module3-bootstrap/
+!artifacts/metrics/history/module3-bootstrap/manifest.json
+!artifacts/metrics/history/module3-bootstrap/metrics.json
+!artifacts/metrics/history/module4-bootstrap/
+!artifacts/metrics/history/module4-bootstrap/manifest.json
+!artifacts/metrics/history/module4-bootstrap/metrics.json
+!artifacts/metrics/history/module4-bootstrap/summary.json

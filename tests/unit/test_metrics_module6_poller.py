@@ -115,3 +115,24 @@ def test_module6_run_now_enables_backend_coverage(tmp_path: Path, monkeypatch) -
 
     assert result["status"] == "success"
     assert captured["skip_pytest"] is False
+
+
+def test_module6_cleanup_runtime_artifacts_removes_ephemeral_files(tmp_path: Path) -> None:
+    _write_text(tmp_path / "metrics" / "state" / "runtime.json", json.dumps(poller_runner._runtime_defaults()))
+    _write_text(tmp_path / "metrics" / "state" / "last_processed_commit", "x" * 40)
+    _write_text(tmp_path / "metrics" / "state" / "poller_status.json", "{}")
+    _write_text(tmp_path / "metrics" / "state" / "last_publication.json", "{}")
+    _write_text(tmp_path / "metrics" / "state" / "poller.lock", "")
+    _write_text(tmp_path / "artifacts" / "metrics" / "latest" / "manifest.json", "{}")
+    _write_text(tmp_path / "metrics" / "output" / "reports" / "latest.md", "# latest")
+
+    result = poller_runner.cleanup_runtime_artifacts(tmp_path)
+
+    assert result["status"] == "cleaned"
+    assert not (tmp_path / "metrics" / "state" / "last_processed_commit").exists()
+    assert not (tmp_path / "metrics" / "state" / "poller_status.json").exists()
+    assert not (tmp_path / "metrics" / "state" / "last_publication.json").exists()
+    assert not (tmp_path / "metrics" / "state" / "poller.lock").exists()
+    assert not (tmp_path / "artifacts" / "metrics" / "latest").exists()
+    assert not (tmp_path / "metrics" / "output").exists()
+    assert (tmp_path / "metrics" / "state" / "runtime.json").exists()

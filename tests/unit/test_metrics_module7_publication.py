@@ -44,8 +44,10 @@ def _seed_runtime_and_latest(repo_root: Path, run_id: str = "module6-run") -> No
 
     (repo_root / "dashboard").mkdir(parents=True, exist_ok=True)
     (repo_root / "dashboard" / "index.html").write_text("<html>dashboard</html>", encoding="utf-8")
-    (repo_root / "reports").mkdir(parents=True, exist_ok=True)
-    (repo_root / "reports" / "latest.md").write_text("# report", encoding="utf-8")
+    (repo_root / "metrics" / "output" / "dashboard" / "latest").mkdir(parents=True, exist_ok=True)
+    (repo_root / "metrics" / "output" / "dashboard" / "latest" / "__data.json").write_text("{}", encoding="utf-8")
+    (repo_root / "metrics" / "output" / "reports").mkdir(parents=True, exist_ok=True)
+    (repo_root / "metrics" / "output" / "reports" / "latest.md").write_text("# report", encoding="utf-8")
 
 
 def test_module7_publish_writes_publication_state_and_syncs_worktree(tmp_path: Path, monkeypatch) -> None:
