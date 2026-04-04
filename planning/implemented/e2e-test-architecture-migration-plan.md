@@ -1,8 +1,20 @@
 # E2E Test Architecture Migration Plan
 
-Status: Completed (2026-04-04)
+Status: Implemented (2026-04-04)
 Date: 2026-04-04
 Scope: Execute Sections 4 and 5 from the E2E test architecture consolidation as deterministic, chunk-oriented execution units.
+
+## Implementation Snapshot
+
+- Variant B intent delivered: pytest-first remains primary, with selective Playwright contract and policy integration.
+- Implementation anchors delivered and validated:
+	- `dev/devctl`: strict `test-web-unit` and `test-web-e2e` contracts with deterministic behavior and `E2E_ARTIFACT_PATH` output.
+	- `.mcp/model.json`: `web.test.e2e` and `web.test.integration` map to real `./dev/devctl test-web-e2e` execution.
+	- `tests/unit/test_devctl_contracts.py` and `tests/unit/test_mcp_web_tasks.py`: contract coverage for devctl and MCP task execution semantics.
+- Reusable browser capability-chain harness added for extension:
+	- `tests/integration/browser_chain_harness/`.
+	- Encodes three Variant B browser scenarios and rationale metadata for future DOM-level growth.
+- Focused validation result (this implementation): `9 passed in 0.70s` for unit contracts plus browser chain harness tests.
 
 Source baseline:
 - [E2E test architecture consolidation](../../design/rationale/e2e-test-architecture-consolidation.md)

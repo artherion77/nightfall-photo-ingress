@@ -12,7 +12,7 @@ def test_adl_variant_b_matches_plan_and_consolidation() -> None:
     root = Path(__file__).resolve().parents[3]
 
     adl = _read(root / "design" / "rationale" / "architecture-decision-log.md")
-    plan = _read(root / "planning" / "planned" / "e2e-test-architecture-migration-plan.md")
+    plan = _read(root / "planning" / "implemented" / "e2e-test-architecture-migration-plan.md")
     consolidation = _read(root / "design" / "rationale" / "e2e-test-architecture-consolidation.md")
 
     assert "Variant B" in adl

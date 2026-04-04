@@ -2,15 +2,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from tests.integration.system_demo.harness import (
-    DemoBrowserHarness,
-    run_variant_b_demo,
-    variant_b_browser_contracts,
+from tests.integration.browser_chain_harness.chain_harness import (
+    BrowserCapabilityChainHarness,
+    run_browser_capability_chain,
+    variant_b_chain_contracts,
 )
 
 
 def test_variant_b_contracts_are_layered_and_rationale_complete() -> None:
-    contracts = variant_b_browser_contracts()
+    contracts = variant_b_chain_contracts()
 
     assert len(contracts) == 3
     for contract in contracts:
@@ -20,9 +20,9 @@ def test_variant_b_contracts_are_layered_and_rationale_complete() -> None:
         assert "artifact-path-output" in contract.rationale.flake_risk_controls
 
 
-def test_demo_harness_executes_all_browser_scenarios(tmp_path: Path) -> None:
-    harness = DemoBrowserHarness(artifact_root=tmp_path / "artifacts")
-    results = run_variant_b_demo(harness)
+def test_browser_chain_harness_executes_all_browser_scenarios(tmp_path: Path) -> None:
+    harness = BrowserCapabilityChainHarness(artifact_root=tmp_path / "artifacts")
+    results = run_browser_capability_chain(harness)
 
     assert [result.scenario_id for result in results] == [
         "staging.keyboard-triage.spec.ts",

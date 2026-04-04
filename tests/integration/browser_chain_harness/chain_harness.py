@@ -29,7 +29,7 @@ class ScenarioResult:
     artifact_path: str
 
 
-class BrowserHarness(Protocol):
+class BrowserChainHarness(Protocol):
     def run_staging_keyboard_triage(self) -> ScenarioResult:
         ...
 
@@ -41,7 +41,7 @@ class BrowserHarness(Protocol):
 
 
 @dataclass
-class DemoBrowserHarness:
+class BrowserCapabilityChainHarness:
     artifact_root: Path
     events: list[str] = field(default_factory=list)
 
@@ -123,7 +123,7 @@ class DemoBrowserHarness:
         )
 
 
-def variant_b_browser_contracts() -> tuple[BrowserScenarioContract, ...]:
+def variant_b_chain_contracts() -> tuple[BrowserScenarioContract, ...]:
     common_candidates = ("pytest", "vitest", "playwright")
     common_controls = (
         "stable-selectors",
@@ -168,7 +168,7 @@ def variant_b_browser_contracts() -> tuple[BrowserScenarioContract, ...]:
     )
 
 
-def run_variant_b_demo(harness: BrowserHarness) -> tuple[ScenarioResult, ...]:
+def run_browser_capability_chain(harness: BrowserChainHarness) -> tuple[ScenarioResult, ...]:
     return (
         harness.run_staging_keyboard_triage(),
         harness.run_blocklist_confirm_cancel(),

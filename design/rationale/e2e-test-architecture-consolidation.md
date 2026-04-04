@@ -5,7 +5,7 @@ Date: 2026-04-04
 Scope: Test architecture consolidation for nightfall-photo-ingress
 
 Related documents:
-- [Execution migration plan](../../planning/planned/e2e-test-architecture-migration-plan.md)
+- [Execution migration plan](../../planning/implemented/e2e-test-architecture-migration-plan.md)
 - [Architecture decision log](architecture-decision-log.md)
 
 ## 1. Current Test Architecture (Matrix)

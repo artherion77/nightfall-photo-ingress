@@ -56,7 +56,7 @@ Field notes:
 - Decision:
   - Adopt Variant B: keep pytest as the primary backend/API/domain test layer and add a selective Playwright browser layer with a minimal Vitest component layer.
   - Maintain the analytical baseline in [design/rationale/e2e-test-architecture-consolidation.md](e2e-test-architecture-consolidation.md), Sections 1-3.
-  - Move executable migration work (former Sections 4-5) to a dedicated chunk-oriented plan in [planning/planned/e2e-test-architecture-migration-plan.md](../../planning/planned/e2e-test-architecture-migration-plan.md).
+  - Move executable migration work (former Sections 4-5) to a dedicated chunk-oriented plan in [planning/implemented/e2e-test-architecture-migration-plan.md](../../planning/implemented/e2e-test-architecture-migration-plan.md).
 - Rationale:
   - Current pytest coverage is broad and fast, but browser-only interaction gaps remain (keyboard, focus, dialog, overlay, and feedback semantics).
   - A selective Playwright layer adds targeted browser realism without replacing stable pytest contracts.
@@ -77,7 +77,7 @@ Field notes:
   - none
 - References:
   - [design/rationale/e2e-test-architecture-consolidation.md](e2e-test-architecture-consolidation.md)
-  - [planning/planned/e2e-test-architecture-migration-plan.md](../../planning/planned/e2e-test-architecture-migration-plan.md)
+  - [planning/implemented/e2e-test-architecture-migration-plan.md](../../planning/implemented/e2e-test-architecture-migration-plan.md)
   - `dev/devctl`
   - `.mcp/model.json`
 
