@@ -85,3 +85,15 @@ Module 6 writes:
 - `metrics/state/poller_status.json`
 - `metrics/state/last_publication.json` (publication surface state)
 
+Module 7 adds publication pipeline responsibilities:
+
+- maintain a dedicated `metrics` branch worktree for publication commits
+- sync latest successful dashboard/report/artifacts into the publication worktree
+- create deterministic publication commits with run metadata
+- preserve run history snapshots under published `artifacts/metrics/history/<run-id>/`
+
+Module 7 writes:
+
+- `metrics/state/last_publication.json` (published/no-change/skip state)
+- `metrics/output/publication/metrics-branch-worktree/...` (published branch worktree)
+

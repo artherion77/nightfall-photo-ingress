@@ -4,7 +4,9 @@ import argparse
 import fcntl
 import getpass
 import json
+import shutil
 import socket
+import subprocess
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -47,6 +49,7 @@ class RuntimePaths:
     lock_file: Path
     status_json: Path
     publication_json: Path
+    publication_worktree: Path
     systemd_service: Path
     systemd_timer: Path
 
@@ -60,6 +63,7 @@ def _paths(repo_root: Path) -> RuntimePaths:
         lock_file=state / "poller.lock",
         status_json=state / "poller_status.json",
         publication_json=state / "last_publication.json",
+        publication_worktree=repo_root / "metrics" / "output" / "publication" / "metrics-branch-worktree",
         systemd_service=systemd / "nightfall-metrics-poller.service",
         systemd_timer=systemd / "nightfall-metrics-poller.timer",
     )
@@ -275,6 +279,60 @@ def _enforce_timeout(deadline: float, step_name: str) -> None:
         raise TimeoutError(f"poller timeout exceeded before step: {step_name}")
 
 
+def _run_git(repo_root: Path, args: list[str], cwd: Path | None = None, check: bool = True) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["git", *args],
+        cwd=str(cwd or repo_root),
+        check=check,
+        capture_output=True,
+        text=True,
+    )
+
+
+def _branch_exists(repo_root: Path, branch: str) -> bool:
+    result = _run_git(repo_root, ["show-ref", "--verify", "--quiet", f"refs/heads/{branch}"], check=False)
+    return result.returncode == 0
+
+
+def _ensure_publication_worktree(repo_root: Path, branch: str) -> Path:
+    paths = _paths(repo_root)
+    worktree = paths.publication_worktree
+    worktree.parent.mkdir(parents=True, exist_ok=True)
+
+    if (worktree / ".git").exists():
+        _run_git(repo_root, ["-C", str(worktree), "checkout", branch], check=False)
+        return worktree
+
+    if worktree.exists():
+        shutil.rmtree(worktree)
+
+    if _branch_exists(repo_root, branch):
+        _run_git(repo_root, ["worktree", "add", "--force", str(worktree), branch])
+    else:
+        _run_git(repo_root, ["worktree", "add", "--force", "-b", branch, str(worktree)])
+    return worktree
+
+
+def _copy_tree(src: Path, dst: Path) -> None:
+    if not src.exists():
+        return
+    if src.is_dir():
+        shutil.copytree(src, dst, dirs_exist_ok=True)
+    else:
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst)
+
+
+def _commit_if_needed(repo_root: Path, worktree: Path, message: str) -> tuple[bool, str | None]:
+    _run_git(repo_root, ["-C", str(worktree), "add", "dashboard", "reports", "artifacts/metrics/latest", "artifacts/metrics/history"])
+    status = _run_git(repo_root, ["-C", str(worktree), "status", "--porcelain"], check=False)
+    if not status.stdout.strip():
+        return False, None
+    _run_git(repo_root, ["-C", str(worktree), "commit", "-m", message])
+    commit = _run_git(repo_root, ["-C", str(worktree), "rev-parse", "HEAD"])
+    return True, commit.stdout.strip()
+
+
 def run_now(repo_root: Path, max_retries: int = 1, timeout_seconds: int = 1800) -> dict[str, Any]:
     paths = _paths(repo_root)
     config = _load_runtime_config(repo_root)
@@ -391,12 +449,69 @@ def run_now(repo_root: Path, max_retries: int = 1, timeout_seconds: int = 1800) 
 
 
 def publish_metrics(repo_root: Path) -> dict[str, Any]:
+    paths = _paths(repo_root)
+    runtime = _load_runtime_config(repo_root)
+    branch = str(runtime.get("metrics_branch", "metrics"))
+
+    latest_manifest_path = repo_root / "artifacts" / "metrics" / "latest" / "manifest.json"
+    latest_metrics_path = repo_root / "artifacts" / "metrics" / "latest" / "metrics.json"
+    latest_summary_path = repo_root / "artifacts" / "metrics" / "latest" / "summary.json"
+
+    if not latest_manifest_path.exists() or not latest_metrics_path.exists() or not latest_summary_path.exists():
+        payload = {
+            "status": "skipped_missing_artifacts",
+            "published_at": _utc_now_iso(),
+            "metrics_branch": branch,
+        }
+        _write_json(paths.publication_json, payload)
+        return payload
+
+    manifest = _read_json(latest_manifest_path)
+    run_id = str(manifest.get("run_id", "unknown"))
+    exit_state = str(manifest.get("execution", {}).get("exit_state", "unknown"))
+    if exit_state != "success":
+        payload = {
+            "status": "skipped_last_run_not_successful",
+            "published_at": _utc_now_iso(),
+            "metrics_branch": branch,
+            "run_id": run_id,
+            "last_exit_state": exit_state,
+        }
+        _write_json(paths.publication_json, payload)
+        return payload
+
+    commit_sha = str(manifest.get("source", {}).get("commit_sha", ""))
+    history_run_dir = repo_root / "artifacts" / "metrics" / "history" / run_id
+    if not history_run_dir.exists():
+        payload = {
+            "status": "skipped_missing_history_run",
+            "published_at": _utc_now_iso(),
+            "metrics_branch": branch,
+            "run_id": run_id,
+        }
+        _write_json(paths.publication_json, payload)
+        return payload
+
+    worktree = _ensure_publication_worktree(repo_root, branch)
+    _copy_tree(repo_root / "dashboard", worktree / "dashboard")
+    _copy_tree(repo_root / "reports", worktree / "reports")
+    _copy_tree(repo_root / "artifacts" / "metrics" / "latest", worktree / "artifacts" / "metrics" / "latest")
+    _copy_tree(history_run_dir, worktree / "artifacts" / "metrics" / "history" / run_id)
+
+    commit_message = f"metrics publish: {run_id} {commit_sha[:12]}"
+    committed, publication_commit = _commit_if_needed(repo_root, worktree, commit_message)
+
     payload = {
-        "status": "deferred_to_module7",
+        "status": "published" if committed else "no_changes",
         "published_at": _utc_now_iso(),
-        "details": "Module 7 publication pipeline not yet installed in this module checkpoint.",
+        "metrics_branch": branch,
+        "run_id": run_id,
+        "source_commit": commit_sha,
+        "publication_commit": publication_commit,
+        "dashboard_url_path": str(runtime.get("dashboard_relative_path", "/dashboard/")),
+        "worktree_path": str(worktree.relative_to(repo_root)),
     }
-    _write_json(_paths(repo_root).publication_json, payload)
+    _write_json(paths.publication_json, payload)
     return payload
 
 
