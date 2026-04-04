@@ -57,6 +57,7 @@ def test_test_web_unit_passes_with_dummy_component_test(tmp_path: Path) -> None:
         "test-web-unit",
         {
             "DEVCTL_CONTRACT_TEST_ROOT": str(web_root),
+            "DEVCTL_TEST_WEB_TYPECHECK_RUNNER": "true",
             "DEVCTL_TEST_WEB_UNIT_RUNNER": "true",
         },
     )
@@ -64,6 +65,21 @@ def test_test_web_unit_passes_with_dummy_component_test(tmp_path: Path) -> None:
     assert result.returncode == 0
     assert "Discovered 1 tests/component test file(s)." in result.stdout
     assert "test-web-unit completed successfully." in result.stdout
+
+
+def test_test_web_typecheck_runs_in_contract_mode(tmp_path: Path) -> None:
+    web_root = _make_web_root(tmp_path)
+
+    result = _run_devctl(
+        "test-web-typecheck",
+        {
+            "DEVCTL_CONTRACT_TEST_ROOT": str(web_root),
+            "DEVCTL_TEST_WEB_TYPECHECK_RUNNER": "true",
+        },
+    )
+
+    assert result.returncode == 0
+    assert "test-web-typecheck completed successfully." in result.stdout
 
 
 def test_test_web_e2e_runs_and_reports_artifact_path(tmp_path: Path) -> None:

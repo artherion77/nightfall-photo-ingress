@@ -140,6 +140,17 @@ _run_test_runner() {
     )
 }
 
+_run_typecheck_runner() {
+    local web_root="$1"
+    local runner="${DEVCTL_TEST_WEB_TYPECHECK_RUNNER:-npm exec -- svelte-check --fail-on-warnings}"
+
+    _info "Running typecheck command: $runner"
+    (
+        cd "$web_root"
+        bash -lc "$runner"
+    )
+}
+
 _sync_webui_sources() {
     lxc exec "$CONTAINER" -- mkdir -p "$DEV_WEBUI_ROOT"
     tar -C "$PROJECT_ROOT" \
@@ -314,6 +325,7 @@ cmd_test_web_unit() {
             _fail "Missing package.json in contract test root: $contract_root"
         fi
         _require_web_tests "$contract_root" "tests/component" "*.test.ts"
+        _run_typecheck_runner "$contract_root"
         _run_test_runner "$contract_root" "DEVCTL_TEST_WEB_UNIT_RUNNER" "npm exec -- vitest run"
         _ok "test-web-unit completed successfully."
         return 0
@@ -335,10 +347,35 @@ if [[ "\$count" == "0" ]]; then
   exit 1
 fi
 echo \"[devctl] Discovered \$count tests/component test file(s).\"
+npm exec -- svelte-check --fail-on-warnings
 npm exec -- vitest run
 "
 
     _ok "test-web-unit completed successfully."
+}
+
+cmd_test_web_typecheck() {
+    local contract_root
+    if contract_root="$(_contract_mode_web_root)"; then
+        _info "Contract test mode enabled (local web root: $contract_root)."
+        if [[ ! -f "$contract_root/package.json" ]]; then
+            _fail "Missing package.json in contract test root: $contract_root"
+        fi
+        _run_typecheck_runner "$contract_root"
+        _ok "test-web-typecheck completed successfully."
+        return 0
+    fi
+
+    nf_require_container_running "$CONTAINER" "devctl setup" "devctl"
+    _sync_webui_sources
+
+    lxc exec "$CONTAINER" -- bash -lc "
+set -euo pipefail
+cd '$DEV_WEBUI_ROOT'
+npm exec -- svelte-check --fail-on-warnings
+"
+
+    _ok "test-web-typecheck completed successfully."
 }
 
 cmd_test_web_e2e() {
@@ -440,6 +477,7 @@ Commands:
   assert-cached-ready Ensure cache mounts and clean snapshot are available for MCP test flow.
   run-api             API run scaffold (placeholder for upcoming implementation).
   run-webui           Sync webui source and run Vite dev server in container.
+    test-web-typecheck  Run Svelte/TypeScript typecheck in dev container.
   test-web-unit       Run Vitest unit/component tests in dev container.
     test-web-e2e        Run Playwright e2e browser tests in dev container.
   status              Show container, snapshot, and cache mount status.
@@ -468,6 +506,7 @@ main() {
         assert-cached-ready) cmd_assert_cached_ready "$@" ;;
         run-api) cmd_run_api "$@" ;;
         run-webui) cmd_run_webui "$@" ;;
+        test-web-typecheck) cmd_test_web_typecheck "$@" ;;
         test-web-unit) cmd_test_web_unit "$@" ;;
         test-web-e2e) cmd_test_web_e2e "$@" ;;
         status) cmd_status "$@" ;;

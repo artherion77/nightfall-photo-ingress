@@ -12,9 +12,30 @@
 		enabled: boolean;
 	};
 
+	type BlockRuleListItem = {
+		id: number;
+		pattern: string;
+		rule_type: string;
+		reason?: string | null;
+		enabled: boolean;
+	};
+
 	let { data }: { data: { blocklist?: { rules?: BlockRule[] } } } = $props();
 	let editingRule = $state<BlockRule | null>(null);
 	let deletingRule = $state<BlockRule | null>(null);
+
+	function normalizeRule(item: BlockRuleListItem): BlockRule | null {
+		if (item.rule_type !== 'filename' && item.rule_type !== 'regex') {
+			return null;
+		}
+		return {
+			id: item.id,
+			pattern: item.pattern,
+			rule_type: item.rule_type,
+			reason: item.reason ?? null,
+			enabled: item.enabled,
+		};
+	}
 
 	$effect(() => {
 		blocklist.hydrate(data.blocklist?.rules ?? []);
@@ -32,7 +53,7 @@
 		editingRule = null;
 	}
 
-	async function handleToggle(rule: BlockRule) {
+	async function handleToggle(rule: BlockRuleListItem) {
 		await blocklist.updateRule(rule.id, { enabled: !rule.enabled });
 	}
 
@@ -65,10 +86,10 @@
 		rules={$blocklist.rules ?? []}
 		onToggle={handleToggle}
 		onEdit={(rule) => {
-			editingRule = rule;
+			editingRule = normalizeRule(rule);
 		}}
 		onDelete={(rule) => {
-			deletingRule = rule;
+			deletingRule = normalizeRule(rule);
 		}}
 	/>
 

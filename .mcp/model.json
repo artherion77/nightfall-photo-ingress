@@ -61,6 +61,7 @@
         "./dev/devctl bootstrap-playwright",
         "./dev/devctl snapshot-create",
         "./dev/devctl assert-cached-ready",
+        "./dev/devctl test-web-typecheck",
         "./dev/devctl test-web-unit"
       ],
       "test.integration": [
@@ -96,6 +97,7 @@
       "assert-cached-ready",
       "run-api",
       "run-webui",
+      "test-web-typecheck",
       "test-web-unit",
       "test-web-e2e",
       "status",
@@ -184,6 +186,7 @@
       "./dev/devctl bootstrap-playwright",
       "./dev/devctl snapshot-create",
       "./dev/devctl assert-cached-ready",
+      "./dev/devctl test-web-typecheck",
       "./dev/devctl test-web-unit"
     ],
     "web.test.integration": [
@@ -211,6 +214,7 @@
         "./dev/devctl bootstrap-playwright",
         "./dev/devctl snapshot-create",
         "./dev/devctl assert-cached-ready",
+        "./dev/devctl test-web-typecheck",
         "./dev/devctl test-web-unit"
       ]
     },
