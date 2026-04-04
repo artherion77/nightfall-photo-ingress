@@ -1,5 +1,7 @@
 """Bearer token authentication dependency for FastAPI."""
 
+import hmac
+
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
@@ -45,7 +47,7 @@ async def verify_api_token(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    if credentials.credentials != app_config.web.api_token:
+    if not hmac.compare_digest(credentials.credentials, app_config.web.api_token):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token",
