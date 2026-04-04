@@ -269,3 +269,35 @@ Go/No-Go review checklist finalized:
 	- false-positive ratio > 30 percent,
 	- CI duration delta exceeds budget for two consecutive windows,
 	- or unresolved Severity 1 tooling incidents persist beyond the review window.
+
+Chunk 7 delivery note (Future Test Policy Finalization, LLM-Usable):
+- Default test-layer routing policy finalized:
+	- Use `pytest` by default for backend/domain/API and cross-service state transitions.
+	- Use `vitest` for component/store isolation and deterministic DOM-unit behavior.
+	- Use `playwright` only for browser-only semantics (focus, keyboard choreography, overlay layering, real navigation event ordering).
+- Explicit "do not use Playwright" cases finalized:
+	- Pure API contract validation,
+	- deterministic business-rule checks without browser dependency,
+	- fast unit regressions that can be covered by pytest/vitest,
+	- data-shape/idempotency/retry semantics already covered by integration tests.
+- Anti-flakiness rules finalized:
+	- Prefer `data-testid` and role-based selectors; avoid style/text-only selectors when stable hooks exist.
+	- Disallow arbitrary sleep; require deterministic waits bound to visible state or network completion.
+	- Use isolated fixtures per scenario and reset shared state between tests.
+	- Preserve explicit artifact path output (`E2E_ARTIFACT_PATH`) for failed runs.
+	- Keep browser scenarios short, independent, and single-defect-class focused.
+- Over-testing guardrail finalized:
+	- For each new test request, choose the cheapest reliable layer that can detect the target defect class.
+	- Escalate from pytest -> vitest -> playwright only when the lower layer cannot reliably reproduce the behavior.
+	- Reject new Playwright coverage that duplicates existing deterministic coverage without new defect-class value.
+- LLM execution heuristic finalized (required rationale format):
+	- Every proposed test addition must include:
+		- `defect_class`,
+		- `candidate_layers_considered`,
+		- `selected_layer`,
+		- `why_lower_layers_are_insufficient`,
+		- `flake_risk_controls`.
+	- Pull requests and agent turns that add Playwright tests without this rationale are policy-noncompliant.
+
+Policy enforcement intent:
+- This policy is review-enforceable and intended for both human contributors and coding agents; automation hooks may be added later but are not required for validity.

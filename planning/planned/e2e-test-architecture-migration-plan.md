@@ -265,6 +265,15 @@ Operationalize success metrics for DX, runtime, flakiness, and defect yield.
 
 ## Chunk 7: Future Test Policy Finalization (LLM-Usable)
 
+Status: Completed (2026-04-04)
+
+Delivered summary:
+- Finalized strict default layer-routing policy (`pytest` default, `vitest` for component/store isolation, `playwright` only for browser-only semantics).
+- Finalized explicit "do not use Playwright" cases to prevent unnecessary browser expansion.
+- Finalized anti-flakiness rules for selectors, waits, fixture isolation, and artifact-path consistency.
+- Finalized over-testing guardrail based on cheapest reliable defect-class detection layer.
+- Finalized required LLM rationale schema for new browser-test additions and review enforcement intent.
+
 ### Goal
 Provide a strict test-layer policy for future human and LLM contributors.
 
