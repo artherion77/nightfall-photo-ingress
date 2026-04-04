@@ -55,6 +55,7 @@ def test_module7_publish_writes_publication_state_and_syncs_worktree(tmp_path: P
 
     monkeypatch.setattr(poller_runner, "_ensure_publication_worktree", lambda _root, _branch: worktree)
     monkeypatch.setattr(poller_runner, "_commit_if_needed", lambda _root, _worktree, _message: (True, "c" * 40))
+    monkeypatch.setattr(poller_runner, "_push_publication_branch", lambda _root, _worktree, _branch: (True, None))
 
     payload = poller_runner.publish_metrics(tmp_path)
 
@@ -62,6 +63,7 @@ def test_module7_publish_writes_publication_state_and_syncs_worktree(tmp_path: P
     assert payload["metrics_branch"] == "metrics"
     assert payload["run_id"] == "module6-success"
     assert payload["publication_commit"] == "c" * 40
+    assert payload["push_succeeded"] is True
     assert (worktree / "dashboard" / "index.html").exists()
     assert (worktree / "reports" / "latest.md").exists()
     assert (worktree / "artifacts" / "metrics" / "latest" / "manifest.json").exists()
@@ -88,3 +90,21 @@ def test_module7_publish_skips_when_last_run_not_success(tmp_path: Path) -> None
     payload = poller_runner.publish_metrics(tmp_path)
     assert payload["status"] == "skipped_last_run_not_successful"
     assert payload["run_id"] == "module6-failed"
+
+
+def test_module7_publish_reports_push_failure(tmp_path: Path, monkeypatch) -> None:
+    _seed_runtime_and_latest(tmp_path, run_id="module6-push-fail")
+    worktree = tmp_path / "worktree"
+
+    monkeypatch.setattr(poller_runner, "_ensure_publication_worktree", lambda _root, _branch: worktree)
+    monkeypatch.setattr(poller_runner, "_commit_if_needed", lambda _root, _worktree, _message: (True, "d" * 40))
+    monkeypatch.setattr(
+        poller_runner,
+        "_push_publication_branch",
+        lambda _root, _worktree, _branch: (False, "remote rejected"),
+    )
+
+    payload = poller_runner.publish_metrics(tmp_path)
+    assert payload["status"] == "published_commit_only"
+    assert payload["push_succeeded"] is False
+    assert payload["push_error"] == "remote rejected"

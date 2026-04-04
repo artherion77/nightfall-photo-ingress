@@ -344,6 +344,14 @@ def _commit_if_needed(repo_root: Path, worktree: Path, message: str) -> tuple[bo
     return True, commit.stdout.strip()
 
 
+def _push_publication_branch(repo_root: Path, worktree: Path, branch: str) -> tuple[bool, str | None]:
+    push = _run_git(repo_root, ["-C", str(worktree), "push", "origin", branch], check=False)
+    if push.returncode == 0:
+        return True, None
+    detail = (push.stderr or push.stdout or "git push failed").strip()
+    return False, detail
+
+
 def run_now(repo_root: Path, max_retries: int = 1, timeout_seconds: int = 1800) -> dict[str, Any]:
     paths = _paths(repo_root)
     config = _load_runtime_config(repo_root)
@@ -573,14 +581,21 @@ def publish_metrics(repo_root: Path) -> dict[str, Any]:
 
     commit_message = f"metrics publish: {run_id} {commit_sha[:12]}"
     committed, publication_commit = _commit_if_needed(repo_root, worktree, commit_message)
+    pushed = False
+    push_error: str | None = None
+    if committed:
+        pushed, push_error = _push_publication_branch(repo_root, worktree, branch)
 
     payload = {
-        "status": "published" if committed else "no_changes",
+        "status": "published" if (committed and pushed) else ("published_commit_only" if committed else "no_changes"),
         "published_at": _utc_now_iso(),
         "metrics_branch": branch,
         "run_id": run_id,
         "source_commit": commit_sha,
         "publication_commit": publication_commit,
+        "push_performed": committed,
+        "push_succeeded": pushed,
+        "push_error": push_error,
         "dashboard_url_path": str(runtime.get("dashboard_relative_path", "/dashboard/")),
         "worktree_path": str(worktree.relative_to(repo_root)),
     }

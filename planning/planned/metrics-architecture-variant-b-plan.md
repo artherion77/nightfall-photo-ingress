@@ -1,6 +1,6 @@
 # Metrics Architecture Plan (Variant B)
 
-Status: Planned
+Status: Implemented (Modules 1-8 complete)
 Date: 2026-04-04
 Scope: Remote-host polling architecture for automated metrics, coverage, complexity collection, publication, and review visibility.
 
@@ -99,6 +99,8 @@ The system consists of eight modules executed in a deterministic host-side pipel
 
 ## Module 1: Metrics Schema and Run Manifest
 
+Implementation status: Complete
+
 Goal:
 - Define the canonical data contract for every run.
 
@@ -134,6 +136,8 @@ Acceptance criteria:
 
 ## Module 2: Backend Metrics Collector
 
+Implementation status: Complete
+
 Goal:
 - Collect backend code metrics and real coverage from host-side execution.
 
@@ -160,6 +164,8 @@ Acceptance criteria:
 
 ## Module 3: Frontend Metrics Collector
 
+Implementation status: Complete
+
 Goal:
 - Collect frontend structure and complexity metrics independently of browser maturity.
 
@@ -183,6 +189,8 @@ Acceptance criteria:
 
 ## Module 4: Aggregator and Delta Engine
 
+Implementation status: Complete
+
 Goal:
 - Normalize all collector outputs into one audit-friendly dataset.
 
@@ -201,6 +209,8 @@ Acceptance criteria:
 - Re-running the same commit without source changes produces stable aggregate results except timestamp fields.
 
 ## Module 5: Dashboard Generator
+
+Implementation status: Complete
 
 Goal:
 - Create human-readable presentation artifacts from normalized data.
@@ -233,6 +243,8 @@ Acceptance criteria:
 - No live server is needed to inspect results on GitHub Pages.
 
 ## Module 6: Poller and Orchestration Runner
+
+Implementation status: Complete
 
 Goal:
 - Provide the only authoritative execution loop on the remote host.
@@ -286,6 +298,8 @@ Acceptance criteria:
 
 ## Module 7: Publication Pipeline
 
+Implementation status: Complete
+
 Goal:
 - Publish generated metrics artifacts into GitHub-facing outputs without giving GitHub execution authority.
 
@@ -306,6 +320,8 @@ Acceptance criteria:
 - Dashboard URL layout is stable and predictable for operators and review links.
 
 ## Module 8: Operations, Audit, and Extensibility
+
+Implementation status: Complete
 
 Goal:
 - Keep the system operable, inspectable, and easy to extend.
@@ -557,6 +573,128 @@ Implementation is organized as deterministic steps that can later be executed as
 - unchanged-commit fast-exit tests
 - systemd unit generation tests
 - MCP delegation and status-output tests
+
+### Stepwise implementation verification (2026-04-04)
+
+1. Step 1 complete
+	 - Derived acceptance criteria:
+		 - Metrics layout directories and state files exist.
+		 - Manifest and metrics schemas validate latest artifacts.
+	 - Evidence:
+		 - `metrics/runner/module1_init.py`
+		 - `metrics/runner/schema_contract.py`
+	 - Regression tests:
+		 - `tests/unit/test_metrics_module1_schema.py`
+
+2. Step 2 complete
+	 - Derived acceptance criteria:
+		 - Host runner state and lock handling exist.
+		 - No-change fast-exit path is implemented.
+	 - Evidence:
+		 - `metrics/runner/poller_runner.py`
+	 - Regression tests:
+		 - `tests/unit/test_metrics_module6_poller.py` (lock and unchanged paths)
+
+3. Step 3 complete
+	 - Derived acceptance criteria:
+		 - `metricsctl` exposes runtime control surface and validation.
+	 - Evidence:
+		 - `metricsctl`
+	 - Regression tests:
+		 - `tests/unit/test_metrics_module6_poller.py`
+
+4. Step 4 complete
+	 - Derived acceptance criteria:
+		 - MCP delegates metrics operations through mapped `metricsctl` tasks.
+		 - MCP status path for metrics includes manifest/summary/dashboard-relative paths via `metricsctl status` output.
+	 - Evidence:
+		 - `.mcp/model.json` mappings for `metrics.status`, `metrics.run-now`, `metrics.publish`, `metrics.install`, `metrics.stop`
+	 - Regression tests:
+		 - `tests/unit/test_mcp_metrics_tasks.py`
+
+5. Step 5 complete
+	 - Derived acceptance criteria:
+		 - Backend LOC/complexity/MI/dependency graph and coverage states are emitted.
+	 - Evidence:
+		 - `metrics/runner/backend_collector.py`
+	 - Regression tests:
+		 - `tests/unit/test_metrics_module2_backend.py`
+
+6. Step 6 complete
+	 - Derived acceptance criteria:
+		 - Frontend LOC/complexity/dependency graph emitted; coverage deferred explicitly.
+	 - Evidence:
+		 - `metrics/runner/frontend_collector.py`
+	 - Regression tests:
+		 - `tests/unit/test_metrics_module3_frontend.py`
+
+7. Step 7 complete
+	 - Derived acceptance criteria:
+		 - Aggregation merges module payloads and computes deltas/summary.
+		 - Aggregation remains extension-compatible with additional module payloads.
+	 - Evidence:
+		 - `metrics/runner/aggregator.py`
+	 - Regression tests:
+		 - `tests/unit/test_metrics_module4_aggregator.py`
+		 - `tests/unit/test_metrics_module8_operations.py` (extensible module preservation)
+
+8. Step 8 complete
+	 - Derived acceptance criteria:
+		 - Dashboard and markdown summary are generated from artifacts only.
+		 - Output contains links to machine-readable metrics artifacts.
+	- Temporary plain-HTML mode is active; SvelteKit static prerender target remains a future upgrade.
+	 - Evidence:
+		 - `metrics/runner/dashboard_generator.py`
+		 - `dashboard/index.html`
+		 - `reports/latest.md`
+	 - Regression tests:
+		 - `tests/unit/test_metrics_module5_dashboard.py`
+
+9. Step 9 complete
+	 - Derived acceptance criteria:
+		 - Publication pipeline manages metrics worktree and syncs publication structure.
+		 - Publish path commits generated outputs and attempts branch push.
+	 - Evidence:
+		 - `metrics/runner/poller_runner.py` (`publish_metrics`)
+	 - Regression tests:
+		 - `tests/unit/test_metrics_module7_publication.py`
+
+10. Step 10 complete
+		- Derived acceptance criteria:
+			- Service and timer unit templates are generated and configurable.
+		- Evidence:
+			- `metrics/systemd/nightfall-metrics-poller.service`
+			- `metrics/systemd/nightfall-metrics-poller.timer`
+		- Regression tests:
+			- `tests/unit/test_metrics_module6_poller.py`
+
+11. Step 11 complete
+		- Derived acceptance criteria:
+			- Timeout and failure taxonomy are enforced.
+			- Retention policy and unchanged-commit skip logic are enforced.
+			- MCP remains delegating surface, not scheduler.
+		- Evidence:
+			- `metrics/runner/poller_runner.py`
+			- `metrics/runner/module8_ops.py`
+			- `.mcp/model.json`
+		- Regression tests:
+			- `tests/unit/test_metrics_module6_poller.py`
+			- `tests/unit/test_metrics_module8_operations.py`
+			- `tests/unit/test_mcp_metrics_tasks.py`
+
+12. Step 12 complete
+		- Derived acceptance criteria:
+			- Unit regression suite covers schema, collectors, aggregator, dashboard, poller, publication, ops/extensibility, and MCP delegation.
+		- Evidence:
+			- `tests/unit/test_metrics_module1_schema.py`
+			- `tests/unit/test_metrics_module2_backend.py`
+			- `tests/unit/test_metrics_module3_frontend.py`
+			- `tests/unit/test_metrics_module4_aggregator.py`
+			- `tests/unit/test_metrics_module5_dashboard.py`
+			- `tests/unit/test_metrics_module6_poller.py`
+			- `tests/unit/test_metrics_module7_publication.py`
+			- `tests/unit/test_metrics_module8_operations.py`
+			- `tests/unit/test_mcp_metrics_tasks.py`
 
 ## 11. Determinism and Auditability Rules
 
