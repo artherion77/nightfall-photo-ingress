@@ -70,6 +70,21 @@ Module 5 writes:
 - `metrics/output/dashboard/<run-id>/index.html` (staged transient output)
 - `metrics/output/reports/<run-id>/latest.md` (staged transient output)
 
+Module 5 dashboard payload baseline contract (`metrics/output/dashboard/latest/__data.json`):
+
+- required top-level fields for dashboard render path:
+  - `runId`: non-empty string
+  - `lastRunAt`: non-empty string (ISO timestamp or `unknown`)
+  - `repoUrl`, `repoHeadUrl`, `repoCommitUrl`: string or null
+  - `versions.python`, `versions.typescript`: string or null
+  - `runMeta.startedAt`, `runMeta.finishedAt`: string
+  - `runMeta.durationSeconds`: number or null
+- provenance notes:
+  - `coveragePercent`: measured from backend coverage collector when available
+  - `sparklinePoints`: synthetic trend heuristic in current baseline (to be replaced by measured history in chunk 1)
+  - `backendCoverageBars[0]` (Unit): measured coverage
+  - `backendCoverageBars[1..]` (Integration/Flow): derived synthetic values from unit coverage baseline
+
 Module 6 adds poller and orchestration responsibilities:
 
 - lock-protected single-run execution loop via `metricsctl run-now`

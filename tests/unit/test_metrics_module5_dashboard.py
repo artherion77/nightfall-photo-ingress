@@ -108,3 +108,33 @@ def test_module5_dashboard_generation_from_artifacts_only(tmp_path: Path) -> Non
     assert dashboard_data["runId"] == "module4-bootstrap"
     assert "Nightfall Metrics Executive Summary" in report_md
     assert "Artifact Links" in report_md
+
+    # Chunk 0 payload contract assertions for required dashboard fields.
+    assert isinstance(dashboard_data.get("runId"), str)
+    assert isinstance(dashboard_data.get("lastRunAt"), str)
+
+    assert "repoUrl" in dashboard_data
+    assert "repoHeadUrl" in dashboard_data
+    assert "repoCommitUrl" in dashboard_data
+    assert dashboard_data["repoUrl"] is None or isinstance(dashboard_data["repoUrl"], str)
+    assert dashboard_data["repoHeadUrl"] is None or isinstance(dashboard_data["repoHeadUrl"], str)
+    assert dashboard_data["repoCommitUrl"] is None or isinstance(dashboard_data["repoCommitUrl"], str)
+
+    assert "versions" in dashboard_data
+    assert isinstance(dashboard_data["versions"], dict)
+    assert "python" in dashboard_data["versions"]
+    assert "typescript" in dashboard_data["versions"]
+    assert dashboard_data["versions"]["python"] is None or isinstance(dashboard_data["versions"]["python"], str)
+    assert dashboard_data["versions"]["typescript"] is None or isinstance(dashboard_data["versions"]["typescript"], str)
+
+    assert "runMeta" in dashboard_data
+    assert isinstance(dashboard_data["runMeta"], dict)
+    assert "startedAt" in dashboard_data["runMeta"]
+    assert "finishedAt" in dashboard_data["runMeta"]
+    assert "durationSeconds" in dashboard_data["runMeta"]
+    assert isinstance(dashboard_data["runMeta"]["startedAt"], str)
+    assert isinstance(dashboard_data["runMeta"]["finishedAt"], str)
+    assert dashboard_data["runMeta"]["durationSeconds"] is None or isinstance(
+        dashboard_data["runMeta"]["durationSeconds"],
+        (int, float),
+    )

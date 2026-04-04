@@ -240,7 +240,7 @@
 
     <section class="cards-row">
       <article class="card metric-card">
-        <h2>Python Test Coverage</h2>
+        <h2>Python Test Coverage <span class="tip-anchor hint-inline" tabindex="0" role="button" aria-label="Coverage sparkline source details">i<span class="tip-bubble">Sparkline source: synthetic trend heuristic in Module 5 baseline. It is not measured historical coverage yet.</span></span></h2>
         <div class="hero-value">{coverageText}</div>
         <svg viewBox="0 0 180 42" aria-label="Coverage sparkline" class="sparkline">
           <polyline points={data.sparklinePoints} fill="none" stroke="#9bf77a" stroke-width="2.5" stroke-linecap="round" />
@@ -317,7 +317,7 @@
                 <div xmlns="http://www.w3.org/1999/xhtml" class="bar-hover tip-anchor" tabindex="0" role="button" aria-label={`Coverage details for ${bar.label}`}>
                   <span class="tip-bubble">
                     {bar.label}: {bar.value.toFixed(1)}%<br />
-                    Source: pytest-cov aggregate<br />
+                    Source: {idx === 0 ? 'pytest-cov aggregate (measured)' : 'derived from measured unit coverage (synthetic)'}<br />
                     Suite path: {suitePath}
                     {#if suiteHref}
                       <br />

@@ -268,6 +268,55 @@ def _footer_python_text(manifest: dict[str, Any], backend_coverage: dict[str, An
     return f"Python {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
 
 
+def _validate_dashboard_payload_contract(payload: dict[str, Any]) -> None:
+    required_top_level = ["runId", "lastRunAt", "repoUrl", "repoHeadUrl", "repoCommitUrl", "versions", "runMeta"]
+    for key in required_top_level:
+        if key not in payload:
+            raise ValueError(f"dashboard payload missing required key: {key}")
+
+    run_id = payload.get("runId")
+    if not isinstance(run_id, str) or not run_id:
+        raise ValueError("dashboard payload runId must be a non-empty string")
+
+    last_run_at = payload.get("lastRunAt")
+    if not isinstance(last_run_at, str) or not last_run_at:
+        raise ValueError("dashboard payload lastRunAt must be a non-empty string")
+
+    for key in ("repoUrl", "repoHeadUrl", "repoCommitUrl"):
+        value = payload.get(key)
+        if value is not None and not isinstance(value, str):
+            raise ValueError(f"dashboard payload {key} must be a string or null")
+
+    versions = payload.get("versions")
+    if not isinstance(versions, dict):
+        raise ValueError("dashboard payload versions must be an object")
+    for key in ("python", "typescript"):
+        if key not in versions:
+            raise ValueError(f"dashboard payload versions missing required key: {key}")
+        value = versions.get(key)
+        if value is not None and not isinstance(value, str):
+            raise ValueError(f"dashboard payload versions.{key} must be a string or null")
+
+    run_meta = payload.get("runMeta")
+    if not isinstance(run_meta, dict):
+        raise ValueError("dashboard payload runMeta must be an object")
+    for key in ("startedAt", "finishedAt", "durationSeconds"):
+        if key not in run_meta:
+            raise ValueError(f"dashboard payload runMeta missing required key: {key}")
+
+    started_at = run_meta.get("startedAt")
+    if not isinstance(started_at, str):
+        raise ValueError("dashboard payload runMeta.startedAt must be a string")
+
+    finished_at = run_meta.get("finishedAt")
+    if not isinstance(finished_at, str):
+        raise ValueError("dashboard payload runMeta.finishedAt must be a string")
+
+    duration_seconds = run_meta.get("durationSeconds")
+    if duration_seconds is not None and not isinstance(duration_seconds, (int, float)):
+        raise ValueError("dashboard payload runMeta.durationSeconds must be numeric or null")
+
+
 def _dashboard_payload(repo_root: Path, manifest: dict[str, Any], metrics: dict[str, Any], summary: dict[str, Any], trends: list[dict[str, Any]]) -> dict[str, Any]:
     modules = metrics.get("modules", {})
     backend = modules.get("backend", {}) if isinstance(modules, dict) else {}
@@ -422,6 +471,7 @@ def run_dashboard_generation(repo_root: Path, run_id: str) -> dict[str, Any]:
     executive_md = _render_markdown_summary(run_id=run_id, summary=summary, trends=trends)
 
     dashboard_data = _dashboard_payload(repo_root=repo_root, manifest=manifest, metrics=metrics, summary=summary, trends=trends)
+    _validate_dashboard_payload_contract(dashboard_data)
 
     dashboard_dir = repo_root / "dashboard"
     output_dashboard_latest = repo_root / "metrics" / "output" / "dashboard" / "latest"

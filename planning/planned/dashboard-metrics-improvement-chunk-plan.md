@@ -1,6 +1,6 @@
 # Dashboard Metrics Improvement Plan (Chunked)
 
-Status: Planned
+Status: In Progress
 Date: 2026-04-04
 Owner: Systems Engineering
 Scope: Metrics dashboard quality, metric correctness, collector enablement, and observability upgrades
@@ -38,6 +38,8 @@ This plan decomposes improvements into independent chunks with hard acceptance c
 ## 3. Chunk details
 
 ## Chunk 0: Baseline contracts
+
+Implementation status: Implemented (2026-04-04)
 
 ### Goal
 Document metric provenance and lock the dashboard payload contract so future chunks remain backwards compatible.
