@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "nightfall.metrics.payload.v1",
+  "title": "Nightfall Metrics Payload v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "source",
+    "collection_status",
+    "modules",
+    "delta"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commit_sha",
+        "branch"
+      ],
+      "properties": {
+        "commit_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "branch": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "collection_status": {
+      "type": "string",
+      "enum": [
+        "initialized",
+        "success",
+        "failed",
+        "partial"
+      ]
+    },
+    "modules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "backend",
+        "frontend"
+      ],
+      "properties": {
+        "backend": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "metrics"
+          ],
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": [
+                "not_available",
+                "success",
+                "failed"
+              ]
+            },
+            "metrics": {
+              "type": "object"
+            }
+          }
+        },
+        "frontend": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "metrics"
+          ],
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": [
+                "not_available",
+                "success",
+                "failed"
+              ]
+            },
+            "metrics": {
+              "type": "object"
+            }
+          }
+        }
+      }
+    },
+    "delta": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

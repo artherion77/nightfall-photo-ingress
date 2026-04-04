@@ -1,0 +1,70 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+
+from metrics.runner.module1_init import initialize_module1
+from metrics.runner.schema_contract import manifest_schema, metrics_schema, validate_manifest_payload, validate_metrics_payload
+
+
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parent
+
+
+def cmd_init_module1(args: argparse.Namespace) -> int:
+    initialize_module1(_repo_root(), args.run_id)
+    print(f"module1 initialized with run_id={args.run_id}")
+    return 0
+
+
+def cmd_validate_module1(_: argparse.Namespace) -> int:
+    root = _repo_root()
+    latest_manifest = json.loads((root / "artifacts" / "metrics" / "latest" / "manifest.json").read_text(encoding="utf-8"))
+    latest_metrics = json.loads((root / "artifacts" / "metrics" / "latest" / "metrics.json").read_text(encoding="utf-8"))
+
+    manifest_schema()
+    metrics_schema()
+    validate_manifest_payload(latest_manifest)
+    validate_metrics_payload(latest_metrics)
+
+    print("module1 validation successful")
+    return 0
+
+
+def cmd_paths(_: argparse.Namespace) -> int:
+    root = _repo_root()
+    print(str(root / "metrics" / "runner"))
+    print(str(root / "metrics" / "systemd"))
+    print(str(root / "metrics" / "state"))
+    print(str(root / "metrics" / "output"))
+    print(str(root / "artifacts" / "metrics" / "latest"))
+    return 0
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Nightfall metrics administrative entrypoint")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    init_parser = sub.add_parser("init-module1", help="Initialize Module 1 schema/layout artifacts")
+    init_parser.add_argument("--run-id", default="module1-bootstrap")
+    init_parser.set_defaults(func=cmd_init_module1)
+
+    validate_parser = sub.add_parser("validate-module1", help="Validate Module 1 artifacts and schemas")
+    validate_parser.set_defaults(func=cmd_validate_module1)
+
+    paths_parser = sub.add_parser("paths", help="Print key metrics runtime paths")
+    paths_parser.set_defaults(func=cmd_paths)
+
+    return parser
+
+
+def main() -> int:
+    parser = build_parser()
+    args = parser.parse_args()
+    return int(args.func(args))
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

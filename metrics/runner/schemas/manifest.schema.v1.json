@@ -1,0 +1,226 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "nightfall.metrics.manifest.v1",
+  "title": "Nightfall Metrics Run Manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "source",
+    "trigger",
+    "execution",
+    "tools",
+    "steps",
+    "artifacts",
+    "publication",
+    "warnings",
+    "failures"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository_path",
+        "branch",
+        "commit_sha"
+      ],
+      "properties": {
+        "repository_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "branch": {
+          "type": "string",
+          "minLength": 1
+        },
+        "commit_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        }
+      }
+    },
+    "trigger": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "polled_at"
+      ],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "bootstrap",
+            "poll"
+          ]
+        },
+        "polled_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "started_at",
+        "finished_at",
+        "duration_seconds",
+        "hostname",
+        "executor_identity",
+        "exit_state"
+      ],
+      "properties": {
+        "started_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "finished_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "duration_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "hostname": {
+          "type": "string",
+          "minLength": 1
+        },
+        "executor_identity": {
+          "type": "string",
+          "minLength": 1
+        },
+        "exit_state": {
+          "type": "string",
+          "enum": [
+            "success",
+            "failed",
+            "initialized"
+          ]
+        }
+      }
+    },
+    "tools": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "status",
+          "exit_code",
+          "duration_seconds"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed",
+              "skipped"
+            ]
+          },
+          "exit_code": {
+            "type": "integer"
+          },
+          "duration_seconds": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "latest_manifest",
+        "latest_metrics",
+        "history_manifest",
+        "history_metrics"
+      ],
+      "properties": {
+        "latest_manifest": {
+          "type": "string"
+        },
+        "latest_metrics": {
+          "type": "string"
+        },
+        "history_manifest": {
+          "type": "string"
+        },
+        "history_metrics": {
+          "type": "string"
+        }
+      }
+    },
+    "publication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "metrics_branch",
+        "dashboard_relative_path",
+        "published_at"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "not_published",
+            "success",
+            "failed"
+          ]
+        },
+        "metrics_branch": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dashboard_relative_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "published_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "failures": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

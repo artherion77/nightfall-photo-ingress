@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "frequency_minutes": 60,
+  "metrics_branch": "metrics",
+  "dashboard_relative_path": "/dashboard/",
+  "configured_at": "2026-04-04T12:18:09.987677+00:00"
+}
