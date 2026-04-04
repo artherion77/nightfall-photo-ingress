@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "run_id": "module4-bootstrap",
+  "run_id": "coverage-check-local2",
   "source": {
-    "commit_sha": "831aeb4cf21e7ce3e72948f4005a49187078de74",
+    "commit_sha": "7582510188b24be6c4c1bf5edab56161bbef529c",
     "branch": "main"
   },
   "collection_status": "partial",
@@ -17,9 +17,9 @@
             "api",
             "tests"
           ],
-          "files": 156,
-          "total_lines": 25396,
-          "total_code_lines": 20946,
+          "files": 163,
+          "total_lines": 26231,
+          "total_code_lines": 21636,
           "per_file": {
             "api/__init__.py": {
               "lines": 1,
@@ -482,8 +482,8 @@
               "code_lines": 159
             },
             "tests/unit/test_devcontainer_snapshot_invariants.py": {
-              "lines": 54,
-              "code_lines": 39
+              "lines": 55,
+              "code_lines": 40
             },
             "tests/unit/test_devctl_contracts.py": {
               "lines": 104,
@@ -545,6 +545,10 @@
               "lines": 86,
               "code_lines": 67
             },
+            "tests/unit/test_mcp_metrics_tasks.py": {
+              "lines": 102,
+              "code_lines": 85
+            },
             "tests/unit/test_mcp_server.py": {
               "lines": 67,
               "code_lines": 57
@@ -558,8 +562,32 @@
               "code_lines": 34
             },
             "tests/unit/test_metrics_module2_backend.py": {
-              "lines": 69,
-              "code_lines": 54
+              "lines": 107,
+              "code_lines": 84
+            },
+            "tests/unit/test_metrics_module3_frontend.py": {
+              "lines": 78,
+              "code_lines": 63
+            },
+            "tests/unit/test_metrics_module4_aggregator.py": {
+              "lines": 131,
+              "code_lines": 119
+            },
+            "tests/unit/test_metrics_module5_dashboard.py": {
+              "lines": 110,
+              "code_lines": 96
+            },
+            "tests/unit/test_metrics_module6_poller.py": {
+              "lines": 117,
+              "code_lines": 81
+            },
+            "tests/unit/test_metrics_module7_publication.py": {
+              "lines": 112,
+              "code_lines": 90
+            },
+            "tests/unit/test_metrics_module8_operations.py": {
+              "lines": 146,
+              "code_lines": 125
             },
             "tests/unit/test_module8_packaging.py": {
               "lines": 28,
@@ -785,10 +813,17 @@
             "tests/unit/test_m4_h7_audit_ordering.py",
             "tests/unit/test_m4_h8_performance_scaling.py",
             "tests/unit/test_m4_h9_security_policies.py",
+            "tests/unit/test_mcp_metrics_tasks.py",
             "tests/unit/test_mcp_server.py",
             "tests/unit/test_mcp_web_tasks.py",
             "tests/unit/test_metrics_module1_schema.py",
             "tests/unit/test_metrics_module2_backend.py",
+            "tests/unit/test_metrics_module3_frontend.py",
+            "tests/unit/test_metrics_module4_aggregator.py",
+            "tests/unit/test_metrics_module5_dashboard.py",
+            "tests/unit/test_metrics_module6_poller.py",
+            "tests/unit/test_metrics_module7_publication.py",
+            "tests/unit/test_metrics_module8_operations.py",
             "tests/unit/test_module8_packaging.py",
             "tests/unit/test_onboarding_metadata_config.py",
             "tests/unit/test_onedrive_auth.py",
@@ -3177,6 +3212,42 @@
               "to": "pytest"
             },
             {
+              "from": "tests/unit/test_mcp_metrics_tasks.py",
+              "to": "__future__"
+            },
+            {
+              "from": "tests/unit/test_mcp_metrics_tasks.py",
+              "to": "http.server"
+            },
+            {
+              "from": "tests/unit/test_mcp_metrics_tasks.py",
+              "to": "json"
+            },
+            {
+              "from": "tests/unit/test_mcp_metrics_tasks.py",
+              "to": "mcp_server"
+            },
+            {
+              "from": "tests/unit/test_mcp_metrics_tasks.py",
+              "to": "os"
+            },
+            {
+              "from": "tests/unit/test_mcp_metrics_tasks.py",
+              "to": "pathlib"
+            },
+            {
+              "from": "tests/unit/test_mcp_metrics_tasks.py",
+              "to": "threading"
+            },
+            {
+              "from": "tests/unit/test_mcp_metrics_tasks.py",
+              "to": "time"
+            },
+            {
+              "from": "tests/unit/test_mcp_metrics_tasks.py",
+              "to": "urllib"
+            },
+            {
               "from": "tests/unit/test_mcp_server.py",
               "to": "__future__"
             },
@@ -3270,10 +3341,118 @@
             },
             {
               "from": "tests/unit/test_metrics_module2_backend.py",
+              "to": "metrics.runner"
+            },
+            {
+              "from": "tests/unit/test_metrics_module2_backend.py",
               "to": "metrics.runner.backend_collector"
             },
             {
               "from": "tests/unit/test_metrics_module2_backend.py",
+              "to": "pathlib"
+            },
+            {
+              "from": "tests/unit/test_metrics_module3_frontend.py",
+              "to": "__future__"
+            },
+            {
+              "from": "tests/unit/test_metrics_module3_frontend.py",
+              "to": "json"
+            },
+            {
+              "from": "tests/unit/test_metrics_module3_frontend.py",
+              "to": "metrics.runner.frontend_collector"
+            },
+            {
+              "from": "tests/unit/test_metrics_module3_frontend.py",
+              "to": "pathlib"
+            },
+            {
+              "from": "tests/unit/test_metrics_module4_aggregator.py",
+              "to": "__future__"
+            },
+            {
+              "from": "tests/unit/test_metrics_module4_aggregator.py",
+              "to": "json"
+            },
+            {
+              "from": "tests/unit/test_metrics_module4_aggregator.py",
+              "to": "metrics.runner.aggregator"
+            },
+            {
+              "from": "tests/unit/test_metrics_module4_aggregator.py",
+              "to": "pathlib"
+            },
+            {
+              "from": "tests/unit/test_metrics_module5_dashboard.py",
+              "to": "__future__"
+            },
+            {
+              "from": "tests/unit/test_metrics_module5_dashboard.py",
+              "to": "json"
+            },
+            {
+              "from": "tests/unit/test_metrics_module5_dashboard.py",
+              "to": "metrics.runner"
+            },
+            {
+              "from": "tests/unit/test_metrics_module5_dashboard.py",
+              "to": "pathlib"
+            },
+            {
+              "from": "tests/unit/test_metrics_module6_poller.py",
+              "to": "__future__"
+            },
+            {
+              "from": "tests/unit/test_metrics_module6_poller.py",
+              "to": "fcntl"
+            },
+            {
+              "from": "tests/unit/test_metrics_module6_poller.py",
+              "to": "json"
+            },
+            {
+              "from": "tests/unit/test_metrics_module6_poller.py",
+              "to": "metrics.runner"
+            },
+            {
+              "from": "tests/unit/test_metrics_module6_poller.py",
+              "to": "pathlib"
+            },
+            {
+              "from": "tests/unit/test_metrics_module7_publication.py",
+              "to": "__future__"
+            },
+            {
+              "from": "tests/unit/test_metrics_module7_publication.py",
+              "to": "json"
+            },
+            {
+              "from": "tests/unit/test_metrics_module7_publication.py",
+              "to": "metrics.runner"
+            },
+            {
+              "from": "tests/unit/test_metrics_module7_publication.py",
+              "to": "pathlib"
+            },
+            {
+              "from": "tests/unit/test_metrics_module8_operations.py",
+              "to": "__future__"
+            },
+            {
+              "from": "tests/unit/test_metrics_module8_operations.py",
+              "to": "json"
+            },
+            {
+              "from": "tests/unit/test_metrics_module8_operations.py",
+              "to": "metrics.runner.aggregator"
+            },
+            {
+              "from": "tests/unit/test_metrics_module8_operations.py",
+              "to": "metrics.runner.module8_ops"
+            },
+            {
+              "from": "tests/unit/test_metrics_module8_operations.py",
               "to": "pathlib"
             },
             {
@@ -3831,11 +4010,16 @@
           ]
         },
         "coverage": {
-          "status": "not_available",
-          "reason": "pytest-cov unavailable",
-          "exit_code": 4,
-          "duration_seconds": 0.3806,
-          "pytest_log": "metrics/output/backend/module2-bootstrap/pytest-coverage.log"
+          "status": "success",
+          "exit_code": 0,
+          "duration_seconds": 15.9441,
+          "coverage_percent": 80.11625090821022,
+          "covered_lines": 3308,
+          "num_statements": 4129,
+          "missing_lines": 821,
+          "coverage_json": "metrics/output/backend/coverage-check-local2/coverage.json",
+          "pytest_log": "metrics/output/backend/coverage-check-local2/pytest-coverage.log",
+          "python_executable": "/home/chris/dev/nightfall-photo-ingress/.venv/bin/python"
         }
       }
     },
@@ -4579,22 +4763,37 @@
     }
   },
   "delta": {
-    "previous_run_id": "module3-bootstrap",
+    "previous_run_id": "module6-20260404T135144-1",
     "comparisons": {
       "modules.backend.metrics.loc.files": {
-        "current": 156,
-        "previous": 156,
+        "current": 163,
+        "previous": 163,
         "change": 0
       },
       "modules.backend.metrics.loc.total_lines": {
-        "current": 25396,
-        "previous": 25396,
-        "change": 0
+        "current": 26231,
+        "previous": 26168,
+        "change": 63
       },
       "modules.backend.metrics.loc.total_code_lines": {
-        "current": 20946,
-        "previous": 20946,
-        "change": 0
+        "current": 21636,
+        "previous": 21589,
+        "change": 47
+      },
+      "modules.backend.metrics.coverage.coverage_percent": {
+        "current": 80.11625090821022,
+        "previous": null,
+        "change": null
+      },
+      "modules.backend.metrics.coverage.covered_lines": {
+        "current": 3308,
+        "previous": null,
+        "change": null
+      },
+      "modules.backend.metrics.coverage.num_statements": {
+        "current": 4129,
+        "previous": null,
+        "change": null
       },
       "modules.frontend.metrics.loc.files": {
         "current": 56,

@@ -442,7 +442,7 @@ def run_now(repo_root: Path, max_retries: int = 1, timeout_seconds: int = 1800) 
                     },
                 )
                 _enforce_timeout(deadline, "collect_backend")
-                run_backend_collection(repo_root=repo_root, run_id=run_id, pytest_target="tests/unit", skip_pytest=True)
+                run_backend_collection(repo_root=repo_root, run_id=run_id, pytest_target="tests/unit", skip_pytest=False)
 
                 _enforce_timeout(deadline, "collect_frontend")
                 run_frontend_collection(repo_root=repo_root, run_id=run_id)

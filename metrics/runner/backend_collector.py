@@ -5,6 +5,7 @@ import ast
 import getpass
 import importlib.metadata
 import json
+import os
 import socket
 import subprocess
 import sys
@@ -104,6 +105,15 @@ def _tool_version(distribution: str) -> str | None:
         return None
 
 
+def _pytest_python(repo_root: Path) -> str:
+    venv_python = repo_root / ".venv" / "bin" / "python"
+    if os.name == "nt":
+        venv_python = repo_root / ".venv" / "Scripts" / "python.exe"
+    if venv_python.exists():
+        return str(venv_python)
+    return sys.executable
+
+
 def collect_complexity_and_maintainability(repo_root: Path, roots: list[str]) -> dict[str, Any]:
     try:
         from radon.complexity import cc_visit  # type: ignore
@@ -157,7 +167,7 @@ def collect_pytest_coverage(repo_root: Path, pytest_target: str, output_dir: Pat
     log_path = output_dir / "pytest-coverage.log"
 
     cmd = [
-        sys.executable,
+        _pytest_python(repo_root),
         "-m",
         "pytest",
         pytest_target,
@@ -202,6 +212,7 @@ def collect_pytest_coverage(repo_root: Path, pytest_target: str, output_dir: Pat
         "missing_lines": totals.get("missing_lines"),
         "coverage_json": str(coverage_json.relative_to(repo_root)),
         "pytest_log": str(log_path.relative_to(repo_root)),
+        "python_executable": _pytest_python(repo_root),
     }
 
 

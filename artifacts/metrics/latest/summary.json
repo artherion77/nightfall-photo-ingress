@@ -1,22 +1,21 @@
 {
   "schema_version": 1,
-  "run_id": "module4-bootstrap",
-  "generated_at": "2026-04-04T12:28:57.924234+00:00",
+  "run_id": "coverage-check-local2",
+  "generated_at": "2026-04-04T14:15:10.988968+00:00",
   "source": {
-    "commit_sha": "831aeb4cf21e7ce3e72948f4005a49187078de74",
+    "commit_sha": "7582510188b24be6c4c1bf5edab56161bbef529c",
     "branch": "main"
   },
   "collection_status": "partial",
   "severity": "warning",
   "indicators": {
     "failed_checks": 0,
-    "warning_checks": 3,
-    "delta_items": 11
+    "warning_checks": 2,
+    "delta_items": 14
   },
-  "previous_successful_run_id": "module3-bootstrap",
+  "previous_successful_run_id": "module6-20260404T135144-1",
   "warnings": [
     "modules.backend.metrics.complexity not available",
-    "modules.backend.metrics.coverage not available",
     "modules.frontend.metrics.test_coverage not available"
   ],
   "failures": []

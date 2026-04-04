@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from metrics.runner import backend_collector
 from metrics.runner.backend_collector import collect_dependency_graph, collect_loc, run_backend_collection
 
 
@@ -38,13 +39,20 @@ def test_run_backend_collection_writes_latest_and_history_artifacts(tmp_path: Pa
     (tmp_path / "api").mkdir(parents=True)
     (tmp_path / "api" / "m.py").write_text("def g():\n    return 2\n", encoding="utf-8")
     (tmp_path / "tests").mkdir(parents=True)
-    (tmp_path / "tests" / "test_dummy.py").write_text("def test_ok():\n    assert True\n", encoding="utf-8")
+    (tmp_path / "tests" / "test_dummy.py").write_text(
+        "from src.m import f\n"
+        "from api.m import g\n\n"
+        "def test_ok():\n"
+        "    assert f() == 1\n"
+        "    assert g() == 2\n",
+        encoding="utf-8",
+    )
 
     run_backend_collection(
         repo_root=tmp_path,
         run_id="module2-test",
         pytest_target="tests",
-        skip_pytest=True,
+        skip_pytest=False,
     )
 
     latest_manifest = tmp_path / "artifacts" / "metrics" / "latest" / "manifest.json"
@@ -66,4 +74,34 @@ def test_run_backend_collection_writes_latest_and_history_artifacts(tmp_path: Pa
     assert metrics_payload["schema_version"] == 1
     assert manifest_payload["run_id"] == "module2-test"
     assert metrics_payload["run_id"] == "module2-test"
-    assert metrics_payload["modules"]["backend"]["metrics"]["coverage"]["status"] == "not_available"
+    coverage = metrics_payload["modules"]["backend"]["metrics"]["coverage"]
+    assert coverage["status"] == "success"
+    assert coverage["coverage_percent"] is not None
+
+
+def test_collect_pytest_coverage_prefers_repo_venv_python(tmp_path: Path, monkeypatch) -> None:
+    (tmp_path / ".venv" / "bin").mkdir(parents=True)
+    venv_python = tmp_path / ".venv" / "bin" / "python"
+    venv_python.write_text("", encoding="utf-8")
+    output_dir = tmp_path / "metrics" / "output" / "backend" / "venv-check"
+
+    captured: dict[str, object] = {}
+
+    class _Proc:
+        returncode = 0
+        stdout = ""
+        stderr = ""
+
+    def _run(cmd: list[str], **kwargs: object) -> _Proc:
+        captured["cmd"] = cmd
+        coverage_json = output_dir / "coverage.json"
+        coverage_json.parent.mkdir(parents=True, exist_ok=True)
+        coverage_json.write_text('{"totals": {"percent_covered": 50, "covered_lines": 1, "num_statements": 2, "missing_lines": 1}}', encoding="utf-8")
+        return _Proc()
+
+    monkeypatch.setattr(backend_collector.subprocess, "run", _run)
+
+    payload = backend_collector.collect_pytest_coverage(tmp_path, "tests/unit", output_dir)
+
+    assert captured["cmd"][0] == str(venv_python)
+    assert payload["python_executable"] == str(venv_python)

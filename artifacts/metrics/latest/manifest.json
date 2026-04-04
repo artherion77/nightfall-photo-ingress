@@ -1,19 +1,19 @@
 {
   "schema_version": 1,
-  "run_id": "module4-bootstrap",
+  "run_id": "coverage-check-local2",
   "source": {
     "repository_path": "/home/chris/dev/nightfall-photo-ingress",
     "branch": "main",
-    "commit_sha": "831aeb4cf21e7ce3e72948f4005a49187078de74"
+    "commit_sha": "7582510188b24be6c4c1bf5edab56161bbef529c"
   },
   "trigger": {
     "mode": "bootstrap",
-    "polled_at": "2026-04-04T12:28:57.919618+00:00"
+    "polled_at": "2026-04-04T14:15:10.980738+00:00"
   },
   "execution": {
-    "started_at": "2026-04-04T12:28:57.919618+00:00",
-    "finished_at": "2026-04-04T12:28:57.924242+00:00",
-    "duration_seconds": 0.0046,
+    "started_at": "2026-04-04T14:15:10.980738+00:00",
+    "finished_at": "2026-04-04T14:15:10.988978+00:00",
+    "duration_seconds": 0.0082,
     "hostname": "nightfall",
     "executor_identity": "chris",
     "exit_state": "success"
@@ -28,14 +28,14 @@
       "name": "module4_aggregate",
       "status": "success",
       "exit_code": 0,
-      "duration_seconds": 0.0046
+      "duration_seconds": 0.0082
     }
   ],
   "artifacts": {
     "latest_manifest": "artifacts/metrics/latest/manifest.json",
     "latest_metrics": "artifacts/metrics/latest/metrics.json",
-    "history_manifest": "artifacts/metrics/history/module4-bootstrap/manifest.json",
-    "history_metrics": "artifacts/metrics/history/module4-bootstrap/metrics.json"
+    "history_manifest": "artifacts/metrics/history/coverage-check-local2/manifest.json",
+    "history_metrics": "artifacts/metrics/history/coverage-check-local2/metrics.json"
   },
   "publication": {
     "status": "not_published",
@@ -45,7 +45,6 @@
   },
   "warnings": [
     "modules.backend.metrics.complexity not available",
-    "modules.backend.metrics.coverage not available",
     "modules.frontend.metrics.test_coverage not available"
   ],
   "failures": []

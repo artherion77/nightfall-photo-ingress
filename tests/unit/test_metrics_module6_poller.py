@@ -90,3 +90,28 @@ def test_module6_run_now_respects_lock(tmp_path: Path, monkeypatch) -> None:
         fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         result = poller_runner.run_now(tmp_path, max_retries=0, timeout_seconds=60)
         assert result["status"] == "concurrent_run"
+
+
+def test_module6_run_now_enables_backend_coverage(tmp_path: Path, monkeypatch) -> None:
+    _write_text(tmp_path / "metrics" / "state" / "last_processed_commit", "0" * 40)
+    _write_text(tmp_path / "metrics" / "state" / "runtime.json", json.dumps(poller_runner._runtime_defaults()))
+
+    monkeypatch.setattr(poller_runner, "_git_head_sha", lambda _: "d" * 40)
+    monkeypatch.setattr(poller_runner, "_git_branch", lambda _: "main")
+
+    captured: dict[str, object] = {}
+
+    def _backend(**kwargs: object) -> None:
+        captured.update(kwargs)
+
+    monkeypatch.setattr(poller_runner, "run_backend_collection", _backend)
+    monkeypatch.setattr(poller_runner, "run_frontend_collection", lambda **_: None)
+    monkeypatch.setattr(poller_runner, "run_optional_collectors", lambda **_: None)
+    monkeypatch.setattr(poller_runner, "run_aggregation", lambda **_: None)
+    monkeypatch.setattr(poller_runner, "run_dashboard_generation", lambda **_: None)
+    monkeypatch.setattr(poller_runner, "apply_retention_policy", lambda **_: {"kept": 0, "pruned": []})
+
+    result = poller_runner.run_now(tmp_path, max_retries=0, timeout_seconds=60)
+
+    assert result["status"] == "success"
+    assert captured["skip_pytest"] is False
