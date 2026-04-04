@@ -11,6 +11,17 @@ Source baseline:
 
 ## Chunk 1: Tooling Contract Normalization
 
+Status: Completed (2026-04-04)
+
+Delivered summary:
+- Implemented strict `devctl test-web-unit` contract: no placeholder pass path, deterministic fail on missing tests, deterministic logs.
+- Implemented strict `devctl test-web-e2e` contract: deterministic exit behavior, deterministic logs, explicit `E2E_ARTIFACT_PATH` output.
+- Added real MCP mappings:
+	- `web.test.e2e` -> `./dev/devctl test-web-e2e`
+	- `web.test.integration` -> `./dev/devctl test-web-e2e`
+- Added isolated pytest coverage for devctl contracts and MCP task execution semantics.
+- Performed drift audit across devctl implementation, MCP mappings, and task execution behavior; drift resolved.
+
 ### Goal
 Define strict, non-placeholder execution contracts for frontend test commands and MCP mappings.
 

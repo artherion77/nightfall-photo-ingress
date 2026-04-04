@@ -64,7 +64,7 @@
         "./dev/devctl test-web-unit"
       ],
       "test.integration": [
-        "echo \"Web integration is validated through web.e2e and staging smoke flow\""
+        "./dev/devctl test-web-e2e"
       ],
       "build": [
         "npm --prefix webui run build"
@@ -77,7 +77,7 @@
         "./dev/devctl setup"
       ],
       "e2e": [
-        "./staging/stagingctl smoke"
+        "./dev/devctl test-web-e2e"
       ]
     }
   },
@@ -97,6 +97,7 @@
       "run-api",
       "run-webui",
       "test-web-unit",
+      "test-web-e2e",
       "status",
       "shell"
     ],
@@ -186,7 +187,10 @@
       "./dev/devctl test-web-unit"
     ],
     "web.test.integration": [
-      "echo \"Web integration is validated through web.e2e and staging smoke flow\""
+      "./dev/devctl test-web-e2e"
+    ],
+    "web.test.e2e": [
+      "./dev/devctl test-web-e2e"
     ],
     "web.e2e": [
       "./staging/stagingctl smoke"
@@ -219,7 +223,7 @@
         "./.venv/bin/python -m pytest tests/integration"
       ],
       "web": [
-        "echo \"Web integration is validated through web.e2e and staging smoke flow\""
+        "./dev/devctl test-web-e2e"
       ]
     },
     "e2e": {
@@ -227,7 +231,7 @@
         "./staging/stagingctl smoke"
       ],
       "web": [
-        "./staging/stagingctl smoke"
+        "./dev/devctl test-web-e2e"
       ]
     }
   }

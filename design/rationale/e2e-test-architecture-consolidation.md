@@ -49,8 +49,8 @@ Important frontend gaps:
 Devcontainer/MCP/devctl status:
 - devctl can install Node, Vitest, Playwright, and cache browser binaries: [dev/devctl](../../dev/devctl)
 - Cache mounts are already defined (npm/pip/playwright): [dev/devctl](../../dev/devctl), [.mcp/model.json](../../.mcp/model.json)
-- MCP task web.test.unit calls devctl test-web-unit; web.test.integration is currently a placeholder echo: [.mcp/model.json](../../.mcp/model.json)
-- test-web-unit currently includes a fallback placeholder pass path, so it is not yet a strict quality gate: [dev/devctl](../../dev/devctl)
+- Chunk 1 delivery: `devctl test-web-unit` and `devctl test-web-e2e` now use strict, non-placeholder contracts with deterministic failure behavior and explicit logs/artifact path output: [dev/devctl](../../dev/devctl)
+- Chunk 1 delivery: MCP mappings `web.test.e2e` and `web.test.integration` now resolve to real command paths (`./dev/devctl test-web-e2e`) without placeholder echo paths: [.mcp/model.json](../../.mcp/model.json)
 
 ## 2. Playwright Potential (Pros/Cons + Concrete Scenarios)
 

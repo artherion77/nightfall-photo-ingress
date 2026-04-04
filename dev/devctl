@@ -101,6 +101,45 @@ _require_clean_snapshot() {
     fi
 }
 
+_contract_mode_web_root() {
+    if [[ -n "${DEVCTL_CONTRACT_TEST_ROOT:-}" ]]; then
+        printf "%s" "$DEVCTL_CONTRACT_TEST_ROOT"
+        return 0
+    fi
+    return 1
+}
+
+_require_web_tests() {
+    local web_root="$1"
+    local mode="$2"
+    local pattern="$3"
+    local count
+
+    if [[ ! -d "$web_root/$mode" ]]; then
+        _fail "Missing $mode directory in $web_root"
+    fi
+
+    count="$(find "$web_root/$mode" -type f \( -name "$pattern" -o -name "*.test.ts" -o -name "*.test.js" -o -name "*.spec.ts" -o -name "*.spec.js" \) | wc -l | tr -d '[:space:]')"
+    if [[ "$count" == "0" ]]; then
+        _fail "No $mode test files found under $web_root/$mode"
+    fi
+
+    _info "Discovered $count $mode test file(s)."
+}
+
+_run_test_runner() {
+    local web_root="$1"
+    local runner_env_name="$2"
+    local default_cmd="$3"
+    local runner="${!runner_env_name:-$default_cmd}"
+
+    _info "Running test command: $runner"
+    (
+        cd "$web_root"
+        bash -lc "$runner"
+    )
+}
+
 _sync_webui_sources() {
     lxc exec "$CONTAINER" -- mkdir -p "$DEV_WEBUI_ROOT"
     tar -C "$PROJECT_ROOT" \
@@ -268,14 +307,79 @@ cmd_run_api() {
 }
 
 cmd_test_web_unit() {
+    local contract_root
+    if contract_root="$(_contract_mode_web_root)"; then
+        _info "Contract test mode enabled (local web root: $contract_root)."
+        if [[ ! -f "$contract_root/package.json" ]]; then
+            _fail "Missing package.json in contract test root: $contract_root"
+        fi
+        _require_web_tests "$contract_root" "tests/component" "*.test.ts"
+        _run_test_runner "$contract_root" "DEVCTL_TEST_WEB_UNIT_RUNNER" "npm exec -- vitest run"
+        _ok "test-web-unit completed successfully."
+        return 0
+    fi
+
     nf_require_container_running "$CONTAINER" "devctl setup" "devctl"
     _sync_webui_sources
 
     lxc exec "$CONTAINER" -- bash -lc "
 set -euo pipefail
 cd '$DEV_WEBUI_ROOT'
-npx vitest run || echo 'Vitest script/config pending in webui; placeholder pass'
+if [[ ! -d tests/component ]]; then
+  echo '[devctl] Missing tests/component directory in $DEV_WEBUI_ROOT' >&2
+  exit 1
+fi
+count=\$(find tests/component -type f \( -name '*.test.ts' -o -name '*.test.js' -o -name '*.spec.ts' -o -name '*.spec.js' \) | wc -l | tr -d '[:space:]')
+if [[ "\$count" == "0" ]]; then
+  echo '[devctl] No tests/component test files found' >&2
+  exit 1
+fi
+echo \"[devctl] Discovered \$count tests/component test file(s).\"
+npm exec -- vitest run
 "
+
+    _ok "test-web-unit completed successfully."
+}
+
+cmd_test_web_e2e() {
+    local artifact_dir="${DEVCTL_E2E_ARTIFACT_DIR:-test-results/playwright}"
+    local contract_root
+
+    if contract_root="$(_contract_mode_web_root)"; then
+        _info "Contract test mode enabled (local web root: $contract_root)."
+        if [[ ! -f "$contract_root/package.json" ]]; then
+            _fail "Missing package.json in contract test root: $contract_root"
+        fi
+        _require_web_tests "$contract_root" "tests/e2e" "*.spec.ts"
+        mkdir -p "$contract_root/$artifact_dir"
+        echo "E2E_ARTIFACT_PATH=$contract_root/$artifact_dir"
+        _run_test_runner "$contract_root" "DEVCTL_TEST_WEB_E2E_RUNNER" "npx playwright test --reporter=line"
+        _ok "test-web-e2e completed successfully."
+        return 0
+    fi
+
+    nf_require_container_running "$CONTAINER" "devctl setup" "devctl"
+    _sync_webui_sources
+
+    lxc exec "$CONTAINER" -- bash -lc "
+set -euo pipefail
+cd '$DEV_WEBUI_ROOT'
+if [[ ! -d tests/e2e ]]; then
+  echo '[devctl] Missing tests/e2e directory in $DEV_WEBUI_ROOT' >&2
+  exit 1
+fi
+count=\$(find tests/e2e -type f \( -name '*.spec.ts' -o -name '*.spec.js' \) | wc -l | tr -d '[:space:]')
+if [[ "\$count" == "0" ]]; then
+  echo '[devctl] No tests/e2e spec files found' >&2
+  exit 1
+fi
+echo \"[devctl] Discovered \$count tests/e2e spec file(s).\"
+mkdir -p '$artifact_dir'
+echo "E2E_ARTIFACT_PATH=$DEV_WEBUI_ROOT/$artifact_dir"
+npx playwright test --reporter=line
+"
+
+    _ok "test-web-e2e completed successfully."
 }
 
 cmd_assert_cached_ready() {
@@ -337,6 +441,7 @@ Commands:
   run-api             API run scaffold (placeholder for upcoming implementation).
   run-webui           Sync webui source and run Vite dev server in container.
   test-web-unit       Run Vitest unit/component tests in dev container.
+    test-web-e2e        Run Playwright e2e browser tests in dev container.
   status              Show container, snapshot, and cache mount status.
   shell               Open interactive shell in development container.
 
@@ -364,6 +469,7 @@ main() {
         run-api) cmd_run_api "$@" ;;
         run-webui) cmd_run_webui "$@" ;;
         test-web-unit) cmd_test_web_unit "$@" ;;
+        test-web-e2e) cmd_test_web_e2e "$@" ;;
         status) cmd_status "$@" ;;
         shell) cmd_shell "$@" ;;
         *) _usage ;;
