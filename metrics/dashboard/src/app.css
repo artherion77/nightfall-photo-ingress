@@ -312,6 +312,16 @@ h4 {
   transform: translateY(0);
 }
 
+.topbar .tip-bubble {
+  bottom: auto;
+  top: calc(100% + 8px);
+}
+
+.meta-stack .meta-pill .tip-bubble {
+  left: auto;
+  right: 0;
+}
+
 .loc-row .tip-bubble {
   left: auto;
   right: 0;

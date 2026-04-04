@@ -229,7 +229,8 @@
           </div>
         {/if}
         <div class="meta-pill tip-anchor" tabindex="0" role="button" aria-label="Show run metadata">
-          <span>Last Run: {lastRunDisplay}</span>
+          <span>Last Run:</span>
+          <span>{lastRunDisplay}</span>
           {#if lastRunDetail}
             <span class="tip-bubble">{lastRunDetail}</span>
           {/if}
@@ -267,7 +268,7 @@
             <dt>
               <a class="tip-anchor loc-link" href="https://www.svelte.dev" target="_blank" rel="noreferrer" aria-label="Open Svelte website">
                 Svelte
-                <span class="tip-bubble">web development for the rest of us</span>
+                <span class="tip-bubble">https://svelte.dev. web development for the rest of us</span>
               </a>
             </dt>
             <dd>{data.locBreakdown.svelte}</dd>
@@ -375,10 +376,13 @@
           <div class="loc-bars">
             {#each data.frontendLocRows as row}
               {@const pctOfMax = maxFrontendLoc > 0 ? (row.lines / maxFrontendLoc) * 100 : 0}
+              {@const pathParts = row.name.split('/')}
+              {@const fileName = pathParts.at(-1) || row.name}
+              {@const parentPath = pathParts.length > 1 ? pathParts.slice(0, -1).join('/') : '(root)'}
               <div class="loc-row tip-anchor" tabindex="0" role="button" aria-label="Show LOC row details">
                 <span>{row.name.split('/').at(-1)}</span>
                 <div class="bar"><i style={`width:${(row.lines / maxFrontendLoc) * 100}%`}></i></div>
-                <span class="tip-bubble loc-tip">Path: {row.name}<br />LOC: {row.lines}<br />Bar share: {pctOfMax.toFixed(1)}%</span>
+                <span class="tip-bubble loc-tip">Filename: {fileName}<br />Path: {parentPath}<br />LOC: {row.lines}<br />Bar share: {pctOfMax.toFixed(1)}%</span>
               </div>
             {/each}
           </div>

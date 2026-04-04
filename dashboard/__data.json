@@ -1,18 +1,18 @@
 {
   "projectName": "nightfall++photo-ingress",
-  "commitSha": "642a24c",
-  "commitFull": "642a24c8f684c2334888841747ead4d446a7a1fa",
-  "runId": "manual-ux-20260404T150544",
-  "lastRunAt": "2026-04-04T15:06:00.842535+00:00",
+  "commitSha": "ff6f3f7",
+  "commitFull": "ff6f3f7a52de8ae12f6d9a820c87afd5ecad8da3",
+  "runId": "module6-20260404T151318-1",
+  "lastRunAt": "2026-04-04T15:13:34.451332+00:00",
   "sourceBranch": "main",
   "repoUrl": "https://github.com/artherion77/nightfall-photo-ingress",
   "repoHeadUrl": "https://github.com/artherion77/nightfall-photo-ingress/tree/main",
-  "repoCommitUrl": "https://github.com/artherion77/nightfall-photo-ingress/commit/642a24c8f684c2334888841747ead4d446a7a1fa",
+  "repoCommitUrl": "https://github.com/artherion77/nightfall-photo-ingress/commit/ff6f3f7a52de8ae12f6d9a820c87afd5ecad8da3",
   "runMeta": {
-    "startedAt": "2026-04-04T15:06:00.829385+00:00",
-    "finishedAt": "2026-04-04T15:06:00.842553+00:00",
-    "durationSeconds": 0.0132,
-    "runId": "manual-ux-20260404T150544",
+    "startedAt": "2026-04-04T15:13:34.442842+00:00",
+    "finishedAt": "2026-04-04T15:13:34.451341+00:00",
+    "durationSeconds": 0.0085,
+    "runId": "module6-20260404T151318-1",
     "branch": "main"
   },
   "versions": {
@@ -21,7 +21,7 @@
   },
   "coveragePercent": 80.11625090821022,
   "hasCoverage": true,
-  "sparklinePoints": "0.00,42.00 30.00,35.23 60.00,28.18 90.00,35.23 120.00,28.18 150.00,21.14 180.00,0.00",
+  "sparklinePoints": "0.00,41.67 30.00,33.60 60.00,42.00 90.00,33.60 120.00,25.20 150.00,0.00 180.00,8.40",
   "locBreakdown": {
     "python": "26.2k",
     "tsjs": "8.5k",
@@ -703,6 +703,14 @@
   },
   "trendRows": [
     {
+      "runId": "module6-20260404T151318-1",
+      "severity": "warning",
+      "warningChecks": 8,
+      "failedChecks": 0,
+      "deltaItems": 14,
+      "generatedAt": "2026-04-04T15:13:34.451332+00:00"
+    },
+    {
       "runId": "manual-ux-20260404T150544",
       "severity": "warning",
       "warningChecks": 2,
@@ -741,14 +749,6 @@
       "failedChecks": 0,
       "deltaItems": 14,
       "generatedAt": "2026-04-04T14:15:10.988968+00:00"
-    },
-    {
-      "runId": "coverage-check-local",
-      "severity": "critical",
-      "warningChecks": 2,
-      "failedChecks": 2,
-      "deltaItems": 14,
-      "generatedAt": "2026-04-04T14:13:29.563004+00:00"
     }
   ]
 }
