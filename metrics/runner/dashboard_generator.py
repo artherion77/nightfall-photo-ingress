@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import argparse
-import html
 import json
+import shutil
+import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -19,6 +20,46 @@ def _write_text(path: Path, content: str) -> None:
 
 def _as_utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _copy_tree(src: Path, dst: Path) -> None:
+    if not src.exists():
+        return
+    shutil.copytree(src, dst, dirs_exist_ok=True)
+
+
+def _run_command(command: list[str], cwd: Path) -> None:
+    subprocess.run(
+        command,
+        cwd=str(cwd),
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+
+def _build_svelte_dashboard_via_devcontainer(repo_root: Path) -> None:
+    if shutil.which("lxc") is None:
+        raise FileNotFoundError("npm is unavailable and lxc fallback is not installed")
+
+    command = (
+        "set -euo pipefail && "
+        "lxc exec dev-photo-ingress -- rm -rf /opt/nightfall-metrics && "
+        "lxc exec dev-photo-ingress -- mkdir -p /opt/nightfall-metrics && "
+        "tar -czf - metrics/dashboard artifacts/metrics/latest artifacts/metrics/history "
+        "| lxc exec dev-photo-ingress -- tar -xzf - -C /opt/nightfall-metrics && "
+        "lxc exec dev-photo-ingress -- bash -lc 'cd /opt/nightfall-metrics/metrics/dashboard && npm install --no-fund --no-audit && npm run build' && "
+        "rm -rf dashboard && mkdir -p dashboard && "
+        "lxc exec dev-photo-ingress -- tar -czf - -C /opt/nightfall-metrics dashboard "
+        "| tar -xzf - -C ."
+    )
+    subprocess.run(
+        ["bash", "-lc", command],
+        cwd=str(repo_root),
+        check=True,
+        capture_output=True,
+        text=True,
+    )
 
 
 def _history_trend(repo_root: Path, current_run_id: str, limit: int = 6) -> list[dict[str, Any]]:
@@ -57,167 +98,6 @@ def _history_trend(repo_root: Path, current_run_id: str, limit: int = 6) -> list
             }
         )
     return trends
-
-
-def _render_html_dashboard(
-    run_id: str,
-    manifest: dict[str, Any],
-    metrics: dict[str, Any],
-    summary: dict[str, Any],
-    trends: list[dict[str, Any]],
-) -> str:
-    backend = metrics.get("modules", {}).get("backend", {})
-    frontend = metrics.get("modules", {}).get("frontend", {})
-    delta = metrics.get("delta", {})
-    comparisons = delta.get("comparisons", {})
-
-    warning_list = summary.get("warnings", [])
-    failure_list = summary.get("failures", [])
-
-    trend_rows = "\n".join(
-        (
-            "<tr>"
-            f"<td>{html.escape(str(item.get('run_id', '')))}</td>"
-            f"<td>{html.escape(str(item.get('severity', '')))}</td>"
-            f"<td>{html.escape(str(item.get('collection_status', '')))}</td>"
-            f"<td>{html.escape(str(item.get('warning_checks', 0)))}</td>"
-            f"<td>{html.escape(str(item.get('failed_checks', 0)))}</td>"
-            f"<td>{html.escape(str(item.get('delta_items', 0)))}</td>"
-            "</tr>"
-        )
-        for item in trends
-    )
-    if not trend_rows:
-        trend_rows = "<tr><td colspan=\"6\">No historical trend data available yet.</td></tr>"
-
-    delta_rows = "\n".join(
-        (
-            "<tr>"
-            f"<td>{html.escape(path)}</td>"
-            f"<td>{html.escape(str(value.get('previous')))}</td>"
-            f"<td>{html.escape(str(value.get('current')))}</td>"
-            f"<td>{html.escape(str(value.get('change')))}</td>"
-            "</tr>"
-        )
-        for path, value in comparisons.items()
-    )
-    if not delta_rows:
-        delta_rows = "<tr><td colspan=\"4\">No delta comparisons available.</td></tr>"
-
-    def list_items(values: list[str]) -> str:
-        if not values:
-            return "<li>None</li>"
-        return "\n".join(f"<li>{html.escape(str(value))}</li>" for value in values)
-
-    backend_blob = html.escape(json.dumps(backend.get("metrics", {}), indent=2))
-    frontend_blob = html.escape(json.dumps(frontend.get("metrics", {}), indent=2))
-
-    return f"""<!doctype html>
-<html lang=\"en\">
-<head>
-  <meta charset=\"utf-8\" />
-  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />
-  <title>Nightfall Metrics Dashboard</title>
-  <style>
-    :root {{
-      color-scheme: light;
-      --bg: #f5f8fb;
-      --panel: #ffffff;
-      --text: #16202a;
-      --muted: #5d6b7a;
-      --accent: #0c7a6f;
-      --warn: #b7791f;
-      --fail: #b91c1c;
-      --border: #d4dee8;
-    }}
-    body {{ margin: 0; background: linear-gradient(180deg, #edf5ff 0%, var(--bg) 40%, #f7fafc 100%); color: var(--text); font-family: "IBM Plex Sans", "Segoe UI", sans-serif; }}
-    main {{ max-width: 1120px; margin: 0 auto; padding: 24px; }}
-    section {{ background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 16px; }}
-    h1, h2 {{ margin: 0 0 10px; }}
-    .meta {{ color: var(--muted); font-size: 14px; }}
-    .badge {{ display: inline-block; border-radius: 999px; padding: 4px 10px; font-size: 13px; font-weight: 600; background: #d9efe9; color: #07534c; }}
-    .warning {{ background: #fff1db; color: var(--warn); }}
-    .critical {{ background: #ffe0e0; color: var(--fail); }}
-    table {{ width: 100%; border-collapse: collapse; font-size: 14px; }}
-    th, td {{ text-align: left; padding: 8px; border-bottom: 1px solid var(--border); vertical-align: top; }}
-    pre {{ background: #0f172a; color: #d8e7ff; border-radius: 8px; padding: 12px; overflow-x: auto; }}
-    a {{ color: #1453a2; }}
-  </style>
-</head>
-<body>
-  <main>
-    <section>
-      <h1>Nightfall Metrics Dashboard</h1>
-      <p class=\"meta\">Run {html.escape(run_id)} generated at {html.escape(str(summary.get('generated_at')))}</p>
-      <p>
-        <span class=\"badge {'critical' if summary.get('severity') == 'critical' else ('warning' if summary.get('severity') == 'warning' else '')}\">Severity: {html.escape(str(summary.get('severity')))}</span>
-      </p>
-    </section>
-
-    <section>
-      <h2>Repository and Commit Context</h2>
-      <p><strong>Branch:</strong> {html.escape(str(summary.get('source', {}).get('branch')))}</p>
-      <p><strong>Commit:</strong> {html.escape(str(summary.get('source', {}).get('commit_sha')))}</p>
-      <p><strong>Collection Status:</strong> {html.escape(str(summary.get('collection_status')))}</p>
-      <p><strong>Manifest Exit State:</strong> {html.escape(str(manifest.get('execution', {}).get('exit_state')))}</p>
-      <p>
-        <a href=\"../artifacts/metrics/latest/manifest.json\">Manifest JSON</a> |
-        <a href=\"../artifacts/metrics/latest/metrics.json\">Metrics JSON</a> |
-        <a href=\"../artifacts/metrics/latest/summary.json\">Summary JSON</a>
-      </p>
-    </section>
-
-    <section>
-      <h2>Backend Metrics</h2>
-      <p><strong>Status:</strong> {html.escape(str(backend.get('status')))}</p>
-      <pre>{backend_blob}</pre>
-    </section>
-
-    <section>
-      <h2>Frontend Metrics</h2>
-      <p><strong>Status:</strong> {html.escape(str(frontend.get('status')))}</p>
-      <pre>{frontend_blob}</pre>
-    </section>
-
-    <section>
-      <h2>Coverage Summary</h2>
-    <p><strong>Backend coverage status:</strong> {html.escape(str(backend.get('metrics', {}).get('coverage', {}).get('status', 'not_available')))}</p>
-    <p><strong>Frontend coverage status:</strong> {html.escape(str(frontend.get('metrics', {}).get('test_coverage', {}).get('status', 'not_available')))}</p>
-    </section>
-
-    <section>
-      <h2>Dependency Graph References</h2>
-      <p>Dependency graph artifacts are represented inside the raw metrics payloads linked above.</p>
-    </section>
-
-    <section>
-      <h2>Trend Delta</h2>
-      <p><strong>Previous successful run:</strong> {html.escape(str(summary.get('previous_successful_run_id')))}</p>
-      <table>
-        <thead><tr><th>Metric Path</th><th>Previous</th><th>Current</th><th>Change</th></tr></thead>
-        <tbody>{delta_rows}</tbody>
-      </table>
-    </section>
-
-    <section>
-      <h2>Warnings and Unavailable Metrics</h2>
-      <h3>Warnings</h3>
-      <ul>{list_items([str(v) for v in warning_list])}</ul>
-      <h3>Failures</h3>
-      <ul>{list_items([str(v) for v in failure_list])}</ul>
-    </section>
-
-    <section>
-      <h2>Trend Snippets From History</h2>
-      <table>
-        <thead><tr><th>Run</th><th>Severity</th><th>Status</th><th>Warnings</th><th>Failures</th><th>Delta Items</th></tr></thead>
-        <tbody>{trend_rows}</tbody>
-      </table>
-    </section>
-  </main>
-</body>
-</html>
-"""
 
 
 def _render_markdown_summary(run_id: str, summary: dict[str, Any], trends: list[dict[str, Any]]) -> str:
@@ -277,6 +157,22 @@ def _render_markdown_summary(run_id: str, summary: dict[str, Any], trends: list[
     return "\n".join(lines)
 
 
+def _build_svelte_dashboard(repo_root: Path) -> None:
+    app_root = repo_root / "metrics" / "dashboard"
+    if not app_root.exists():
+        raise FileNotFoundError("metrics/dashboard SvelteKit project is missing")
+
+    if shutil.which("npm") is None:
+        _build_svelte_dashboard_via_devcontainer(repo_root)
+        return
+
+    node_modules = app_root / "node_modules"
+    if not node_modules.exists():
+        _run_command(["npm", "install", "--no-fund", "--no-audit"], cwd=app_root)
+
+    _run_command(["npm", "run", "build"], cwd=app_root)
+
+
 def run_dashboard_generation(repo_root: Path, run_id: str) -> dict[str, Any]:
     latest_root = repo_root / "artifacts" / "metrics" / "latest"
     manifest = _read_json(latest_root / "manifest.json")
@@ -285,29 +181,23 @@ def run_dashboard_generation(repo_root: Path, run_id: str) -> dict[str, Any]:
 
     trends = _history_trend(repo_root=repo_root, current_run_id=run_id)
 
-    dashboard_html = _render_html_dashboard(
-        run_id=run_id,
-        manifest=manifest,
-        metrics=metrics,
-        summary=summary,
-        trends=trends,
-    )
     executive_md = _render_markdown_summary(run_id=run_id, summary=summary, trends=trends)
 
-    dashboard_path = repo_root / "dashboard" / "index.html"
+    _build_svelte_dashboard(repo_root)
+
+    dashboard_dir = repo_root / "dashboard"
     report_path = repo_root / "reports" / "latest.md"
-    staged_dashboard = repo_root / "metrics" / "output" / "dashboard" / run_id / "index.html"
+    staged_dashboard_dir = repo_root / "metrics" / "output" / "dashboard" / run_id
     staged_report = repo_root / "metrics" / "output" / "reports" / run_id / "latest.md"
 
-    _write_text(dashboard_path, dashboard_html)
     _write_text(report_path, executive_md)
-    _write_text(staged_dashboard, dashboard_html)
+    _copy_tree(dashboard_dir, staged_dashboard_dir)
     _write_text(staged_report, executive_md)
 
     return {
         "run_id": run_id,
         "generated_at": _as_utc_now(),
-        "dashboard": str(dashboard_path.relative_to(repo_root)),
+        "dashboard": str((dashboard_dir / "index.html").relative_to(repo_root)),
         "report": str(report_path.relative_to(repo_root)),
         "trends": trends,
     }

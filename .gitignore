@@ -12,6 +12,8 @@ dist/
 .ruff_cache/
 webui/node_modules/
 webui/.svelte-kit/
+metrics/dashboard/node_modules/
+metrics/dashboard/.svelte-kit/
 webui/build/
 webui/.env
 api/__pycache__/

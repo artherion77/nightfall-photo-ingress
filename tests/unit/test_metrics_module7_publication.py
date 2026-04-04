@@ -56,6 +56,7 @@ def test_module7_publish_writes_publication_state_and_syncs_worktree(tmp_path: P
     monkeypatch.setattr(poller_runner, "_ensure_publication_worktree", lambda _root, _branch: worktree)
     monkeypatch.setattr(poller_runner, "_commit_if_needed", lambda _root, _worktree, _message: (True, "c" * 40))
     monkeypatch.setattr(poller_runner, "_push_publication_branch", lambda _root, _worktree, _branch: (True, None))
+    monkeypatch.setattr(poller_runner, "run_dashboard_generation", lambda repo_root, run_id: {"run_id": run_id})
 
     payload = poller_runner.publish_metrics(tmp_path)
 
@@ -98,6 +99,7 @@ def test_module7_publish_reports_push_failure(tmp_path: Path, monkeypatch) -> No
 
     monkeypatch.setattr(poller_runner, "_ensure_publication_worktree", lambda _root, _branch: worktree)
     monkeypatch.setattr(poller_runner, "_commit_if_needed", lambda _root, _worktree, _message: (True, "d" * 40))
+    monkeypatch.setattr(poller_runner, "run_dashboard_generation", lambda repo_root, run_id: {"run_id": run_id})
     monkeypatch.setattr(
         poller_runner,
         "_push_publication_branch",

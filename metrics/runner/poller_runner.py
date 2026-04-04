@@ -573,6 +573,9 @@ def publish_metrics(repo_root: Path) -> dict[str, Any]:
         append_event_log(repo_root, {"event": "publish", "timestamp": _utc_now_iso(), "status": payload["status"], "run_id": run_id})
         return payload
 
+    # Rebuild static dashboard from latest artifacts before publication sync.
+    run_dashboard_generation(repo_root=repo_root, run_id=run_id)
+
     worktree = _ensure_publication_worktree(repo_root, branch)
     _copy_tree(repo_root / "dashboard", worktree / "dashboard")
     _copy_tree(repo_root / "reports", worktree / "reports")

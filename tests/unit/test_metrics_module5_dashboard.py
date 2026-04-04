@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from metrics.runner.dashboard_generator import run_dashboard_generation
+from metrics.runner import dashboard_generator
 
 
 def _write_json(path: Path, payload: dict) -> None:
@@ -11,7 +11,7 @@ def _write_json(path: Path, payload: dict) -> None:
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
-def test_module5_dashboard_generation_from_artifacts_only(tmp_path: Path) -> None:
+def test_module5_dashboard_generation_from_artifacts_only(tmp_path: Path, monkeypatch) -> None:
     latest = tmp_path / "artifacts" / "metrics" / "latest"
     history = tmp_path / "artifacts" / "metrics" / "history" / "module4-bootstrap"
 
@@ -79,7 +79,15 @@ def test_module5_dashboard_generation_from_artifacts_only(tmp_path: Path) -> Non
         },
     )
 
-    result = run_dashboard_generation(tmp_path, run_id="module5-bootstrap")
+    (tmp_path / "metrics" / "dashboard").mkdir(parents=True, exist_ok=True)
+
+    def _fake_build(repo_root: Path) -> None:
+        (repo_root / "dashboard").mkdir(parents=True, exist_ok=True)
+        (repo_root / "dashboard" / "index.html").write_text("<html>svelte-build</html>", encoding="utf-8")
+
+    monkeypatch.setattr(dashboard_generator, "_build_svelte_dashboard", _fake_build)
+
+    result = dashboard_generator.run_dashboard_generation(tmp_path, run_id="module5-bootstrap")
 
     dashboard_path = tmp_path / "dashboard" / "index.html"
     report_path = tmp_path / "reports" / "latest.md"
@@ -96,8 +104,6 @@ def test_module5_dashboard_generation_from_artifacts_only(tmp_path: Path) -> Non
     dashboard_html = dashboard_path.read_text(encoding="utf-8")
     report_md = report_path.read_text(encoding="utf-8")
 
-    assert "Nightfall Metrics Dashboard" in dashboard_html
-    assert "../artifacts/metrics/latest/manifest.json" in dashboard_html
-    assert "Trend Snippets From History" in dashboard_html
+    assert "svelte-build" in dashboard_html
     assert "Nightfall Metrics Executive Summary" in report_md
     assert "Artifact Links" in report_md
