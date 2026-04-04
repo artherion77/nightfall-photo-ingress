@@ -30,10 +30,25 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v6
 
+      - name: Package dashboard artifact
+        shell: bash
+        run: |
+          tar \
+            --dereference --hard-dereference \
+            --directory dashboard \
+            -cvf "$RUNNER_TEMP/artifact.tar" \
+            --exclude=.git \
+            --exclude=.github \
+            --exclude=".[^/]*" \
+            .
+
       - name: Upload dashboard artifact
-        uses: actions/upload-pages-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
-          path: 'dashboard'
+          name: github-pages
+          path: ${{ runner.temp }}/artifact.tar
+          retention-days: 1
+          if-no-files-found: error
 
       - name: Deploy to GitHub Pages
         id: deployment
