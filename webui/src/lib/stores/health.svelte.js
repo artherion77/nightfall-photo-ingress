@@ -6,6 +6,7 @@ const initialState = {
   auth_ok: { ok: false, message: 'unknown' },
   registry_ok: { ok: false, message: 'unknown' },
   disk_ok: { ok: false, message: 'unknown' },
+  last_updated_at: /** @type {string | undefined} */ (undefined),
   error: null
 };
 

@@ -11,8 +11,12 @@
 </script>
 
 {#if open}
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="dialog-overlay" onclick={onCancel}>
-    <div class="dialog-content" onclick={(e) => e.stopPropagation()}>
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="dialog-content" role="dialog" aria-modal="true" tabindex="-1" onclick={(e) => e.stopPropagation()}>
       <h2 class="dialog-title">{title}</h2>
       <p class="dialog-message">{message}</p>
       <div class="dialog-actions">

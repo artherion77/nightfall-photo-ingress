@@ -1,14 +1,19 @@
 <script lang="ts">
 	import AuditTimeline from '$lib/components/audit/AuditTimeline.svelte';
 	import { getAuditLog } from '$lib/api/audit';
+        import type { AuditEvent, AuditPage } from '$lib/api/audit';
 
-	let { data } = $props();
+        interface PageData {
+                audit?: AuditPage;
+        }
 
-	let events = $state([]);
-	let cursor = $state(null);
-	let hasMore = $state(false);
-	let loading = $state(false);
-	let filter = $state<string | null>(null);
+        let { data }: { data: PageData } = $props();
+
+        let events = $state<AuditEvent[]>([]);
+        let cursor = $state<string | null>(null);
+        let hasMore = $state(false);
+        let loading = $state(false);
+        let filter = $state<string | null>(null);
 
 	$effect(() => {
 		events = data.audit?.events ?? [];

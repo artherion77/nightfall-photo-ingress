@@ -4,7 +4,7 @@
   import AuditEvent from './AuditEvent.svelte';
 
   interface Props {
-    events: Array<{ id: number; action: string; ts: string; actor?: string; sha256?: string }>;
+    events: Array<{ id: number; action: string; ts: string; actor?: string; sha256?: string | null }>;
     loading?: boolean;
     hasMore: boolean;
     onLoadMore: () => void;

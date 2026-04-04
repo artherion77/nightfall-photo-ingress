@@ -25,7 +25,7 @@
             : 'ok'
   );
 
-  const statusColors = {
+  const statusColors: Record<string, string> = {
     ok: 'var(--status-ok)',
     warning: 'var(--status-warning)',
     error: 'var(--status-error)',

@@ -140,6 +140,11 @@ _run_test_runner() {
     )
 }
 
+_default_web_unit_runner() {
+    # Node 18 in dev containers is incompatible with Vitest 4's rolldown dependency.
+    printf "%s" "npm install --save-dev --no-audit --no-fund vitest@1.6.1 jsdom@22.1.0 @testing-library/svelte@5.2.8 @testing-library/jest-dom@6.9.1 && npm exec -- vitest run"
+}
+
 _run_typecheck_runner() {
     local web_root="$1"
     local runner="${DEVCTL_TEST_WEB_TYPECHECK_RUNNER:-npm exec -- svelte-check --fail-on-warnings}"
@@ -148,6 +153,17 @@ _run_typecheck_runner() {
     (
         cd "$web_root"
         bash -lc "$runner"
+    )
+}
+
+_ensure_web_test_dependencies() {
+    local web_root="$1"
+    local install_cmd="npm install --save-dev --no-audit --no-fund vitest@1.6.1 jsdom@22.1.0 @testing-library/svelte@5.2.8 @testing-library/jest-dom@6.9.1"
+
+    _info "Ensuring web unit test dependencies are installed."
+    (
+        cd "$web_root"
+        bash -lc "$install_cmd"
     )
 }
 
@@ -252,7 +268,7 @@ apt-get install -y --no-install-recommends nodejs npm
 npm config set cache /root/.cache/npm --global
 cd '$DEV_WEBUI_ROOT'
 npm install
-npm install --save-dev vitest @testing-library/svelte @testing-library/jest-dom jsdom @playwright/test playwright
+npm install --save-dev vitest@1.6.1 @testing-library/svelte@5.2.8 @testing-library/jest-dom@6.9.1 jsdom@22.1.0 @playwright/test@1.55.0 playwright
 touch '$MARKER_WEBUI'
 "
 
@@ -325,8 +341,9 @@ cmd_test_web_unit() {
             _fail "Missing package.json in contract test root: $contract_root"
         fi
         _require_web_tests "$contract_root" "tests/component" "*.test.ts"
+        _ensure_web_test_dependencies "$contract_root"
         _run_typecheck_runner "$contract_root"
-        _run_test_runner "$contract_root" "DEVCTL_TEST_WEB_UNIT_RUNNER" "npm exec -- vitest run"
+        _run_test_runner "$contract_root" "DEVCTL_TEST_WEB_UNIT_RUNNER" "$(_default_web_unit_runner)"
         _ok "test-web-unit completed successfully."
         return 0
     fi
@@ -347,8 +364,9 @@ if [[ "\$count" == "0" ]]; then
   exit 1
 fi
 echo \"[devctl] Discovered \$count tests/component test file(s).\"
+npm install --save-dev --no-audit --no-fund vitest@1.6.1 jsdom@22.1.0 @testing-library/svelte@5.2.8 @testing-library/jest-dom@6.9.1
 npm exec -- svelte-check --fail-on-warnings
-npm exec -- vitest run
+$(_default_web_unit_runner)
 "
 
     _ok "test-web-unit completed successfully."
@@ -361,6 +379,7 @@ cmd_test_web_typecheck() {
         if [[ ! -f "$contract_root/package.json" ]]; then
             _fail "Missing package.json in contract test root: $contract_root"
         fi
+        _ensure_web_test_dependencies "$contract_root"
         _run_typecheck_runner "$contract_root"
         _ok "test-web-typecheck completed successfully."
         return 0
@@ -372,6 +391,7 @@ cmd_test_web_typecheck() {
     lxc exec "$CONTAINER" -- bash -lc "
 set -euo pipefail
 cd '$DEV_WEBUI_ROOT'
+npm install --save-dev --no-audit --no-fund vitest@1.6.1 jsdom@22.1.0 @testing-library/svelte@5.2.8 @testing-library/jest-dom@6.9.1
 npm exec -- svelte-check --fail-on-warnings
 "
 

@@ -5,7 +5,7 @@
       action: string;
       ts: string;
       actor?: string;
-      sha256?: string;
+      sha256?: string | null;
     };
   }
 
