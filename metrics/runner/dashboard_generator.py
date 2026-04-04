@@ -35,25 +35,30 @@ def _history_trend(repo_root: Path, current_run_id: str, limit: int = 6) -> list
         return []
 
     items: list[tuple[str, dict[str, Any]]] = []
+    trend_items = []
     for run_dir in history_root.iterdir():
         if not run_dir.is_dir() or run_dir.name == current_run_id:
             continue
         summary_path = run_dir / "summary.json"
         manifest_path = run_dir / "manifest.json"
-        if not summary_path.exists() or not manifest_path.exists():
+        metrics_path = run_dir / "metrics.json"
+        if not summary_path.exists() or not manifest_path.exists() or not metrics_path.exists():
             continue
         try:
             summary = _read_json(summary_path)
             manifest = _read_json(manifest_path)
+            metrics = _read_json(metrics_path)
         except Exception:
             continue
         finished_at = str(manifest.get("execution", {}).get("finished_at", ""))
-        items.append((finished_at, summary))
-
-    items.sort(key=lambda item: item[0], reverse=True)
-    trends: list[dict[str, Any]] = []
-    for _, summary in items[:limit]:
-        trends.append(
+        # Extract measured coverage percent if available
+        modules = metrics.get("modules", {})
+        backend = modules.get("backend", {}) if isinstance(modules, dict) else {}
+        backend_metrics = backend.get("metrics", {}) if isinstance(backend, dict) else {}
+        backend_coverage = backend_metrics.get("coverage", {}) if isinstance(backend_metrics, dict) else {}
+        cov_value = backend_coverage.get("coverage_percent") if isinstance(backend_coverage, dict) else None
+        coverage_percent = float(cov_value) if isinstance(cov_value, (int, float)) else None
+        trend_items.append(
             {
                 "run_id": summary.get("run_id"),
                 "severity": summary.get("severity"),
@@ -62,9 +67,12 @@ def _history_trend(repo_root: Path, current_run_id: str, limit: int = 6) -> list
                 "failed_checks": summary.get("indicators", {}).get("failed_checks", 0),
                 "delta_items": summary.get("indicators", {}).get("delta_items", 0),
                 "generated_at": summary.get("generated_at"),
+                "coverage_percent": coverage_percent,
             }
         )
-    return trends
+    # Sort by generated_at descending
+    trend_items.sort(key=lambda item: item["generated_at"] or "", reverse=True)
+    return trend_items[:limit]
 
 
 def _render_markdown_summary(run_id: str, summary: dict[str, Any], trends: list[dict[str, Any]]) -> str:
@@ -359,9 +367,17 @@ def _dashboard_payload(repo_root: Path, manifest: dict[str, Any], metrics: dict[
     backend_graph_nodes = _nodes(len(backend_dep_nodes) if isinstance(backend_dep_nodes, dict) else 0)
     frontend_graph_nodes = _nodes(len(frontend_rows))
 
-    trend_series = [max(8.0, 100.0 - idx * 3.0 - float(item.get("warning_checks", 0))) for idx, item in enumerate(trends[:10])]
+    # Build trend series from measured historical coverage if available
+    measured_trend = [item["coverage_percent"] for item in trends if item.get("coverage_percent") is not None]
     if coverage_percent is not None:
-        trend_series.append(max(8.0, coverage_percent))
+        measured_trend.append(coverage_percent)
+    # Fallback: flat line if fewer than 2 measured points
+    if len(measured_trend) < 2:
+        trend_series = [0.0, 0.0]
+        coverage_trend_source = "fallback_flat"
+    else:
+        trend_series = measured_trend[-7:]  # last 6 history + current
+        coverage_trend_source = "measured_history"
 
     optional_collectors = modules.get("optional_collectors", {}) if isinstance(modules, dict) else {}
     optional_map = optional_collectors.get("collectors", {}) if isinstance(optional_collectors, dict) else {}
@@ -409,6 +425,7 @@ def _dashboard_payload(repo_root: Path, manifest: dict[str, Any], metrics: dict[
         "coveragePercent": coverage_percent,
         "hasCoverage": coverage_percent is not None,
         "sparklinePoints": _sparkline(list(reversed(trend_series)) if len(trend_series) > 1 else [0.0, 0.0]),
+        "coverageTrendSource": coverage_trend_source,
         "locBreakdown": {
             "python": _compact(_as_number(backend_loc.get("total_lines"), 0)),
             "tsjs": _compact(_as_number(frontend_loc.get("js_ts_files"), 0) * 340),

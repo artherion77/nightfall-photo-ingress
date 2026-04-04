@@ -138,3 +138,18 @@ def test_module5_dashboard_generation_from_artifacts_only(tmp_path: Path) -> Non
         dashboard_data["runMeta"]["durationSeconds"],
         (int, float),
     )
+
+    # Chunk 1: Sparkline correctness assertions
+    assert "sparklinePoints" in dashboard_data
+    assert "coverageTrendSource" in dashboard_data
+    # If measured history is available, sparkline should reflect it and provenance should be 'measured_history'
+    # In this test, no measured coverage is present, so fallback should be used
+    if dashboard_data["coverageTrendSource"] == "measured_history":
+        # Should not use warning_checks for sparkline
+        assert all(
+            pt != 100.0 - idx * 3.0 - float(1)  # warning_checks=1 in this test
+            for idx, pt in enumerate([float(x.split(",")[1]) for x in dashboard_data["sparklinePoints"].split()])
+        )
+    else:
+        # Fallback: flat line (SVG height is 42.0)
+        assert dashboard_data["sparklinePoints"] == "0.00,42.00 180.00,42.00"
