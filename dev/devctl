@@ -194,6 +194,14 @@ _ensure_web_test_dependencies() {
     local web_root="$1"
     local install_cmd="npm install --save-dev --no-audit --no-fund vitest@1.6.1 jsdom@22.1.0 @testing-library/svelte@5.2.8 @testing-library/jest-dom@6.9.1"
 
+    if ! command -v npm >/dev/null 2>&1; then
+        if [[ -n "${DEVCTL_TEST_WEB_TYPECHECK_RUNNER:-}" || -n "${DEVCTL_TEST_WEB_UNIT_RUNNER:-}" || -n "${DEVCTL_TEST_WEB_E2E_RUNNER:-}" ]]; then
+            _warn "npm not found; skipping web dependency install because contract-mode runners are overridden."
+            return 0
+        fi
+        _fail "npm is required to install web test dependencies"
+    fi
+
     _info "Ensuring web unit test dependencies are installed."
     (
         cd "$web_root"
@@ -209,6 +217,19 @@ _sync_webui_sources() {
         --exclude='webui/build' \
         -czf - webui \
         | lxc exec "$CONTAINER" -- tar -xzf - -C "$DEV_WEBUI_ROOT" --strip-components=1
+}
+
+_sync_webui_manifests() {
+    lxc exec "$CONTAINER" -- mkdir -p "$DEV_WEBUI_ROOT"
+
+    if [[ -f "$PROJECT_ROOT/webui/package-lock.json" ]]; then
+        tar -C "$PROJECT_ROOT/webui" -czf - package.json package-lock.json \
+            | lxc exec "$CONTAINER" -- tar -xzf - -C "$DEV_WEBUI_ROOT"
+        return 0
+    fi
+
+    tar -C "$PROJECT_ROOT/webui" -czf - package.json \
+        | lxc exec "$CONTAINER" -- tar -xzf - -C "$DEV_WEBUI_ROOT"
 }
 
 cmd_create() {
@@ -292,7 +313,7 @@ cmd_bootstrap_webui() {
         return 0
     fi
 
-    _sync_webui_sources
+    _sync_webui_manifests
 
     _info "Installing Node/npm and web test dependencies in container (first run only) ..."
     lxc exec "$CONTAINER" -- bash -lc "
@@ -317,7 +338,7 @@ cmd_bootstrap_playwright() {
         return 0
     fi
 
-    _sync_webui_sources
+    lxc exec "$CONTAINER" -- mkdir -p "$DEV_WEBUI_ROOT"
 
     _info "Installing Playwright browsers in container (first run only) ..."
     lxc exec "$CONTAINER" -- bash -lc "
@@ -383,6 +404,9 @@ cmd_test_web_unit() {
     fi
 
     nf_require_container_running "$CONTAINER" "devctl setup" "devctl"
+    if ! lxc exec "$CONTAINER" -- test -f "$MARKER_WEBUI"; then
+        _fail "Web UI bootstrap marker missing. Run: devctl bootstrap-webui && devctl snapshot-create"
+    fi
     _sync_webui_sources
 
     lxc exec "$CONTAINER" -- bash -lc "
@@ -398,7 +422,6 @@ if [[ "\$count" == "0" ]]; then
   exit 1
 fi
 echo \"[devctl] Discovered \$count tests/component test file(s).\"
-npm install --save-dev --no-audit --no-fund vitest@1.6.1 jsdom@22.1.0 @testing-library/svelte@5.2.8 @testing-library/jest-dom@6.9.1
 npm exec -- svelte-check --fail-on-warnings
 $(_default_web_unit_runner)
 "
@@ -420,12 +443,14 @@ cmd_test_web_typecheck() {
     fi
 
     nf_require_container_running "$CONTAINER" "devctl setup" "devctl"
+    if ! lxc exec "$CONTAINER" -- test -f "$MARKER_WEBUI"; then
+        _fail "Web UI bootstrap marker missing. Run: devctl bootstrap-webui && devctl snapshot-create"
+    fi
     _sync_webui_sources
 
     lxc exec "$CONTAINER" -- bash -lc "
 set -euo pipefail
 cd '$DEV_WEBUI_ROOT'
-npm install --save-dev --no-audit --no-fund vitest@1.6.1 jsdom@22.1.0 @testing-library/svelte@5.2.8 @testing-library/jest-dom@6.9.1
 npm exec -- svelte-check --fail-on-warnings
 "
 
