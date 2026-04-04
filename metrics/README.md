@@ -32,3 +32,14 @@ Collector outputs are staged under:
 
 - `metrics/output/backend/<run-id>/...`
 
+Module 3 adds frontend collector responsibilities:
+
+- LOC for JS/TS/Svelte in `webui/src` and `webui/tests`
+- frontend cognitive complexity estimate
+- JS dependency graph extraction from import/require statements
+- explicit deferred frontend test coverage marker (`not_available`)
+
+Collector outputs are staged under:
+
+- `metrics/output/frontend/<run-id>/...`
+

@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 from metrics.runner.backend_collector import run_backend_collection
+from metrics.runner.frontend_collector import run_frontend_collection
 from metrics.runner.module1_init import initialize_module1
 from metrics.runner.schema_contract import manifest_schema, metrics_schema, validate_manifest_payload, validate_metrics_payload
 
@@ -56,6 +57,16 @@ def cmd_collect_backend(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_collect_frontend(args: argparse.Namespace) -> int:
+    root = _repo_root()
+    run_frontend_collection(
+        repo_root=root,
+        run_id=args.run_id,
+    )
+    print(f"module3 frontend collection complete run_id={args.run_id}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Nightfall metrics administrative entrypoint")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -75,6 +86,10 @@ def build_parser() -> argparse.ArgumentParser:
     backend_parser.add_argument("--pytest-target", default="tests/unit")
     backend_parser.add_argument("--skip-pytest", action="store_true")
     backend_parser.set_defaults(func=cmd_collect_backend)
+
+    frontend_parser = sub.add_parser("collect-frontend", help="Run Module 3 frontend metrics collector")
+    frontend_parser.add_argument("--run-id", default="module3-bootstrap")
+    frontend_parser.set_defaults(func=cmd_collect_frontend)
 
     return parser
 
