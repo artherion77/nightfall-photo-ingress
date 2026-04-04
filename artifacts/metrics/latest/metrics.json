@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "run_id": "coverage-check-local2",
+  "run_id": "module6-20260404T141709-1",
   "source": {
-    "commit_sha": "7582510188b24be6c4c1bf5edab56161bbef529c",
+    "commit_sha": "20271cc58a9c7b84a69da9870f905522cc63f56c",
     "branch": "main"
   },
   "collection_status": "partial",
@@ -4012,13 +4012,13 @@
         "coverage": {
           "status": "success",
           "exit_code": 0,
-          "duration_seconds": 15.9441,
+          "duration_seconds": 15.8162,
           "coverage_percent": 80.11625090821022,
           "covered_lines": 3308,
           "num_statements": 4129,
           "missing_lines": 821,
-          "coverage_json": "metrics/output/backend/coverage-check-local2/coverage.json",
-          "pytest_log": "metrics/output/backend/coverage-check-local2/pytest-coverage.log",
+          "coverage_json": "metrics/output/backend/module6-20260404T141709-1/coverage.json",
+          "pytest_log": "metrics/output/backend/module6-20260404T141709-1/pytest-coverage.log",
           "python_executable": "/home/chris/dev/nightfall-photo-ingress/.venv/bin/python"
         }
       }
@@ -4760,10 +4760,40 @@
           "reason": "deferred_until_vitest_playwright_maturity"
         }
       }
+    },
+    "optional_collectors": {
+      "status": "not_available",
+      "collectors": {
+        "bundle_size": {
+          "status": "not_available",
+          "optional": true,
+          "reason": "disabled"
+        },
+        "openapi_complexity": {
+          "status": "not_available",
+          "optional": true,
+          "reason": "disabled"
+        },
+        "api_surface_diff": {
+          "status": "not_available",
+          "optional": true,
+          "reason": "disabled"
+        },
+        "vitest_coverage": {
+          "status": "not_available",
+          "optional": true,
+          "reason": "disabled"
+        },
+        "playwright_coverage": {
+          "status": "not_available",
+          "optional": true,
+          "reason": "disabled"
+        }
+      }
     }
   },
   "delta": {
-    "previous_run_id": "module6-20260404T135144-1",
+    "previous_run_id": "coverage-check-local2",
     "comparisons": {
       "modules.backend.metrics.loc.files": {
         "current": 163,
@@ -4772,28 +4802,28 @@
       },
       "modules.backend.metrics.loc.total_lines": {
         "current": 26231,
-        "previous": 26168,
-        "change": 63
+        "previous": 26231,
+        "change": 0
       },
       "modules.backend.metrics.loc.total_code_lines": {
         "current": 21636,
-        "previous": 21589,
-        "change": 47
+        "previous": 21636,
+        "change": 0
       },
       "modules.backend.metrics.coverage.coverage_percent": {
         "current": 80.11625090821022,
-        "previous": null,
-        "change": null
+        "previous": 80.11625090821022,
+        "change": 0.0
       },
       "modules.backend.metrics.coverage.covered_lines": {
         "current": 3308,
-        "previous": null,
-        "change": null
+        "previous": 3308,
+        "change": 0
       },
       "modules.backend.metrics.coverage.num_statements": {
         "current": 4129,
-        "previous": null,
-        "change": null
+        "previous": 4129,
+        "change": 0
       },
       "modules.frontend.metrics.loc.files": {
         "current": 56,

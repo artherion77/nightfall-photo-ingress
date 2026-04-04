@@ -1,22 +1,28 @@
 {
   "schema_version": 1,
-  "run_id": "coverage-check-local2",
-  "generated_at": "2026-04-04T14:15:10.988968+00:00",
+  "run_id": "module6-20260404T141709-1",
+  "generated_at": "2026-04-04T14:17:25.112084+00:00",
   "source": {
-    "commit_sha": "7582510188b24be6c4c1bf5edab56161bbef529c",
+    "commit_sha": "20271cc58a9c7b84a69da9870f905522cc63f56c",
     "branch": "main"
   },
   "collection_status": "partial",
   "severity": "warning",
   "indicators": {
     "failed_checks": 0,
-    "warning_checks": 2,
+    "warning_checks": 8,
     "delta_items": 14
   },
-  "previous_successful_run_id": "module6-20260404T135144-1",
+  "previous_successful_run_id": "coverage-check-local2",
   "warnings": [
     "modules.backend.metrics.complexity not available",
-    "modules.frontend.metrics.test_coverage not available"
+    "modules.frontend.metrics.test_coverage not available",
+    "modules.optional_collectors not available",
+    "modules.optional_collectors.collectors.bundle_size not available",
+    "modules.optional_collectors.collectors.openapi_complexity not available",
+    "modules.optional_collectors.collectors.api_surface_diff not available",
+    "modules.optional_collectors.collectors.vitest_coverage not available",
+    "modules.optional_collectors.collectors.playwright_coverage not available"
   ],
   "failures": []
 }

@@ -26,6 +26,10 @@
     system: { apiSurface: { endpoints: 0, schemas: 0 }, bundleSizeKb: null, openapiScore: null },
     footer: { host: 'unknown', python: 'unknown', git: 'unknown', executor: 'unknown' },
     trendRows: [],
+    sourceBranch: 'main',
+    repoUrl: null,
+    repoHeadUrl: null,
+    repoCommitUrl: null,
   };
 
   let data = defaultData;
@@ -37,6 +41,8 @@
   let cyclomaticText = 'N/A';
   let maintainabilityText = 'N/A';
   let frontendComplexityText = 'N/A';
+  let repoLabel = 'unknown';
+  let commitHref = null;
 
   onMount(async () => {
     try {
@@ -105,6 +111,12 @@
     ? data.frontendComplexity.toFixed(1)
     : 'N/A';
 
+  $: repoLabel = typeof data.repoUrl === 'string' && data.repoUrl
+    ? data.repoUrl.replace(/^https?:\/\//, '')
+    : 'unknown';
+
+  $: commitHref = data.repoCommitUrl || data.repoHeadUrl || data.repoUrl || null;
+
   function heatColor(value) {
     if (value >= 18) return '#cc3f38';
     if (value >= 14) return '#db7b2a';
@@ -126,7 +138,18 @@
         <h1>{data.projectName} <span class="subtitle">- Code Quality &amp; Metrics Dashboard</span></h1>
       </div>
       <div class="meta-stack">
-        <div class="meta-pill">Commit: {data.commitSha}</div>
+        {#if commitHref}
+          <a class="meta-pill meta-link tip-anchor" href={commitHref} target="_blank" rel="noreferrer" aria-label="Open repository commit">
+            <span>Commit: {data.commitSha}</span>
+            <span>Repo: {repoLabel}</span>
+            <span class="tip-bubble">Opens source commit for this metrics run. {#if data.repoHeadUrl}Head: {data.repoHeadUrl}{/if}</span>
+          </a>
+        {:else}
+          <div class="meta-pill">
+            <span>Commit: {data.commitSha}</span>
+            <span>Repo: {repoLabel}</span>
+          </div>
+        {/if}
         <div class="meta-pill">Last Run: {data.lastRunAt}</div>
       </div>
     </header>
@@ -158,8 +181,8 @@
       </article>
 
       <article class="card metric-card">
-        <h2>Frontend Cognitive Complexity</h2>
-        <div class="hero-value compact">ESLint / SonarJS: <strong>{frontendComplexityText}</strong></div>
+        <h2>Frontend Cognitive Complexity <span class="tip-anchor hint-inline" tabindex="0" role="button" aria-label="Complexity metric explanation">i<span class="tip-bubble">Heuristic score from frontend_collector: branching tokens weighted by nesting depth. Typical human-maintained app range: 12-40 mean. Lower is easier to maintain.</span></span></h2>
+        <div class="hero-value compact"><strong>{frontendComplexityText}</strong></div>
       </article>
     </section>
 
@@ -233,9 +256,10 @@
           {/if}
           <div class="loc-bars">
             {#each data.frontendLocRows as row}
-              <div class="loc-row">
+              <div class="loc-row tip-anchor" tabindex="0" role="button" aria-label="Show LOC row details">
                 <span>{row.name.split('/').at(-1)}</span>
                 <div class="bar"><i style={`width:${(row.lines / maxFrontendLoc) * 100}%`}></i></div>
+                <span class="tip-bubble">{row.name} | {row.lines} LOC</span>
               </div>
             {/each}
           </div>

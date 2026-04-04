@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import shutil
+import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -177,7 +178,38 @@ def _sparkline(series: list[float]) -> str:
     return " ".join(points)
 
 
-def _dashboard_payload(manifest: dict[str, Any], metrics: dict[str, Any], summary: dict[str, Any], trends: list[dict[str, Any]]) -> dict[str, Any]:
+def _origin_repo_url(repo_root: Path) -> str | None:
+    try:
+        proc = subprocess.run(
+            ["git", "config", "--get", "remote.origin.url"],
+            cwd=str(repo_root),
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except Exception:
+        return None
+
+    raw = (proc.stdout or "").strip()
+    if not raw:
+        return None
+
+    if raw.startswith("git@") and ":" in raw:
+        host_part, repo_part = raw.split(":", 1)
+        host = host_part.split("@", 1)[1]
+        normalized = f"https://{host}/{repo_part}"
+    elif raw.startswith("ssh://git@"):
+        normalized = "https://" + raw[len("ssh://git@"):]
+    else:
+        normalized = raw
+
+    if normalized.endswith(".git"):
+        normalized = normalized[:-4]
+
+    return normalized
+
+
+def _dashboard_payload(repo_root: Path, manifest: dict[str, Any], metrics: dict[str, Any], summary: dict[str, Any], trends: list[dict[str, Any]]) -> dict[str, Any]:
     modules = metrics.get("modules", {})
     backend = modules.get("backend", {}) if isinstance(modules, dict) else {}
     frontend = modules.get("frontend", {}) if isinstance(modules, dict) else {}
@@ -229,6 +261,11 @@ def _dashboard_payload(manifest: dict[str, Any], metrics: dict[str, Any], summar
     openapi_score = (optional_map.get("openapi_complexity") or {}).get("score") if isinstance(optional_map, dict) else None
 
     per_file_backend = backend_loc.get("per_file", {}) if isinstance(backend_loc, dict) else {}
+    source_branch = str((summary.get("source") or {}).get("branch", "main"))
+    commit_full = str((summary.get("source") or {}).get("commit_sha", ""))
+    repo_url = _origin_repo_url(repo_root)
+    repo_head_url = f"{repo_url}/tree/{source_branch}" if repo_url else None
+    repo_commit_url = f"{repo_url}/commit/{commit_full}" if repo_url and commit_full else None
     api_surface = {
         "endpoints": len([key for key in per_file_backend.keys() if "/routers/" in key]) if isinstance(per_file_backend, dict) else 0,
         "schemas": len([key for key in per_file_backend.keys() if "/schemas/" in key]) if isinstance(per_file_backend, dict) else 0,
@@ -236,10 +273,14 @@ def _dashboard_payload(manifest: dict[str, Any], metrics: dict[str, Any], summar
 
     return {
         "projectName": "nightfall++photo-ingress",
-        "commitSha": str((summary.get("source") or {}).get("commit_sha", ""))[:7],
-        "commitFull": str((summary.get("source") or {}).get("commit_sha", "")),
+        "commitSha": commit_full[:7],
+        "commitFull": commit_full,
         "runId": str(summary.get("run_id", "unknown")),
         "lastRunAt": str(summary.get("generated_at", "unknown")),
+        "sourceBranch": source_branch,
+        "repoUrl": repo_url,
+        "repoHeadUrl": repo_head_url,
+        "repoCommitUrl": repo_commit_url,
         "coveragePercent": coverage_percent,
         "hasCoverage": coverage_percent is not None,
         "sparklinePoints": _sparkline(list(reversed(trend_series)) if len(trend_series) > 1 else [0.0, 0.0]),
@@ -304,7 +345,7 @@ def run_dashboard_generation(repo_root: Path, run_id: str) -> dict[str, Any]:
 
     executive_md = _render_markdown_summary(run_id=run_id, summary=summary, trends=trends)
 
-    dashboard_data = _dashboard_payload(manifest=manifest, metrics=metrics, summary=summary, trends=trends)
+    dashboard_data = _dashboard_payload(repo_root=repo_root, manifest=manifest, metrics=metrics, summary=summary, trends=trends)
 
     dashboard_dir = repo_root / "dashboard"
     dashboard_data_path = dashboard_dir / "__data.json"
