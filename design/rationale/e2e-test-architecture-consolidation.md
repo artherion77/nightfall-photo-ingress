@@ -234,3 +234,38 @@ Chunk 5 delivery note (Rollback and Stabilization Plan):
 
 Pytest gate protection rule:
 - Rollback never alters pytest blocking behavior; browser rollback is strictly additive risk containment to protect baseline confidence.
+
+Chunk 6 delivery note (Evaluation Metrics and Decision Review):
+- Evaluation cadence finalized:
+	- Use fixed 14-day evaluation windows.
+	- Run a formal Go/No-Go review at the end of each window.
+	- Assign owners: test architecture owner (decision chair), frontend owner (runtime and DX), platform owner (CI/artifact cost), QA owner (defect-yield validation).
+- DX metrics finalized:
+	- Cold local browser run time (first run after environment start).
+	- Warm local browser run time (repeat run without dependency reinstall).
+	- Median time-to-diagnose failed browser regressions (open failure to root-cause label applied).
+	- Developer friction signal: count of "blocked-by-test-infra" incidents per window.
+- Quality metrics finalized:
+	- Browser-only defects found (not detected by existing pytest unit/integration paths).
+	- Flaky failure ratio (intermittent non-product failures divided by total browser failures).
+	- False-positive ratio (failures closed as non-product issues without code fix).
+	- Escaped UI regressions rate after PR merge.
+- Cost metrics finalized:
+	- CI duration delta attributable to browser smoke stage.
+	- Artifact storage growth per week for traces/screenshots/videos.
+	- Maintenance overhead measured as stabilization and test-infra engineering hours per window.
+- Measurement attribution rule finalized:
+	- Metrics must be attributable to the browser layer by tagging each failure and each detected defect with test-layer source (`pytest`, `vitest`, `playwright`).
+
+Go/No-Go review checklist finalized:
+- Go (continue or expand selective Playwright scope) requires all of the following:
+	- Flaky failure ratio <= 2 percent for the window.
+	- False-positive ratio <= 20 percent for the window.
+	- CI duration delta within approved budget.
+	- At least one confirmed browser-only defect in the last two windows, or explicit risk sign-off that current scope remains justified.
+	- No unresolved Severity 1 tooling incidents.
+- No-Go (freeze or reduce browser scope) applies if any of the following hold:
+	- Flaky failure ratio > 5 percent,
+	- false-positive ratio > 30 percent,
+	- CI duration delta exceeds budget for two consecutive windows,
+	- or unresolved Severity 1 tooling incidents persist beyond the review window.
