@@ -8,6 +8,8 @@ Policy: prefer to use MCP endpoints first, over ad-hoc shell commands.
 
 Policy: Host-installations only with explicit user approval. Dev-container installations are allowed and every installation is reported in the task summary.
 
+Policy: After each significant task, if execution shows that extending MCP itself or connected tools would significantly improve efficiency, record an extension proposal in MCP and evaluate it for implementation.
+
 ## Design Decision
 
 Implemented strategy:
@@ -73,6 +75,21 @@ Important safety rule:
 - MCP must not run arbitrary install commands directly.
 - Install actions are executed via devctl bootstrap commands only.
 
+## Continuous MCP Extension Policy
+
+The MCP server supports extension-capture as part of significant task execution.
+
+Execution-time fields on `/mcp/exec`:
+- `significantTask` (boolean)
+- `extensionRecommendation` (string, optional)
+
+When `significantTask=true` and `extensionRecommendation` is present, MCP records a proposal in:
+- `.mcp/tasks/extensions.json`
+
+Endpoints:
+- `GET /mcp/extensions` — list extension proposals backlog
+- `POST /mcp/extensions/propose` — manually add a proposal
+
 ## Start MCP Server
 
 ```bash
@@ -122,6 +139,30 @@ Inspect status/log/context:
 curl -sS http://<server>/mcp/status/<id>
 curl -sS http://<server>/mcp/log/<id>
 curl -sS http://<server>/mcp/context
+curl -sS http://<server>/mcp/extensions
+```
+
+Submit a significant-task execution with extension recommendation:
+
+```bash
+curl -sS -X POST http://<server>/mcp/exec \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "task":"backend.test.integration",
+    "significantTask": true,
+    "extensionRecommendation": "Add dedicated devctl command for fast triage smoke seeding"
+  }'
+```
+
+Submit a manual extension proposal:
+
+```bash
+curl -sS -X POST http://<server>/mcp/extensions/propose \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "task":"web.test.unit",
+    "recommendation":"Add MCP mapping for Node>=20 bootstrap in dev container"
+  }'
 ```
 
 ## Security and Policy

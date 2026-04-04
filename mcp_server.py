@@ -30,6 +30,8 @@ class TaskRecord:
     finishedAt: str | None
     cwd: str
     args: list[str]
+    significantTask: bool
+    extensionRecommendation: str | None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -41,6 +43,8 @@ class TaskRecord:
             "finishedAt": self.finishedAt,
             "cwd": self.cwd,
             "args": self.args,
+            "significantTask": self.significantTask,
+            "extensionRecommendation": self.extensionRecommendation,
         }
 
 
@@ -51,11 +55,14 @@ class MCPServerState:
         self.logs_dir = workspace_root / ".mcp" / "logs"
         self.tasks_dir = workspace_root / ".mcp" / "tasks"
         self.history_file = self.tasks_dir / "history.json"
+        self.extensions_file = self.tasks_dir / "extensions.json"
         self.lock = threading.Lock()
         self.tasks: dict[str, TaskRecord] = {}
+        self.extensions: list[dict[str, Any]] = []
         self.model = self._load_model()
         self._ensure_dirs()
         self._load_history()
+        self._load_extensions()
 
     def _ensure_dirs(self) -> None:
         self.logs_dir.mkdir(parents=True, exist_ok=True)
@@ -93,12 +100,35 @@ class MCPServerState:
                 finishedAt=item.get("finishedAt"),
                 cwd=str(item.get("cwd", str(self.workspace_root))),
                 args=list(item.get("args", [])),
+                significantTask=bool(item.get("significantTask", False)),
+                extensionRecommendation=(
+                    str(item.get("extensionRecommendation"))
+                    if item.get("extensionRecommendation") is not None
+                    else None
+                ),
             )
 
     def _persist_history(self) -> None:
         with self.lock:
             payload = [record.to_dict() for record in self.tasks.values()]
             self.history_file.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+    def _load_extensions(self) -> None:
+        if not self.extensions_file.exists():
+            return
+        try:
+            raw = json.loads(self.extensions_file.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            return
+        if isinstance(raw, list):
+            self.extensions = [item for item in raw if isinstance(item, dict)]
+
+    def _persist_extensions(self) -> None:
+        with self.lock:
+            self.extensions_file.write_text(
+                json.dumps(self.extensions, indent=2),
+                encoding="utf-8",
+            )
 
     def get_mapping(self, task_name: str) -> list[str] | None:
         mapping = self.model.get("mappings", {})
@@ -115,6 +145,8 @@ class MCPServerState:
         args: list[str] | None,
         env: dict[str, str] | None,
         cwd: str | None,
+        significant_task: bool = False,
+        extension_recommendation: str | None = None,
     ) -> str:
         commands = self.get_mapping(task_name)
         if commands is None:
@@ -134,6 +166,8 @@ class MCPServerState:
             finishedAt=None,
             cwd=str(cwd_path),
             args=args or [],
+            significantTask=significant_task,
+            extensionRecommendation=extension_recommendation.strip() if extension_recommendation else None,
         )
         with self.lock:
             self.tasks[task_id] = record
@@ -190,6 +224,14 @@ class MCPServerState:
             record.status = "success" if exit_code == 0 else "failed"
             record.finishedAt = utc_now_iso()
         self._persist_history()
+
+        if record.significantTask and record.extensionRecommendation:
+            self.propose_extension(
+                recommendation=record.extensionRecommendation,
+                related_task_id=record.taskId,
+                task_name=record.task,
+                source="post_significant_task_review",
+            )
 
     def status(self, task_id: str) -> dict[str, Any] | None:
         with self.lock:
@@ -270,8 +312,34 @@ class MCPServerState:
                 "cliAvailable": devcontainer_cli is not None,
                 "devcontainerJsonExists": (self.workspace_root / ".devcontainer" / "devcontainer.json").exists(),
             },
+            "extensionPolicy": {
+                "enabled": True,
+                "extensionsBacklogCount": len(self.extensions),
+                "extensionsBacklogPath": str(self.extensions_file),
+            },
         }
         return {"model": self.model, "runtime": runtime}
+
+    def propose_extension(
+        self,
+        *,
+        recommendation: str,
+        related_task_id: str | None,
+        task_name: str | None,
+        source: str,
+    ) -> dict[str, Any]:
+        proposal = {
+            "proposalId": str(uuid.uuid4()),
+            "createdAt": utc_now_iso(),
+            "source": source,
+            "relatedTaskId": related_task_id,
+            "task": task_name,
+            "recommendation": recommendation,
+            "status": "proposed",
+        }
+        self.extensions.append(proposal)
+        self._persist_extensions()
+        return proposal
 
 
 def json_response(handler: BaseHTTPRequestHandler, status: int, payload: dict[str, Any]) -> None:
@@ -324,6 +392,10 @@ def make_handler(state: MCPServerState):
                 json_response(self, HTTPStatus.OK, {"taskId": task_id, "log": log_text})
                 return
 
+            if self.path == "/mcp/extensions":
+                json_response(self, HTTPStatus.OK, {"extensions": state.extensions})
+                return
+
             json_response(self, HTTPStatus.NOT_FOUND, {"error": "not found"})
 
         def do_POST(self) -> None:
@@ -338,6 +410,8 @@ def make_handler(state: MCPServerState):
                 args = payload.get("args")
                 env = payload.get("env")
                 cwd = payload.get("cwd")
+                significant_task = payload.get("significantTask", False)
+                extension_recommendation = payload.get("extensionRecommendation")
 
                 if not isinstance(task_name, str):
                     json_response(self, HTTPStatus.BAD_REQUEST, {"error": "task must be a string"})
@@ -351,13 +425,50 @@ def make_handler(state: MCPServerState):
                 if cwd is not None and not isinstance(cwd, str):
                     json_response(self, HTTPStatus.BAD_REQUEST, {"error": "cwd must be a string or null"})
                     return
+                if not isinstance(significant_task, bool):
+                    json_response(self, HTTPStatus.BAD_REQUEST, {"error": "significantTask must be a boolean"})
+                    return
+                if extension_recommendation is not None and not isinstance(extension_recommendation, str):
+                    json_response(self, HTTPStatus.BAD_REQUEST, {"error": "extensionRecommendation must be a string or null"})
+                    return
 
                 try:
-                    task_id = state.enqueue_task(task_name, args, env, cwd)
+                    task_id = state.enqueue_task(
+                        task_name,
+                        args,
+                        env,
+                        cwd,
+                        significant_task=significant_task,
+                        extension_recommendation=extension_recommendation,
+                    )
                 except ValueError as exc:
                     json_response(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
                     return
                 json_response(self, HTTPStatus.ACCEPTED, {"taskId": task_id, "status": "queued"})
+                return
+
+            if self.path == "/mcp/extensions/propose":
+                recommendation = payload.get("recommendation")
+                related_task_id = payload.get("relatedTaskId")
+                task_name = payload.get("task")
+
+                if not isinstance(recommendation, str) or not recommendation.strip():
+                    json_response(self, HTTPStatus.BAD_REQUEST, {"error": "recommendation must be a non-empty string"})
+                    return
+                if related_task_id is not None and not isinstance(related_task_id, str):
+                    json_response(self, HTTPStatus.BAD_REQUEST, {"error": "relatedTaskId must be a string or null"})
+                    return
+                if task_name is not None and not isinstance(task_name, str):
+                    json_response(self, HTTPStatus.BAD_REQUEST, {"error": "task must be a string or null"})
+                    return
+
+                proposal = state.propose_extension(
+                    recommendation=recommendation.strip(),
+                    related_task_id=related_task_id,
+                    task_name=task_name,
+                    source="manual",
+                )
+                json_response(self, HTTPStatus.CREATED, proposal)
                 return
 
             if self.path == "/mcp/verify":

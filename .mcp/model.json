@@ -6,6 +6,19 @@
     "workspaceRoot": ".",
     "policy": "prefer_mcp_first",
     "hostInstallPolicy": "explicit_user_approval_required",
+    "continuousExtensionPolicy": {
+      "enabled": true,
+      "trigger": "after_each_significant_task",
+      "goal": "extend_mcp_and_connected_tools_when_extension_would_significantly_improve_efficiency",
+      "capture": {
+        "execFields": [
+          "significantTask",
+          "extensionRecommendation"
+        ],
+        "manualProposalEndpoint": "/mcp/extensions/propose",
+        "backlogEndpoint": "/mcp/extensions"
+      }
+    },
     "design": {
       "cacheStrategy": "lxc_snapshot_reuse_plus_bind_mount_caches",
       "baseImageLayering": "documentation_only_future_option"
