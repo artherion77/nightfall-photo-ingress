@@ -11,18 +11,18 @@
     "preview": "vite preview"
   },
   "devDependencies": {
-    "@playwright/test": "^1.55.0",
+    "@playwright/test": "^1.55.1",
     "@sveltejs/adapter-static": "^3.0.6",
     "@sveltejs/kit": "^2.5.18",
     "@sveltejs/vite-plugin-svelte": "^4.0.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/svelte": "^5.2.8",
     "@types/node": "^22.10.7",
-    "jsdom": "22.1.0",
+    "jsdom": "^25.0.0",
     "svelte-check": "^4.1.0",
     "svelte": "^5.0.0",
     "typescript": "^5.7.2",
     "vite": "^5.4.10",
-    "vitest": "1.6.1"
+    "vitest": "^3.1.0"
   }
 }

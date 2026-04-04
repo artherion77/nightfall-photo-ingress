@@ -83,7 +83,7 @@ class ContainerHandle:
             capture_output=True,
             text=True,
         )
-        return "Status: Running" in result.stdout
+        return "status: running" in result.stdout.lower()
 
 
 def _require_container(container_name: str) -> None:
@@ -97,7 +97,7 @@ def _require_container(container_name: str) -> None:
             f"Staging container '{container_name}' not available. "
             "Run: stagingctl create && stagingctl install"
         )
-    if "Status: Running" not in result.stdout:
+    if "status: running" not in result.stdout.lower():
         pytest.skip(
             f"Staging container '{container_name}' exists but is not running."
         )
