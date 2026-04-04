@@ -130,3 +130,17 @@ Rationale in five points:
 3. devctl and MCP already include Playwright bootstrap and cache mount scaffolding.
 4. A selective browser layer controls flakiness and runtime cost.
 5. This provides real UI realism where needed without forcing an architecture rewrite.
+
+Chunk 2 delivery note (Directory and Naming Conventions):
+- Planned frontend test directories are explicitly standardized as:
+	- `webui/tests/component/`
+	- `webui/tests/e2e/`
+	- `webui/tests/e2e/fixtures/`
+- Naming conventions are finalized as:
+	- Playwright files: `<feature>.<behavior>.spec.ts`
+	- Vitest files: `<component>.test.ts`
+- Selector and fixture conventions are finalized as:
+	- Prefer stable `data-testid` and role-based selectors over style/text-only selectors.
+	- Keep reusable browser fixtures in `webui/tests/e2e/fixtures/` and name them by scope (`app.fixture.ts`, `api.fixture.ts`, `auth.fixture.ts`).
+- Test file metadata header conventions are finalized as:
+	- Include a short header with `scope`, `risk_class`, and `owner` for traceability.

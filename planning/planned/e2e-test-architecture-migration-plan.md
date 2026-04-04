@@ -49,6 +49,23 @@ Define strict, non-placeholder execution contracts for frontend test commands an
 
 ## Chunk 2: Directory and Naming Conventions
 
+Status: Completed (2026-04-04)
+
+Delivered summary:
+- Finalized target test directory map:
+	- `webui/tests/component/`
+	- `webui/tests/e2e/`
+	- `webui/tests/e2e/fixtures/`
+- Finalized file naming conventions:
+	- Playwright: `<feature>.<behavior>.spec.ts`
+	- Vitest: `<component>.test.ts`
+- Finalized selector and fixture conventions:
+	- Use stable `data-testid` and role-based selectors as primary strategy.
+	- Keep shared browser fixtures under `webui/tests/e2e/fixtures/` with scope-based names.
+- Finalized test metadata header convention:
+	- Include `scope`, `risk_class`, and `owner` header fields for traceability.
+- Performed chunk-level drift check: migration plan conventions and consolidation rationale note are aligned.
+
 ### Goal
 Define stable repository structure and naming conventions for Vitest and Playwright tests.
 
