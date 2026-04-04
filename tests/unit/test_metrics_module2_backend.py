@@ -78,6 +78,33 @@ def test_run_backend_collection_writes_latest_and_history_artifacts(tmp_path: Pa
     assert coverage["status"] == "success"
     assert coverage["coverage_percent"] is not None
 
+    # Chunk 2: Assert complexity and maintainability metrics are present and valid
+    complexity = metrics_payload["modules"]["backend"]["metrics"]["complexity"]
+    assert complexity["status"] == "success"
+    assert complexity["radon_version"] != "not_available"
+    cyclomatic = complexity["cyclomatic"]
+    assert cyclomatic["mean"] is not None
+    assert cyclomatic["max"] is not None
+    assert cyclomatic["count"] > 0
+    maintain = complexity["maintainability_index"]
+    assert maintain["mean"] is not None
+    assert maintain["min"] is not None
+    assert maintain["count"] > 0
+
+def test_complexity_unavailable_if_radon_missing(monkeypatch, tmp_path: Path) -> None:
+    # Simulate radon import failure
+    import builtins
+    real_import = builtins.__import__
+    def fake_import(name, *args, **kwargs):
+        if name.startswith("radon"):
+            raise ImportError("radon not installed")
+        return real_import(name, *args, **kwargs)
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+    from metrics.runner import backend_collector
+    result = backend_collector.collect_complexity_and_maintainability(tmp_path, ["src"])  # src can be empty
+    assert result["status"] == "not_available"
+    assert "radon unavailable" in result["reason"]
+
 
 def test_collect_pytest_coverage_prefers_repo_venv_python(tmp_path: Path, monkeypatch) -> None:
     (tmp_path / ".venv" / "bin").mkdir(parents=True)
