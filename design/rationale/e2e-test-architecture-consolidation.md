@@ -205,3 +205,32 @@ Chunk 4 delivery note (CI and MCP Rollout Plan):
 
 Rollout boundary rule:
 - Chunk 4 defines policy only; CI pipeline file edits and execution enablement remain implementation work for a later chunk.
+
+Chunk 5 delivery note (Rollback and Stabilization Plan):
+- Deterministic rollback triggers finalized (any one trigger is sufficient):
+	- Flaky failure ratio exceeds 5 percent for one 7-day window or exceeds 3 percent for two consecutive 7-day windows.
+	- Median browser smoke runtime exceeds 8 minutes for two consecutive nightly windows.
+	- Browser-suite false-positive ratio exceeds 30 percent in one evaluation window.
+	- Two or more unresolved Severity 1 or Severity 2 tooling incidents in Playwright/devctl/MCP path remain open beyond 48 hours.
+	- Repeated artifact unavailability: `E2E_ARTIFACT_PATH` missing on failed runs for 3 or more runs in 7 days.
+- Rollback actions finalized (deterministic order):
+	1. Demote PR browser smoke from blocking to non-blocking immediately.
+	2. Reduce active browser scope to one critical smoke flow (`staging.keyboard-triage.spec.ts`).
+	3. Preserve existing pytest unit/integration gates as fully blocking with no relaxation.
+	4. Open and track a stabilization task list with owners, due dates, and defect-class tags.
+	5. Keep nightly/main browser execution active for diagnosis, but classify failures as stabilization signals, not release blockers.
+- Stabilization task list minimum content finalized:
+	- Selector determinism fixes,
+	- wait/timeout hardening,
+	- fixture isolation cleanup,
+	- artifact/log discoverability fixes,
+	- root-cause labels for flaky vs infrastructure vs product regressions.
+- Re-promotion criteria finalized (all must be satisfied):
+	- Flaky failure ratio <= 2 percent for two consecutive evaluation windows.
+	- Median browser smoke runtime <= 6 minutes for two consecutive evaluation windows.
+	- Zero unresolved Severity 1 or Severity 2 tooling incidents for at least 14 days.
+	- `E2E_ARTIFACT_PATH` present on 100 percent of failed runs during the promotion window.
+	- Stabilization backlog reduced to zero open critical items and signed off by test owner.
+
+Pytest gate protection rule:
+- Rollback never alters pytest blocking behavior; browser rollback is strictly additive risk containment to protect baseline confidence.

@@ -180,6 +180,19 @@ Define staged rollout for browser tests with clear blocking policy and artifact 
 
 ## Chunk 5: Rollback and Stabilization Plan
 
+Status: Completed (2026-04-04)
+
+Delivered summary:
+- Finalized objective rollback trigger thresholds for flakiness, runtime, false positives, tooling incidents, and artifact-marker reliability.
+- Finalized deterministic rollback action order:
+	- demote PR browser smoke to non-blocking,
+	- reduce scope to one critical smoke scenario,
+	- preserve pytest blocking gates,
+	- open stabilization task list with explicit ownership.
+- Finalized stabilization work categories for anti-flakiness and infrastructure hardening.
+- Finalized explicit re-promotion criteria with consecutive-window thresholds and tooling/observability health requirements.
+- Documented pytest gate protection invariant: rollback does not weaken existing pytest confidence gates.
+
 ### Goal
 Define deterministic rollback triggers and stabilization actions if the browser layer degrades reliability.
 
