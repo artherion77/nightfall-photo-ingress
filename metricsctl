@@ -5,6 +5,7 @@ import argparse
 import json
 from pathlib import Path
 
+from metrics.runner.backend_collector import run_backend_collection
 from metrics.runner.module1_init import initialize_module1
 from metrics.runner.schema_contract import manifest_schema, metrics_schema, validate_manifest_payload, validate_metrics_payload
 
@@ -43,6 +44,18 @@ def cmd_paths(_: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_collect_backend(args: argparse.Namespace) -> int:
+    root = _repo_root()
+    run_backend_collection(
+        repo_root=root,
+        run_id=args.run_id,
+        pytest_target=args.pytest_target,
+        skip_pytest=args.skip_pytest,
+    )
+    print(f"module2 backend collection complete run_id={args.run_id}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Nightfall metrics administrative entrypoint")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -56,6 +69,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     paths_parser = sub.add_parser("paths", help="Print key metrics runtime paths")
     paths_parser.set_defaults(func=cmd_paths)
+
+    backend_parser = sub.add_parser("collect-backend", help="Run Module 2 backend metrics collector")
+    backend_parser.add_argument("--run-id", default="module2-bootstrap")
+    backend_parser.add_argument("--pytest-target", default="tests/unit")
+    backend_parser.add_argument("--skip-pytest", action="store_true")
+    backend_parser.set_defaults(func=cmd_collect_backend)
 
     return parser
 

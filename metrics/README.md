@@ -20,3 +20,15 @@ Publication layout contract:
 - `reports/latest.md` (future module)
 
 Module 1 focuses on schema and manifest contracts plus initialization artifacts.
+
+Module 2 adds backend collector responsibilities:
+
+- Python LOC collection for `src/`, `api/`, `tests/`
+- Cyclomatic complexity and maintainability index collection (when radon is available)
+- Python dependency graph extraction
+- Host-side pytest coverage execution (with explicit `not_available` when coverage toolchain is unavailable)
+
+Collector outputs are staged under:
+
+- `metrics/output/backend/<run-id>/...`
+
