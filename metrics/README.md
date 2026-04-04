@@ -56,3 +56,17 @@ Module 4 writes:
 - `artifacts/metrics/history/<run-id>/summary.json`
 - `metrics/output/aggregator/<run-id>/summary.json` (staged transient output)
 
+Module 5 adds dashboard generation responsibilities:
+
+- static HTML dashboard generated from latest manifest/metrics/summary artifacts
+- Markdown executive summary for operators
+- historical trend snippets from prior history runs
+- direct links to manifest and raw metric artifacts
+
+Module 5 writes:
+
+- `dashboard/index.html`
+- `reports/latest.md`
+- `metrics/output/dashboard/<run-id>/index.html` (staged transient output)
+- `metrics/output/reports/<run-id>/latest.md` (staged transient output)
+

@@ -7,6 +7,7 @@ from pathlib import Path
 
 from metrics.runner.aggregator import run_aggregation
 from metrics.runner.backend_collector import run_backend_collection
+from metrics.runner.dashboard_generator import run_dashboard_generation
 from metrics.runner.frontend_collector import run_frontend_collection
 from metrics.runner.module1_init import initialize_module1
 from metrics.runner.schema_contract import manifest_schema, metrics_schema, validate_manifest_payload, validate_metrics_payload
@@ -78,6 +79,16 @@ def cmd_aggregate(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_generate_dashboard(args: argparse.Namespace) -> int:
+    root = _repo_root()
+    run_dashboard_generation(
+        repo_root=root,
+        run_id=args.run_id,
+    )
+    print(f"module5 dashboard generation complete run_id={args.run_id}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Nightfall metrics administrative entrypoint")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -105,6 +116,10 @@ def build_parser() -> argparse.ArgumentParser:
     aggregate_parser = sub.add_parser("aggregate", help="Run Module 4 aggregator and delta engine")
     aggregate_parser.add_argument("--run-id", default="module4-bootstrap")
     aggregate_parser.set_defaults(func=cmd_aggregate)
+
+    dashboard_parser = sub.add_parser("generate-dashboard", help="Run Module 5 dashboard generator")
+    dashboard_parser.add_argument("--run-id", default="module5-bootstrap")
+    dashboard_parser.set_defaults(func=cmd_generate_dashboard)
 
     return parser
 
