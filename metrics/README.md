@@ -70,3 +70,18 @@ Module 5 writes:
 - `metrics/output/dashboard/<run-id>/index.html` (staged transient output)
 - `metrics/output/reports/<run-id>/latest.md` (staged transient output)
 
+Module 6 adds poller and orchestration responsibilities:
+
+- lock-protected single-run execution loop via `metricsctl run-now`
+- unchanged commit fast-exit using `metrics/state/last_processed_commit`
+- retry and timeout policy for unattended operation
+- failure manifest emission on failed runs
+- runtime control surface for install/reconfigure/start/stop/status/uninstall/publish
+
+Module 6 writes:
+
+- `metrics/systemd/nightfall-metrics-poller.service`
+- `metrics/systemd/nightfall-metrics-poller.timer`
+- `metrics/state/poller_status.json`
+- `metrics/state/last_publication.json` (publication surface state)
+

@@ -1,0 +1,10 @@
+[Unit]
+Description=Nightfall Metrics Poller Timer
+
+[Timer]
+OnUnitActiveSec=60m
+Persistent=true
+Unit=nightfall-metrics-poller.service
+
+[Install]
+WantedBy=timers.target

@@ -3,5 +3,9 @@
   "frequency_minutes": 60,
   "metrics_branch": "metrics",
   "dashboard_relative_path": "/dashboard/",
-  "configured_at": "2026-04-04T12:18:09.987677+00:00"
+  "configured_at": "2026-04-04T12:35:23.641963+00:00",
+  "installed": false,
+  "enabled": false,
+  "retry_max_retries": 1,
+  "timeout_seconds": 1800
 }

@@ -10,6 +10,16 @@ from metrics.runner.backend_collector import run_backend_collection
 from metrics.runner.dashboard_generator import run_dashboard_generation
 from metrics.runner.frontend_collector import run_frontend_collection
 from metrics.runner.module1_init import initialize_module1
+from metrics.runner.poller_runner import (
+    install_poller,
+    poller_status,
+    publish_metrics,
+    reconfigure_poller,
+    run_now,
+    start_poller,
+    stop_poller,
+    uninstall_poller,
+)
 from metrics.runner.schema_contract import manifest_schema, metrics_schema, validate_manifest_payload, validate_metrics_payload
 
 
@@ -89,6 +99,66 @@ def cmd_generate_dashboard(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_install(args: argparse.Namespace) -> int:
+    root = _repo_root()
+    payload = install_poller(repo_root=root, frequency_minutes=args.frequency_minutes)
+    print(json.dumps(payload, indent=2))
+    return 0
+
+
+def cmd_reconfigure(args: argparse.Namespace) -> int:
+    root = _repo_root()
+    payload = reconfigure_poller(repo_root=root, frequency_minutes=args.frequency_minutes)
+    print(json.dumps(payload, indent=2))
+    return 0
+
+
+def cmd_start(_: argparse.Namespace) -> int:
+    root = _repo_root()
+    payload = start_poller(repo_root=root)
+    print(json.dumps(payload, indent=2))
+    return 0
+
+
+def cmd_stop(_: argparse.Namespace) -> int:
+    root = _repo_root()
+    payload = stop_poller(repo_root=root)
+    print(json.dumps(payload, indent=2))
+    return 0
+
+
+def cmd_status(_: argparse.Namespace) -> int:
+    root = _repo_root()
+    payload = poller_status(repo_root=root)
+    print(json.dumps(payload, indent=2))
+    return 0
+
+
+def cmd_run_now(args: argparse.Namespace) -> int:
+    root = _repo_root()
+    payload = run_now(
+        repo_root=root,
+        max_retries=args.max_retries,
+        timeout_seconds=args.timeout_seconds,
+    )
+    print(json.dumps(payload, indent=2))
+    return 0
+
+
+def cmd_uninstall(_: argparse.Namespace) -> int:
+    root = _repo_root()
+    payload = uninstall_poller(repo_root=root)
+    print(json.dumps(payload, indent=2))
+    return 0
+
+
+def cmd_publish(_: argparse.Namespace) -> int:
+    root = _repo_root()
+    payload = publish_metrics(repo_root=root)
+    print(json.dumps(payload, indent=2))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Nightfall metrics administrative entrypoint")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -120,6 +190,34 @@ def build_parser() -> argparse.ArgumentParser:
     dashboard_parser = sub.add_parser("generate-dashboard", help="Run Module 5 dashboard generator")
     dashboard_parser.add_argument("--run-id", default="module5-bootstrap")
     dashboard_parser.set_defaults(func=cmd_generate_dashboard)
+
+    install_parser = sub.add_parser("install", help="Install Module 6 poller runtime and systemd units")
+    install_parser.add_argument("--frequency-minutes", type=int, default=60)
+    install_parser.set_defaults(func=cmd_install)
+
+    reconfigure_parser = sub.add_parser("reconfigure", help="Reconfigure Module 6 poller frequency")
+    reconfigure_parser.add_argument("--frequency-minutes", type=int, default=60)
+    reconfigure_parser.set_defaults(func=cmd_reconfigure)
+
+    start_parser = sub.add_parser("start", help="Enable Module 6 poller runtime")
+    start_parser.set_defaults(func=cmd_start)
+
+    stop_parser = sub.add_parser("stop", help="Disable Module 6 poller runtime")
+    stop_parser.set_defaults(func=cmd_stop)
+
+    status_parser = sub.add_parser("status", help="Report Module 6 poller runtime status")
+    status_parser.set_defaults(func=cmd_status)
+
+    run_now_parser = sub.add_parser("run-now", help="Execute Module 6 poller once")
+    run_now_parser.add_argument("--max-retries", type=int, default=1)
+    run_now_parser.add_argument("--timeout-seconds", type=int, default=1800)
+    run_now_parser.set_defaults(func=cmd_run_now)
+
+    uninstall_parser = sub.add_parser("uninstall", help="Uninstall Module 6 poller runtime assets")
+    uninstall_parser.set_defaults(func=cmd_uninstall)
+
+    publish_parser = sub.add_parser("publish", help="Trigger publication action for Module 7 surface")
+    publish_parser.set_defaults(func=cmd_publish)
 
     return parser
 
