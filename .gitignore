@@ -15,3 +15,7 @@ webui/.svelte-kit/
 webui/build/
 webui/.env
 api/__pycache__/
+
+# MCP runtime artifacts
+.mcp/logs/
+.mcp/tasks/history.json
