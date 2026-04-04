@@ -1,4 +1,6 @@
+
 from __future__ import annotations
+import shutil
 
 import argparse
 import getpass
@@ -115,22 +117,90 @@ def _estimate_cognitive_complexity(text: str) -> int:
 
 def collect_cognitive_complexity(repo_root: Path, roots: list[str]) -> dict[str, Any]:
     files = _iter_frontend_files(repo_root, roots)
-    per_file: dict[str, int] = {}
-    values: list[int] = []
+    eslint_path = shutil.which("eslint")
+    if eslint_path:
+        # Try to run ESLint with complexity plugin and parse results
+        try:
+            # Use --format json for machine-readable output
+            cmd = [eslint_path, "--ext", ".js,.ts,.svelte,.jsx,.tsx", "--format", "json"]
+            for root in roots:
+                cmd.append(str((repo_root / root).resolve()))
+            proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+            if proc.returncode == 0 or proc.returncode == 1:  # 1 = lint errors, still parseable
+                try:
+                    eslint_results = json.loads(proc.stdout)
+                except Exception as exc:
+                    return {
+                        "status": "not_available",
+                        "reason": f"eslint output parse error: {exc}",
+                        "source": "eslint_rules",
+                    }
+                per_file = {}
+                values = []
+                for file_result in eslint_results:
+                    rel = str(Path(file_result.get("filePath", "")).relative_to(str(repo_root)))
+                    # Look for complexity metrics in messages (plugin must be configured)
+                    complexity_score = None
+                    for msg in file_result.get("messages", []):
+                        if "complexity" in msg.get("ruleId", "") and "value" in msg:
+                            try:
+                                complexity_score = int(msg["value"])
+                            except Exception:
+                                continue
+                    if complexity_score is not None:
+                        per_file[rel] = complexity_score
+                        values.append(complexity_score)
+                if values:
+                    return {
+                        "status": "success",
+                        "source": "eslint_rules",
+                        "count": len(values),
+                        "mean": round((sum(values) / len(values)), 4),
+                        "max": max(values),
+                        "per_file": per_file,
+                    }
+                else:
+                    return {
+                        "status": "not_available",
+                        "reason": "eslint ran but no complexity metrics found (plugin missing?)",
+                        "source": "eslint_rules",
+                    }
+            else:
+                return {
+                    "status": "not_available",
+                    "reason": f"eslint failed: {proc.stderr.strip()}",
+                    "source": "eslint_rules",
+                }
+        except Exception as exc:
+            return {
+                "status": "not_available",
+                "reason": f"eslint invocation error: {exc}",
+                "source": "eslint_rules",
+            }
+    # Fallback: heuristic
+    per_file = {}
+    values = []
     for file_path in files:
         rel = str(file_path.relative_to(repo_root))
         text = file_path.read_text(encoding="utf-8", errors="replace")
         score = _estimate_cognitive_complexity(text)
         per_file[rel] = score
         values.append(score)
-
-    return {
-        "status": "success",
-        "count": len(values),
-        "mean": round((sum(values) / len(values)), 4) if values else 0.0,
-        "max": max(values) if values else 0,
-        "per_file": per_file,
-    }
+    if values:
+        return {
+            "status": "success",
+            "source": "heuristic_fallback",
+            "count": len(values),
+            "mean": round((sum(values) / len(values)), 4),
+            "max": max(values),
+            "per_file": per_file,
+        }
+    else:
+        return {
+            "status": "not_available",
+            "reason": "no frontend files found for complexity analysis",
+            "source": "heuristic_fallback",
+        }
 
 
 def collect_dependency_graph(repo_root: Path, roots: list[str]) -> dict[str, Any]:

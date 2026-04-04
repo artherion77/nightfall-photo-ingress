@@ -1,4 +1,35 @@
-from __future__ import annotations
+from pathlib import Path
+def test_collect_cognitive_complexity_heuristic_and_not_available(tmp_path: Path, monkeypatch) -> None:
+    # No ESLint: fallback to heuristic
+    from metrics.runner import frontend_collector
+    (tmp_path / "webui" / "src").mkdir(parents=True)
+    (tmp_path / "webui" / "src" / "a.ts").write_text("if (x) { y(); }", encoding="utf-8")
+    monkeypatch.setattr("shutil.which", lambda name: None)
+    result = frontend_collector.collect_cognitive_complexity(tmp_path, ["webui/src"])
+    assert result["status"] == "success"
+    assert result["source"] == "heuristic_fallback"
+    assert result["count"] == 1
+    assert "a.ts" in next(iter(result["per_file"]))
+
+    # No files: not_available
+    result2 = frontend_collector.collect_cognitive_complexity(tmp_path, ["webui/empty"])
+    assert result2["status"] == "not_available"
+    assert result2["source"] == "heuristic_fallback"
+
+def test_collect_cognitive_complexity_eslint_not_available(monkeypatch, tmp_path: Path) -> None:
+    # Simulate ESLint present but fails
+    from metrics.runner import frontend_collector
+    (tmp_path / "webui" / "src").mkdir(parents=True)
+    (tmp_path / "webui" / "src" / "b.ts").write_text("if (y) { z(); }", encoding="utf-8")
+    monkeypatch.setattr("shutil.which", lambda name: "/usr/bin/eslint")
+    class DummyProc:
+        returncode = 2
+        stdout = ""
+        stderr = "ESLint error"
+    monkeypatch.setattr(frontend_collector.subprocess, "run", lambda *a, **k: DummyProc())
+    result = frontend_collector.collect_cognitive_complexity(tmp_path, ["webui/src"])
+    assert result["status"] == "not_available"
+    assert result["source"] == "eslint_rules"
 
 import json
 from pathlib import Path
