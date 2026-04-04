@@ -43,3 +43,16 @@ Collector outputs are staged under:
 
 - `metrics/output/frontend/<run-id>/...`
 
+Module 4 adds aggregation and delta responsibilities:
+
+- merge backend/frontend module outputs into one `metrics.json`
+- compute delta against previous successful run
+- classify warnings/failures and generate summary severity indicators
+- emit compact `summary.json` for dashboard/report consumers
+
+Module 4 writes:
+
+- `artifacts/metrics/latest/summary.json`
+- `artifacts/metrics/history/<run-id>/summary.json`
+- `metrics/output/aggregator/<run-id>/summary.json` (staged transient output)
+

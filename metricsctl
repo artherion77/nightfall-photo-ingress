@@ -5,6 +5,7 @@ import argparse
 import json
 from pathlib import Path
 
+from metrics.runner.aggregator import run_aggregation
 from metrics.runner.backend_collector import run_backend_collection
 from metrics.runner.frontend_collector import run_frontend_collection
 from metrics.runner.module1_init import initialize_module1
@@ -67,6 +68,16 @@ def cmd_collect_frontend(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_aggregate(args: argparse.Namespace) -> int:
+    root = _repo_root()
+    run_aggregation(
+        repo_root=root,
+        run_id=args.run_id,
+    )
+    print(f"module4 aggregation complete run_id={args.run_id}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Nightfall metrics administrative entrypoint")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -90,6 +101,10 @@ def build_parser() -> argparse.ArgumentParser:
     frontend_parser = sub.add_parser("collect-frontend", help="Run Module 3 frontend metrics collector")
     frontend_parser.add_argument("--run-id", default="module3-bootstrap")
     frontend_parser.set_defaults(func=cmd_collect_frontend)
+
+    aggregate_parser = sub.add_parser("aggregate", help="Run Module 4 aggregator and delta engine")
+    aggregate_parser.add_argument("--run-id", default="module4-bootstrap")
+    aggregate_parser.set_defaults(func=cmd_aggregate)
 
     return parser
 
