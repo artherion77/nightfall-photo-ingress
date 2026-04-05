@@ -3,12 +3,15 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from metrics.runner.aggregator import run_aggregation
 from metrics.runner.module8_ops import (
     apply_retention_policy,
     classify_failure,
     ensure_ops_state,
     run_optional_collectors,
+    _parse_bundle_stats,
 )
 
 
@@ -74,16 +77,31 @@ def test_module8_optional_bundle_size_success_when_enabled(tmp_path: Path) -> No
             ],
         },
     )
-    (tmp_path / "dashboard").mkdir(parents=True, exist_ok=True)
-    (tmp_path / "dashboard" / "index.html").write_text("x", encoding="utf-8")
-    (tmp_path / "reports").mkdir(parents=True, exist_ok=True)
-    (tmp_path / "reports" / "latest.md").write_text("x", encoding="utf-8")
-    _write_json(tmp_path / "artifacts" / "metrics" / "latest" / "manifest.json", {"schema_version": 1})
-    _write_json(tmp_path / "artifacts" / "metrics" / "latest" / "summary.json", {"schema_version": 1})
+
+    # Provide a valid bundle-stats.json so the collector can parse it.
+    bundle_stats = {
+        "schema_version": 1,
+        "chunks": [
+            {
+                "name": "index.js",
+                "type": "js",
+                "raw_bytes": 51200,
+                "gzip_bytes": 17408,
+                "brotli_bytes": 14336,
+                "modules": [{"id": "src/main.ts", "rendered_bytes": 51200}],
+            }
+        ],
+    }
+    (tmp_path / "webui" / "dist").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "webui" / "dist" / "bundle-stats.json").write_text(
+        json.dumps(bundle_stats), encoding="utf-8"
+    )
 
     payload = run_optional_collectors(tmp_path, run_id="module8-enabled")
     assert payload["status"] == "partial"
-    assert payload["collectors"]["bundle_size"]["status"] == "success"
+    assert payload["collectors"]["bundle_size"]["status"] == "available"
+    assert payload["collectors"]["bundle_size"]["total_kb"] == 50.0
+    assert payload["collectors"]["bundle_size"]["chunk_count"] == 1
 
 
 def test_module8_retention_prunes_old_history_runs(tmp_path: Path) -> None:
@@ -144,3 +162,54 @@ def test_module8_aggregation_preserves_optional_module_payload(tmp_path: Path) -
 
     result = run_aggregation(tmp_path, run_id="module8-agg")
     assert "optional_collectors" in result["metrics"]["modules"]
+
+
+# ── Chunk 4: Bundle analysis collector ────────────────────────────────────────
+
+_FIXTURE_DIR = Path(__file__).resolve().parents[2] / "tests" / "fixtures"
+
+
+def test_bundle_stats_parser_against_fixture() -> None:
+    """Unit test: parser produces correct aggregated bundle payload from saved fixture."""
+    stats_path = _FIXTURE_DIR / "bundle_stats_fixture.json"
+    result = _parse_bundle_stats(stats_path)
+
+    assert result["status"] == "available"
+    assert result["source"] == "bundle_stats_json"
+    assert result["chunk_count"] == 3
+
+    # Total raw = 51200 + 30720 + 8192 = 90112 bytes = 88.0 KB
+    assert result["total_kb"] == pytest.approx(88.0, abs=0.1)
+
+    # Gzip total = 17408 + 10752 + 2048 = 30208 bytes = 29.5 KB
+    assert result["gzip_kb"] == pytest.approx(29.5, abs=0.1)
+
+    # Brotli total = 14336 + 9216 + 1638 = 25190 bytes = 24.6 KB
+    assert result["brotli_kb"] == pytest.approx(24.6, abs=0.2)
+
+    # Largest chunk is index-Dt3Pl3Gi.js at 51200 bytes
+    largest = result["largest_chunk"]
+    assert largest["name"] == "index-Dt3Pl3Gi.js"
+    assert largest["raw_bytes"] == 51200
+
+    # Top contributors: should have 5 entries, sorted descending by rendered_bytes
+    top = result["top_contributors"]
+    assert len(top) == 5
+    assert top[0]["id"] == "src/routes/+page.svelte"
+    assert top[0]["rendered_kb"] == pytest.approx(22000 / 1024, abs=0.1)
+
+
+def test_bundle_stats_parser_not_available_on_missing_stats_file(tmp_path: Path) -> None:
+    """Collector returns not_available when no bundle-stats.json exists."""
+    ensure_ops_state(tmp_path)
+    _seed_latest_metrics(tmp_path)
+    _write_json(
+        tmp_path / "metrics" / "state" / "extensions.json",
+        {
+            "schema_version": 1,
+            "collectors": [{"name": "bundle_size", "enabled": True, "optional": True}],
+        },
+    )
+    payload = run_optional_collectors(tmp_path, run_id="module8-no-build")
+    assert payload["collectors"]["bundle_size"]["status"] == "not_available"
+    assert "bundle-stats.json not found" in payload["collectors"]["bundle_size"]["reason"]

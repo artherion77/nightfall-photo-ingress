@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-04-05T10:00:00+00:00",
+  "chunks": [
+    {
+      "name": "index-Dt3Pl3Gi.js",
+      "type": "js",
+      "raw_bytes": 51200,
+      "gzip_bytes": 17408,
+      "brotli_bytes": 14336,
+      "modules": [
+        {"id": "src/routes/+page.svelte", "rendered_bytes": 22000},
+        {"id": "src/lib/DashboardCard.svelte", "rendered_bytes": 12000},
+        {"id": "node_modules/d3-scale/src/index.js", "rendered_bytes": 9000},
+        {"id": "src/lib/SparklineChart.svelte", "rendered_bytes": 5200},
+        {"id": "src/lib/utils.ts", "rendered_bytes": 3000}
+      ]
+    },
+    {
+      "name": "vendor-D4XLq8s.js",
+      "type": "js",
+      "raw_bytes": 30720,
+      "gzip_bytes": 10752,
+      "brotli_bytes": 9216,
+      "modules": [
+        {"id": "node_modules/svelte/index.mjs", "rendered_bytes": 18000},
+        {"id": "node_modules/svelte/store/index.mjs", "rendered_bytes": 7000},
+        {"id": "node_modules/svelte/motion/index.mjs", "rendered_bytes": 5720}
+      ]
+    },
+    {
+      "name": "style-BCtlKvhJ.css",
+      "type": "css",
+      "raw_bytes": 8192,
+      "gzip_bytes": 2048,
+      "brotli_bytes": 1638,
+      "modules": []
+    }
+  ]
+}

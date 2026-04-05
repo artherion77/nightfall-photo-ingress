@@ -124,6 +124,8 @@ Add rule-backed frontend complexity metrics (in addition to or replacing heurist
 
 ## Chunk 4: Bundle analysis collector
 
+Implementation status: Implemented (2026-04-05)
+
 ### Goal
 Expose real bundle intelligence from frontend build artifacts.
 

@@ -153,3 +153,9 @@ def test_module5_dashboard_generation_from_artifacts_only(tmp_path: Path) -> Non
     else:
         # Fallback: flat line (SVG height is 42.0)
         assert dashboard_data["sparklinePoints"] == "0.00,42.00 180.00,42.00"
+
+    # Chunk 4: bundleSizeDetail must be null when no optional collector data is present.
+    assert "system" in dashboard_data
+    assert "bundleSizeDetail" in dashboard_data["system"]
+    assert dashboard_data["system"]["bundleSizeDetail"] is None
+    assert dashboard_data["system"]["bundleSizeKb"] is None

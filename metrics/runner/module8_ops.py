@@ -144,26 +144,81 @@ def append_event_log(repo_root: Path, payload: dict[str, Any]) -> None:
         handle.write(json.dumps(trimmed) + "\n")
 
 
-def _bundle_size_metrics(repo_root: Path) -> dict[str, Any]:
-    targets = [
-        repo_root / "dashboard" / "index.html",
-        repo_root / "metrics" / "output" / "reports" / "latest.md",
-        repo_root / "reports" / "latest.md",
-        repo_root / "artifacts" / "metrics" / "latest" / "manifest.json",
-        repo_root / "artifacts" / "metrics" / "latest" / "metrics.json",
-        repo_root / "artifacts" / "metrics" / "latest" / "summary.json",
+def _parse_bundle_stats(stats_path: Path) -> dict[str, Any]:
+    """Parse a bundle-stats.json file (schema_version 1) and return a rich collector payload."""
+    raw = json.loads(stats_path.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict) or raw.get("schema_version") != 1:
+        raise ValueError("unsupported bundle-stats.json schema")
+    chunks = raw.get("chunks", [])
+    if not isinstance(chunks, list):
+        raise ValueError("bundle-stats.json missing 'chunks' array")
+
+    total_raw = 0
+    total_gzip = 0
+    total_brotli = 0
+    all_modules: list[dict[str, Any]] = []
+    largest_chunk: dict[str, Any] | None = None
+
+    for chunk in chunks:
+        raw_bytes = int(chunk.get("raw_bytes", 0))
+        gzip_bytes = int(chunk.get("gzip_bytes", 0))
+        brotli_bytes = int(chunk.get("brotli_bytes", 0))
+        total_raw += raw_bytes
+        total_gzip += gzip_bytes
+        total_brotli += brotli_bytes
+        if largest_chunk is None or raw_bytes > largest_chunk["raw_bytes"]:
+            largest_chunk = {
+                "name": str(chunk.get("name", "unknown")),
+                "type": str(chunk.get("type", "js")),
+                "raw_bytes": raw_bytes,
+                "raw_kb": round(raw_bytes / 1024, 1),
+            }
+        for mod in chunk.get("modules", []):
+            all_modules.append({
+                "id": str(mod.get("id", "")),
+                "rendered_bytes": int(mod.get("rendered_bytes", 0)),
+            })
+
+    all_modules.sort(key=lambda m: m["rendered_bytes"], reverse=True)
+    top_contributors = [
+        {"id": m["id"], "rendered_kb": round(m["rendered_bytes"] / 1024, 1)}
+        for m in all_modules[:5]
     ]
-    present = [path for path in targets if path.exists()]
-    if not present:
-        return {
-            "status": "not_available",
-            "reason": "presentation artifacts missing",
-        }
-    total_bytes = sum(path.stat().st_size for path in present)
+
     return {
-        "status": "success",
-        "files": len(present),
-        "total_bytes": total_bytes,
+        "status": "available",
+        "source": "bundle_stats_json",
+        "chunk_count": len(chunks),
+        "total_kb": round(total_raw / 1024, 1),
+        "gzip_kb": round(total_gzip / 1024, 1),
+        "brotli_kb": round(total_brotli / 1024, 1),
+        "largest_chunk": largest_chunk,
+        "top_contributors": top_contributors,
+    }
+
+
+def _bundle_size_metrics(repo_root: Path) -> dict[str, Any]:
+    # Prefer a bundle-stats.json produced by the Vite/Rollup build step.
+    stats_candidates = [
+        repo_root / "webui" / "dist" / "bundle-stats.json",
+        repo_root / "frontend" / "dist" / "bundle-stats.json",
+        repo_root / "metrics" / "dashboard" / "dist" / "bundle-stats.json",
+    ]
+    for stats_path in stats_candidates:
+        if stats_path.exists():
+            try:
+                return _parse_bundle_stats(stats_path)
+            except (ValueError, KeyError, TypeError) as exc:
+                return {
+                    "status": "not_available",
+                    "reason": f"bundle-stats.json parse error: {exc}",
+                    "source": "bundle_stats_json",
+                }
+
+    return {
+        "status": "not_available",
+        "reason": "bundle-stats.json not found; run frontend build with bundle visualizer enabled",
+        "source": "none",
     }
 
 
@@ -220,7 +275,7 @@ def run_optional_collectors(repo_root: Path, run_id: str) -> dict[str, Any]:
             "optional": optional,
             **result,
         }
-        if result.get("status") == "success":
+        if result.get("status") in ("success", "available"):
             any_success = True
 
     if not any_enabled:

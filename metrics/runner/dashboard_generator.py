@@ -381,7 +381,13 @@ def _dashboard_payload(repo_root: Path, manifest: dict[str, Any], metrics: dict[
 
     optional_collectors = modules.get("optional_collectors", {}) if isinstance(modules, dict) else {}
     optional_map = optional_collectors.get("collectors", {}) if isinstance(optional_collectors, dict) else {}
-    bundle_size = (optional_map.get("bundle_size") or {}).get("total_bytes") if isinstance(optional_map, dict) else None
+    bundle_entry = (optional_map.get("bundle_size") or {}) if isinstance(optional_map, dict) else {}
+    bundle_status = bundle_entry.get("status")
+    bundle_total_kb = bundle_entry.get("total_kb") if bundle_status == "available" else None
+    bundle_gzip_kb = bundle_entry.get("gzip_kb") if bundle_status == "available" else None
+    bundle_brotli_kb = bundle_entry.get("brotli_kb") if bundle_status == "available" else None
+    bundle_largest_chunk = bundle_entry.get("largest_chunk") if bundle_status == "available" else None
+    bundle_top_contributors = bundle_entry.get("top_contributors") if bundle_status == "available" else None
     openapi_score = (optional_map.get("openapi_complexity") or {}).get("score") if isinstance(optional_map, dict) else None
 
     per_file_backend = backend_loc.get("per_file", {}) if isinstance(backend_loc, dict) else {}
@@ -454,7 +460,14 @@ def _dashboard_payload(repo_root: Path, manifest: dict[str, Any], metrics: dict[
         },
         "system": {
             "apiSurface": api_surface,
-            "bundleSizeKb": round(float(bundle_size) / 1024) if isinstance(bundle_size, (int, float)) else None,
+            "bundleSizeKb": round(float(bundle_total_kb)) if isinstance(bundle_total_kb, (int, float)) else None,
+            "bundleSizeDetail": {
+                "totalKb": bundle_total_kb,
+                "gzipKb": bundle_gzip_kb,
+                "brotliKb": bundle_brotli_kb,
+                "largestChunk": bundle_largest_chunk,
+                "topContributors": bundle_top_contributors,
+            } if bundle_status == "available" else None,
             "openapiScore": float(openapi_score) if isinstance(openapi_score, (int, float)) else None,
         },
         "footer": {
