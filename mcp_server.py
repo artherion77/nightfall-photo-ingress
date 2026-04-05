@@ -1,429 +1,413 @@
 #!/usr/bin/env python3
+"""Nightfall Photo Ingress — MCP stdio server.
+
+Protocol: MCP 2025-03-26 (also accepted: 2024-11-05).
+Transport: stdin/stdout JSON-RPC with Content-Length framing.
+"""
 from __future__ import annotations
 
-import argparse
 import fcntl
 import json
+import logging
 import os
-import shutil
 import subprocess
 import sys
 import threading
 import time
 import uuid
-from dataclasses import dataclass
 from datetime import datetime, timezone
-from http import HTTPStatus
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
+# ── Protocol constants ────────────────────────────────────────────────────────
 
-REPO_LOCK_FILE = "/tmp/nightfall-repo.lock"
+SUPPORTED_PROTOCOL_VERSIONS = ["2025-03-26", "2024-11-05"]
+HISTORY_MAX = 20  # keep only the N most recent task records
+
+# ── Logging (file-only; stdout is reserved for JSON-RPC) ─────────────────────
+
+log = logging.getLogger("nightfall_mcp")
 
 
-def utc_now_iso() -> str:
+def _setup_logging(logs_dir: Path) -> None:
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format="%(asctime)s %(levelname)s %(message)s",
+        handlers=[logging.FileHandler(logs_dir / "mcp_server.log", encoding="utf-8")],
+    )
+
+
+# ── JSON-RPC framing ──────────────────────────────────────────────────────────
+
+def _write(payload: dict[str, Any]) -> None:
+    body = json.dumps(payload).encode("utf-8")
+    sys.stdout.buffer.write(
+        f"Content-Length: {len(body)}\r\n\r\n".encode("ascii") + body
+    )
+    sys.stdout.buffer.flush()
+
+
+def _read() -> dict[str, Any] | None:
+    """Read the next well-formed JSON-RPC message from stdin.
+
+    Returns None only on a clean EOF or unrecoverable I/O error.
+    Silently skips malformed frames so one bad message never kills the server.
+    """
+    while True:
+        # Collect headers until blank line
+        headers: dict[str, str] = {}
+        while True:
+            try:
+                line = sys.stdin.buffer.readline()
+            except OSError as exc:
+                log.error("stdin read error: %s", exc)
+                return None
+            if not line:                   # clean EOF
+                return None
+            stripped = line.rstrip(b"\r\n")
+            if not stripped:               # blank separator line
+                break
+            try:
+                k, _, v = line.decode("ascii", errors="replace").partition(":")
+                headers[k.strip().lower()] = v.strip()
+            except Exception:
+                pass
+
+        # Parse Content-Length
+        try:
+            content_length = int(headers.get("content-length", "0") or "0")
+        except ValueError:
+            log.warning("Skipping frame: invalid Content-Length header")
+            continue
+        if content_length <= 0:
+            log.warning("Skipping frame: Content-Length=%d", content_length)
+            continue
+
+        # Read body
+        try:
+            body = sys.stdin.buffer.read(content_length)
+        except OSError as exc:
+            log.error("stdin body read error: %s", exc)
+            return None
+        if not body:
+            return None  # EOF inside body
+
+        # Decode and parse
+        try:
+            obj = json.loads(body.decode("utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+            log.warning("Skipping malformed JSON frame: %s", exc)
+            continue
+        if not isinstance(obj, dict):
+            log.warning("Skipping non-object JSON frame")
+            continue
+
+        return obj
+
+
+def _ok(msg_id: Any, result: Any) -> dict[str, Any]:
+    return {"jsonrpc": "2.0", "id": msg_id, "result": result}
+
+
+def _err(msg_id: Any, code: int, message: str) -> dict[str, Any]:
+    return {"jsonrpc": "2.0", "id": msg_id, "error": {"code": code, "message": message}}
+
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+REPO_LOCK_FILE = os.environ.get("REPO_LOCK_FILE", "/tmp/nightfall-repo.lock")
+
+
+def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-@dataclass
-class TaskRecord:
-    taskId: str
-    task: str
-    status: str
-    exitCode: int | None
-    startedAt: str
-    finishedAt: str | None
-    cwd: str
-    args: list[str]
-    dependsOn: list[str]
-    significantTask: bool
-    extensionRecommendation: str | None
+# ── Server state ──────────────────────────────────────────────────────────────
 
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "taskId": self.taskId,
-            "task": self.task,
-            "status": self.status,
-            "exitCode": self.exitCode,
-            "startedAt": self.startedAt,
-            "finishedAt": self.finishedAt,
-            "cwd": self.cwd,
-            "args": self.args,
-            "dependsOn": self.dependsOn,
-            "significantTask": self.significantTask,
-            "extensionRecommendation": self.extensionRecommendation,
-        }
+class ServerState:
+    def __init__(self, workspace_root: Path, model_path: Path) -> None:
+        self.workspace_root = workspace_root.resolve()
+        self._mcp_dir = self.workspace_root / ".mcp"
+        self._logs_dir = self._mcp_dir / "logs"
+        self._tasks_dir = self._mcp_dir / "tasks"
+        self._history_file = self._tasks_dir / "history.json"
+        self._extensions_file = self._tasks_dir / "extensions.json"
 
+        self._lock = threading.Lock()
+        self._tasks: dict[str, dict[str, Any]] = {}  # taskId → record
+        self._extensions: list[dict[str, Any]] = []
 
-TERMINAL_STATUSES = {"success", "failed", "completed"}
-SUCCESS_STATUSES = {"success", "completed"}
+        self._logs_dir.mkdir(parents=True, exist_ok=True)
+        self._tasks_dir.mkdir(parents=True, exist_ok=True)
 
-
-def normalize_status(status: str) -> str:
-    if status in SUCCESS_STATUSES:
-        return "success"
-    if status == "failed":
-        return "failed"
-    if status in {"queued", "running", "waiting"}:
-        return status
-    return status
-
-
-def is_terminal_status(status: str) -> bool:
-    return status in TERMINAL_STATUSES
-
-
-class MCPServerState:
-    def __init__(self, workspace_root: Path, model_path: Path):
-        self.workspace_root = workspace_root
-        self.model_path = model_path
-        self.logs_dir = workspace_root / ".mcp" / "logs"
-        self.tasks_dir = workspace_root / ".mcp" / "tasks"
-        self.history_file = self.tasks_dir / "history.json"
-        self.extensions_file = self.tasks_dir / "extensions.json"
-        self.lock = threading.Lock()
-        self.tasks: dict[str, TaskRecord] = {}
-        self.extensions: list[dict[str, Any]] = []
-        self.model = self._load_model()
-        self._ensure_dirs()
+        self._model = self._load_model(model_path)
         self._load_history()
         self._load_extensions()
 
-    def _ensure_dirs(self) -> None:
-        self.logs_dir.mkdir(parents=True, exist_ok=True)
-        self.tasks_dir.mkdir(parents=True, exist_ok=True)
+    # ── Persistence ───────────────────────────────────────────────────────
 
-    def _load_model(self) -> dict[str, Any]:
-        data = json.loads(self.model_path.read_text(encoding="utf-8"))
-        if not isinstance(data, dict):
-            raise ValueError("Model file must contain a JSON object")
-        if "mappings" not in data or not isinstance(data["mappings"], dict):
-            raise ValueError("Model file must contain object key 'mappings'")
+    def _load_model(self, path: Path) -> dict[str, Any]:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(data, dict) or not isinstance(data.get("mappings"), dict):
+            raise ValueError(f"Invalid model file: {path}")
         return data
 
     def _load_history(self) -> None:
-        if not self.history_file.exists():
+        if not self._history_file.exists():
             return
         try:
-            raw = json.loads(self.history_file.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
+            records = json.loads(self._history_file.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
             return
-        if not isinstance(raw, list):
-            return
-        for item in raw:
-            if not isinstance(item, dict):
-                continue
-            task_id = item.get("taskId")
-            if not isinstance(task_id, str):
-                continue
-            self.tasks[task_id] = TaskRecord(
-                taskId=task_id,
-                task=str(item.get("task", "")),
-                status=str(item.get("status", "failed")),
-                exitCode=item.get("exitCode"),
-                startedAt=str(item.get("startedAt", "")),
-                finishedAt=item.get("finishedAt"),
-                cwd=str(item.get("cwd", str(self.workspace_root))),
-                args=list(item.get("args", [])),
-                dependsOn=list(item.get("dependsOn", [])),
-                significantTask=bool(item.get("significantTask", False)),
-                extensionRecommendation=(
-                    str(item.get("extensionRecommendation"))
-                    if item.get("extensionRecommendation") is not None
-                    else None
-                ),
-            )
-
-    def _persist_history(self) -> None:
-        with self.lock:
-            payload = [record.to_dict() for record in self.tasks.values()]
-            self.history_file.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        if isinstance(records, list):
+            for r in records:
+                if isinstance(r, dict) and isinstance(r.get("taskId"), str):
+                    self._tasks[r["taskId"]] = r
 
     def _load_extensions(self) -> None:
-        if not self.extensions_file.exists():
+        if not self._extensions_file.exists():
             return
         try:
-            raw = json.loads(self.extensions_file.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
+            data = json.loads(self._extensions_file.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
             return
-        if isinstance(raw, list):
-            self.extensions = [item for item in raw if isinstance(item, dict)]
+        if isinstance(data, list):
+            self._extensions = [x for x in data if isinstance(x, dict)]
 
-    def _persist_extensions(self) -> None:
-        with self.lock:
-            self.extensions_file.write_text(
-                json.dumps(self.extensions, indent=2),
-                encoding="utf-8",
+    def _save_history(self) -> None:
+        """Persist history, keeping only the HISTORY_MAX most recent tasks."""
+        all_records = sorted(
+            self._tasks.values(),
+            key=lambda r: r.get("startedAt", ""),
+            reverse=True,
+        )
+        kept = all_records[:HISTORY_MAX]
+        # Evict purged records from in-memory dict as well
+        self._tasks = {r["taskId"]: r for r in kept}
+        try:
+            self._history_file.write_text(json.dumps(kept, indent=2), encoding="utf-8")
+        except OSError as exc:
+            log.warning("Could not persist task history: %s", exc)
+
+    def _save_extensions(self) -> None:
+        try:
+            self._extensions_file.write_text(
+                json.dumps(self._extensions, indent=2), encoding="utf-8"
             )
+        except OSError as exc:
+            log.warning("Could not persist extensions: %s", exc)
 
-    def get_mapping(self, task_name: str) -> list[str] | None:
-        mapping = self.model.get("mappings", {})
-        commands = mapping.get(task_name)
-        if not isinstance(commands, list):
-            return None
-        if not all(isinstance(item, str) for item in commands):
-            return None
-        return commands
+    # ── Task execution ────────────────────────────────────────────────────
 
-    def enqueue_task(
+    def enqueue(
         self,
         task_name: str,
-        args: list[str] | None,
-        env: dict[str, str] | None,
-        cwd: str | None,
-        depends_on: list[str] | None,
+        *,
+        args: list[str] | None = None,
+        env: dict[str, str] | None = None,
+        cwd: str | None = None,
+        depends_on: list[str] | None = None,
         significant_task: bool = False,
         extension_recommendation: str | None = None,
     ) -> str:
-        commands = self.get_mapping(task_name)
-        if commands is None:
-            raise ValueError(f"Unknown task mapping: {task_name}")
+        mapping = self._model["mappings"].get(task_name)
+        if not isinstance(mapping, list) or not all(isinstance(c, str) for c in mapping):
+            raise ValueError(f"Unknown task mapping: {task_name!r}")
+
+        cwd_path = self.workspace_root
+        if cwd is not None:
+            cwd_path = (self.workspace_root / cwd).resolve()
+            if not str(cwd_path).startswith(str(self.workspace_root)):
+                raise ValueError("cwd must be inside workspace root")
+
+        with self._lock:
+            for dep_id in depends_on or []:
+                if not isinstance(dep_id, str):
+                    raise ValueError("dependsOn entries must be strings")
+                if dep_id not in self._tasks:
+                    raise ValueError(f"dependsOn task not found: {dep_id!r}")
 
         task_id = str(uuid.uuid4())
-        cwd_path = self.workspace_root if cwd is None else (self.workspace_root / cwd).resolve()
-        if not str(cwd_path).startswith(str(self.workspace_root.resolve())):
-            raise ValueError("cwd must stay inside workspace root")
+        record: dict[str, Any] = {
+            "taskId": task_id,
+            "task": task_name,
+            "status": "queued",
+            "exitCode": None,
+            "startedAt": _now(),
+            "finishedAt": None,
+            "cwd": str(cwd_path),
+            "args": args or [],
+            "dependsOn": list(depends_on or []),
+            "significantTask": significant_task,
+            "extensionRecommendation": extension_recommendation,
+        }
+        with self._lock:
+            self._tasks[task_id] = record
+            self._save_history()
 
-        validated_dependencies: list[str] = []
-        for dep_task_id in depends_on or []:
-            if not isinstance(dep_task_id, str) or not dep_task_id.strip():
-                raise ValueError("dependsOn entries must be non-empty strings")
-            dep = self.tasks.get(dep_task_id)
-            if dep is None:
-                raise ValueError(f"dependsOn taskId not found: {dep_task_id}")
-            if dep_task_id == task_id:
-                raise ValueError("dependsOn cannot include the current task")
-            validated_dependencies.append(dep_task_id)
-
-        record = TaskRecord(
-            taskId=task_id,
-            task=task_name,
-            status="queued",
-            exitCode=None,
-            startedAt=utc_now_iso(),
-            finishedAt=None,
-            cwd=str(cwd_path),
-            args=args or [],
-            dependsOn=validated_dependencies,
-            significantTask=significant_task,
-            extensionRecommendation=extension_recommendation.strip() if extension_recommendation else None,
-        )
-        with self.lock:
-            self.tasks[task_id] = record
-        self._persist_history()
-
-        thread = threading.Thread(
+        threading.Thread(
             target=self._run_task,
-            args=(task_id, commands, env or {}, str(cwd_path)),
+            args=(task_id, list(mapping), dict(env or {}), str(cwd_path)),
             daemon=True,
-        )
-        thread.start()
+        ).start()
         return task_id
 
-    def _run_task(self, task_id: str, commands: list[str], env: dict[str, str], cwd: str) -> None:
-        log_path = self.logs_dir / f"{task_id}.log"
-        with self.lock:
-            record = self.tasks[task_id]
-            record.status = "waiting" if record.dependsOn else "running"
-            if not record.dependsOn:
-                record.startedAt = utc_now_iso()
-        self._persist_history()
+    def _run_task(
+        self, task_id: str, commands: list[str], extra_env: dict[str, str], cwd: str
+    ) -> None:
+        log_path = self._logs_dir / f"{task_id}.log"
+        merged_env = {**os.environ, **extra_env, "DEVCTL_GLOBAL_LOCK_HELD": "1"}
 
-        merged_env = os.environ.copy()
-        for key, value in env.items():
-            if isinstance(key, str) and isinstance(value, str):
-                merged_env[key] = value
-        merged_env["DEVCTL_GLOBAL_LOCK_HELD"] = "1"
+        with self._lock:
+            record = self._tasks[task_id]
+            record["status"] = "waiting" if record["dependsOn"] else "running"
 
         exit_code = 0
-        with log_path.open("a", encoding="utf-8") as log_file:
-            if record.dependsOn:
-                deps = ",".join(record.dependsOn)
-                log_file.write(f"[{utc_now_iso()}] task={record.task} status=waiting dependsOn={deps}\n")
-            else:
-                log_file.write(f"[{utc_now_iso()}] task={record.task} status=running\n")
+        with log_path.open("w", encoding="utf-8") as lf:
+            lf.write(f"[{_now()}] task={record['task']} status={record['status']}\n")
 
-            if record.dependsOn:
-                wait_failure: str | None = None
-                while True:
-                    with self.lock:
-                        dep_records = [(dep_id, self.tasks.get(dep_id)) for dep_id in record.dependsOn]
-                    missing = [dep_id for dep_id, dep_record in dep_records if dep_record is None]
-                    if missing:
-                        wait_failure = f"Dependency missing: {missing[0]}"
+            # Wait for dependencies
+            if record["dependsOn"]:
+                failure: str | None = None
+                while failure is None:
+                    with self._lock:
+                        deps = [(d, self._tasks.get(d)) for d in record["dependsOn"]]
+                    for dep_id, dep in deps:
+                        if dep is None:
+                            failure = f"dependency missing: {dep_id}"
+                            break
+                        if dep["status"] == "failed":
+                            failure = f"dependency failed: {dep_id}"
+                            break
+                    else:
+                        all_done = all(
+                            dep is not None and dep["status"] in ("success", "completed")
+                            for _, dep in deps
+                        )
+                        if all_done:
+                            break
+                    if failure:
                         break
-
-                    failed_dep = next(
-                        (
-                            dep_id
-                            for dep_id, dep_record in dep_records
-                            if dep_record is not None and normalize_status(dep_record.status) == "failed"
-                        ),
-                        None,
-                    )
-                    if failed_dep is not None:
-                        wait_failure = f"Dependency failed: {failed_dep}"
-                        break
-
-                    all_done = all(
-                        dep_record is not None and normalize_status(dep_record.status) == "success"
-                        for _, dep_record in dep_records
-                    )
-                    if all_done:
-                        break
-
                     time.sleep(0.25)
 
-                if wait_failure is not None:
-                    exit_code = 1
-                    log_file.write(f"{wait_failure}\n")
-                    with self.lock:
-                        record = self.tasks[task_id]
-                        record.exitCode = exit_code
-                        record.status = "failed"
-                        record.finishedAt = utc_now_iso()
-                    self._persist_history()
+                if failure:
+                    lf.write(f"{failure}\n")
+                    with self._lock:
+                        record["status"] = "failed"
+                        record["exitCode"] = 1
+                        record["finishedAt"] = _now()
+                        self._save_history()
                     return
 
-                with self.lock:
-                    record = self.tasks[task_id]
-                    record.status = "running"
-                    record.startedAt = utc_now_iso()
-                self._persist_history()
-                log_file.write(f"[{utc_now_iso()}] dependencies satisfied; task={record.task} status=running\n")
+                with self._lock:
+                    record["status"] = "running"
+                lf.write(f"[{_now()}] dependencies satisfied, running\n")
 
-            for command in commands:
-                log_file.write(f"$ {command}\n")
-                log_file.flush()
-                os.makedirs(os.path.dirname(REPO_LOCK_FILE), exist_ok=True)
-                with open(REPO_LOCK_FILE, "w", encoding="utf-8") as lock_handle:
-                    fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX)
-                    proc = subprocess.Popen(
-                        command,
-                        shell=True,
-                        cwd=cwd,
-                        env=merged_env,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.STDOUT,
-                        text=True,
-                    )
-                    assert proc.stdout is not None
-                    for line in proc.stdout:
-                        log_file.write(line)
-                    proc.wait()
-                if proc.returncode != 0:
+            # Execute commands sequentially
+            for cmd in commands:
+                lf.write(f"$ {cmd}\n")
+                lf.flush()
+                try:
+                    os.makedirs(os.path.dirname(REPO_LOCK_FILE), exist_ok=True)
+                    with open(REPO_LOCK_FILE, "w") as lock_fh:
+                        fcntl.flock(lock_fh, fcntl.LOCK_EX)
+                        proc = subprocess.Popen(
+                            cmd,
+                            shell=True,
+                            cwd=cwd,
+                            env=merged_env,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT,
+                            text=True,
+                        )
+                        for line in proc.stdout:  # type: ignore[union-attr]
+                            lf.write(line)
+                        proc.wait()
                     exit_code = proc.returncode
-                    log_file.write(f"Command failed with exit code {exit_code}\n")
+                except OSError as exc:
+                    lf.write(f"error launching command: {exc}\n")
+                    exit_code = 1
+                if exit_code != 0:
+                    lf.write(f"command exited with code {exit_code}\n")
                     break
 
-        with self.lock:
-            record = self.tasks[task_id]
-            record.exitCode = exit_code
-            record.status = "success" if exit_code == 0 else "failed"
-            record.finishedAt = utc_now_iso()
-        self._persist_history()
+        with self._lock:
+            record["status"] = "success" if exit_code == 0 else "failed"
+            record["exitCode"] = exit_code
+            record["finishedAt"] = _now()
+            self._save_history()
 
-        if record.significantTask and record.extensionRecommendation:
+        if record.get("significantTask") and record.get("extensionRecommendation"):
             self.propose_extension(
-                recommendation=record.extensionRecommendation,
-                related_task_id=record.taskId,
-                task_name=record.task,
-                source="post_significant_task_review",
+                recommendation=record["extensionRecommendation"],
+                related_task_id=task_id,
+                task_name=record["task"],
+                source="post_significant_task",
             )
 
-    def status(self, task_id: str) -> dict[str, Any] | None:
-        with self.lock:
-            record = self.tasks.get(task_id)
-            if record is None:
-                return None
-            return {
-                "taskId": record.taskId,
-                "status": record.status,
-                "normalizedStatus": normalize_status(record.status),
-                "terminal": is_terminal_status(record.status),
-                "exitCode": record.exitCode,
-                "startedAt": record.startedAt,
-                "finishedAt": record.finishedAt,
-            }
+    # ── Queries ───────────────────────────────────────────────────────────
 
-    def read_log(self, task_id: str, tail: int | None = None) -> str | None:
-        log_path = self.logs_dir / f"{task_id}.log"
+    def task_status(self, task_id: str) -> dict[str, Any] | None:
+        with self._lock:
+            r = self._tasks.get(task_id)
+        if r is None:
+            return None
+        return {k: r.get(k) for k in ("taskId", "task", "status", "exitCode", "startedAt", "finishedAt")}
+
+    def task_log(self, task_id: str, tail: int | None = None) -> str | None:
+        log_path = self._logs_dir / f"{task_id}.log"
         if not log_path.exists():
             return None
         text = log_path.read_text(encoding="utf-8")
-        if tail is None:
-            return text
-        lines = text.splitlines()
-        return "\n".join(lines[-tail:])
+        if tail:
+            return "\n".join(text.splitlines()[-tail:])
+        return text
+
+    def context(self) -> dict[str, Any]:
+        devctl_rel = self._model.get("devctl", {}).get("path", "dev/bin/devctl")
+        stagectl_rel = self._model.get("stagectl", {}).get("path", "dev/bin/stagingctl")
+        devctl = self.workspace_root / devctl_rel
+        stagectl = self.workspace_root / stagectl_rel
+        return {
+            "model": self._model,
+            "runtime": {
+                "workspaceRoot": str(self.workspace_root),
+                "devctl": {"path": str(devctl), "exists": devctl.exists()},
+                "stagectl": {"path": str(stagectl), "exists": stagectl.exists()},
+                "taskHistoryCount": len(self._tasks),
+                "extensionsBacklogCount": len(self._extensions),
+            },
+        }
 
     def verify(self, verify_key: str, target: str) -> dict[str, Any]:
-        verifications = self.model.get("verifications", {})
-        scoped = verifications.get(verify_key)
-        if not isinstance(scoped, dict):
-            raise ValueError(f"Unknown verification key: {verify_key}")
-        commands = scoped.get(target)
-        if not isinstance(commands, list) or not all(isinstance(item, str) for item in commands):
-            raise ValueError(f"No verification mapping for target: {target}")
-
-        details: list[dict[str, Any]] = []
-        merged_env = os.environ.copy()
+        verifs = self._model.get("verifications", {})
+        scope = verifs.get(verify_key)
+        if not isinstance(scope, dict):
+            raise ValueError(f"Unknown verification key: {verify_key!r}")
+        commands = scope.get(target)
+        if not isinstance(commands, list):
+            raise ValueError(f"No verification for target: {target!r}")
+        results = []
         passed = True
-        for command in commands:
+        for cmd in commands:
             proc = subprocess.run(
-                command,
+                cmd,
                 shell=True,
                 cwd=str(self.workspace_root),
-                env=merged_env,
                 capture_output=True,
                 text=True,
             )
-            detail = {
-                "command": command,
+            results.append({
+                "command": cmd,
                 "exitCode": proc.returncode,
                 "stdout": proc.stdout,
                 "stderr": proc.stderr,
-            }
-            details.append(detail)
+            })
             if proc.returncode != 0:
                 passed = False
                 break
-        return {"passed": passed, "details": details}
-
-    def context(self) -> dict[str, Any]:
-        devctl = self.model.get("devctl", {})
-        stagectl = self.model.get("stagectl", {})
-        devctl_path = self.workspace_root / str(devctl.get("path", ""))
-        stagectl_path = self.workspace_root / str(stagectl.get("path", ""))
-
-        devcontainer_cli = shutil.which("devcontainer")
-        runtime = {
-            "workspaceRoot": str(self.workspace_root),
-            "devctl": {
-                "path": str(devctl_path),
-                "exists": devctl_path.exists(),
-                "executable": os.access(devctl_path, os.X_OK),
-            },
-            "stagectl": {
-                "path": str(stagectl_path),
-                "exists": stagectl_path.exists(),
-                "executable": os.access(stagectl_path, os.X_OK),
-            },
-            "devcontainer": {
-                "cliAvailable": devcontainer_cli is not None,
-                "devcontainerJsonExists": (self.workspace_root / ".devcontainer" / "devcontainer.json").exists(),
-            },
-            "extensionPolicy": {
-                "enabled": True,
-                "extensionsBacklogCount": len(self.extensions),
-                "extensionsBacklogPath": str(self.extensions_file),
-            },
-            "statusModel": {
-                "terminalStatuses": ["success", "failed", "completed"],
-                "preferredPollingTerminalStatuses": ["success", "failed"],
-            },
-        }
-        return {"model": self.model, "runtime": runtime}
+        return {"passed": passed, "results": results}
 
     def propose_extension(
         self,
@@ -435,216 +419,34 @@ class MCPServerState:
     ) -> dict[str, Any]:
         proposal = {
             "proposalId": str(uuid.uuid4()),
-            "createdAt": utc_now_iso(),
+            "createdAt": _now(),
             "source": source,
             "relatedTaskId": related_task_id,
             "task": task_name,
             "recommendation": recommendation,
             "status": "proposed",
         }
-        self.extensions.append(proposal)
-        self._persist_extensions()
+        self._extensions.append(proposal)
+        self._save_extensions()
         return proposal
 
 
-def json_response(handler: BaseHTTPRequestHandler, status: int, payload: dict[str, Any]) -> None:
-    body = json.dumps(payload).encode("utf-8")
-    handler.send_response(status)
-    handler.send_header("Content-Type", "application/json")
-    handler.send_header("Content-Length", str(len(body)))
-    handler.end_headers()
-    handler.wfile.write(body)
+# ── Tool schema ───────────────────────────────────────────────────────────────
 
-
-def parse_json_body(handler: BaseHTTPRequestHandler) -> dict[str, Any]:
-    length = int(handler.headers.get("Content-Length", "0"))
-    raw = handler.rfile.read(length) if length else b"{}"
-    if not raw:
-        return {}
-    data = json.loads(raw.decode("utf-8"))
-    if not isinstance(data, dict):
-        raise ValueError("JSON body must be an object")
-    return data
-
-
-def make_handler(state: MCPServerState):
-    class MCPHandler(BaseHTTPRequestHandler):
-        server_version = "NightfallMCP/1.0"
-
-        def log_message(self, fmt: str, *args: Any) -> None:
-            return
-
-        def do_GET(self) -> None:
-            if self.path == "/mcp/context":
-                json_response(self, HTTPStatus.OK, state.context())
-                return
-
-            if self.path.startswith("/mcp/status/"):
-                task_id = self.path.split("/mcp/status/", 1)[1]
-                status_payload = state.status(task_id)
-                if status_payload is None:
-                    json_response(self, HTTPStatus.NOT_FOUND, {"error": "taskId not found"})
-                    return
-                json_response(self, HTTPStatus.OK, status_payload)
-                return
-
-            if self.path.startswith("/mcp/log/"):
-                task_id = self.path.split("/mcp/log/", 1)[1]
-                log_text = state.read_log(task_id, tail=200)
-                if log_text is None:
-                    json_response(self, HTTPStatus.NOT_FOUND, {"error": "log not found"})
-                    return
-                json_response(self, HTTPStatus.OK, {"taskId": task_id, "log": log_text})
-                return
-
-            if self.path == "/mcp/extensions":
-                json_response(self, HTTPStatus.OK, {"extensions": state.extensions})
-                return
-
-            json_response(self, HTTPStatus.NOT_FOUND, {"error": "not found"})
-
-        def do_POST(self) -> None:
-            try:
-                payload = parse_json_body(self)
-            except (json.JSONDecodeError, ValueError) as exc:
-                json_response(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
-                return
-
-            if self.path == "/mcp/exec":
-                task_name = payload.get("task")
-                args = payload.get("args")
-                env = payload.get("env")
-                cwd = payload.get("cwd")
-                depends_on = payload.get("dependsOn")
-                significant_task = payload.get("significantTask", False)
-                extension_recommendation = payload.get("extensionRecommendation")
-
-                if not isinstance(task_name, str):
-                    json_response(self, HTTPStatus.BAD_REQUEST, {"error": "task must be a string"})
-                    return
-                if args is not None and not isinstance(args, list):
-                    json_response(self, HTTPStatus.BAD_REQUEST, {"error": "args must be a list"})
-                    return
-                if env is not None and not isinstance(env, dict):
-                    json_response(self, HTTPStatus.BAD_REQUEST, {"error": "env must be an object"})
-                    return
-                if cwd is not None and not isinstance(cwd, str):
-                    json_response(self, HTTPStatus.BAD_REQUEST, {"error": "cwd must be a string or null"})
-                    return
-                if depends_on is not None:
-                    if not isinstance(depends_on, list) or not all(isinstance(item, str) for item in depends_on):
-                        json_response(self, HTTPStatus.BAD_REQUEST, {"error": "dependsOn must be an array of taskId strings"})
-                        return
-                if not isinstance(significant_task, bool):
-                    json_response(self, HTTPStatus.BAD_REQUEST, {"error": "significantTask must be a boolean"})
-                    return
-                if extension_recommendation is not None and not isinstance(extension_recommendation, str):
-                    json_response(self, HTTPStatus.BAD_REQUEST, {"error": "extensionRecommendation must be a string or null"})
-                    return
-
-                try:
-                    task_id = state.enqueue_task(
-                        task_name,
-                        args,
-                        env,
-                        cwd,
-                        depends_on,
-                        significant_task=significant_task,
-                        extension_recommendation=extension_recommendation,
-                    )
-                except ValueError as exc:
-                    json_response(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
-                    return
-                json_response(self, HTTPStatus.ACCEPTED, {"taskId": task_id, "status": "queued"})
-                return
-
-            if self.path == "/mcp/extensions/propose":
-                recommendation = payload.get("recommendation")
-                related_task_id = payload.get("relatedTaskId")
-                task_name = payload.get("task")
-
-                if not isinstance(recommendation, str) or not recommendation.strip():
-                    json_response(self, HTTPStatus.BAD_REQUEST, {"error": "recommendation must be a non-empty string"})
-                    return
-                if related_task_id is not None and not isinstance(related_task_id, str):
-                    json_response(self, HTTPStatus.BAD_REQUEST, {"error": "relatedTaskId must be a string or null"})
-                    return
-                if task_name is not None and not isinstance(task_name, str):
-                    json_response(self, HTTPStatus.BAD_REQUEST, {"error": "task must be a string or null"})
-                    return
-
-                proposal = state.propose_extension(
-                    recommendation=recommendation.strip(),
-                    related_task_id=related_task_id,
-                    task_name=task_name,
-                    source="manual",
-                )
-                json_response(self, HTTPStatus.CREATED, proposal)
-                return
-
-            if self.path == "/mcp/verify":
-                verify_key = payload.get("verify")
-                target = payload.get("target")
-                if not isinstance(verify_key, str) or not isinstance(target, str):
-                    json_response(self, HTTPStatus.BAD_REQUEST, {"error": "verify and target must be strings"})
-                    return
-                try:
-                    result = state.verify(verify_key, target)
-                except ValueError as exc:
-                    json_response(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
-                    return
-                json_response(self, HTTPStatus.OK, result)
-                return
-
-            json_response(self, HTTPStatus.NOT_FOUND, {"error": "not found"})
-
-    return MCPHandler
-
-
-def _stdio_write(payload: dict[str, Any]) -> None:
-    body = json.dumps(payload).encode("utf-8")
-    header = f"Content-Length: {len(body)}\r\n\r\n".encode("ascii")
-    sys.stdout.buffer.write(header)
-    sys.stdout.buffer.write(body)
-    sys.stdout.buffer.flush()
-
-
-def _stdio_read() -> dict[str, Any] | None:
-    headers: dict[str, str] = {}
-    while True:
-        line = sys.stdin.buffer.readline()
-        if not line:
-            return None
-        if line in (b"\r\n", b"\n"):
-            break
-        key, _, value = line.decode("ascii", errors="replace").partition(":")
-        headers[key.strip().lower()] = value.strip()
-
-    content_length = int(headers.get("content-length", "0") or "0")
-    if content_length <= 0:
-        return None
-    raw = sys.stdin.buffer.read(content_length)
-    if not raw:
-        return None
-    parsed = json.loads(raw.decode("utf-8"))
-    if not isinstance(parsed, dict):
-        return None
-    return parsed
-
-
-def _mcp_tool_list() -> list[dict[str, Any]]:
+def _tool_list() -> list[dict[str, Any]]:
+    S = {"type": "string"}
     return [
         {
             "name": "mcp.exec",
-            "description": "Queue a mapped MCP task from .mcp/model.json mappings.",
+            "description": "Queue a devctl task from .mcp/model.json mappings and return its taskId.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "task": {"type": "string"},
-                    "args": {"type": "array", "items": {"type": "string"}},
-                    "env": {"type": "object", "additionalProperties": {"type": "string"}},
-                    "cwd": {"type": "string"},
-                    "dependsOn": {"type": "array", "items": {"type": "string"}},
+                    "task": {"type": "string", "description": "Mapping key from model.json"},
+                    "args": {"type": "array", "items": S, "description": "Extra CLI args"},
+                    "env": {"type": "object", "additionalProperties": S},
+                    "cwd": {"type": "string", "description": "Working dir relative to workspace root"},
+                    "dependsOn": {"type": "array", "items": S, "description": "taskIds to wait for"},
                     "significantTask": {"type": "boolean"},
                     "extensionRecommendation": {"type": "string"},
                 },
@@ -656,19 +458,16 @@ def _mcp_tool_list() -> list[dict[str, Any]]:
             "description": "Get task status by taskId.",
             "inputSchema": {
                 "type": "object",
-                "properties": {"taskId": {"type": "string"}},
+                "properties": {"taskId": S},
                 "required": ["taskId"],
             },
         },
         {
             "name": "mcp.log",
-            "description": "Get task log by taskId.",
+            "description": "Get task log. Optional 'tail' limits to last N lines.",
             "inputSchema": {
                 "type": "object",
-                "properties": {
-                    "taskId": {"type": "string"},
-                    "tail": {"type": "integer"},
-                },
+                "properties": {"taskId": S, "tail": {"type": "integer"}},
                 "required": ["taskId"],
             },
         },
@@ -682,10 +481,7 @@ def _mcp_tool_list() -> list[dict[str, Any]]:
             "description": "Run verification commands from .mcp/model.json verifications.",
             "inputSchema": {
                 "type": "object",
-                "properties": {
-                    "verify": {"type": "string"},
-                    "target": {"type": "string"},
-                },
+                "properties": {"verify": S, "target": S},
                 "required": ["verify", "target"],
             },
         },
@@ -700,9 +496,9 @@ def _mcp_tool_list() -> list[dict[str, Any]]:
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "recommendation": {"type": "string"},
-                    "relatedTaskId": {"type": "string"},
-                    "task": {"type": "string"},
+                    "recommendation": S,
+                    "relatedTaskId": S,
+                    "task": S,
                 },
                 "required": ["recommendation"],
             },
@@ -710,167 +506,172 @@ def _mcp_tool_list() -> list[dict[str, Any]]:
     ]
 
 
-def _tool_text(payload: dict[str, Any], is_error: bool = False) -> dict[str, Any]:
+def _tool_result(payload: dict[str, Any], *, is_error: bool = False) -> dict[str, Any]:
     return {
         "content": [{"type": "text", "text": json.dumps(payload, indent=2)}],
-        "structuredContent": payload,
         "isError": is_error,
     }
 
 
-def run_stdio_server(state: MCPServerState) -> None:
-    while True:
-        msg = _stdio_read()
-        if msg is None:
-            break
+# ── Request dispatch ──────────────────────────────────────────────────────────
 
-        method = msg.get("method")
-        msg_id = msg.get("id")
-        params = msg.get("params") if isinstance(msg.get("params"), dict) else {}
+def _dispatch(state: ServerState, msg: dict[str, Any]) -> None:
+    method: str = msg.get("method", "")
+    msg_id = msg.get("id")          # None for notifications
+    params: dict[str, Any] = msg.get("params") if isinstance(msg.get("params"), dict) else {}  # type: ignore[assignment]
 
-        if method == "notifications/initialized":
-            continue
-        if method == "exit":
-            break
+    log.debug("recv method=%s id=%s", method, msg_id)
 
-        if msg_id is None:
-            continue
+    # Notifications have no id and require no response
+    if method == "notifications/initialized":
+        return
+    if method == "exit":
+        raise SystemExit(0)
+    if msg_id is None:
+        return  # other notifications; ignore
 
-        try:
-            if method == "initialize":
-                _stdio_write(
-                    {
-                        "jsonrpc": "2.0",
-                        "id": msg_id,
-                        "result": {
-                            "protocolVersion": "2024-11-05",
-                            "capabilities": {"tools": {}},
-                            "serverInfo": {"name": "nightfall-mcp", "version": "1.0.0"},
-                        },
-                    }
-                )
-                continue
-
-            if method == "tools/list":
-                _stdio_write({"jsonrpc": "2.0", "id": msg_id, "result": {"tools": _mcp_tool_list()}})
-                continue
-
-            if method == "tools/call":
-                tool_name = params.get("name")
-                arguments = params.get("arguments") if isinstance(params.get("arguments"), dict) else {}
-
-                if tool_name == "mcp.exec":
-                    task_name = arguments.get("task")
-                    if not isinstance(task_name, str):
-                        raise ValueError("mcp.exec requires string argument 'task'")
-                    task_id = state.enqueue_task(
-                        task_name=task_name,
-                        args=arguments.get("args") if isinstance(arguments.get("args"), list) else None,
-                        env=arguments.get("env") if isinstance(arguments.get("env"), dict) else None,
-                        cwd=arguments.get("cwd") if isinstance(arguments.get("cwd"), str) else None,
-                        depends_on=arguments.get("dependsOn") if isinstance(arguments.get("dependsOn"), list) else None,
-                        significant_task=bool(arguments.get("significantTask", False)),
-                        extension_recommendation=(
-                            arguments.get("extensionRecommendation")
-                            if isinstance(arguments.get("extensionRecommendation"), str)
-                            else None
-                        ),
-                    )
-                    result = _tool_text({"taskId": task_id, "status": "queued"})
-                elif tool_name == "mcp.status":
-                    task_id = arguments.get("taskId")
-                    if not isinstance(task_id, str):
-                        raise ValueError("mcp.status requires string argument 'taskId'")
-                    status_payload = state.status(task_id)
-                    if status_payload is None:
-                        result = _tool_text({"error": "taskId not found"}, is_error=True)
-                    else:
-                        result = _tool_text(status_payload)
-                elif tool_name == "mcp.log":
-                    task_id = arguments.get("taskId")
-                    if not isinstance(task_id, str):
-                        raise ValueError("mcp.log requires string argument 'taskId'")
-                    tail = arguments.get("tail")
-                    log_text = state.read_log(task_id, tail=tail if isinstance(tail, int) else None)
-                    if log_text is None:
-                        result = _tool_text({"error": "log not found"}, is_error=True)
-                    else:
-                        result = _tool_text({"taskId": task_id, "log": log_text})
-                elif tool_name == "mcp.context":
-                    result = _tool_text(state.context())
-                elif tool_name == "mcp.verify":
-                    verify_key = arguments.get("verify")
-                    target = arguments.get("target")
-                    if not isinstance(verify_key, str) or not isinstance(target, str):
-                        raise ValueError("mcp.verify requires string arguments 'verify' and 'target'")
-                    result = _tool_text(state.verify(verify_key, target))
-                elif tool_name == "mcp.extensions.list":
-                    result = _tool_text({"extensions": state.extensions})
-                elif tool_name == "mcp.extensions.propose":
-                    recommendation = arguments.get("recommendation")
-                    if not isinstance(recommendation, str) or not recommendation.strip():
-                        raise ValueError("mcp.extensions.propose requires non-empty string 'recommendation'")
-                    related_task_id = arguments.get("relatedTaskId")
-                    task_name = arguments.get("task")
-                    result = _tool_text(
-                        state.propose_extension(
-                            recommendation=recommendation.strip(),
-                            related_task_id=related_task_id if isinstance(related_task_id, str) else None,
-                            task_name=task_name if isinstance(task_name, str) else None,
-                            source="manual",
-                        )
-                    )
-                else:
-                    raise ValueError(f"Unknown tool: {tool_name}")
-
-                _stdio_write({"jsonrpc": "2.0", "id": msg_id, "result": result})
-                continue
-
-            if method == "shutdown":
-                _stdio_write({"jsonrpc": "2.0", "id": msg_id, "result": None})
-                continue
-
-            _stdio_write(
-                {
-                    "jsonrpc": "2.0",
-                    "id": msg_id,
-                    "error": {"code": -32601, "message": f"Method not found: {method}"},
-                }
+    try:
+        if method == "initialize":
+            client_ver = params.get("protocolVersion", SUPPORTED_PROTOCOL_VERSIONS[0])
+            negotiated = (
+                client_ver if client_ver in SUPPORTED_PROTOCOL_VERSIONS
+                else SUPPORTED_PROTOCOL_VERSIONS[0]
             )
-        except Exception as exc:
-            _stdio_write(
-                {
-                    "jsonrpc": "2.0",
-                    "id": msg_id,
-                    "error": {"code": -32000, "message": str(exc)},
-                }
-            )
+            _write(_ok(msg_id, {
+                "protocolVersion": negotiated,
+                "capabilities": {"tools": {}},
+                "serverInfo": {"name": "nightfall-photo-ingress", "version": "2.0.0"},
+            }))
+
+        elif method == "ping":
+            _write(_ok(msg_id, {}))
+
+        elif method == "tools/list":
+            _write(_ok(msg_id, {"tools": _tool_list()}))
+
+        elif method == "tools/call":
+            _write(_ok(msg_id, _call_tool(state, params)))
+
+        elif method == "shutdown":
+            _write(_ok(msg_id, None))
+
+        else:
+            _write(_err(msg_id, -32601, f"Method not found: {method}"))
+
+    except ValueError as exc:
+        _write(_err(msg_id, -32602, str(exc)))
+    except Exception as exc:
+        log.exception("Error handling %s", method)
+        _write(_err(msg_id, -32603, str(exc)))
 
 
-def parse_args() -> argparse.Namespace:
-    script_root = Path(__file__).resolve().parent
-    parser = argparse.ArgumentParser(description="Nightfall MCP orchestrator server")
-    parser.add_argument("--transport", choices=["http", "stdio"], default=os.environ.get("MCP_TRANSPORT", "http"))
-    parser.add_argument("--host", default=os.environ.get("MCP_HOST", "127.0.0.1"))
-    parser.add_argument("--port", type=int, default=int(os.environ.get("MCP_PORT", "8765")))
-    parser.add_argument("--workspace", default=os.environ.get("MCP_WORKSPACE", str(script_root)))
-    parser.add_argument("--model", default=os.environ.get("MCP_MODEL_PATH", ".mcp/model.json"))
-    return parser.parse_args()
+def _call_tool(state: ServerState, params: dict[str, Any]) -> dict[str, Any]:
+    name = params.get("name")
+    a: dict[str, Any] = params.get("arguments") if isinstance(params.get("arguments"), dict) else {}  # type: ignore[assignment]
 
+    if name == "mcp.exec":
+        task_name = a.get("task")
+        if not isinstance(task_name, str):
+            raise ValueError("mcp.exec: 'task' must be a string")
+        task_id = state.enqueue(
+            task_name,
+            args=a.get("args") if isinstance(a.get("args"), list) else None,
+            env=a.get("env") if isinstance(a.get("env"), dict) else None,
+            cwd=a.get("cwd") if isinstance(a.get("cwd"), str) else None,
+            depends_on=a.get("dependsOn") if isinstance(a.get("dependsOn"), list) else None,
+            significant_task=bool(a.get("significantTask", False)),
+            extension_recommendation=a.get("extensionRecommendation") if isinstance(a.get("extensionRecommendation"), str) else None,
+        )
+        return _tool_result({"taskId": task_id, "status": "queued"})
+
+    if name == "mcp.status":
+        task_id = a.get("taskId")
+        if not isinstance(task_id, str):
+            raise ValueError("mcp.status: 'taskId' must be a string")
+        s = state.task_status(task_id)
+        return _tool_result(s) if s is not None else _tool_result({"error": "taskId not found"}, is_error=True)
+
+    if name == "mcp.log":
+        task_id = a.get("taskId")
+        if not isinstance(task_id, str):
+            raise ValueError("mcp.log: 'taskId' must be a string")
+        text = state.task_log(task_id, tail=a.get("tail") if isinstance(a.get("tail"), int) else None)
+        if text is None:
+            return _tool_result({"error": "log not found"}, is_error=True)
+        return _tool_result({"taskId": task_id, "log": text})
+
+    if name == "mcp.context":
+        return _tool_result(state.context())
+
+    if name == "mcp.verify":
+        verify_key, target = a.get("verify"), a.get("target")
+        if not isinstance(verify_key, str) or not isinstance(target, str):
+            raise ValueError("mcp.verify: 'verify' and 'target' must be strings")
+        return _tool_result(state.verify(verify_key, target))
+
+    if name == "mcp.extensions.list":
+        with state._lock:
+            exts = list(state._extensions)
+        return _tool_result({"extensions": exts})
+
+    if name == "mcp.extensions.propose":
+        rec = a.get("recommendation")
+        if not isinstance(rec, str) or not rec.strip():
+            raise ValueError("mcp.extensions.propose: 'recommendation' must be a non-empty string")
+        proposal = state.propose_extension(
+            recommendation=rec.strip(),
+            related_task_id=a.get("relatedTaskId") if isinstance(a.get("relatedTaskId"), str) else None,
+            task_name=a.get("task") if isinstance(a.get("task"), str) else None,
+            source="manual",
+        )
+        return _tool_result(proposal)
+
+    raise ValueError(f"Unknown tool: {name!r}")
+
+
+# ── Entry point ───────────────────────────────────────────────────────────────
 
 def main() -> None:
-    args = parse_args()
-    workspace_root = Path(args.workspace).resolve()
-    model_path = (workspace_root / args.model).resolve()
-    state = MCPServerState(workspace_root=workspace_root, model_path=model_path)
-    if args.transport == "stdio":
-        run_stdio_server(state)
-        return
+    import argparse
 
-    handler = make_handler(state)
-    server = ThreadingHTTPServer((args.host, args.port), handler)
-    print(f"MCP server listening on http://{args.host}:{args.port}")
-    server.serve_forever()
+    script_dir = Path(__file__).resolve().parent
+    p = argparse.ArgumentParser(description="Nightfall Photo Ingress MCP server (stdio)")
+    p.add_argument("--workspace", default=os.environ.get("MCP_WORKSPACE", str(script_dir)))
+    p.add_argument("--model", default=os.environ.get("MCP_MODEL_PATH", ".mcp/model.json"))
+    args = p.parse_args()
+
+    workspace = Path(args.workspace).resolve()
+    logs_dir = workspace / ".mcp" / "logs"
+
+    # Redirect stderr to a log file before anything else so Python tracebacks
+    # never pollute stdout (which is the JSON-RPC pipe).
+    _setup_logging(logs_dir)
+    sys.stderr = open(logs_dir / "mcp_server_stderr.log", "a", encoding="utf-8")  # noqa: SIM115
+
+    model_path = (workspace / args.model).resolve()
+    log.info(
+        "Starting nightfall-photo-ingress MCP server workspace=%s model=%s",
+        workspace, model_path,
+    )
+
+    try:
+        state = ServerState(workspace_root=workspace, model_path=model_path)
+    except Exception as exc:
+        log.critical("Failed to initialise server state: %s", exc, exc_info=True)
+        sys.exit(1)
+
+    log.info("Server ready, entering stdio loop")
+    while True:
+        msg = _read()
+        if msg is None:
+            log.info("stdin EOF — exiting")
+            break
+        try:
+            _dispatch(state, msg)
+        except SystemExit:
+            break
+        except Exception as exc:
+            log.exception("Unhandled error in dispatch: %s", exc)
 
 
 if __name__ == "__main__":

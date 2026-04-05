@@ -5,12 +5,10 @@
       "command": "${workspaceFolder}/.venv/bin/python",
       "args": [
         "${workspaceFolder}/mcp_server.py",
-        "--transport",
-        "stdio",
         "--workspace",
         "${workspaceFolder}",
         "--model",
-        ".mcp/model.json"
+        "${workspaceFolder}/.mcp/model.json"
       ]
     }
   }
