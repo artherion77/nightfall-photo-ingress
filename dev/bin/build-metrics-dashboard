@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# build-metrics-dashboard — Build the metrics dashboard static site.
+#
+# Syncs sources into the dev container, ensures the dashboard Node stack is
+# up to date (auto-fixes drift via ensure-stack-ready), runs the SvelteKit
+# production build inside the container, and copies the output back to
+# dashboard/ in the repository root.
+#
+# Usage:
+#   ./dev/bin/build-metrics-dashboard          # sync + build + copy output
+#   ./dev/bin/build-metrics-dashboard --help   # show this message
+#
+# Why the container?
+#   The dashboard uses SvelteKit + Vite with a pinned Node.js version managed
+#   via nvm inside dev-photo-ingress.  No system-level Node binary is assumed.
+#   Sources live at /opt/nightfall-metrics-dashboard inside the container; the
+#   static adapter writes output to /dashboard (../../dashboard relative to the
+#   project root in the container).
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+source "$PROJECT_ROOT/lib/container-common.sh"
+
+SCOPE="build-metrics-dashboard"
+CONTAINER="dev-photo-ingress"
+DEVCTL="$SCRIPT_DIR/devctl"
+CONTAINER_DASHBOARD_SRC="/opt/nightfall-metrics-dashboard"
+CONTAINER_BUILD_OUTPUT="/dashboard"
+HOST_OUTPUT_DIR="$PROJECT_ROOT/dashboard"
+
+# ── Argument parsing ──────────────────────────────────────────────────────────
+
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+    sed -n '/^# Usage:/,/^[^#]/{ /^[^#]/d; s/^# \{0,2\}//; p }' "$0"
+    exit 0
+fi
+
+if [[ $# -gt 0 ]]; then
+    nf_log_fail "$SCOPE" "Unknown argument: $1. Run with --help for usage."
+fi
+
+# ── Step 1: Ensure container is running ──────────────────────────────────────
+
+nf_require_container_running "$CONTAINER" "devctl setup" "$SCOPE"
+
+# ── Step 2: Sync sources + auto-fix any stack drift ──────────────────────────
+#
+# ensure-stack-ready syncs all source files into the container and
+# reinstalls node_modules if the lockfile hash has drifted.  No manual
+# intervention needed.
+
+nf_log_info "$SCOPE" "Syncing sources and ensuring dashboard stack is up to date ..."
+"$DEVCTL" ensure-stack-ready dashboard
+
+# ── Step 3: Build inside the container ───────────────────────────────────────
+
+nf_log_info "$SCOPE" "Running SvelteKit production build in container ..."
+lxc exec "$CONTAINER" -- bash -lc "
+set -euo pipefail
+cd '$CONTAINER_DASHBOARD_SRC'
+npm run build
+"
+
+# ── Step 4: Copy static output back to repository ────────────────────────────
+
+nf_log_info "$SCOPE" "Copying build output to $HOST_OUTPUT_DIR ..."
+rm -rf "$HOST_OUTPUT_DIR"
+mkdir -p "$HOST_OUTPUT_DIR"
+lxc exec "$CONTAINER" -- tar -czf - -C "$CONTAINER_BUILD_OUTPUT" . \
+    | tar -xzf - -C "$HOST_OUTPUT_DIR"
+
+nf_log_ok "$SCOPE" "Dashboard statics built → dashboard/"

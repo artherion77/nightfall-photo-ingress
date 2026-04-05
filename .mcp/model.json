@@ -117,6 +117,9 @@
       "status",
       "shell"
     ],
+    "scripts": {
+      "build-metrics-dashboard": "./dev/bin/build-metrics-dashboard"
+    },
     "cacheMounts": {
       "npm_home": "~/.npm -> /root/.npm",
       "npm_cache": "~/.cache/npm -> /root/.cache/npm",
@@ -218,6 +221,9 @@
     ],
     "metrics.publish": [
       "./metricsctl publish"
+    ],
+    "metrics.build-dashboard": [
+      "./dev/bin/build-metrics-dashboard"
     ],
     "metrics.install": [
       "./metricsctl install"
