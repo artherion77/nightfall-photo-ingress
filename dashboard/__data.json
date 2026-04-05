@@ -1,18 +1,18 @@
 {
   "projectName": "nightfall++photo-ingress",
-  "commitSha": "e2e4512",
-  "commitFull": "e2e45126fffda54b86bb4db23369c02388fc9ec6",
-  "runId": "module6-20260405T170149-1",
-  "lastRunAt": "2026-04-05T17:02:06.510188+00:00",
+  "commitSha": "a392f15",
+  "commitFull": "a392f159390eee64095aab7a42fa014793f24948",
+  "runId": "module6-20260405T170434-1",
+  "lastRunAt": "2026-04-05T17:04:51.771807+00:00",
   "sourceBranch": "main",
   "repoUrl": "https://github.com/artherion77/nightfall-photo-ingress",
   "repoHeadUrl": "https://github.com/artherion77/nightfall-photo-ingress/tree/main",
-  "repoCommitUrl": "https://github.com/artherion77/nightfall-photo-ingress/commit/e2e45126fffda54b86bb4db23369c02388fc9ec6",
+  "repoCommitUrl": "https://github.com/artherion77/nightfall-photo-ingress/commit/a392f159390eee64095aab7a42fa014793f24948",
   "runMeta": {
-    "startedAt": "2026-04-05T17:02:06.495031+00:00",
-    "finishedAt": "2026-04-05T17:02:06.510199+00:00",
-    "durationSeconds": 0.0152,
-    "runId": "module6-20260405T170149-1",
+    "startedAt": "2026-04-05T17:04:51.756673+00:00",
+    "finishedAt": "2026-04-05T17:04:51.771817+00:00",
+    "durationSeconds": 0.0151,
+    "runId": "module6-20260405T170434-1",
     "branch": "main"
   },
   "versions": {
@@ -2978,6 +2978,14 @@
   },
   "trendRows": [
     {
+      "runId": "module6-20260405T170149-1",
+      "severity": "warning",
+      "warningChecks": 5,
+      "failedChecks": 0,
+      "deltaItems": 15,
+      "generatedAt": "2026-04-05T17:02:06.510188+00:00"
+    },
+    {
       "runId": "module6-20260405T165133-1",
       "severity": "warning",
       "warningChecks": 5,
@@ -3016,14 +3024,6 @@
       "failedChecks": 0,
       "deltaItems": 17,
       "generatedAt": "2026-04-05T14:57:14.573277+00:00"
-    },
-    {
-      "runId": "coverage-ok-20260405T083227",
-      "severity": "warning",
-      "warningChecks": 2,
-      "failedChecks": 0,
-      "deltaItems": 14,
-      "generatedAt": "2026-04-05T06:32:49.353270+00:00"
     }
   ]
 }

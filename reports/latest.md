@@ -1,12 +1,12 @@
 # Nightfall Metrics Executive Summary
 
-- Run ID: module6-20260405T170149-1
-- Generated At: 2026-04-05T17:02:06.510188+00:00
+- Run ID: module6-20260405T170434-1
+- Generated At: 2026-04-05T17:04:51.771807+00:00
 - Branch: main
-- Commit: e2e45126fffda54b86bb4db23369c02388fc9ec6
+- Commit: a392f159390eee64095aab7a42fa014793f24948
 - Collection Status: partial
 - Severity: warning
-- Previous Successful Run: module6-20260405T165133-1
+- Previous Successful Run: module6-20260405T170149-1
 
 ## Indicators
 
@@ -34,9 +34,9 @@
 
 ## Trend Snippets
 
+- module6-20260405T170149-1: severity=warning, status=partial, warnings=5, failures=0, delta_items=15
 - module6-20260405T165133-1: severity=warning, status=partial, warnings=5, failures=0, delta_items=17
 - chunk4-bundle-20260405T160008: severity=warning, status=partial, warnings=5, failures=0, delta_items=17
 - chunk4-bundle-20260405T155944: severity=warning, status=partial, warnings=1, failures=0, delta_items=17
 - module6-20260405T155829-1: severity=warning, status=partial, warnings=7, failures=0, delta_items=17
 - module6-20260405T145657-1: severity=warning, status=partial, warnings=7, failures=0, delta_items=17
-- coverage-ok-20260405T083227: severity=warning, status=partial, warnings=2, failures=0, delta_items=14
