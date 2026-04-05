@@ -631,7 +631,7 @@
           {#if activeComplexitySegment}
             {@const detail = data.complexityBreakdownDetail?.[activeComplexitySegment] || { totalModules: 0, topModules: [] }}
             <div class="segment-tip-panel">
-              <strong>Top 10 / {detail.totalModules} modules contributing to {activeComplexitySegment} complexity</strong>
+              <strong>Top {detail.topModules.length} / {detail.totalModules} modules contributing to {activeComplexitySegment} complexity</strong>
               <div class="tip-section">
                 {#if detail.topModules.length === 0}
                   <div>None</div>

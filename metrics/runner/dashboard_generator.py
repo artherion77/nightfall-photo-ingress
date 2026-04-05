@@ -409,12 +409,6 @@ def _dashboard_payload(repo_root: Path, manifest: dict[str, Any], metrics: dict[
         for row in range(8)
     ]
 
-    complexity_mix = {
-        "low": max(0, round(_as_number((backend_complexity.get("cyclomatic") or {}).get("mean"), 0) * 2)),
-        "moderate": max(0, round(_as_number(frontend_cognitive.get("mean"), 0) * 2)),
-        "high": max(0, round(_as_number((backend_complexity.get("cyclomatic") or {}).get("max"), 0) / 2)),
-    }
-
     backend_complexity_per_file = (backend_complexity.get("per_file") or {}) if isinstance(backend_complexity, dict) else {}
     frontend_complexity_per_file = (frontend_cognitive.get("per_file") or {}) if isinstance(frontend_cognitive, dict) else {}
 
@@ -470,6 +464,13 @@ def _dashboard_payload(repo_root: Path, manifest: dict[str, Any], metrics: dict[
         "high": _top_modules("high"),
         "moderate": _top_modules("moderate"),
         "low": _top_modules("low"),
+    }
+
+    # Keep donut segment proportions aligned with the actual categorized module totals.
+    complexity_mix = {
+        "low": int(complexity_breakdown_detail["low"]["totalModules"]),
+        "moderate": int(complexity_breakdown_detail["moderate"]["totalModules"]),
+        "high": int(complexity_breakdown_detail["high"]["totalModules"]),
     }
 
     python_complexity_reference = {

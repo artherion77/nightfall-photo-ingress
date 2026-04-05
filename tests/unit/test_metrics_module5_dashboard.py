@@ -340,3 +340,98 @@ def test_module5_buildStamp_present(tmp_path: Path) -> None:
     assert "runId" in bs
     assert isinstance(bs["generatedAt"], str)
     assert bs["runId"] == "bs-test"
+
+
+def test_module5_complexity_mix_matches_breakdown_totals(tmp_path: Path) -> None:
+    """Donut mix must use the same category totals as complexityBreakdownDetail."""
+    latest = tmp_path / "artifacts" / "metrics" / "latest"
+
+    _write_json(
+        latest / "manifest.json",
+        {
+            "schema_version": 1,
+            "run_id": "mix-test",
+            "execution": {"exit_state": "success", "finished_at": "2026-05-01T12:00:00+00:00"},
+        },
+    )
+    _write_json(
+        latest / "metrics.json",
+        {
+            "schema_version": 1,
+            "run_id": "mix-test",
+            "modules": {
+                "backend": {
+                    "status": "success",
+                    "metrics": {
+                        "loc": {"total_lines": 10},
+                        "complexity": {
+                            "status": "success",
+                            "cyclomatic": {"mean": 3.2, "max": 12.0},
+                            "per_file": {
+                                "api/a.py": {"cyclomatic_avg": 12.0},
+                                "api/b.py": {"cyclomatic_avg": 11.0},
+                                "api/c.py": {"cyclomatic_avg": 10.0},
+                                "api/d.py": {"cyclomatic_avg": 7.0},
+                                "api/e.py": {"cyclomatic_avg": 6.0},
+                                "api/f.py": {"cyclomatic_avg": 3.0},
+                            },
+                        },
+                    },
+                },
+                "frontend": {
+                    "status": "success",
+                    "metrics": {
+                        "loc": {"total_lines": 5},
+                        "cognitive_complexity": {
+                            "status": "available",
+                            "mean": 1.2,
+                            "per_file": {
+                                "webui/src/a.ts": 1.0,
+                                "webui/src/b.ts": 2.0,
+                                "webui/src/c.ts": 3.0,
+                                "webui/src/d.ts": 4.0,
+                            },
+                        },
+                    },
+                },
+            },
+            "delta": {"previous_run_id": None, "comparisons": {}},
+        },
+    )
+    _write_json(
+        latest / "summary.json",
+        {
+            "schema_version": 1,
+            "run_id": "mix-test",
+            "generated_at": "2026-05-01T12:00:00+00:00",
+            "source": {"branch": "main", "commit_sha": "e" * 40},
+            "collection_status": "success",
+            "severity": "info",
+            "indicators": {"failed_checks": 0, "warning_checks": 0, "delta_items": 0},
+            "warnings": [],
+            "failures": [],
+        },
+    )
+
+    (tmp_path / "dashboard").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "dashboard" / "index.html").write_text("<html></html>", encoding="utf-8")
+
+    dashboard_generator.run_dashboard_generation(tmp_path, run_id="mix-test")
+    data_path = tmp_path / "metrics" / "output" / "dashboard" / "latest" / "__data.json"
+    data = json.loads(data_path.read_text(encoding="utf-8"))
+
+    detail = data["complexityBreakdownDetail"]
+    mix = data["complexityMix"]
+    assert mix["low"] == detail["low"]["totalModules"]
+    assert mix["moderate"] == detail["moderate"]["totalModules"]
+    assert mix["high"] == detail["high"]["totalModules"]
+
+
+def test_module5_complexity_tooltip_header_not_hardcoded() -> None:
+    """Tooltip header must use dynamic top count instead of hardcoded Top 10."""
+    root = Path(__file__).resolve().parents[2]
+    svelte_path = root / "metrics" / "dashboard" / "src" / "routes" / "+page.svelte"
+    source = svelte_path.read_text(encoding="utf-8")
+
+    assert "Top 10 / {detail.totalModules} modules contributing to" not in source
+    assert "Top {detail.topModules.length} / {detail.totalModules} modules contributing to" in source
