@@ -694,6 +694,7 @@
       "schemas": 7
     },
     "bundleSizeKb": null,
+    "bundleSizeDetail": null,
     "openapiScore": null
   },
   "footer": {
