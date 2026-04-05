@@ -424,11 +424,13 @@ def _dashboard_payload(repo_root: Path, manifest: dict[str, Any], metrics: dict[
         "cyclomatic": {
             "method": "McCabe cyclomatic complexity via radon",
             "scale": {"min": 1.0, "max": 20.0},
+            "median": 4.5,
             "industryMedian": 4.5,
         },
         "maintainability": {
             "method": "Maintainability Index via radon",
             "scale": {"min": 0.0, "max": 100.0},
+            "median": 65.0,
             "industryMedian": 65.0,
         },
     }

@@ -335,6 +335,8 @@ h4 {
 .complexity-breakdown-tip {
   min-width: min(560px, 92vw);
   max-width: min(760px, 96vw);
+  left: auto;
+  right: 0;
 }
 
 .tip-section {
@@ -351,6 +353,8 @@ h4 {
 
 .scale-tip {
   min-width: min(420px, 92vw);
+  left: auto;
+  right: 0;
 }
 
 .scale-bar {
@@ -360,8 +364,12 @@ h4 {
   width: 100%;
   height: 8px;
   border-radius: 999px;
-  background: linear-gradient(90deg, #2f5ea8 0%, #4a8f4b 50%, #db7b2a 78%, #cc3f38 100%);
+  background: linear-gradient(90deg, #4a8f4b 0%, #d8b33f 52%, #cc3f38 100%);
   border: 1px solid rgba(152, 176, 217, 0.34);
+}
+
+.scale-bar.maintainability {
+  background: linear-gradient(90deg, #cc3f38 0%, #d8b33f 52%, #4a8f4b 100%);
 }
 
 .scale-bar .marker {
@@ -375,11 +383,11 @@ h4 {
 }
 
 .scale-bar .marker.project {
-  border-bottom: 8px solid #e9f3ff;
+  border-bottom: 8px solid #4a8f4b;
 }
 
 .scale-bar .marker.median {
-  border-bottom: 8px solid #f6d084;
+  border-bottom: 8px solid #d8b33f;
   top: 8px;
 }
 
@@ -388,6 +396,79 @@ h4 {
   margin-top: 6px;
   color: #bed2f7;
   font-size: 11px;
+}
+
+.panel-has-overlay {
+  position: relative;
+}
+
+.panel-subtle {
+  margin: -2px 0 8px;
+  color: #a8bcde;
+  font-size: 12px;
+}
+
+.donut-segment {
+  cursor: pointer;
+}
+
+.donut-segment:focus-visible,
+.legend-item:focus-visible,
+.graph-node:focus-visible {
+  outline: 2px solid #9fc3ff;
+  outline-offset: 2px;
+}
+
+.legend-item {
+  cursor: pointer;
+}
+
+.segment-tip-panel {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  max-width: min(520px, calc(100vw - 42px));
+  max-height: 220px;
+  overflow: auto;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(144, 167, 210, 0.42);
+  background: rgba(6, 13, 26, 0.96);
+  color: #dbe9ff;
+  font-size: 12px;
+  line-height: 1.35;
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.45);
+  z-index: 25;
+  pointer-events: none;
+}
+
+.graph-wrap {
+  position: relative;
+}
+
+.graph line {
+  pointer-events: none;
+}
+
+.graph-node {
+  cursor: pointer;
+}
+
+.graph-node-tip {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  max-width: min(360px, calc(100vw - 48px));
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(144, 167, 210, 0.42);
+  background: rgba(6, 13, 26, 0.96);
+  color: #dbe9ff;
+  font-size: 12px;
+  line-height: 1.35;
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.45);
+  z-index: 26;
+  pointer-events: none;
 }
 
 .loc-link {

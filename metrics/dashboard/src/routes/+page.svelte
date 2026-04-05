@@ -64,6 +64,16 @@
   let cyclomaticMedianPct = 0;
   let maintainabilityProjectPct = 0;
   let maintainabilityMedianPct = 0;
+  let cyclomaticRelation = 'near median';
+  let maintainabilityRelation = 'near median';
+  let cyclomaticProjectColor = '#4a8f4b';
+  let cyclomaticMedianColor = '#d8b33f';
+  let maintainabilityProjectColor = '#4a8f4b';
+  let maintainabilityMedianColor = '#d8b33f';
+  let activeComplexitySegment = null;
+  let complexityTotalModules = 0;
+  let backendNodeHover = null;
+  let frontendNodeHover = null;
 
   onMount(async () => {
     try {
@@ -225,6 +235,28 @@
     return ((clamped - min) / span) * 100;
   }
 
+  function classifyAgainstMedian(value, median) {
+    if (typeof value !== 'number' || !Number.isFinite(value) || !Number.isFinite(median)) {
+      return 'near median';
+    }
+    const threshold = Math.max(0.5, Math.abs(median) * 0.1);
+    if (value < median - threshold) return 'below median';
+    if (value > median + threshold) return 'above median';
+    return 'near median';
+  }
+
+  function cyclomaticGradientColor(pct) {
+    if (pct < 33) return '#4a8f4b';
+    if (pct < 66) return '#d8b33f';
+    return '#cc3f38';
+  }
+
+  function maintainabilityGradientColor(pct) {
+    if (pct < 33) return '#cc3f38';
+    if (pct < 66) return '#d8b33f';
+    return '#4a8f4b';
+  }
+
   function graphNodeTooltip(detail, graphType) {
     if (!detail) {
       return `Module: unknown\nType: ${graphType}\nFan-in/Fan-out: n/a\nCycle: n/a`;
@@ -240,14 +272,27 @@
     const cycloRef = data.pythonComplexityReference?.cyclomatic || { scale: { min: 1, max: 20 }, industryMedian: 4.5 };
     const cycloMin = Number(cycloRef.scale?.min ?? 1);
     const cycloMax = Number(cycloRef.scale?.max ?? 20);
+    const cycloMedian = Number(cycloRef.median ?? cycloRef.industryMedian ?? 4.5);
     cyclomaticProjectPct = metricToScalePercent(data.complexityCard?.cyclomatic, cycloMin, cycloMax);
-    cyclomaticMedianPct = metricToScalePercent(Number(cycloRef.industryMedian ?? 4.5), cycloMin, cycloMax);
+    cyclomaticMedianPct = metricToScalePercent(cycloMedian, cycloMin, cycloMax);
+    cyclomaticRelation = classifyAgainstMedian(data.complexityCard?.cyclomatic, cycloMedian);
+    cyclomaticProjectColor = cyclomaticGradientColor(cyclomaticProjectPct);
+    cyclomaticMedianColor = cyclomaticGradientColor(cyclomaticMedianPct);
 
     const miRef = data.pythonComplexityReference?.maintainability || { scale: { min: 0, max: 100 }, industryMedian: 65 };
     const miMin = Number(miRef.scale?.min ?? 0);
     const miMax = Number(miRef.scale?.max ?? 100);
+    const miMedian = Number(miRef.median ?? miRef.industryMedian ?? 65);
     maintainabilityProjectPct = metricToScalePercent(data.complexityCard?.maintainability, miMin, miMax);
-    maintainabilityMedianPct = metricToScalePercent(Number(miRef.industryMedian ?? 65), miMin, miMax);
+    maintainabilityMedianPct = metricToScalePercent(miMedian, miMin, miMax);
+    maintainabilityRelation = classifyAgainstMedian(data.complexityCard?.maintainability, miMedian);
+    maintainabilityProjectColor = maintainabilityGradientColor(maintainabilityProjectPct);
+    maintainabilityMedianColor = maintainabilityGradientColor(maintainabilityMedianPct);
+
+    const detail = data.complexityBreakdownDetail || {};
+    complexityTotalModules = Number(detail.high?.totalModules || 0)
+      + Number(detail.moderate?.totalModules || 0)
+      + Number(detail.low?.totalModules || 0);
   }
 </script>
 
@@ -334,9 +379,10 @@
                   <strong>Cyclomatic Complexity (McCabe via radon)</strong><br />
                   Scale: {data.pythonComplexityReference.cyclomatic.scale.min}-{data.pythonComplexityReference.cyclomatic.scale.max} (lower is simpler).<br />
                   Industry median (typical Python projects): {data.pythonComplexityReference.cyclomatic.industryMedian}
-                  <span class="scale-bar">
-                    <span class="marker project" style={`left:${cyclomaticProjectPct}%`}></span>
-                    <span class="marker median" style={`left:${cyclomaticMedianPct}%`}></span>
+                  <br />Classification: {cyclomaticRelation}
+                  <span class="scale-bar cyclomatic">
+                    <span class="marker project" style={`left:${cyclomaticProjectPct}%; border-bottom-color:${cyclomaticProjectColor};`}></span>
+                    <span class="marker median" style={`left:${cyclomaticMedianPct}%; border-bottom-color:${cyclomaticMedianColor};`}></span>
                   </span>
                   <span class="scale-legend">▲ Project value &nbsp; ▲ Industry median</span>
                 </span>
@@ -352,9 +398,10 @@
                   <strong>Maintainability Index (radon)</strong><br />
                   Scale: {data.pythonComplexityReference.maintainability.scale.min}-{data.pythonComplexityReference.maintainability.scale.max} (higher is better).<br />
                   Industry median (typical Python projects): {data.pythonComplexityReference.maintainability.industryMedian}
-                  <span class="scale-bar">
-                    <span class="marker project" style={`left:${maintainabilityProjectPct}%`}></span>
-                    <span class="marker median" style={`left:${maintainabilityMedianPct}%`}></span>
+                  <br />Classification: {maintainabilityRelation}
+                  <span class="scale-bar maintainability">
+                    <span class="marker project" style={`left:${maintainabilityProjectPct}%; border-bottom-color:${maintainabilityProjectColor};`}></span>
+                    <span class="marker median" style={`left:${maintainabilityMedianPct}%; border-bottom-color:${maintainabilityMedianColor};`}></span>
                   </span>
                   <span class="scale-legend">▲ Project value &nbsp; ▲ Industry median</span>
                 </span>
@@ -411,78 +458,92 @@
           </svg>
         </article>
 
-        <article class="card panel">
-          <h4>
-            Complexity Breakdown
-            <span class="tip-anchor hint-inline" tabindex="0" role="button" aria-label="Complexity contribution details">
-              i
-              <span class="tip-bubble complexity-breakdown-tip">
-                <strong>Top 10 / {data.complexityBreakdownDetail.high.totalModules} modules contributing to complexity</strong>
-                <div class="tip-section">
-                  <em>High</em>
-                  {#if data.complexityBreakdownDetail.high.topModules.length === 0}
-                    <div>None</div>
-                  {:else}
-                    {#each data.complexityBreakdownDetail.high.topModules as mod}
-                      <div>{mod.module} ({mod.type}, {mod.score})</div>
-                    {/each}
-                  {/if}
-                </div>
-                <div class="tip-section">
-                  <strong>Top 10 / {data.complexityBreakdownDetail.moderate.totalModules} modules contributing to complexity</strong>
-                  {#if data.complexityBreakdownDetail.moderate.topModules.length === 0}
-                    <div>None</div>
-                  {:else}
-                    {#each data.complexityBreakdownDetail.moderate.topModules as mod}
-                      <div>{mod.module} ({mod.type}, {mod.score})</div>
-                    {/each}
-                  {/if}
-                </div>
-                <div class="tip-section">
-                  <strong>Top 10 / {data.complexityBreakdownDetail.low.totalModules} modules contributing to complexity</strong>
-                  {#if data.complexityBreakdownDetail.low.topModules.length === 0}
-                    <div>None</div>
-                  {:else}
-                    {#each data.complexityBreakdownDetail.low.topModules as mod}
-                      <div>{mod.module} ({mod.type}, {mod.score})</div>
-                    {/each}
-                  {/if}
-                </div>
-              </span>
-            </span>
-          </h4>
+        <article class="card panel panel-has-overlay">
+          <h4>Complexity Breakdown</h4>
+          <p class="panel-subtle">{complexityTotalModules} modules</p>
           <svg viewBox="0 0 300 300" class="chart donut-chart">
             {#each donut as segment}
-              <path d={segment.d} fill={segment.color}></path>
+              <path
+                d={segment.d}
+                fill={segment.color}
+                class="donut-segment"
+                on:mouseenter={() => (activeComplexitySegment = segment.key)}
+                on:mouseleave={() => (activeComplexitySegment = null)}
+                on:focus={() => (activeComplexitySegment = segment.key)}
+                on:blur={() => (activeComplexitySegment = null)}
+                tabindex="0"
+              ></path>
             {/each}
           </svg>
           <div class="legend">
             {#each donutParts as part}
-              <span><i style={`background:${part.color}`}></i>{part.label}</span>
+              <span
+                class="legend-item"
+                on:mouseenter={() => (activeComplexitySegment = part.key)}
+                on:mouseleave={() => (activeComplexitySegment = null)}
+                on:focus={() => (activeComplexitySegment = part.key)}
+                on:blur={() => (activeComplexitySegment = null)}
+                tabindex="0"
+              ><i style={`background:${part.color}`}></i>{part.label}</span>
             {/each}
           </div>
+          {#if activeComplexitySegment}
+            {@const detail = data.complexityBreakdownDetail?.[activeComplexitySegment] || { totalModules: 0, topModules: [] }}
+            <div class="segment-tip-panel">
+              <strong>Top 10 / {detail.totalModules} modules contributing to {activeComplexitySegment} complexity</strong>
+              <div class="tip-section">
+                {#if detail.topModules.length === 0}
+                  <div>None</div>
+                {:else}
+                  {#each detail.topModules as mod}
+                    <div>{mod.module} ({mod.type}, {mod.score})</div>
+                  {/each}
+                {/if}
+              </div>
+            </div>
+          {/if}
         </article>
 
         <article class="card panel">
           <h4>Dependency Graph</h4>
-          <svg viewBox="0 0 300 180" class="chart graph">
-            {#each data.backendGraph.edges as edge}
-              <line
-                x1={data.backendGraph.nodes[edge.a].x}
-                y1={data.backendGraph.nodes[edge.a].y}
-                x2={data.backendGraph.nodes[edge.b].x}
-                y2={data.backendGraph.nodes[edge.b].y}
-                stroke="#70819f"
-                stroke-opacity="0.32"
-              />
-            {/each}
-            {#each data.backendGraph.nodes as node, idx}
-              {@const nodeDetail = data.backendGraph.nodeDetails?.[idx]}
-              <circle cx={node.x} cy={node.y} r={node.r} fill="#cfd9ea" fill-opacity="0.78">
-                <title>{graphNodeTooltip(nodeDetail, 'backend')}</title>
-              </circle>
-            {/each}
-          </svg>
+          <div class="graph-wrap">
+            <svg viewBox="0 0 300 180" class="chart graph">
+              {#each data.backendGraph.edges as edge}
+                <line
+                  x1={data.backendGraph.nodes[edge.a].x}
+                  y1={data.backendGraph.nodes[edge.a].y}
+                  x2={data.backendGraph.nodes[edge.b].x}
+                  y2={data.backendGraph.nodes[edge.b].y}
+                  stroke="#70819f"
+                  stroke-opacity="0.32"
+                />
+              {/each}
+              {#each data.backendGraph.nodes as node, idx}
+                {@const nodeDetail = data.backendGraph.nodeDetails?.[idx]}
+                <circle
+                  cx={node.x}
+                  cy={node.y}
+                  r={node.r}
+                  fill="#cfd9ea"
+                  fill-opacity="0.78"
+                  class="graph-node"
+                  on:mouseenter={() => (backendNodeHover = nodeDetail || { path: 'unknown', fan_in: 'n/a', fan_out: 'n/a', in_cycle: false })}
+                  on:mouseleave={() => (backendNodeHover = null)}
+                  on:focus={() => (backendNodeHover = nodeDetail || { path: 'unknown', fan_in: 'n/a', fan_out: 'n/a', in_cycle: false })}
+                  on:blur={() => (backendNodeHover = null)}
+                  tabindex="0"
+                />
+              {/each}
+            </svg>
+            {#if backendNodeHover}
+              <div class="graph-node-tip">
+                <div>Module: {backendNodeHover.path || 'unknown'}</div>
+                <div>Type: backend</div>
+                <div>Fan-in / Fan-out: {backendNodeHover.fan_in ?? 'n/a'} / {backendNodeHover.fan_out ?? 'n/a'}</div>
+                <div>Cycle: {backendNodeHover.in_cycle ? 'yes' : 'no'}</div>
+              </div>
+            {/if}
+          </div>
         </article>
       </div>
     </section>
@@ -525,24 +586,44 @@
 
         <article class="card panel">
           <h4>JS Dependency Graph</h4>
-          <svg viewBox="0 0 300 180" class="chart graph">
-            {#each data.frontendGraph.edges as edge}
-              <line
-                x1={data.frontendGraph.nodes[edge.a].x}
-                y1={data.frontendGraph.nodes[edge.a].y}
-                x2={data.frontendGraph.nodes[edge.b].x}
-                y2={data.frontendGraph.nodes[edge.b].y}
-                stroke="#7d8cac"
-                stroke-opacity="0.31"
-              />
-            {/each}
-            {#each data.frontendGraph.nodes as node, idx}
-              {@const nodeDetail = data.frontendGraph.nodeDetails?.[idx]}
-              <circle cx={node.x} cy={node.y} r={node.r} fill="#dce6f5" fill-opacity="0.8">
-                <title>{graphNodeTooltip(nodeDetail, 'frontend')}</title>
-              </circle>
-            {/each}
-          </svg>
+          <div class="graph-wrap">
+            <svg viewBox="0 0 300 180" class="chart graph">
+              {#each data.frontendGraph.edges as edge}
+                <line
+                  x1={data.frontendGraph.nodes[edge.a].x}
+                  y1={data.frontendGraph.nodes[edge.a].y}
+                  x2={data.frontendGraph.nodes[edge.b].x}
+                  y2={data.frontendGraph.nodes[edge.b].y}
+                  stroke="#7d8cac"
+                  stroke-opacity="0.31"
+                />
+              {/each}
+              {#each data.frontendGraph.nodes as node, idx}
+                {@const nodeDetail = data.frontendGraph.nodeDetails?.[idx]}
+                <circle
+                  cx={node.x}
+                  cy={node.y}
+                  r={node.r}
+                  fill="#dce6f5"
+                  fill-opacity="0.8"
+                  class="graph-node"
+                  on:mouseenter={() => (frontendNodeHover = nodeDetail || { path: 'unknown', fan_in: 'n/a', fan_out: 'n/a', in_cycle: false })}
+                  on:mouseleave={() => (frontendNodeHover = null)}
+                  on:focus={() => (frontendNodeHover = nodeDetail || { path: 'unknown', fan_in: 'n/a', fan_out: 'n/a', in_cycle: false })}
+                  on:blur={() => (frontendNodeHover = null)}
+                  tabindex="0"
+                />
+              {/each}
+            </svg>
+            {#if frontendNodeHover}
+              <div class="graph-node-tip">
+                <div>Module: {frontendNodeHover.path || 'unknown'}</div>
+                <div>Type: frontend</div>
+                <div>Fan-in / Fan-out: {frontendNodeHover.fan_in ?? 'n/a'} / {frontendNodeHover.fan_out ?? 'n/a'}</div>
+                <div>Cycle: {frontendNodeHover.in_cycle ? 'yes' : 'no'}</div>
+              </div>
+            {/if}
+          </div>
         </article>
       </div>
     </section>
