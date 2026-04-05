@@ -332,6 +332,72 @@ h4 {
   text-align: left;
 }
 
+.loc-detail-tip {
+  min-width: min(500px, 92vw);
+  max-width: min(600px, 96vw);
+  left: 0;
+  right: auto;
+  bottom: auto;
+  top: calc(100% + 8px);
+}
+
+.loc-tip-charts {
+  display: flex;
+  gap: 16px;
+  margin-top: 6px;
+}
+
+.loc-tip-chart {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.loc-tip-chart strong {
+  font-size: 12px;
+  color: #9eb9e8;
+}
+
+.tip-donut {
+  width: 80px;
+  height: 80px;
+}
+
+.tip-mini-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 11px;
+  width: 100%;
+}
+
+.tip-mini-legend span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.tip-mini-legend i {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.tip-note {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(137, 158, 202, 0.22);
+  font-style: italic;
+  color: #8ea7c8;
+  font-size: 11px;
+  margin-bottom: 0;
+}
+
 .complexity-breakdown-tip {
   min-width: min(560px, 92vw);
   max-width: min(760px, 96vw);

@@ -276,6 +276,58 @@ def _footer_python_text(manifest: dict[str, Any], backend_coverage: dict[str, An
     return f"Python {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
 
 
+def _collect_extra_loc(repo_root: Path) -> dict[str, dict[str, Any]]:
+    """Collect LOC from dirs not covered by existing collectors: metrics/, staging/, install/, dev/bin/."""
+    result: dict[str, dict[str, Any]] = {}
+
+    # Python files in metrics/ and staging/ (staging/evidence/*.py etc.)
+    for root in ("metrics", "staging"):
+        start = repo_root / root
+        if not start.exists():
+            continue
+        for fp in sorted(start.rglob("*.py")):
+            if not fp.is_file():
+                continue
+            fp_str = str(fp)
+            if "__pycache__" in fp_str or "output/publication" in fp_str:
+                continue
+            rel = str(fp.relative_to(repo_root))
+            lines = len(fp.read_text(encoding="utf-8", errors="replace").splitlines())
+            result[rel] = {"lines": lines, "tech": "python"}
+
+    # Shell scripts in install/, dev/bin/, staging/
+    for root in ("install", "dev/bin", "staging"):
+        start = repo_root / root
+        if not start.exists():
+            continue
+        for fp in sorted(start.rglob("*")):
+            if not fp.is_file():
+                continue
+            rel = str(fp.relative_to(repo_root))
+            fp_str = str(fp)
+            if rel in result or "__pycache__" in fp_str or "output/publication" in fp_str:
+                continue
+            suffix = fp.suffix.lower()
+            if suffix == ".sh":
+                tech: str = "bash"
+            elif suffix == "":
+                try:
+                    header = fp.read_bytes()[:80].decode("utf-8", "replace")
+                    first_line = (header.splitlines() or [""])[0]
+                    if "bash" in first_line or "/sh" in first_line:
+                        tech = "bash"
+                    else:
+                        continue
+                except Exception:
+                    continue
+            else:
+                continue
+            lines = len(fp.read_text(encoding="utf-8", errors="replace").splitlines())
+            result[rel] = {"lines": lines, "tech": tech}
+
+    return result
+
+
 def _validate_dashboard_payload_contract(payload: dict[str, Any]) -> None:
     required_top_level = ["runId", "lastRunAt", "repoUrl", "repoHeadUrl", "repoCommitUrl", "versions", "runMeta"]
     for key in required_top_level:
@@ -491,6 +543,56 @@ def _dashboard_payload(repo_root: Path, manifest: dict[str, Any], metrics: dict[
         "schemas": len([key for key in per_file_backend.keys() if "/schemas/" in key]) if isinstance(per_file_backend, dict) else 0,
     }
 
+    # --- Comprehensive LOC: combine all per-file sources ---
+    def _purpose_of_path(path: str) -> str:
+        if path.startswith("src/") or path.startswith("webui/src/"):
+            return "production"
+        if path.startswith("tests/") or path.startswith("webui/tests/"):
+            return "test"
+        return "other"
+
+    _loc_purpose: dict[str, int] = {"production": 0, "test": 0, "other": 0}
+    _loc_tech: dict[str, int] = {"python": 0, "svelte": 0, "jsts": 0, "bash": 0, "other": 0}
+    _loc_total = 0
+    _loc_files = 0
+
+    _backend_pf = backend_loc.get("per_file", {}) if isinstance(backend_loc, dict) else {}
+    if isinstance(_backend_pf, dict):
+        for _p, _m in _backend_pf.items():
+            _l = int(_as_number(_m.get("lines") if isinstance(_m, dict) else _m, 0))
+            _loc_purpose[_purpose_of_path(str(_p))] += _l
+            _loc_tech["python"] += _l
+            _loc_total += _l
+            _loc_files += 1
+
+    _frontend_pf = frontend_loc.get("per_file", {}) if isinstance(frontend_loc, dict) else {}
+    if isinstance(_frontend_pf, dict):
+        for _p, _m in _frontend_pf.items():
+            _l = int(_as_number(_m.get("lines") if isinstance(_m, dict) else _m, 0))
+            _loc_purpose[_purpose_of_path(str(_p))] += _l
+            _ft = (_m.get("type") if isinstance(_m, dict) else None) or ""
+            _t = "svelte" if _ft == "svelte" else "jsts" if _ft == "js_ts" else "other"
+            _loc_tech[_t] = _loc_tech.get(_t, 0) + _l
+            _loc_total += _l
+            _loc_files += 1
+
+    _extra_pf = _collect_extra_loc(repo_root)
+    for _p, _m in _extra_pf.items():
+        _l = int(_as_number(_m.get("lines", 0), 0))
+        _loc_purpose["other"] += _l
+        _xt = _m.get("tech", "other")
+        _loc_tech[_xt] = _loc_tech.get(_xt, 0) + _l
+        _loc_total += _l
+        _loc_files += 1
+
+    _loc_detail: dict[str, Any] = {
+        "total": _loc_total,
+        "purpose": _loc_purpose,
+        "technology": _loc_tech,
+        "totalFiles": _loc_files,
+        "note": "System-level metric. Includes all code in the repository.",
+    }
+
     return {
         "projectName": "nightfall++photo-ingress",
         "commitSha": commit_full[:7],
@@ -516,11 +618,8 @@ def _dashboard_payload(repo_root: Path, manifest: dict[str, Any], metrics: dict[
         "hasCoverage": coverage_percent is not None,
         "sparklinePoints": _sparkline(list(reversed(trend_series)) if len(trend_series) > 1 else [0.0, 0.0]),
         "coverageTrendSource": coverage_trend_source,
-        "locBreakdown": {
-            "python": _compact(_as_number(backend_loc.get("total_lines"), 0)),
-            "tsjs": _compact(_as_number(frontend_loc.get("js_ts_files"), 0) * 340),
-            "svelte": _compact(_as_number(frontend_loc.get("svelte_files"), 0) * 100),
-        },
+        "locTotal": _compact(_loc_detail["total"]),
+        "locDetail": _loc_detail,
         "complexityCard": {
             "cyclomatic": (backend_complexity.get("cyclomatic") or {}).get("mean") if isinstance(backend_complexity, dict) else None,
             "maintainability": (backend_complexity.get("maintainability_index") or {}).get("mean") if isinstance(backend_complexity, dict) else None,

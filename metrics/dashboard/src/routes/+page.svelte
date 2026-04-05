@@ -10,7 +10,8 @@
     coveragePercent: null,
     hasCoverage: false,
     sparklinePoints: '0,36 180,36',
-    locBreakdown: { python: '0', tsjs: '0', svelte: '0' },
+    locTotal: '0',
+    locDetail: { total: 0, purpose: { production: 0, test: 0, other: 0 }, technology: { python: 0, svelte: 0, jsts: 0, bash: 0, other: 0 }, totalFiles: 0, note: '' },
     complexityCard: { cyclomatic: null, maintainability: null },
     frontendComplexity: null,
     backendCoverageBars: [
@@ -57,9 +58,9 @@
   let footerCommitHref = null;
   let lastRunDisplay = 'unknown';
   let lastRunDetail = '';
-  let tsjsLabelDetail = 'TypeScript / JavaScript';
-  let pythonLocDetail = 'Python';
   let metricsFolderHref = null;
+  let purposeDonut = [];
+  let techDonut = [];
   let cyclomaticProjectPct = 0;
   let cyclomaticMedianPct = 0;
   let maintainabilityProjectPct = 0;
@@ -203,21 +204,6 @@
     }
   }
 
-  $: {
-    tsjsLabelDetail = 'TypeScript / JavaScript';
-    if (data.versions?.typescript) {
-      tsjsLabelDetail = `${tsjsLabelDetail} (TypeScript ${data.versions.typescript})`;
-    }
-  }
-
-  $: {
-    pythonLocDetail = 'Python';
-    if (data.versions?.python) {
-      const cleaned = String(data.versions.python).replace(/^Python\s+/i, '').trim();
-      pythonLocDetail = cleaned ? `Python ${cleaned}` : 'Python';
-    }
-  }
-
   function heatColor(value) {
     if (value >= 18) return '#cc3f38';
     if (value >= 14) return '#db7b2a';
@@ -294,6 +280,44 @@
       + Number(detail.moderate?.totalModules || 0)
       + Number(detail.low?.totalModules || 0);
   }
+
+  $: {
+    const _pt = data.locDetail?.purpose || { production: 0, test: 0, other: 0 };
+    const _ptTotal = (_pt.production || 0) + (_pt.test || 0) + (_pt.other || 0);
+    const _purposeParts = [
+      { label: 'Production', value: _pt.production || 0, color: '#53b676' },
+      { label: 'Test', value: _pt.test || 0, color: '#3f90ff' },
+      { label: 'Other', value: _pt.other || 0, color: '#8a8fa8' },
+    ];
+    let _pAngle = 0;
+    purposeDonut = _purposeParts.map((p) => {
+      const span = _ptTotal > 0 ? (p.value / _ptTotal) * 360 : 0;
+      const pct = _ptTotal > 0 ? Math.round((p.value / _ptTotal) * 100) : 0;
+      const d = span >= 1.8 ? arcPath(_pAngle, _pAngle + span, 40, 22) : '';
+      _pAngle += span;
+      return { ...p, d, pct };
+    }).filter((p) => p.d !== '');
+  }
+
+  $: {
+    const _tm = data.locDetail?.technology || { python: 0, svelte: 0, jsts: 0, bash: 0, other: 0 };
+    const _tmTotal = Object.values(_tm).reduce((acc, v) => acc + (Number(v) || 0), 0);
+    const _techParts = [
+      { label: 'Python', value: _tm.python || 0, color: '#4584e0' },
+      { label: 'Svelte', value: _tm.svelte || 0, color: '#ff6900' },
+      { label: 'JS/TS', value: _tm.jsts || 0, color: '#f0b443' },
+      { label: 'Bash', value: _tm.bash || 0, color: '#9b7fe8' },
+      { label: 'Other', value: _tm.other || 0, color: '#8a8fa8' },
+    ];
+    let _tAngle = 0;
+    techDonut = _techParts.map((p) => {
+      const span = _tmTotal > 0 ? (p.value / _tmTotal) * 360 : 0;
+      const pct = _tmTotal > 0 ? Math.round((p.value / _tmTotal) * 100) : 0;
+      const d = span >= 1.8 ? arcPath(_tAngle, _tAngle + span, 40, 22) : '';
+      _tAngle += span;
+      return { ...p, d, pct };
+    }).filter((p) => p.d !== '');
+  }
 </script>
 
 <svelte:head>
@@ -340,32 +364,42 @@
       </article>
 
       <article class="card metric-card">
-        <h2>LOC Breakdown</h2>
-        <dl class="kv">
-          <div>
-            <dt><span class="tip-anchor">
-              Python
-              <span class="tip-bubble">{pythonLocDetail}</span>
-            </span></dt>
-            <dd>{data.locBreakdown.python}</dd>
+        <h2>Total Lines of Code</h2>
+        <div class="hero-value tip-anchor" tabindex="0" role="button" aria-label="Show LOC breakdown">
+          <strong>{data.locTotal}</strong>
+          <div class="tip-bubble loc-detail-tip">
+            <div class="loc-tip-charts">
+              <div class="loc-tip-chart">
+                <strong>Purpose</strong>
+                <svg viewBox="0 0 100 100" class="tip-donut" aria-hidden="true">
+                  {#each purposeDonut as seg}
+                    <path d={seg.d} fill={seg.color} transform="translate(-100,-100)" />
+                  {/each}
+                </svg>
+                <div class="tip-mini-legend">
+                  {#each purposeDonut as seg}
+                    <span><i style={`background:${seg.color}`}></i>{seg.label} {seg.pct}%</span>
+                  {/each}
+                </div>
+              </div>
+              <div class="loc-tip-chart">
+                <strong>Technology</strong>
+                <svg viewBox="0 0 100 100" class="tip-donut" aria-hidden="true">
+                  {#each techDonut as seg}
+                    <path d={seg.d} fill={seg.color} transform="translate(-100,-100)" />
+                  {/each}
+                </svg>
+                <div class="tip-mini-legend">
+                  {#each techDonut as seg}
+                    <span><i style={`background:${seg.color}`}></i>{seg.label} {seg.pct}%</span>
+                  {/each}
+                </div>
+              </div>
+            </div>
+            <p class="tip-note">{data.locDetail?.note || ''}</p>
+            <p class="tip-note">{data.locDetail?.totalFiles || 0} files counted.</p>
           </div>
-          <div>
-            <dt><span class="tip-anchor">
-              TS / JS
-              <span class="tip-bubble">{tsjsLabelDetail}</span>
-            </span></dt>
-            <dd>{data.locBreakdown.tsjs}</dd>
-          </div>
-          <div>
-            <dt>
-              <a class="tip-anchor loc-link" href="https://www.svelte.dev" target="_blank" rel="noreferrer" aria-label="Open Svelte website">
-                Svelte
-                <span class="tip-bubble">https://svelte.dev. web development for the rest of us</span>
-              </a>
-            </dt>
-            <dd>{data.locBreakdown.svelte}</dd>
-          </div>
-        </dl>
+        </div>
       </article>
 
       <article class="card metric-card">
@@ -413,8 +447,17 @@
       </article>
 
       <article class="card metric-card">
-        <h2>Frontend Cognitive Complexity <span class="tip-anchor hint-inline" tabindex="0" role="button" aria-label="Complexity metric explanation">i<span class="tip-bubble">Heuristic score from frontend_collector: branching tokens weighted by nesting depth. Typical human-maintained app range: 12-40 mean. Lower is easier to maintain.</span></span></h2>
-        <div class="hero-value compact"><strong>{frontendComplexityText}</strong></div>
+        <h2>Complexity</h2>
+        <dl class="kv">
+          <div>
+            <dt><span class="tip-anchor">Web Frontend<span class="tip-bubble">Heuristic cognitive complexity from webui/ (frontend_collector). Branching tokens weighted by nesting depth. Typical range: 12–40 mean. Lower is easier to maintain.</span></span></dt>
+            <dd>{frontendComplexityText}</dd>
+          </div>
+          <div>
+            <dt><span class="tip-anchor">Backend<span class="tip-bubble">McCabe cyclomatic complexity from src/ (radon). Measures decision paths per function. Lower is simpler. Industry median ≈ 4.5.</span></span></dt>
+            <dd>{cyclomaticText}</dd>
+          </div>
+        </dl>
       </article>
     </section>
 
