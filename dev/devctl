@@ -44,6 +44,7 @@ REPO_LOCK_FILE="/tmp/nightfall-repo.lock"
 REPO_LOCK_FD=200
 REPO_LOCK_TIMEOUT_SEC="${REPO_LOCK_TIMEOUT_SEC:-300}"
 
+# Cache device names for lxc config; used in _ensure_cache_mounts and _print_cache_mounts.
 CACHE_DEVICE_NPM_HOME="cache-root-npm-home"
 CACHE_DEVICE_NPM="cache-root-cache-npm"
 CACHE_DEVICE_PIP="cache-root-cache-pip"
@@ -877,6 +878,18 @@ Environment variables:
   DEVCTL_E2E_ARTIFACT_DIR   Playwright artifact directory (default: test-results/playwright).
   DEVCTL_GLOBAL_LOCK_HELD   Set to 1 by callers that already hold the global repo lock.
   REPO_LOCK_TIMEOUT_SEC     Global repo lock wait timeout in seconds (default: 300).
+    DEVCTL_CONTRACT_TEST_ROOT Contract-test mode root path (host execution; bypasses container).
+    DEVCTL_TEST_WEB_TYPECHECK_RUNNER
+                                                        Contract-test override for web typecheck command (default: npm exec -- svelte-check --fail-on-warnings).
+    DEVCTL_TEST_WEB_UNIT_RUNNER
+                                                        Contract-test override for web unit test command (default: npx vitest run).
+    DEVCTL_TEST_WEB_E2E_RUNNER
+                                                        Contract-test override for web e2e command (default: npx playwright test --reporter=line).
+
+Notes:
+    Contract-test overrides are intended for unit/contract harnesses only.
+    When DEVCTL_CONTRACT_TEST_ROOT is set, web test commands run on the host
+    against that path and do not require container dependencies.
 USAGE
     exit 1
 }
