@@ -1,38 +1,38 @@
 {
   "projectName": "nightfall++photo-ingress",
-  "commitSha": "fdeb684",
-  "commitFull": "fdeb684529eee4e01a60d7b48e7b8c37aaada38d",
-  "runId": "module6-20260405T202507-1",
-  "lastRunAt": "2026-04-05T20:25:25.713335+00:00",
+  "commitSha": "2831b01",
+  "commitFull": "2831b019edeaab32817f91b60c94ee9da2133885",
+  "runId": "module6-manual-20260405T204608",
+  "lastRunAt": "2026-04-05T20:46:09.934656+00:00",
   "sourceBranch": "main",
   "repoUrl": "https://github.com/artherion77/nightfall-photo-ingress",
   "repoHeadUrl": "https://github.com/artherion77/nightfall-photo-ingress/tree/main",
-  "repoCommitUrl": "https://github.com/artherion77/nightfall-photo-ingress/commit/fdeb684529eee4e01a60d7b48e7b8c37aaada38d",
+  "repoCommitUrl": "https://github.com/artherion77/nightfall-photo-ingress/commit/2831b019edeaab32817f91b60c94ee9da2133885",
   "runMeta": {
-    "startedAt": "2026-04-05T20:25:25.690419+00:00",
-    "finishedAt": "2026-04-05T20:25:25.713335+00:00",
-    "durationSeconds": 0.0229,
-    "runId": "module6-20260405T202507-1",
+    "startedAt": "2026-04-05T20:46:09.909055+00:00",
+    "finishedAt": "2026-04-05T20:46:09.934656+00:00",
+    "durationSeconds": 0.0256,
+    "runId": "module6-manual-20260405T204608",
     "branch": "main"
   },
   "versions": {
     "python": "Python 3.12.3",
     "typescript": "5.7.2"
   },
-  "coveragePercent": 80.11625090821022,
-  "hasCoverage": true,
-  "sparklinePoints": "0.00,42.00 45.00,42.00 90.00,42.00 135.00,42.00 180.00,42.00",
+  "coveragePercent": null,
+  "hasCoverage": false,
+  "sparklinePoints": "0.00,42.00 60.00,42.00 120.00,42.00 180.00,42.00",
   "coverageTrendSource": "measured_history",
-  "locTotal": "36.7k",
+  "locTotal": "36.8k",
   "locDetail": {
-    "total": 36673,
+    "total": 36769,
     "purpose": {
       "production": 11848,
-      "test": 16663,
-      "other": 8162
+      "test": 16758,
+      "other": 8163
     },
     "technology": {
-      "python": 31356,
+      "python": 31452,
       "svelte": 1956,
       "jsts": 784,
       "bash": 2577,
@@ -42,8 +42,8 @@
     "note": "System-level metric. Includes all code in the repository."
   },
   "complexityCard": {
-    "cyclomatic": 3.2519,
-    "maintainability": 56.4199,
+    "cyclomatic": 3.2522,
+    "maintainability": 56.3944,
     "frontend": {
       "value": 0.6821266233766233,
       "source": "sonar_cognitive",
@@ -67,21 +67,21 @@
   "backendCoverageBars": [
     {
       "label": "Unit",
-      "value": 80.11625090821022
+      "value": 0
     },
     {
       "label": "Integration",
-      "value": 74.11625090821022
+      "value": 0
     },
     {
       "label": "Flow",
-      "value": 71.11625090821022
+      "value": 0
     }
   ],
   "complexityMix": {
-    "low": 7,
-    "moderate": 1,
-    "high": 24
+    "low": 160,
+    "moderate": 23,
+    "high": 3
   },
   "complexityBreakdownDetail": {
     "high": {
@@ -95,15 +95,15 @@
           "category": "high"
         },
         {
-          "module": "tests/unit/test_metrics_module5_dashboard.py",
-          "type": "backend",
-          "score": 12.8,
-          "category": "high"
-        },
-        {
           "module": "tests/integration/test_m3_m4_operator_semantics.py",
           "type": "backend",
           "score": 11.0,
+          "category": "high"
+        },
+        {
+          "module": "tests/unit/test_metrics_module5_dashboard.py",
+          "type": "backend",
+          "score": 10.14,
           "category": "high"
         }
       ]
@@ -2934,40 +2934,8 @@
       "endpoints": 7,
       "schemas": 7
     },
-    "bundleSizeKb": 370,
-    "bundleSizeDetail": {
-      "totalKb": 370.2,
-      "gzipKb": 97.4,
-      "brotliKb": 83.3,
-      "largestChunk": {
-        "name": "index.js",
-        "type": "js",
-        "raw_bytes": 127240,
-        "raw_kb": 124.3
-      },
-      "topContributors": [
-        {
-          "id": "/opt/nightfall-webui/node_modules/svelte/src/internal/server/renderer.js",
-          "rendered_kb": 23.9
-        },
-        {
-          "id": "/opt/nightfall-webui/node_modules/svelte/src/internal/client/reactivity/batch.js",
-          "rendered_kb": 21.7
-        },
-        {
-          "id": "/opt/nightfall-webui/node_modules/@sveltejs/kit/src/runtime/server/page/render.js",
-          "rendered_kb": 20.7
-        },
-        {
-          "id": "/opt/nightfall-webui/node_modules/@sveltejs/kit/src/runtime/form-utils.js",
-          "rendered_kb": 20.5
-        },
-        {
-          "id": "/opt/nightfall-webui/node_modules/@sveltejs/kit/src/runtime/server/respond.js",
-          "rendered_kb": 18.5
-        }
-      ]
-    },
+    "bundleSizeKb": null,
+    "bundleSizeDetail": null,
     "openapiScore": null
   },
   "footer": {
@@ -2977,6 +2945,22 @@
     "executor": "chris"
   },
   "trendRows": [
+    {
+      "runId": "module6-20260405T204509-1",
+      "severity": "warning",
+      "warningChecks": 6,
+      "failedChecks": 0,
+      "deltaItems": 16,
+      "generatedAt": "2026-04-05T20:45:26.034700+00:00"
+    },
+    {
+      "runId": "module6-20260405T202507-1",
+      "severity": "warning",
+      "warningChecks": 5,
+      "failedChecks": 0,
+      "deltaItems": 16,
+      "generatedAt": "2026-04-05T20:25:25.713324+00:00"
+    },
     {
       "runId": "module6-20260405T202239-1",
       "severity": "critical",
@@ -3008,22 +2992,6 @@
       "failedChecks": 0,
       "deltaItems": 11,
       "generatedAt": "2026-04-05T17:54:46.424607+00:00"
-    },
-    {
-      "runId": "module6-20260405T174239-1",
-      "severity": "warning",
-      "warningChecks": 6,
-      "failedChecks": 0,
-      "deltaItems": 15,
-      "generatedAt": "2026-04-05T17:42:55.838943+00:00"
-    },
-    {
-      "runId": "module6-20260405T170434-1",
-      "severity": "warning",
-      "warningChecks": 5,
-      "failedChecks": 0,
-      "deltaItems": 15,
-      "generatedAt": "2026-04-05T17:04:51.771807+00:00"
     }
   ],
   "collectorStatuses": {
@@ -3036,17 +3004,17 @@
       "reason": null
     },
     "coverage": {
-      "status": "success",
-      "reason": null
+      "status": "not_available",
+      "reason": "pytest execution skipped"
     },
     "bundleSize": {
-      "status": "available",
+      "status": "unknown",
       "reason": null
     }
   },
   "buildStamp": {
-    "generatedAt": "2026-04-05T20:25:31.341822+00:00",
-    "commitSha": "fdeb684529eee4e01a60d7b48e7b8c37aaada38d",
-    "runId": "module6-20260405T202507-1"
+    "generatedAt": "2026-04-05T20:46:19.627724+00:00",
+    "commitSha": "2831b019edeaab32817f91b60c94ee9da2133885",
+    "runId": "module6-manual-20260405T204608"
   }
 }
