@@ -33,6 +33,12 @@
       cyclomatic: { method: 'McCabe cyclomatic complexity via radon', scale: { min: 1, max: 20 }, industryMedian: 4.5 },
       maintainability: { method: 'Maintainability Index via radon', scale: { min: 0, max: 100 }, industryMedian: 65 },
     },
+    frontendComplexityReference: {
+      method: 'Heuristic cognitive complexity from frontend_collector (branch tokens weighted by nesting depth)',
+      scale: { min: 0, max: 60 },
+      industryMedian: 26,
+      industryMeanRange: { min: 12, max: 40 },
+    },
     system: { apiSurface: { endpoints: 0, schemas: 0 }, bundleSizeKb: null, openapiScore: null },
     footer: { host: 'unknown', python: 'unknown', git: 'unknown', executor: 'unknown' },
     trendRows: [],
@@ -65,12 +71,17 @@
   let cyclomaticMedianPct = 0;
   let maintainabilityProjectPct = 0;
   let maintainabilityMedianPct = 0;
+  let frontendProjectPct = 0;
+  let frontendRangeMinPct = 0;
+  let frontendRangeMaxPct = 0;
   let cyclomaticRelation = 'near median';
   let maintainabilityRelation = 'near median';
+  let frontendRelation = 'within typical range';
   let cyclomaticProjectColor = '#4a8f4b';
   let cyclomaticMedianColor = '#d8b33f';
   let maintainabilityProjectColor = '#4a8f4b';
   let maintainabilityMedianColor = '#d8b33f';
+  let frontendProjectColor = '#4a8f4b';
   let activeComplexitySegment = null;
   let complexityTotalModules = 0;
   let backendNodeHover = null;
@@ -231,6 +242,15 @@
     return 'near median';
   }
 
+  function classifyAgainstRange(value, min, max) {
+    if (typeof value !== 'number' || !Number.isFinite(value) || !Number.isFinite(min) || !Number.isFinite(max)) {
+      return 'within typical range';
+    }
+    if (value < min) return 'below typical range';
+    if (value > max) return 'above typical range';
+    return 'within typical range';
+  }
+
   function cyclomaticGradientColor(pct) {
     if (pct < 33) return '#4a8f4b';
     if (pct < 66) return '#d8b33f';
@@ -274,6 +294,21 @@
     maintainabilityRelation = classifyAgainstMedian(data.complexityCard?.maintainability, miMedian);
     maintainabilityProjectColor = maintainabilityGradientColor(maintainabilityProjectPct);
     maintainabilityMedianColor = maintainabilityGradientColor(maintainabilityMedianPct);
+
+    const frontendRef = data.frontendComplexityReference || {
+      scale: { min: 0, max: 60 },
+      industryMedian: 26,
+      industryMeanRange: { min: 12, max: 40 },
+    };
+    const frontendMin = Number(frontendRef.scale?.min ?? 0);
+    const frontendMax = Number(frontendRef.scale?.max ?? 60);
+    const frontendRangeMin = Number(frontendRef.industryMeanRange?.min ?? 12);
+    const frontendRangeMax = Number(frontendRef.industryMeanRange?.max ?? 40);
+    frontendProjectPct = metricToScalePercent(data.frontendComplexity, frontendMin, frontendMax);
+    frontendRangeMinPct = metricToScalePercent(frontendRangeMin, frontendMin, frontendMax);
+    frontendRangeMaxPct = metricToScalePercent(frontendRangeMax, frontendMin, frontendMax);
+    frontendRelation = classifyAgainstRange(data.frontendComplexity, frontendRangeMin, frontendRangeMax);
+    frontendProjectColor = cyclomaticGradientColor(frontendProjectPct);
 
     const detail = data.complexityBreakdownDetail || {};
     complexityTotalModules = Number(detail.high?.totalModules || 0)
@@ -406,7 +441,24 @@
         <h2>Complexity</h2>
         <dl class="kv kv-compact">
           <div>
-            <dt><span class="tip-anchor">Web Frontend<br>Cognitive<span class="tip-bubble">Heuristic cognitive complexity from webui/ (frontend_collector). Branching tokens weighted by nesting depth. Typical range: 12–40 mean. Lower is easier to maintain.</span></span></dt>
+            <dt>
+              <span class="tip-anchor">
+                Web Frontend<br>Cognitive
+                <span class="tip-bubble scale-tip">
+                  <strong>Frontend Cognitive Complexity (heuristic)</strong><br />
+                  Scale: {data.frontendComplexityReference.scale.min}-{data.frontendComplexityReference.scale.max} (lower is simpler).<br />
+                  Industry mean (typical frontend projects): {data.frontendComplexityReference.industryMedian}<br />
+                  Industry mean range (typical frontend projects): {data.frontendComplexityReference.industryMeanRange.min}-{data.frontendComplexityReference.industryMeanRange.max}
+                  <br />Classification: {frontendRelation}
+                  <span class="scale-bar cyclomatic">
+                    <span class="marker project" style={`left:${frontendProjectPct}%; border-top-color:${frontendProjectColor};`}></span>
+                    <span class="marker median" style={`left:${frontendRangeMinPct}%;`}></span>
+                    <span class="marker median" style={`left:${frontendRangeMaxPct}%;`}></span>
+                  </span>
+                  <span class="scale-legend">▼ Project value &nbsp; ▲▲ Industry mean range</span>
+                </span>
+              </span>
+            </dt>
             <dd>{frontendComplexityText}</dd>
           </div>
           <div>
