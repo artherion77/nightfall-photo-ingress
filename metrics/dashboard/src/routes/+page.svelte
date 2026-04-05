@@ -791,7 +791,7 @@
               <span class="tip-anchor">
                 {bundleRawDisplay !== 'N/A' ? `${bundleRawDisplay} KB` : 'N/A'}
                 <span class="tip-bubble scale-tip">
-                  <strong>Bundle Size (Production Build)</strong><br />
+                  Bundle Size (Production Build)<br />
                   Measured size of the frontend production bundle after tree-shaking and code-splitting.<br />
                   <br />
                   This metric reflects the amount of JavaScript delivered to the browser and primarily impacts:<br />
@@ -809,6 +809,10 @@
                   • Warning threshold: &gt;500 KB raw or &gt;200 KB gzip<br />
                   <br />
                   Lower values generally improve load performance, especially on mobile and low-bandwidth connections.<br />
+                  <br />
+                  Classification and scale are based on raw (uncompressed) bundle size.<br />
+                  Scale and classification are based on raw (uncompressed) bundle size.<br />
+                  Compressed sizes are shown for network transfer context.<br />
                   <br />
                   Scale anchors: 0 KB (minimal), 250 KB (industry median), 500 KB (warning threshold), 1000 KB (critical).<br />
                   Color semantics: green below median, yellow near median, red above warning threshold.<br />

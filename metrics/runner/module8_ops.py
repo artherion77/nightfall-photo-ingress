@@ -198,26 +198,21 @@ def _parse_bundle_stats(stats_path: Path) -> dict[str, Any]:
 
 
 def _bundle_size_metrics(repo_root: Path) -> dict[str, Any]:
-    # Prefer a bundle-stats.json produced by the Vite/Rollup build step.
-    stats_candidates = [
-        repo_root / "webui" / "dist" / "bundle-stats.json",
-        repo_root / "frontend" / "dist" / "bundle-stats.json",
-        repo_root / "metrics" / "dashboard" / "dist" / "bundle-stats.json",
-    ]
-    for stats_path in stats_candidates:
-        if stats_path.exists():
-            try:
-                return _parse_bundle_stats(stats_path)
-            except (ValueError, KeyError, TypeError) as exc:
-                return {
-                    "status": "not_available",
-                    "reason": f"bundle-stats.json parse error: {exc}",
-                    "source": "bundle_stats_json",
-                }
+    # Scope metric collection strictly to the WebUI production build output.
+    stats_path = repo_root / "webui" / "dist" / "bundle-stats.json"
+    if stats_path.exists():
+        try:
+            return _parse_bundle_stats(stats_path)
+        except (ValueError, KeyError, TypeError) as exc:
+            return {
+                "status": "not_available",
+                "reason": f"bundle-stats.json parse error: {exc}",
+                "source": "bundle_stats_json",
+            }
 
     return {
         "status": "not_available",
-        "reason": "bundle-stats.json not found; run frontend build with bundle visualizer enabled",
+        "reason": "webui/dist/bundle-stats.json not found; run WebUI production build with bundle visualizer enabled",
         "source": "none",
     }
 

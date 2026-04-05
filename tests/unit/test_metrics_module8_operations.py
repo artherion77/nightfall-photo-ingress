@@ -104,6 +104,44 @@ def test_module8_optional_bundle_size_success_when_enabled(tmp_path: Path) -> No
     assert payload["collectors"]["bundle_size"]["chunk_count"] == 1
 
 
+def test_module8_bundle_size_ignores_metrics_dashboard_build_output(tmp_path: Path) -> None:
+    """Bundle size collector must only use WebUI build artifacts."""
+    ensure_ops_state(tmp_path)
+    _seed_latest_metrics(tmp_path)
+    _write_json(
+        tmp_path / "metrics" / "state" / "extensions.json",
+        {
+            "schema_version": 1,
+            "collectors": [
+                {"name": "bundle_size", "enabled": True, "optional": True},
+            ],
+        },
+    )
+
+    # Provide stats only for metrics/dashboard and ensure collector does not use it.
+    dashboard_only_stats = {
+        "schema_version": 1,
+        "chunks": [
+            {
+                "name": "dashboard.js",
+                "type": "js",
+                "raw_bytes": 20480,
+                "gzip_bytes": 8192,
+                "brotli_bytes": 7168,
+                "modules": [{"id": "metrics/dashboard/src/routes/+page.svelte", "rendered_bytes": 20480}],
+            }
+        ],
+    }
+    (tmp_path / "metrics" / "dashboard" / "dist").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "metrics" / "dashboard" / "dist" / "bundle-stats.json").write_text(
+        json.dumps(dashboard_only_stats), encoding="utf-8"
+    )
+
+    payload = run_optional_collectors(tmp_path, run_id="module8-scope-check")
+    assert payload["collectors"]["bundle_size"]["status"] == "not_available"
+    assert "webui/dist/bundle-stats.json not found" in payload["collectors"]["bundle_size"]["reason"]
+
+
 def test_module8_retention_prunes_old_history_runs(tmp_path: Path) -> None:
     history = tmp_path / "artifacts" / "metrics" / "history"
     for run in ["run-a", "run-b", "run-c", "run-d"]:
@@ -212,4 +250,4 @@ def test_bundle_stats_parser_not_available_on_missing_stats_file(tmp_path: Path)
     )
     payload = run_optional_collectors(tmp_path, run_id="module8-no-build")
     assert payload["collectors"]["bundle_size"]["status"] == "not_available"
-    assert "bundle-stats.json not found" in payload["collectors"]["bundle_size"]["reason"]
+    assert "webui/dist/bundle-stats.json not found" in payload["collectors"]["bundle_size"]["reason"]
