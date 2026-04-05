@@ -375,6 +375,10 @@ class ServerState:
             return "\n".join(text.splitlines()[-tail:])
         return text
 
+    def extensions_snapshot(self) -> list[dict[str, Any]]:
+        with self._lock:
+            return list(self._extensions)
+
     def context(self) -> dict[str, Any]:
         devctl_rel = self._model.get("devctl", {}).get("path", "dev/bin/devctl")
         stagectl_rel = self._model.get("stagectl", {}).get("path", "dev/bin/stagingctl")
@@ -470,6 +474,35 @@ def _parse_json_body(handler: BaseHTTPRequestHandler) -> dict[str, Any]:
     return data
 
 
+def _optional_str(payload: dict[str, Any], key: str) -> str | None:
+    value = payload.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError(f"{key} must be a string")
+    return value
+
+
+def _optional_str_list(payload: dict[str, Any], key: str) -> list[str] | None:
+    value = payload.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, list) or not all(isinstance(x, str) for x in value):
+        raise ValueError(f"{key} must be an array of strings")
+    return value
+
+
+def _optional_str_dict(payload: dict[str, Any], key: str) -> dict[str, str] | None:
+    value = payload.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, dict) or not all(
+        isinstance(k, str) and isinstance(v, str) for k, v in value.items()
+    ):
+        raise ValueError(f"{key} must be an object of string pairs")
+    return value
+
+
 def make_handler(state: ServerState):
     class MCPHandler(BaseHTTPRequestHandler):
         server_version = "NightfallMCPCompat/2.0"
@@ -502,8 +535,7 @@ def make_handler(state: ServerState):
                 return
 
             if self.path == "/mcp/extensions":
-                with state._lock:
-                    exts = list(state._extensions)
+                exts = state.extensions_snapshot()
                 _json_response(self, HTTPStatus.OK, {"extensions": exts})
                 return
 
@@ -522,42 +554,30 @@ def make_handler(state: ServerState):
                     _json_response(self, HTTPStatus.BAD_REQUEST, {"error": "task must be a string"})
                     return
 
-                args = payload.get("args")
-                env = payload.get("env")
-                cwd = payload.get("cwd")
-                depends_on = payload.get("dependsOn")
                 significant = payload.get("significantTask", False)
-                extension_rec = payload.get("extensionRecommendation")
-
-                if args is not None and not isinstance(args, list):
-                    _json_response(self, HTTPStatus.BAD_REQUEST, {"error": "args must be a list"})
-                    return
-                if env is not None and not isinstance(env, dict):
-                    _json_response(self, HTTPStatus.BAD_REQUEST, {"error": "env must be an object"})
-                    return
-                if cwd is not None and not isinstance(cwd, str):
-                    _json_response(self, HTTPStatus.BAD_REQUEST, {"error": "cwd must be a string"})
-                    return
-                if depends_on is not None:
-                    if not isinstance(depends_on, list) or not all(isinstance(x, str) for x in depends_on):
-                        _json_response(self, HTTPStatus.BAD_REQUEST, {"error": "dependsOn must be an array of strings"})
-                        return
                 if not isinstance(significant, bool):
                     _json_response(self, HTTPStatus.BAD_REQUEST, {"error": "significantTask must be a boolean"})
                     return
-                if extension_rec is not None and not isinstance(extension_rec, str):
-                    _json_response(self, HTTPStatus.BAD_REQUEST, {"error": "extensionRecommendation must be a string"})
+
+                try:
+                    args = _optional_str_list(payload, "args")
+                    env = _optional_str_dict(payload, "env")
+                    cwd = _optional_str(payload, "cwd")
+                    depends_on = _optional_str_list(payload, "dependsOn")
+                    extension_rec = _optional_str(payload, "extensionRecommendation")
+                except ValueError as exc:
+                    _json_response(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
                     return
 
                 try:
                     task_id = state.enqueue(
                         task_name,
-                        args=args if isinstance(args, list) else None,
-                        env=env if isinstance(env, dict) else None,
-                        cwd=cwd if isinstance(cwd, str) else None,
-                        depends_on=depends_on if isinstance(depends_on, list) else None,
+                        args=args,
+                        env=env,
+                        cwd=cwd,
+                        depends_on=depends_on,
                         significant_task=significant,
-                        extension_recommendation=extension_rec if isinstance(extension_rec, str) else None,
+                        extension_recommendation=extension_rec,
                     )
                 except ValueError as exc:
                     _json_response(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
