@@ -300,6 +300,44 @@ def _run_git(repo_root: Path, args: list[str], cwd: Path | None = None, check: b
     )
 
 
+def _build_static_dashboard(repo_root: Path) -> None:
+    build_script = repo_root / "dev" / "bin" / "build-metrics-dashboard"
+    devctl_script = repo_root / "dev" / "bin" / "devctl"
+    if not build_script.exists():
+        raise RuntimeError(f"missing dashboard build script: {build_script}")
+
+    result = subprocess.run(
+        [str(build_script)],
+        cwd=str(repo_root),
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode == 0:
+        return
+
+    if "is not running" in result.stderr and devctl_script.exists():
+        subprocess.run(
+            [str(devctl_script), "setup"],
+            cwd=str(repo_root),
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        retry = subprocess.run(
+            [str(build_script)],
+            cwd=str(repo_root),
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if retry.returncode == 0:
+            return
+        raise RuntimeError(retry.stderr.strip() or retry.stdout.strip() or "dashboard build failed after devctl setup")
+
+    raise RuntimeError(result.stderr.strip() or result.stdout.strip() or "dashboard build failed")
+
+
 def _branch_exists(repo_root: Path, branch: str) -> bool:
     result = _run_git(repo_root, ["show-ref", "--verify", "--quiet", f"refs/heads/{branch}"], check=False)
     return result.returncode == 0
@@ -619,8 +657,9 @@ def publish_metrics(repo_root: Path) -> dict[str, Any]:
         append_event_log(repo_root, {"event": "publish", "timestamp": _utc_now_iso(), "status": payload["status"], "run_id": run_id})
         return payload
 
-    # Rebuild static dashboard from latest artifacts before publication sync.
+    # Regenerate dashboard payload and rebuild the static dashboard before publication sync.
     run_dashboard_generation(repo_root=repo_root, run_id=run_id)
+    _build_static_dashboard(repo_root)
 
     worktree = _ensure_publication_worktree(repo_root, branch)
     generated_dashboard_data = repo_root / "metrics" / "output" / "dashboard" / "latest" / "__data.json"

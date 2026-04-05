@@ -12,7 +12,11 @@
     sparklinePoints: '0,36 180,36',
     locTotal: '0',
     locDetail: { total: 0, purpose: { production: 0, test: 0, other: 0 }, technology: { python: 0, svelte: 0, jsts: 0, bash: 0, other: 0 }, totalFiles: 0, note: '' },
-    complexityCard: { cyclomatic: null, maintainability: null },
+    complexityCard: {
+      cyclomatic: null,
+      maintainability: null,
+      frontend: { value: null, source: null, status: null, parser_version_label: null },
+    },
     frontendComplexity: null,
     backendCoverageBars: [
       { label: 'Unit', value: 0 },
@@ -34,7 +38,7 @@
       maintainability: { method: 'Maintainability Index via radon', scale: { min: 0, max: 100 }, industryMedian: 65 },
     },
     frontendComplexityReference: {
-      method: 'Heuristic cognitive complexity from frontend_collector (branch tokens weighted by nesting depth)',
+      method: 'Sonar Cognitive Complexity (tree-sitter AST; nesting-penalised increments)',
       scale: { min: 0, max: 60 },
       industryMedian: 26,
       industryMeanRange: { min: 12, max: 40 },
@@ -445,10 +449,13 @@
               <span class="tip-anchor">
                 Web Frontend<br>Cognitive
                 <span class="tip-bubble scale-tip">
-                  <strong>Frontend Cognitive Complexity (heuristic)</strong><br />
+                  <strong>{data.frontendComplexityReference.method}</strong><br />
                   Scale: {data.frontendComplexityReference.scale.min}-{data.frontendComplexityReference.scale.max} (lower is simpler).<br />
                   Industry mean (typical frontend projects): {data.frontendComplexityReference.industryMedian}<br />
                   Industry mean range (typical frontend projects): {data.frontendComplexityReference.industryMeanRange.min}-{data.frontendComplexityReference.industryMeanRange.max}
+                  {#if data.complexityCard?.frontend?.source}<br />Source: {data.complexityCard.frontend.source}{/if}
+                  {#if data.complexityCard?.frontend?.status}<br />Status: {data.complexityCard.frontend.status}{/if}
+                  {#if data.complexityCard?.frontend?.parser_version_label}<br />Parser: {data.complexityCard.frontend.parser_version_label}{/if}
                   <br />Classification: {frontendRelation}
                   <span class="scale-bar cyclomatic">
                     <span class="marker project" style={`left:${frontendProjectPct}%; border-top-color:${frontendProjectColor};`}></span>
