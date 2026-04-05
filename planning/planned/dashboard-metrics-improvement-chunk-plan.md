@@ -96,29 +96,27 @@ Make backend cyclomatic and maintainability consistently available in dev contai
 
 ### Current state
 
-- `radon 6.0.1` is installed in `.venv` but was not present during the last metrics collection run
-- Dashboard currently shows **N/A** for both Cyclomatic and Maintainability
-- Backend collector has the code to invoke radon but fails at import time: `No module named 'radon'`
+- Backend complexity collector is operational and emits measured complexity metrics
+- Latest artifact reports non-null backend complexity means for both cyclomatic and maintainability index
+- Focused regression tests for backend collector and dashboard payload contract pass
 
-### Explicit implementation steps
+### Verification evidence
 
-1. **Declare radon as a dependency:**
-   - Add `radon>=6.0.1` to `pyproject.toml` dev dependencies
-   - Ensure it appears in the pip install step for the metrics execution environment
+1. **Artifact evidence (`artifacts/metrics/latest/metrics.json`):**
+  - `modules.backend.metrics.complexity.status == "success"`
+  - `modules.backend.metrics.complexity.cyclomatic.mean` is non-null
+  - `modules.backend.metrics.complexity.maintainability_index.mean` is non-null
 
-2. **Verify collector invocation:**
-   - Confirm `metrics/runner/backend_collector.py` `collect_complexity_and_maintainability()` imports radon and calculates per-file metrics
-   - Ensure function is called from `run_backend_collection()`
-   - Verify radon version is recorded in the payload
+2. **Regression evidence:**
+  - `tests/unit/test_metrics_module2_backend.py` passes
+  - `tests/unit/test_metrics_module5_dashboard.py` passes
 
-3. **Add regression tests:**
-   - Test that complexity metrics are emitted when radon is available
-   - Test that non-availability reason is actionable when radon is missing
-   - Add a unit test to `tests/unit/test_metrics_module2_backend.py` that verifies the failure message contains helpful text
+3. **Dashboard payload behavior:**
+  - `complexityCard.cyclomatic` and `complexityCard.maintainability` are populated when metrics are available
 
-4. **Trigger new metrics run:**
-   - After radon is installed and tests pass, run `metricsctl collect` or full pipeline
-   - Verify that dashboard shows numeric complexity values (not N/A)
+### Status note
+
+**No further implementation action required for Chunk 2.** Keep a lightweight regression check in future chunk work to ensure backend complexity remains available and measured.
 
 ### Testable acceptance criteria
 
@@ -333,21 +331,20 @@ Updated execution order (as of 2026-04-05 drift review):
 
 1. ✅ **Chunk 0** (contract hardening) — DONE
 2. ✅ **Chunk 1** (sparkline correctness) — DONE
-3. ⏳ **Chunk 2** (Python complexity enablement) — **NEXT: Quick Win**
-4. ✅ **Chunk 5** (dependency graph actionable UX) — DONE (no action)
-5. 🔧 **Pipeline support** (build → bundle-stats.json) — prerequisite for Chunk 4
-6. ⏳ **Chunk 4** (bundle analysis) — after pipeline is ready
-7. 📋 **Chunk 3A** (design Sonar) — after Chunk 2 is stable
+3. ✅ **Chunk 2** (Python complexity enablement) — DONE
+4. ✅ **Chunk 5** (dependency graph actionable UX) — DONE
+5. 🔧 **Pipeline support** (build -> bundle-stats.json) — **NEXT**, prerequisite for Chunk 4
+6. ⏳ **Chunk 4** (bundle analysis) — after pipeline producer is ready
+7. 📋 **Chunk 3A** (design Sonar) — next design gate for frontend complexity v2
 8. ⏳ **Chunk 3B** (implement Sonar) — after 3A design approved
-9. ⏳ **Chunk 6** (optional collector hardening) — after 2, 3B are done
-10. ⏳ **Chunk 7** (new metric expansion) — after 1, 6 are done
+9. ⏳ **Chunk 6** (optional collector hardening) — after 3B (and validated optional collector paths)
+10. ⏳ **Chunk 7** (new metric expansion) — after 1 and 6 are done
 
 Rationale:
-- **Chunk 2 first:** Quick, unblocks dashboard complexity display immediately
-- **Chunk 5 already done:** No action needed, retain implementation
-- **Chunk 4 deferred:** Requires parallel work on build pipeline; defer until producer is ready
-- **Chunk 3 redesigned:** Old ESLint approach was brittle; new Sonar approach requires design phase (3A) before implementation (3B)
-- **Chunk 6 & 7 dependent:** Wait for earlier metrics to stabilize before adding new collector orchestration or metric families
+- **Chunk 2 and Chunk 5 are complete:** keep only regression checks, no new implementation work required there
+- **Pipeline support now first actionable item:** Chunk 4 cannot complete until bundle-stats producer contract exists
+- **Chunk 3 remains redesign-driven:** execute 3A design before any implementation work in 3B
+- **Chunk 6 and 7 remain downstream:** complete after frontend complexity v2 and optional collector paths stabilize
 
 ---
 
