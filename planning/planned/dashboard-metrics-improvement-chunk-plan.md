@@ -33,6 +33,7 @@ This plan decomposes improvements into independent chunks with hard acceptance c
 | 5 | Dependency graph actionable UX | Surface node metadata and meaningful hover details | Done | 0 |
 | 6 | Optional collector hardening | Promote optional metrics from mostly unavailable to useful | Pending | 2,3B |
 | 7 | New metric set expansion | Add high-value quality and delivery metrics | Pending | 1,6 |
+| 8 | Build Cost & Schema Guardrails | Control build overhead and protect parser compatibility | Backlog (non-blocking) | 4 |
 
 ---
 
@@ -339,6 +340,33 @@ Add practical engineering health metrics beyond current baseline.
 
 ---
 
+## Chunk 8: Build Cost & Schema Guardrails (Non-blocking)
+
+Implementation status: Backlog (non-blocking)
+
+### Goal
+Keep bundle metrics sustainable over time by managing build overhead and guarding against upstream schema drift.
+
+### Scope note
+This chunk is intentionally non-blocking and does not gate Chunk 3A/3B, 6, or 7 delivery.
+
+### Work items
+
+- Add build cost awareness controls for bundle stats generation, such as:
+  - a `--metrics` or CI-only enablement flag
+  - optional caching/reuse of visualizer output when inputs are unchanged
+- Keep parser compatibility protection explicit and tested:
+  - retain fixture-based parser tests for `bundle-stats.json`
+  - ensure schema drift failures remain actionable and visible in test output
+
+### Testable acceptance criteria
+
+- Build can run in a mode that skips bundle stats generation when metrics are not required.
+- CI metrics mode continues to emit `bundle-stats.json` and keeps Chunk 4 behavior intact.
+- Parser fixture tests fail clearly on schema changes and identify the compatibility break.
+
+---
+
 ## 4. Execution order and batching — REVISED
 
 Updated execution order (as of 2026-04-05 drift review):
@@ -353,12 +381,14 @@ Updated execution order (as of 2026-04-05 drift review):
 8. ⏳ **Chunk 3B** (implement Sonar) — after 3A design approved
 9. ⏳ **Chunk 6** (optional collector hardening) — after 3B (and validated optional collector paths)
 10. ⏳ **Chunk 7** (new metric expansion) — after 1 and 6 are done
+11. 🧩 **Chunk 8** (build cost and schema guardrails) — non-blocking hardening follow-up
 
 Rationale:
 - **Chunk 2 and Chunk 5 are complete:** keep only regression checks, no new implementation work required there
 - **Pipeline support and Chunk 4 are complete:** bundle metrics now have a producer/consumer contract and verified data flow
 - **Chunk 3 remains redesign-driven and is now next:** execute 3A design before any implementation work in 3B
 - **Chunk 6 and 7 remain downstream:** complete after frontend complexity v2 and optional collector paths stabilize
+- **Chunk 8 is non-blocking hardening:** optimize build overhead and preserve schema-compatibility safeguards without gating delivery
 
 ---
 
