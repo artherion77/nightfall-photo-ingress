@@ -23,10 +23,23 @@
   "hasCoverage": false,
   "sparklinePoints": "0.00,42.00 180.00,42.00",
   "coverageTrendSource": "measured_history",
-  "locBreakdown": {
-    "python": "26.5k",
-    "tsjs": "8.5k",
-    "svelte": "3.1k"
+  "locTotal": "35.6k",
+  "locDetail": {
+    "total": 35560,
+    "purpose": {
+      "production": 11849,
+      "test": 15982,
+      "other": 7729
+    },
+    "technology": {
+      "python": 30313,
+      "svelte": 1956,
+      "jsts": 785,
+      "bash": 2506,
+      "other": 0
+    },
+    "totalFiles": 239,
+    "note": "System-level metric. Includes all code in the repository."
   },
   "complexityCard": {
     "cyclomatic": 3.2535,
