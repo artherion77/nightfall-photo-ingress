@@ -409,12 +409,16 @@ class SonarCognitiveComplexityCollector:
         else:
             status = "available"
         
+        # Compute max across all file means
+        project_max = max(file_means) if file_means else None
+
         return {
             "source": "sonar_cognitive",
             "status": status,
             "version": "1.0",
             "parser_info": self._parser_info(),
             "mean": project_mean,
+            "max": project_max,
             "file_count": len(analyzed_files),
             "failed_file_count": len(all_failures),
             "files": analyzed_files,
@@ -449,7 +453,19 @@ def collect_cognitive_complexity(repo_root: Path, roots: list[str]) -> dict[str,
         }
     
     result = collector.score_project(files)
-    
+
+    # Build per_file dict (path → file_mean) for dashboard breakdown
+    per_file: dict[str, float] = {}
+    for f in result.get("files", []):
+        if f.get("file_mean") is not None:
+            raw_path = f["path"]
+            try:
+                rel = str(Path(raw_path).relative_to(repo_root))
+            except ValueError:
+                rel = raw_path
+            per_file[rel] = round(f["file_mean"], 2)
+    result["per_file"] = per_file
+
     # Add collection time
     result["collection_time_ms"] = 0  # Will be set by orchestrator
     

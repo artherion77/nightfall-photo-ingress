@@ -810,7 +810,6 @@
                 Lower values generally improve load performance, especially on mobile and low-bandwidth connections.<br />
                 <br />
                 Classification and scale are based on raw (uncompressed) bundle size.<br />
-                Scale and classification are based on raw (uncompressed) bundle size.<br />
                 Compressed sizes are shown for network transfer context.<br />
                 <br />
                 Scale anchors: 0 KB (minimal), 250 KB (industry median), 500 KB (warning threshold), 1000 KB (critical).<br />

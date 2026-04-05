@@ -300,3 +300,66 @@ function main(x) {
         assert cc["source"] == "sonar_cognitive"
         assert cc["status"] in ("available", "partial", "not_available")
         assert cc.get("version") == "1.0"
+
+
+class TestScoreProjectMaxField:
+    """Test that score_project returns the max field."""
+
+    def test_max_field_present(self, tmp_path: Path) -> None:
+        """score_project must include a max across file means."""
+        src_dir = tmp_path / "webui" / "src"
+        src_dir.mkdir(parents=True)
+
+        # File with no complexity → file_mean 0
+        (src_dir / "flat.js").write_text("function f(x) { return x; }", encoding="utf-8")
+        # File with nested complexity → file_mean > 0
+        (src_dir / "complex.js").write_text("""
+function c(x) {
+    if (x > 0) {
+        if (x > 10) {
+            return 'large';
+        }
+        return 'small';
+    }
+    return 'zero';
+}
+        """, encoding="utf-8")
+
+        result = collect_cognitive_complexity(tmp_path, ["webui/src"])
+
+        assert result["status"] == "available"
+        assert "max" in result
+        assert result["max"] is not None
+        assert result["max"] >= result["mean"]
+
+
+class TestCollectCognitiveComplexityPerFile:
+    """Test that collect_cognitive_complexity produces per_file dict."""
+
+    def test_per_file_dict_present(self, tmp_path: Path) -> None:
+        """per_file dict maps relative paths to float means."""
+        src_dir = tmp_path / "webui" / "src"
+        src_dir.mkdir(parents=True)
+
+        (src_dir / "a.js").write_text("function a(x) { return x; }", encoding="utf-8")
+        (src_dir / "b.js").write_text("""
+function b(x) {
+    if (x) { return 1; }
+    return 0;
+}
+        """, encoding="utf-8")
+
+        result = collect_cognitive_complexity(tmp_path, ["webui/src"])
+
+        assert result["status"] == "available"
+        assert "per_file" in result
+        assert isinstance(result["per_file"], dict)
+        assert len(result["per_file"]) == 2
+        for path, score in result["per_file"].items():
+            assert isinstance(path, str)
+            assert isinstance(score, float)
+
+    def test_per_file_empty_when_no_files(self, tmp_path: Path) -> None:
+        """No files → not_available status, no per_file key."""
+        result = collect_cognitive_complexity(tmp_path, ["webui/nonexistent"])
+        assert result["status"] == "not_available"

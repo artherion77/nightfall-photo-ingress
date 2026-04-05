@@ -165,3 +165,178 @@ def test_module5_dashboard_generation_from_artifacts_only(tmp_path: Path) -> Non
     assert "frontendGraph" in dashboard_data
     assert isinstance(dashboard_data["backendGraph"]["nodeDetails"], list)
     assert isinstance(dashboard_data["frontendGraph"]["nodeDetails"], list)
+
+
+def test_module5_lastRunAt_uses_finished_at(tmp_path: Path) -> None:
+    """lastRunAt should prefer manifest execution.finished_at over summary.generated_at."""
+    latest = tmp_path / "artifacts" / "metrics" / "latest"
+
+    _write_json(
+        latest / "manifest.json",
+        {
+            "schema_version": 1,
+            "run_id": "ts-test",
+            "execution": {
+                "exit_state": "success",
+                "finished_at": "2026-05-01T12:00:00+00:00",
+            },
+        },
+    )
+    _write_json(
+        latest / "metrics.json",
+        {
+            "schema_version": 1,
+            "run_id": "ts-test",
+            "modules": {
+                "backend": {"status": "partial", "metrics": {"loc": {"total_lines": 10}}},
+                "frontend": {"status": "partial", "metrics": {"loc": {"total_lines": 5}}},
+            },
+            "delta": {"previous_run_id": None, "comparisons": {}},
+        },
+    )
+    _write_json(
+        latest / "summary.json",
+        {
+            "schema_version": 1,
+            "run_id": "ts-test",
+            "generated_at": "2026-04-01T00:00:00+00:00",
+            "source": {"branch": "main", "commit_sha": "b" * 40},
+            "collection_status": "partial",
+            "severity": "info",
+            "indicators": {"failed_checks": 0, "warning_checks": 0, "delta_items": 0},
+            "warnings": [],
+            "failures": [],
+        },
+    )
+
+    (tmp_path / "dashboard").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "dashboard" / "index.html").write_text("<html></html>", encoding="utf-8")
+
+    dashboard_generator.run_dashboard_generation(tmp_path, run_id="ts-test")
+    data_path = tmp_path / "metrics" / "output" / "dashboard" / "latest" / "__data.json"
+    data = json.loads(data_path.read_text(encoding="utf-8"))
+
+    # Should use finished_at, NOT generated_at
+    assert data["lastRunAt"] == "2026-05-01T12:00:00+00:00"
+
+
+def test_module5_collectorStatuses_present(tmp_path: Path) -> None:
+    """Dashboard payload must contain collectorStatuses for all four collectors."""
+    latest = tmp_path / "artifacts" / "metrics" / "latest"
+
+    _write_json(
+        latest / "manifest.json",
+        {
+            "schema_version": 1,
+            "run_id": "cs-test",
+            "execution": {"exit_state": "success", "finished_at": "2026-05-01T12:00:00+00:00"},
+        },
+    )
+    _write_json(
+        latest / "metrics.json",
+        {
+            "schema_version": 1,
+            "run_id": "cs-test",
+            "modules": {
+                "backend": {
+                    "status": "success",
+                    "metrics": {
+                        "loc": {"total_lines": 10},
+                        "complexity": {"status": "available", "reason": None},
+                        "coverage": {"status": "not_available", "reason": "pytest not found"},
+                    },
+                },
+                "frontend": {
+                    "status": "success",
+                    "metrics": {
+                        "loc": {"total_lines": 5},
+                        "cognitive_complexity": {"status": "error", "reason": "tree-sitter missing"},
+                    },
+                },
+            },
+            "delta": {"previous_run_id": None, "comparisons": {}},
+        },
+    )
+    _write_json(
+        latest / "summary.json",
+        {
+            "schema_version": 1,
+            "run_id": "cs-test",
+            "generated_at": "2026-05-01T12:00:00+00:00",
+            "source": {"branch": "main", "commit_sha": "c" * 40},
+            "collection_status": "success",
+            "severity": "info",
+            "indicators": {"failed_checks": 0, "warning_checks": 0, "delta_items": 0},
+            "warnings": [],
+            "failures": [],
+        },
+    )
+
+    (tmp_path / "dashboard").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "dashboard" / "index.html").write_text("<html></html>", encoding="utf-8")
+
+    dashboard_generator.run_dashboard_generation(tmp_path, run_id="cs-test")
+    data_path = tmp_path / "metrics" / "output" / "dashboard" / "latest" / "__data.json"
+    data = json.loads(data_path.read_text(encoding="utf-8"))
+
+    assert "collectorStatuses" in data
+    cs = data["collectorStatuses"]
+    assert set(cs.keys()) == {"backendComplexity", "frontendCognitive", "coverage", "bundleSize"}
+    for key, entry in cs.items():
+        assert "status" in entry
+        assert "reason" in entry
+
+
+def test_module5_buildStamp_present(tmp_path: Path) -> None:
+    """Dashboard payload must contain buildStamp with generatedAt, commitSha, runId."""
+    latest = tmp_path / "artifacts" / "metrics" / "latest"
+
+    _write_json(
+        latest / "manifest.json",
+        {
+            "schema_version": 1,
+            "run_id": "bs-test",
+            "execution": {"exit_state": "success", "finished_at": "2026-05-01T12:00:00+00:00"},
+        },
+    )
+    _write_json(
+        latest / "metrics.json",
+        {
+            "schema_version": 1,
+            "run_id": "bs-test",
+            "modules": {
+                "backend": {"status": "partial", "metrics": {"loc": {"total_lines": 10}}},
+                "frontend": {"status": "partial", "metrics": {"loc": {"total_lines": 5}}},
+            },
+            "delta": {"previous_run_id": None, "comparisons": {}},
+        },
+    )
+    _write_json(
+        latest / "summary.json",
+        {
+            "schema_version": 1,
+            "run_id": "bs-test",
+            "generated_at": "2026-05-01T12:00:00+00:00",
+            "source": {"branch": "main", "commit_sha": "d" * 40},
+            "collection_status": "partial",
+            "severity": "info",
+            "indicators": {"failed_checks": 0, "warning_checks": 0, "delta_items": 0},
+            "warnings": [],
+            "failures": [],
+        },
+    )
+
+    (tmp_path / "dashboard").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "dashboard" / "index.html").write_text("<html></html>", encoding="utf-8")
+
+    dashboard_generator.run_dashboard_generation(tmp_path, run_id="bs-test")
+    data_path = tmp_path / "metrics" / "output" / "dashboard" / "latest" / "__data.json"
+    data = json.loads(data_path.read_text(encoding="utf-8"))
+
+    assert "buildStamp" in data
+    bs = data["buildStamp"]
+    assert "generatedAt" in bs
+    assert "commitSha" in bs
+    assert "runId" in bs
+    assert isinstance(bs["generatedAt"], str)
+    assert bs["runId"] == "bs-test"

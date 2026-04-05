@@ -605,7 +605,7 @@ def _dashboard_payload(repo_root: Path, manifest: dict[str, Any], metrics: dict[
         "commitSha": commit_full[:7],
         "commitFull": commit_full,
         "runId": str(summary.get("run_id", "unknown")),
-        "lastRunAt": str(summary.get("generated_at", "unknown")),
+        "lastRunAt": finished_at if finished_at else str(summary.get("generated_at", "unknown")),
         "sourceBranch": source_branch,
         "repoUrl": repo_url,
         "repoHeadUrl": repo_head_url,
@@ -694,6 +694,29 @@ def _dashboard_payload(repo_root: Path, manifest: dict[str, Any], metrics: dict[
             }
             for item in trends[:8]
         ],
+        "collectorStatuses": {
+            "backendComplexity": {
+                "status": backend_complexity.get("status") if isinstance(backend_complexity, dict) else "unknown",
+                "reason": backend_complexity.get("reason") if isinstance(backend_complexity, dict) else None,
+            },
+            "frontendCognitive": {
+                "status": frontend_cognitive.get("status") if isinstance(frontend_cognitive, dict) else "unknown",
+                "reason": frontend_cognitive.get("reason") if isinstance(frontend_cognitive, dict) else None,
+            },
+            "coverage": {
+                "status": backend_coverage.get("status") if isinstance(backend_coverage, dict) else "unknown",
+                "reason": backend_coverage.get("reason") if isinstance(backend_coverage, dict) else None,
+            },
+            "bundleSize": {
+                "status": bundle_status or "unknown",
+                "reason": bundle_entry.get("reason") if isinstance(bundle_entry, dict) else None,
+            },
+        },
+        "buildStamp": {
+            "generatedAt": _as_utc_now(),
+            "commitSha": commit_full,
+            "runId": str(summary.get("run_id", "unknown")),
+        },
     }
 
 

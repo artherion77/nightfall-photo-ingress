@@ -55,10 +55,17 @@ def test_module7_publish_writes_publication_state_and_syncs_worktree(tmp_path: P
 
     worktree = tmp_path / "worktree"
 
+    def _fake_dashboard_gen(repo_root, run_id):
+        # Write a valid __data.json matching the run/commit so validation passes.
+        data_dir = repo_root / "metrics" / "output" / "dashboard" / "latest"
+        data_dir.mkdir(parents=True, exist_ok=True)
+        _write_json(data_dir / "__data.json", {"runId": "module6-success", "commitFull": "a" * 40})
+        return {"run_id": run_id}
+
     monkeypatch.setattr(poller_runner, "_ensure_publication_worktree", lambda _root, _branch: worktree)
     monkeypatch.setattr(poller_runner, "_commit_if_needed", lambda _root, _worktree, _message: (True, "c" * 40))
     monkeypatch.setattr(poller_runner, "_push_publication_branch", lambda _root, _worktree, _branch: (True, None))
-    monkeypatch.setattr(poller_runner, "run_dashboard_generation", lambda repo_root, run_id: {"run_id": run_id})
+    monkeypatch.setattr(poller_runner, "run_dashboard_generation", _fake_dashboard_gen)
     monkeypatch.setattr(poller_runner, "_build_static_dashboard", lambda repo_root: None)
 
     payload = poller_runner.publish_metrics(tmp_path)
@@ -100,9 +107,15 @@ def test_module7_publish_reports_push_failure(tmp_path: Path, monkeypatch) -> No
     _seed_runtime_and_latest(tmp_path, run_id="module6-push-fail")
     worktree = tmp_path / "worktree"
 
+    def _fake_dashboard_gen(repo_root, run_id):
+        data_dir = repo_root / "metrics" / "output" / "dashboard" / "latest"
+        data_dir.mkdir(parents=True, exist_ok=True)
+        _write_json(data_dir / "__data.json", {"runId": "module6-push-fail", "commitFull": "a" * 40})
+        return {"run_id": run_id}
+
     monkeypatch.setattr(poller_runner, "_ensure_publication_worktree", lambda _root, _branch: worktree)
     monkeypatch.setattr(poller_runner, "_commit_if_needed", lambda _root, _worktree, _message: (True, "d" * 40))
-    monkeypatch.setattr(poller_runner, "run_dashboard_generation", lambda repo_root, run_id: {"run_id": run_id})
+    monkeypatch.setattr(poller_runner, "run_dashboard_generation", _fake_dashboard_gen)
     monkeypatch.setattr(poller_runner, "_build_static_dashboard", lambda repo_root: None)
     monkeypatch.setattr(
         poller_runner,

@@ -300,6 +300,20 @@ def _run_git(repo_root: Path, args: list[str], cwd: Path | None = None, check: b
     )
 
 
+def _validate_publish_payload(data_path: Path, expected_run_id: str, expected_commit: str) -> None:
+    """Validate that __data.json matches the expected run before publishing."""
+    payload = json.loads(data_path.read_text(encoding="utf-8"))
+    actual_run_id = payload.get("runId", "")
+    actual_commit = payload.get("commitFull", "")
+    errors = []
+    if actual_run_id != expected_run_id:
+        errors.append(f"runId mismatch: payload={actual_run_id!r} expected={expected_run_id!r}")
+    if expected_commit and actual_commit != expected_commit:
+        errors.append(f"commitSha mismatch: payload={actual_commit!r} expected={expected_commit!r}")
+    if errors:
+        raise RuntimeError(f"publish aborted: stale __data.json — {'; '.join(errors)}")
+
+
 def _build_static_dashboard(repo_root: Path) -> None:
     build_script = repo_root / "dev" / "bin" / "build-metrics-dashboard"
     devctl_script = repo_root / "dev" / "bin" / "devctl"
@@ -665,16 +679,18 @@ def publish_metrics(repo_root: Path) -> dict[str, Any]:
     generated_dashboard_data = repo_root / "metrics" / "output" / "dashboard" / "latest" / "__data.json"
     generated_report = repo_root / "metrics" / "output" / "reports" / "latest.md"
 
+    # Validate freshly generated payload before publishing
+    if not generated_dashboard_data.exists():
+        raise RuntimeError(f"publish aborted: generated __data.json not found at {generated_dashboard_data}")
+    _validate_publish_payload(generated_dashboard_data, run_id, commit_sha)
+
     _copy_tree(repo_root / "dashboard", worktree / "dashboard")
-    if generated_dashboard_data.exists():
-        _copy_tree(generated_dashboard_data, worktree / "dashboard" / "__data.json")
-    else:
-        _copy_tree(repo_root / "dashboard" / "__data.json", worktree / "dashboard" / "__data.json")
+    _copy_tree(generated_dashboard_data, worktree / "dashboard" / "__data.json")
 
     if generated_report.exists():
         _copy_tree(generated_report, worktree / "reports" / "latest.md")
     else:
-        _copy_tree(repo_root / "reports", worktree / "reports")
+        (worktree / "reports").mkdir(parents=True, exist_ok=True)
 
     _copy_tree(repo_root / "artifacts" / "metrics" / "latest", worktree / "artifacts" / "metrics" / "latest")
     _copy_tree(history_run_dir, worktree / "artifacts" / "metrics" / "history" / run_id)

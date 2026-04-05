@@ -4,6 +4,8 @@ import fcntl
 import json
 from pathlib import Path
 
+import pytest
+
 from metrics.runner import poller_runner
 
 
@@ -136,3 +138,43 @@ def test_module6_cleanup_runtime_artifacts_removes_ephemeral_files(tmp_path: Pat
     assert not (tmp_path / "artifacts" / "metrics" / "latest").exists()
     assert not (tmp_path / "metrics" / "output").exists()
     assert (tmp_path / "metrics" / "state" / "runtime.json").exists()
+
+
+class TestValidatePublishPayload:
+    """Test _validate_publish_payload rejects stale __data.json."""
+
+    def test_matching_payload_passes(self, tmp_path: Path) -> None:
+        data_path = tmp_path / "__data.json"
+        data_path.write_text(
+            json.dumps({"runId": "run-1", "commitFull": "a" * 40}),
+            encoding="utf-8",
+        )
+        # Should not raise
+        poller_runner._validate_publish_payload(data_path, "run-1", "a" * 40)
+
+    def test_run_id_mismatch_raises(self, tmp_path: Path) -> None:
+        data_path = tmp_path / "__data.json"
+        data_path.write_text(
+            json.dumps({"runId": "old-run", "commitFull": "a" * 40}),
+            encoding="utf-8",
+        )
+        with pytest.raises(RuntimeError, match="runId mismatch"):
+            poller_runner._validate_publish_payload(data_path, "new-run", "a" * 40)
+
+    def test_commit_mismatch_raises(self, tmp_path: Path) -> None:
+        data_path = tmp_path / "__data.json"
+        data_path.write_text(
+            json.dumps({"runId": "run-1", "commitFull": "a" * 40}),
+            encoding="utf-8",
+        )
+        with pytest.raises(RuntimeError, match="commitSha mismatch"):
+            poller_runner._validate_publish_payload(data_path, "run-1", "b" * 40)
+
+    def test_empty_expected_commit_skips_commit_check(self, tmp_path: Path) -> None:
+        data_path = tmp_path / "__data.json"
+        data_path.write_text(
+            json.dumps({"runId": "run-1", "commitFull": "a" * 40}),
+            encoding="utf-8",
+        )
+        # Empty expected_commit → commit check skipped
+        poller_runner._validate_publish_payload(data_path, "run-1", "")
