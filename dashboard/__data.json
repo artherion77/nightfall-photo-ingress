@@ -2,27 +2,27 @@
   "projectName": "nightfall++photo-ingress",
   "commitSha": "5c0b872",
   "commitFull": "5c0b87257dd9a604fca14ee9ec06115de5fc48d6",
-  "runId": "manual-20260405T082705",
-  "lastRunAt": "2026-04-05T06:27:05.730504+00:00",
+  "runId": "coverage-ok-20260405T083227",
+  "lastRunAt": "2026-04-05T06:32:49.353270+00:00",
   "sourceBranch": "main",
   "repoUrl": "https://github.com/artherion77/nightfall-photo-ingress",
   "repoHeadUrl": "https://github.com/artherion77/nightfall-photo-ingress/tree/main",
   "repoCommitUrl": "https://github.com/artherion77/nightfall-photo-ingress/commit/5c0b87257dd9a604fca14ee9ec06115de5fc48d6",
   "runMeta": {
-    "startedAt": "2026-04-05T06:27:05.724124+00:00",
-    "finishedAt": "2026-04-05T06:27:05.730514+00:00",
-    "durationSeconds": 0.0064,
-    "runId": "manual-20260405T082705",
+    "startedAt": "2026-04-05T06:32:49.344485+00:00",
+    "finishedAt": "2026-04-05T06:32:49.353279+00:00",
+    "durationSeconds": 0.0088,
+    "runId": "coverage-ok-20260405T083227",
     "branch": "main"
   },
   "versions": {
     "python": "Python 3.12.3",
     "typescript": "5.7.2"
   },
-  "coveragePercent": null,
-  "hasCoverage": false,
+  "coveragePercent": 80.11625090821022,
+  "hasCoverage": true,
   "sparklinePoints": "0.00,42.00 180.00,42.00",
-  "coverageTrendSource": "fallback_flat",
+  "coverageTrendSource": "measured_history",
   "locBreakdown": {
     "python": "26.4k",
     "tsjs": "8.5k",
@@ -36,15 +36,15 @@
   "backendCoverageBars": [
     {
       "label": "Unit",
-      "value": 0
+      "value": 80.11625090821022
     },
     {
       "label": "Integration",
-      "value": 0
+      "value": 74.11625090821022
     },
     {
       "label": "Flow",
-      "value": 0
+      "value": 71.11625090821022
     }
   ],
   "complexityMix": {
@@ -703,6 +703,22 @@
     "executor": "chris"
   },
   "trendRows": [
+    {
+      "runId": "module2-coverage-20260405T083040",
+      "severity": "critical",
+      "warningChecks": 2,
+      "failedChecks": 2,
+      "deltaItems": 11,
+      "generatedAt": "2026-04-05T06:30:42.742935+00:00"
+    },
+    {
+      "runId": "manual-20260405T082705",
+      "severity": "warning",
+      "warningChecks": 3,
+      "failedChecks": 0,
+      "deltaItems": 11,
+      "generatedAt": "2026-04-05T06:27:05.730504+00:00"
+    },
     {
       "runId": "module6-20260405T062607-1",
       "severity": "critical",
