@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+"""Administrative CLI for Nightfall metrics modules and poller operations.
+
+This entrypoint orchestrates module-specific runners in metrics/runner and keeps
+all command behavior centralized for operators and automation.
+"""
+
 import argparse
 import fcntl
 import json
@@ -34,6 +40,10 @@ REPO_LOCK_FILE = "/tmp/nightfall-repo.lock"
 
 @contextmanager
 def _repo_lock() -> object:
+    """Hold the global repo lock used by devctl/metrics integrations.
+
+    This prevents concurrent stateful operations from separate entrypoints.
+    """
     Path(REPO_LOCK_FILE).parent.mkdir(parents=True, exist_ok=True)
     with open(REPO_LOCK_FILE, "w", encoding="utf-8") as handle:
         fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
@@ -44,6 +54,11 @@ def _repo_lock() -> object:
 
 
 def _devctl_dashboard_drift_preflight(repo_root: Path) -> None:
+    """Ensure dashboard dependencies are synchronized before generation.
+
+    We invoke devctl in lock-reentry mode so both tools share one global lock
+    without deadlocking.
+    """
     devctl_path = repo_root / "dev" / "devctl"
     if not devctl_path.exists():
         raise RuntimeError(f"Missing devctl at {devctl_path}")
@@ -59,16 +74,19 @@ def _devctl_dashboard_drift_preflight(repo_root: Path) -> None:
 
 
 def _repo_root() -> Path:
+    """Return repository root based on this script location."""
     return Path(__file__).resolve().parent
 
 
 def cmd_init_module1(args: argparse.Namespace) -> int:
+    """Initialize baseline schema/layout artifacts for Module 1."""
     initialize_module1(_repo_root(), args.run_id)
     print(f"module1 initialized with run_id={args.run_id}")
     return 0
 
 
 def cmd_validate_module1(_: argparse.Namespace) -> int:
+    """Validate latest manifest and metrics payloads against schemas."""
     root = _repo_root()
     latest_manifest = json.loads((root / "artifacts" / "metrics" / "latest" / "manifest.json").read_text(encoding="utf-8"))
     latest_metrics = json.loads((root / "artifacts" / "metrics" / "latest" / "metrics.json").read_text(encoding="utf-8"))
@@ -83,6 +101,7 @@ def cmd_validate_module1(_: argparse.Namespace) -> int:
 
 
 def cmd_paths(_: argparse.Namespace) -> int:
+    """Print key runtime paths consumed by operators and automation."""
     root = _repo_root()
     print(str(root / "metrics" / "runner"))
     print(str(root / "metrics" / "systemd"))
@@ -93,6 +112,7 @@ def cmd_paths(_: argparse.Namespace) -> int:
 
 
 def cmd_collect_backend(args: argparse.Namespace) -> int:
+    """Run backend collector pipeline (Module 2)."""
     root = _repo_root()
     run_backend_collection(
         repo_root=root,
@@ -105,6 +125,7 @@ def cmd_collect_backend(args: argparse.Namespace) -> int:
 
 
 def cmd_collect_frontend(args: argparse.Namespace) -> int:
+    """Run frontend collector pipeline (Module 3)."""
     root = _repo_root()
     run_frontend_collection(
         repo_root=root,
@@ -115,6 +136,7 @@ def cmd_collect_frontend(args: argparse.Namespace) -> int:
 
 
 def cmd_aggregate(args: argparse.Namespace) -> int:
+    """Run aggregation/delta synthesis (Module 4)."""
     root = _repo_root()
     run_aggregation(
         repo_root=root,
@@ -125,6 +147,7 @@ def cmd_aggregate(args: argparse.Namespace) -> int:
 
 
 def cmd_generate_dashboard(args: argparse.Namespace) -> int:
+    """Generate dashboard/report artifacts after dependency drift preflight."""
     root = _repo_root()
     with _repo_lock():
         _devctl_dashboard_drift_preflight(root)
@@ -137,6 +160,7 @@ def cmd_generate_dashboard(args: argparse.Namespace) -> int:
 
 
 def cmd_install(args: argparse.Namespace) -> int:
+    """Install poller runtime assets and units (Module 6)."""
     root = _repo_root()
     payload = install_poller(
         repo_root=root,
@@ -148,6 +172,7 @@ def cmd_install(args: argparse.Namespace) -> int:
 
 
 def cmd_reconfigure(args: argparse.Namespace) -> int:
+    """Update poller runtime configuration without full reinstall."""
     root = _repo_root()
     payload = reconfigure_poller(
         repo_root=root,
@@ -159,6 +184,7 @@ def cmd_reconfigure(args: argparse.Namespace) -> int:
 
 
 def cmd_start(_: argparse.Namespace) -> int:
+    """Enable/start the poller runtime."""
     root = _repo_root()
     payload = start_poller(repo_root=root)
     print(json.dumps(payload, indent=2))
@@ -166,6 +192,7 @@ def cmd_start(_: argparse.Namespace) -> int:
 
 
 def cmd_stop(_: argparse.Namespace) -> int:
+    """Disable/stop the poller runtime."""
     root = _repo_root()
     payload = stop_poller(repo_root=root)
     print(json.dumps(payload, indent=2))
@@ -173,6 +200,7 @@ def cmd_stop(_: argparse.Namespace) -> int:
 
 
 def cmd_status(_: argparse.Namespace) -> int:
+    """Return current poller runtime status payload."""
     root = _repo_root()
     payload = poller_status(repo_root=root)
     print(json.dumps(payload, indent=2))
@@ -180,6 +208,7 @@ def cmd_status(_: argparse.Namespace) -> int:
 
 
 def cmd_run_now(args: argparse.Namespace) -> int:
+    """Execute one full poller cycle immediately."""
     root = _repo_root()
     payload = run_now(
         repo_root=root,
@@ -191,6 +220,7 @@ def cmd_run_now(args: argparse.Namespace) -> int:
 
 
 def cmd_uninstall(_: argparse.Namespace) -> int:
+    """Remove poller runtime assets and units."""
     root = _repo_root()
     payload = uninstall_poller(repo_root=root)
     print(json.dumps(payload, indent=2))
@@ -198,6 +228,7 @@ def cmd_uninstall(_: argparse.Namespace) -> int:
 
 
 def cmd_publish(_: argparse.Namespace) -> int:
+    """Publish latest metrics surface to the publication target."""
     root = _repo_root()
     payload = publish_metrics(repo_root=root)
     print(json.dumps(payload, indent=2))
@@ -205,6 +236,7 @@ def cmd_publish(_: argparse.Namespace) -> int:
 
 
 def cmd_retention_prune(args: argparse.Namespace) -> int:
+    """Apply retention policy to metrics history artifacts."""
     root = _repo_root()
     ensure_ops_state(root)
     payload = apply_retention_policy(repo_root=root, max_history_runs=args.max_history_runs)
@@ -213,6 +245,7 @@ def cmd_retention_prune(args: argparse.Namespace) -> int:
 
 
 def cmd_extensions_status(_: argparse.Namespace) -> int:
+    """Report optional collector/extension runtime configuration."""
     root = _repo_root()
     paths = ensure_ops_state(root)
     payload = {
@@ -224,6 +257,7 @@ def cmd_extensions_status(_: argparse.Namespace) -> int:
 
 
 def cmd_cleanup_runtime(args: argparse.Namespace) -> int:
+    """Clean generated runtime artifacts (optionally including history)."""
     root = _repo_root()
     payload = cleanup_runtime_artifacts(repo_root=root, include_history=args.include_history)
     print(json.dumps(payload, indent=2))
@@ -231,6 +265,7 @@ def cmd_cleanup_runtime(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Construct CLI command surface and wire handlers."""
     parser = argparse.ArgumentParser(description="Nightfall metrics administrative entrypoint")
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -307,6 +342,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
+    """Parse arguments and dispatch to the selected command handler."""
     parser = build_parser()
     args = parser.parse_args()
     return int(args.func(args))

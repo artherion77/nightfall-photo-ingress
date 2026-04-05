@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# Minimal wrapper for manually triggering metrics runner operations.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+METRICSCTL="$REPO_ROOT/metricsctl"
+
+usage() {
+    cat <<'USAGE'
+Usage: metrics-runner <command> [options]
+
+Commands:
+  run [--max-retries N] [--timeout-seconds N]
+      Trigger one manual metrics runner cycle (maps to: metricsctl run-now).
+
+  status
+      Show current metrics poller/runtime status (maps to: metricsctl status).
+
+  publish-github
+      Publish generated metrics/dashboard artifacts (maps to: metricsctl publish).
+
+  help
+      Show this usage text.
+
+Examples:
+  metrics-runner run
+  metrics-runner run --max-retries 2 --timeout-seconds 2400
+  metrics-runner status
+  metrics-runner publish-github
+USAGE
+}
+
+require_metricsctl() {
+    if [[ ! -x "$METRICSCTL" ]]; then
+        echo "[metrics-runner] Missing executable metricsctl at $METRICSCTL" >&2
+        exit 1
+    fi
+}
+
+main() {
+    local cmd="${1:-help}"
+    shift || true
+
+    case "$cmd" in
+        run)
+            require_metricsctl
+            exec "$METRICSCTL" run-now "$@"
+            ;;
+        status)
+            require_metricsctl
+            exec "$METRICSCTL" status
+            ;;
+        publish-github)
+            require_metricsctl
+            exec "$METRICSCTL" publish
+            ;;
+        help|-h|--help)
+            usage
+            ;;
+        *)
+            echo "[metrics-runner] Unknown command: $cmd" >&2
+            usage
+            exit 1
+            ;;
+    esac
+}
+
+main "$@"
