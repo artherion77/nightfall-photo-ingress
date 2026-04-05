@@ -1,18 +1,18 @@
 {
   "projectName": "nightfall++photo-ingress",
-  "commitSha": "0b64ac3",
-  "commitFull": "0b64ac31a2e65f80dfce411ead36404455eeef4b",
-  "runId": "module6-20260405T180709-1",
-  "lastRunAt": "2026-04-05T18:07:25.790437+00:00",
+  "commitSha": "fdeb684",
+  "commitFull": "fdeb684529eee4e01a60d7b48e7b8c37aaada38d",
+  "runId": "module6-20260405T202507-1",
+  "lastRunAt": "2026-04-05T20:25:25.713335+00:00",
   "sourceBranch": "main",
   "repoUrl": "https://github.com/artherion77/nightfall-photo-ingress",
   "repoHeadUrl": "https://github.com/artherion77/nightfall-photo-ingress/tree/main",
-  "repoCommitUrl": "https://github.com/artherion77/nightfall-photo-ingress/commit/0b64ac31a2e65f80dfce411ead36404455eeef4b",
+  "repoCommitUrl": "https://github.com/artherion77/nightfall-photo-ingress/commit/fdeb684529eee4e01a60d7b48e7b8c37aaada38d",
   "runMeta": {
-    "startedAt": "2026-04-05T18:07:25.769716+00:00",
-    "finishedAt": "2026-04-05T18:07:25.790447+00:00",
-    "durationSeconds": 0.0207,
-    "runId": "module6-20260405T180709-1",
+    "startedAt": "2026-04-05T20:25:25.690419+00:00",
+    "finishedAt": "2026-04-05T20:25:25.713335+00:00",
+    "durationSeconds": 0.0229,
+    "runId": "module6-20260405T202507-1",
     "branch": "main"
   },
   "versions": {
@@ -21,18 +21,18 @@
   },
   "coveragePercent": 80.11625090821022,
   "hasCoverage": true,
-  "sparklinePoints": "0.00,42.00 30.00,42.00 60.00,42.00 90.00,42.00 120.00,42.00 150.00,42.00 180.00,42.00",
+  "sparklinePoints": "0.00,42.00 45.00,42.00 90.00,42.00 135.00,42.00 180.00,42.00",
   "coverageTrendSource": "measured_history",
-  "locTotal": "36.3k",
+  "locTotal": "36.7k",
   "locDetail": {
-    "total": 36325,
+    "total": 36673,
     "purpose": {
       "production": 11848,
-      "test": 16370,
-      "other": 8107
+      "test": 16663,
+      "other": 8162
     },
     "technology": {
-      "python": 31008,
+      "python": 31356,
       "svelte": 1956,
       "jsts": 784,
       "bash": 2577,
@@ -42,16 +42,16 @@
     "note": "System-level metric. Includes all code in the repository."
   },
   "complexityCard": {
-    "cyclomatic": null,
-    "maintainability": null,
+    "cyclomatic": 3.2519,
+    "maintainability": 56.4199,
     "frontend": {
-      "value": null,
+      "value": 0.6821266233766233,
       "source": "sonar_cognitive",
-      "status": "error",
-      "parser_version_label": null
+      "status": "partial",
+      "parser_version_label": "tree-sitter 0.25.2"
     }
   },
-  "frontendComplexity": null,
+  "frontendComplexity": 0.6821266233766233,
   "frontendComplexityReference": {
     "method": "Sonar Cognitive Complexity (tree-sitter AST; nesting-penalised increments)",
     "scale": {
@@ -79,25 +79,166 @@
     }
   ],
   "complexityMix": {
-    "low": 0,
-    "moderate": 0,
-    "high": 0
+    "low": 7,
+    "moderate": 1,
+    "high": 24
   },
   "complexityBreakdownDetail": {
     "high": {
       "category": "high",
-      "totalModules": 0,
-      "topModules": []
+      "totalModules": 3,
+      "topModules": [
+        {
+          "module": "tests/integration/test_pending_lifecycle_integration.py",
+          "type": "backend",
+          "score": 22.0,
+          "category": "high"
+        },
+        {
+          "module": "tests/unit/test_metrics_module5_dashboard.py",
+          "type": "backend",
+          "score": 12.8,
+          "category": "high"
+        },
+        {
+          "module": "tests/integration/test_m3_m4_operator_semantics.py",
+          "type": "backend",
+          "score": 11.0,
+          "category": "high"
+        }
+      ]
     },
     "moderate": {
       "category": "moderate",
-      "totalModules": 0,
-      "topModules": []
+      "totalModules": 23,
+      "topModules": [
+        {
+          "module": "tests/unit/test_status_export.py",
+          "type": "backend",
+          "score": 9.0,
+          "category": "moderate"
+        },
+        {
+          "module": "tests/unit/test_metrics_module2_backend.py",
+          "type": "backend",
+          "score": 8.5,
+          "category": "moderate"
+        },
+        {
+          "module": "tests/integration/test_m3_m4_happy_path.py",
+          "type": "backend",
+          "score": 7.4,
+          "category": "moderate"
+        },
+        {
+          "module": "api/services/audit_service.py",
+          "type": "backend",
+          "score": 7.0,
+          "category": "moderate"
+        },
+        {
+          "module": "src/nightfall_photo_ingress/adapters/onedrive/safe_logging.py",
+          "type": "backend",
+          "score": 7.0,
+          "category": "moderate"
+        },
+        {
+          "module": "tests/integration/browser_chain_harness/test_browser_chain_harness.py",
+          "type": "backend",
+          "score": 7.0,
+          "category": "moderate"
+        },
+        {
+          "module": "tests/integration/test_m3_m4_idempotency.py",
+          "type": "backend",
+          "score": 7.0,
+          "category": "moderate"
+        },
+        {
+          "module": "tests/integration/ui/test_dashboard.py",
+          "type": "backend",
+          "score": 7.0,
+          "category": "moderate"
+        },
+        {
+          "module": "src/nightfall_photo_ingress/domain/ingest.py",
+          "type": "backend",
+          "score": 6.79,
+          "category": "moderate"
+        },
+        {
+          "module": "tests/integration/test_live_photo_integration.py",
+          "type": "backend",
+          "score": 6.5,
+          "category": "moderate"
+        }
+      ]
     },
     "low": {
       "category": "low",
-      "totalModules": 0,
-      "topModules": []
+      "totalModules": 160,
+      "topModules": [
+        {
+          "module": "api/app.py",
+          "type": "backend",
+          "score": 4.67,
+          "category": "low"
+        },
+        {
+          "module": "tests/integration/test_m3_m4_crash_recovery.py",
+          "type": "backend",
+          "score": 4.6,
+          "category": "low"
+        },
+        {
+          "module": "api/services/health_service.py",
+          "type": "backend",
+          "score": 4.5,
+          "category": "low"
+        },
+        {
+          "module": "api/services/staging_service.py",
+          "type": "backend",
+          "score": 4.5,
+          "category": "low"
+        },
+        {
+          "module": "tests/integration/api/test_staging.py",
+          "type": "backend",
+          "score": 4.5,
+          "category": "low"
+        },
+        {
+          "module": "tests/integration/test_m3_m4_duplicates_and_replay.py",
+          "type": "backend",
+          "score": 4.5,
+          "category": "low"
+        },
+        {
+          "module": "tests/unit/test_metrics_module1_schema.py",
+          "type": "backend",
+          "score": 4.5,
+          "category": "low"
+        },
+        {
+          "module": "webui/src/lib/api/client.ts",
+          "type": "frontend",
+          "score": 4.5,
+          "category": "low"
+        },
+        {
+          "module": "src/nightfall_photo_ingress/config.py",
+          "type": "backend",
+          "score": 4.48,
+          "category": "low"
+        },
+        {
+          "module": "src/nightfall_photo_ingress/cli.py",
+          "type": "backend",
+          "score": 4.41,
+          "category": "low"
+        }
+      ]
     }
   },
   "frontendLocRows": [
@@ -1915,7 +2056,7 @@
       {
         "path": "tests/unit/test_metrics_module6_poller.py",
         "fan_in": 0,
-        "fan_out": 5,
+        "fan_out": 6,
         "kind": "local",
         "in_cycle": false,
         "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_metrics_module6_poller.py"
@@ -2837,6 +2978,30 @@
   },
   "trendRows": [
     {
+      "runId": "module6-20260405T202239-1",
+      "severity": "critical",
+      "warningChecks": 5,
+      "failedChecks": 2,
+      "deltaItems": 13,
+      "generatedAt": "2026-04-05T20:22:52.024989+00:00"
+    },
+    {
+      "runId": "manual-20260405T184433-1",
+      "severity": "warning",
+      "warningChecks": 7,
+      "failedChecks": 0,
+      "deltaItems": 8,
+      "generatedAt": "2026-04-05T18:44:34.446362+00:00"
+    },
+    {
+      "runId": "module6-20260405T180709-1",
+      "severity": "warning",
+      "warningChecks": 6,
+      "failedChecks": 0,
+      "deltaItems": 11,
+      "generatedAt": "2026-04-05T18:07:25.790437+00:00"
+    },
+    {
       "runId": "module6-20260405T175429-1",
       "severity": "warning",
       "warningChecks": 6,
@@ -2859,30 +3024,29 @@
       "failedChecks": 0,
       "deltaItems": 15,
       "generatedAt": "2026-04-05T17:04:51.771807+00:00"
-    },
-    {
-      "runId": "module6-20260405T170149-1",
-      "severity": "warning",
-      "warningChecks": 5,
-      "failedChecks": 0,
-      "deltaItems": 15,
-      "generatedAt": "2026-04-05T17:02:06.510188+00:00"
-    },
-    {
-      "runId": "module6-20260405T165133-1",
-      "severity": "warning",
-      "warningChecks": 5,
-      "failedChecks": 0,
-      "deltaItems": 17,
-      "generatedAt": "2026-04-05T16:51:50.705961+00:00"
-    },
-    {
-      "runId": "chunk4-bundle-20260405T160008",
-      "severity": "warning",
-      "warningChecks": 5,
-      "failedChecks": 0,
-      "deltaItems": 17,
-      "generatedAt": "2026-04-05T16:00:46.192370+00:00"
     }
-  ]
+  ],
+  "collectorStatuses": {
+    "backendComplexity": {
+      "status": "success",
+      "reason": null
+    },
+    "frontendCognitive": {
+      "status": "partial",
+      "reason": null
+    },
+    "coverage": {
+      "status": "success",
+      "reason": null
+    },
+    "bundleSize": {
+      "status": "available",
+      "reason": null
+    }
+  },
+  "buildStamp": {
+    "generatedAt": "2026-04-05T20:25:31.341822+00:00",
+    "commitSha": "fdeb684529eee4e01a60d7b48e7b8c37aaada38d",
+    "runId": "module6-20260405T202507-1"
+  }
 }
