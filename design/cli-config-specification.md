@@ -1,6 +1,11 @@
 # photo-ingress Configuration Specification
 This document defines the structure, required fields, defaults, and validation rules for the central configuration file used by the photo-ingress service.
 
+Status: active
+Date: 2026-04-02
+Updated: 2026-04-03
+Author: Systems Engineering
+
 Format: INI
 Location: /etc/nightfall/photo-ingress.conf (recommended)
 
