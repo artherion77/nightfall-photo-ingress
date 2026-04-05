@@ -11,22 +11,28 @@
 #   - DEVCTL_GLOBAL_LOCK_HELD=1 prevents reentry deadlock when called by
 #     metricsctl or mcp_server.py while they already hold the lock.
 
+# Strict mode and error handling.
 set -euo pipefail
 
+# Load common container helper functions and variables.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 source "$PROJECT_ROOT/lib/container-common.sh"
 
+# Container and profile configuration
 CONTAINER="dev-photo-ingress"
 PROFILE_DEFAULT="default"
 PROFILE_DEV="staging"
 SNAPSHOT_CLEAN="clean-installed"
 
+# Configure container intnal paths
 DEV_WEBUI_ROOT="/opt/nightfall-webui"
 DEV_METRICS_DASHBOARD_ROOT="/opt/nightfall-metrics-dashboard"
 DEV_VENV_ROOT="/opt/ingress"
 DEV_WEBUI_PORT="${DEV_WEBUI_PORT:-5173}"
 DEV_WEBUI_PROXY_DEVICE="dev-webui-proxy"
+
+# Configure host cache paths (bind-mounted into the container for persistence and speed)
 HOST_HOME="${HOME}"
 HOST_CACHE_NPM_HOME="${HOST_HOME}/.npm"
 HOST_CACHE_NPM="${HOST_HOME}/.cache/npm"
@@ -36,8 +42,7 @@ HOST_CACHE_PLAYWRIGHT="${HOST_HOME}/.cache/ms-playwright"
 # Global repo lock — shared with metricsctl and mcp_server.py
 REPO_LOCK_FILE="/tmp/nightfall-repo.lock"
 REPO_LOCK_FD=200
-
-source "$SCRIPT_DIR/devctl_helpers.sh"
+REPO_LOCK_TIMEOUT_SEC="${REPO_LOCK_TIMEOUT_SEC:-300}"
 
 CACHE_DEVICE_NPM_HOME="cache-root-npm-home"
 CACHE_DEVICE_NPM="cache-root-cache-npm"
@@ -48,10 +53,145 @@ CACHE_DEVICE_PLAYWRIGHT="cache-root-cache-playwright"
 # invalidated by package-manifest changes).
 MARKER_PYTHON="${DEV_VENV_ROOT}/.bootstrap-python.done"
 
+# Logging helpers with consistent prefix and color coding.
 _info() { nf_log_info "devctl" "$*"; }
 _ok()   { nf_log_ok   "devctl" "$*"; }
 _warn() { nf_log_warn "devctl" "$*"; }
 _fail() { nf_log_fail "devctl" "$*"; }
+
+# Compute a deterministic hash from package.json and package-lock.json.
+# This is used to detect whether a stack's dependency manifest changed.
+compute_manifest_hash() {
+    local stack_dir="$1"
+    local hash_file="$2"
+    local pkg_json="$stack_dir/package.json"
+    local lock_json="$stack_dir/package-lock.json"
+
+    if [[ ! -f "$pkg_json" || ! -f "$lock_json" ]]; then
+        echo "[devctl] Missing manifest files in $stack_dir" >&2
+        return 1
+    fi
+
+    cat "$pkg_json" "$lock_json" | sha256sum | awk '{print $1}' > "$hash_file"
+}
+
+# Read a hash file and strip whitespace/newlines so comparisons are stable.
+read_hash_file() {
+    local path="$1"
+    tr -d '[:space:]' < "$path"
+}
+
+# Compare host and container hash files and return success on exact match.
+compare_manifest_hash() {
+    local host_hash_file="$1"
+    local container_hash_file="$2"
+
+    local host_hash
+    local container_hash
+    host_hash="$(read_hash_file "$host_hash_file")"
+    container_hash="$(read_hash_file "$container_hash_file")"
+    [[ "$host_hash" == "$container_hash" ]]
+}
+
+# Acquire the global repo lock so stateful operations are serialized.
+acquire_repo_lock() {
+    exec {REPO_LOCK_FD}>"$REPO_LOCK_FILE"
+    flock -w "$REPO_LOCK_TIMEOUT_SEC" "$REPO_LOCK_FD" || {
+        echo "[devctl] Timed out waiting for global repo lock ($REPO_LOCK_FILE)" >&2
+        exit 1
+    }
+}
+
+# Release the global repo lock file descriptor if it is held.
+release_repo_lock() {
+    flock -u "$REPO_LOCK_FD"
+    exec {REPO_LOCK_FD}>&-
+}
+
+# Read the project's pinned Node version from .nvmrc or .node-version.
+# Returns the version without a leading "v".
+get_node_version() {
+    local raw=""
+    if [[ -f "$PROJECT_ROOT/.nvmrc" ]]; then
+        raw="$(tr -d '[:space:]' < "$PROJECT_ROOT/.nvmrc")"
+    elif [[ -f "$PROJECT_ROOT/.node-version" ]]; then
+        raw="$(tr -d '[:space:]' < "$PROJECT_ROOT/.node-version")"
+    fi
+
+    raw="${raw#v}"
+    if [[ -n "$raw" ]]; then
+        printf "%s" "$raw"
+    fi
+}
+
+# Convert a semver range/value into just its major version number.
+# Example: "^5.3.1" -> "5".
+extract_major_from_semver() {
+    local value="$1"
+    value="${value#^}"
+    value="${value#~}"
+    value="${value#>=}"
+    value="${value#>}"
+    value="${value#<=}"
+    value="${value#<}"
+    value="${value%%.*}"
+    value="${value%%-*}"
+    printf "%s" "$value"
+}
+
+# Read a dependency version from the devDependencies section of package.json.
+_json_dependency_version() {
+    local package_file="$1"
+    local dep_name="$2"
+    python3 - <<'PY' "$package_file" "$dep_name"
+import json
+import sys
+from pathlib import Path
+
+pkg = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+dep = sys.argv[2]
+dev_deps = pkg.get("devDependencies", {})
+print(dev_deps.get(dep, ""))
+PY
+}
+
+# Ensure web stacks stay aligned on SvelteKit and Vite major versions.
+# This prevents subtle cross-stack tooling incompatibilities.
+assert_web_stack_major_consistency() {
+    local web_pkg="$PROJECT_ROOT/webui/package.json"
+    local dashboard_pkg="$PROJECT_ROOT/metrics/dashboard/package.json"
+
+    [[ -f "$web_pkg" ]] || { echo "Missing $web_pkg" >&2; return 1; }
+    [[ -f "$dashboard_pkg" ]] || { echo "Missing $dashboard_pkg" >&2; return 1; }
+
+    local web_kit web_vite dash_kit dash_vite
+    web_kit="$(_json_dependency_version "$web_pkg" "@sveltejs/kit")"
+    web_vite="$(_json_dependency_version "$web_pkg" "vite")"
+    dash_kit="$(_json_dependency_version "$dashboard_pkg" "@sveltejs/kit")"
+    dash_vite="$(_json_dependency_version "$dashboard_pkg" "vite")"
+
+    local web_kit_major web_vite_major dash_kit_major dash_vite_major
+    web_kit_major="$(extract_major_from_semver "$web_kit")"
+    web_vite_major="$(extract_major_from_semver "$web_vite")"
+    dash_kit_major="$(extract_major_from_semver "$dash_kit")"
+    dash_vite_major="$(extract_major_from_semver "$dash_vite")"
+
+    [[ -n "$web_kit_major" && -n "$web_vite_major" && -n "$dash_kit_major" && -n "$dash_vite_major" ]] || {
+        echo "Unable to derive SvelteKit/Vite majors from package manifests" >&2
+        return 1
+    }
+
+    [[ "$web_kit_major" == "$dash_kit_major" ]] || {
+        echo "SvelteKit major mismatch: webui=$web_kit_major dashboard=$dash_kit_major" >&2
+        return 1
+    }
+
+    [[ "$web_vite_major" == "$dash_vite_major" ]] || {
+        echo "Vite major mismatch: webui=$web_vite_major dashboard=$dash_vite_major" >&2
+        return 1
+    }
+}
+
 
 # ── Lock management ───────────────────────────────────────────────────────────
 
@@ -517,6 +657,36 @@ cmd_run_api() {
 # ── Test commands ─────────────────────────────────────────────────────────────
 
 cmd_test_web_unit() {
+    if [[ -n "${DEVCTL_CONTRACT_TEST_ROOT:-}" ]]; then
+        local web_root="$DEVCTL_CONTRACT_TEST_ROOT"
+        local typecheck_runner="${DEVCTL_TEST_WEB_TYPECHECK_RUNNER:-npm exec -- svelte-check --fail-on-warnings}"
+        local unit_runner="${DEVCTL_TEST_WEB_UNIT_RUNNER:-npx vitest run}"
+
+        [[ -d "$web_root" ]] || _fail "Contract test root not found: $web_root"
+
+        if [[ ! -d "$web_root/tests/component" ]]; then
+            echo '[devctl] Missing tests/component directory in $DEV_WEBUI_ROOT' >&2
+            return 1
+        fi
+
+        local count
+        count="$(find "$web_root/tests/component" -type f \
+            \( -name '*.test.ts' -o -name '*.test.js' \
+               -o -name '*.spec.ts' -o -name '*.spec.js' \) \
+            | wc -l | tr -d '[:space:]')"
+        if [[ "$count" == "0" ]]; then
+            echo '[devctl] No tests/component test files found' >&2
+            return 1
+        fi
+
+        echo "[devctl] Discovered $count tests/component test file(s)."
+        (cd "$web_root" && bash -lc "$typecheck_runner")
+        (cd "$web_root" && bash -lc "$unit_runner")
+
+        _ok "test-web-unit completed successfully."
+        return 0
+    fi
+
     nf_require_container_running "$CONTAINER" "devctl setup" "devctl"
     # Sources synced + drift fixed inside _ensure_stack_ready.
     _ensure_stack_ready webui
@@ -545,6 +715,17 @@ npx vitest run"
 }
 
 cmd_test_web_typecheck() {
+    if [[ -n "${DEVCTL_CONTRACT_TEST_ROOT:-}" ]]; then
+        local web_root="$DEVCTL_CONTRACT_TEST_ROOT"
+        local typecheck_runner="${DEVCTL_TEST_WEB_TYPECHECK_RUNNER:-npm exec -- svelte-check --fail-on-warnings}"
+
+        [[ -d "$web_root" ]] || _fail "Contract test root not found: $web_root"
+        (cd "$web_root" && bash -lc "$typecheck_runner")
+
+        _ok "test-web-typecheck completed successfully."
+        return 0
+    fi
+
     nf_require_container_running "$CONTAINER" "devctl setup" "devctl"
     _ensure_stack_ready webui
 
@@ -572,6 +753,38 @@ npm exec -- svelte-check --fail-on-warnings"
 
 cmd_test_web_e2e() {
     local artifact_dir="${DEVCTL_E2E_ARTIFACT_DIR:-test-results/playwright}"
+
+    if [[ -n "${DEVCTL_CONTRACT_TEST_ROOT:-}" ]]; then
+        local web_root="$DEVCTL_CONTRACT_TEST_ROOT"
+        local e2e_runner="${DEVCTL_TEST_WEB_E2E_RUNNER:-npx playwright test --reporter=line}"
+
+        [[ -d "$web_root" ]] || _fail "Contract test root not found: $web_root"
+
+        if [[ ! -d "$web_root/tests/e2e" ]]; then
+            echo '[devctl] WARN: tests/e2e directory missing; skipping E2E run.'
+            _ok "test-web-e2e completed successfully (or skipped when no e2e specs exist)."
+            return 0
+        fi
+
+        local count
+        count="$(find "$web_root/tests/e2e" -type f \
+            \( -name '*.spec.ts' -o -name '*.spec.js' \) \
+            | wc -l | tr -d '[:space:]')"
+        if [[ "$count" == "0" ]]; then
+            echo '[devctl] WARN: No tests/e2e spec files found; skipping E2E run.'
+            _ok "test-web-e2e completed successfully (or skipped when no e2e specs exist)."
+            return 0
+        fi
+
+        echo "[devctl] Discovered $count tests/e2e spec file(s)."
+        mkdir -p "$web_root/$artifact_dir"
+        echo "E2E_ARTIFACT_PATH=$web_root/$artifact_dir"
+        (cd "$web_root" && bash -lc "$e2e_runner")
+
+        _ok "test-web-e2e completed successfully."
+        return 0
+    fi
+
     nf_require_container_running "$CONTAINER" "devctl setup" "devctl"
     _ensure_stack_ready webui
 
