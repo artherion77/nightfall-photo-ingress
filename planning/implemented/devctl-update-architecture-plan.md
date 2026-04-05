@@ -1,6 +1,6 @@
 # devctl Update Architecture — Chunk-Wise Implementation Plan
 
-**Status:** planned  
+**Status:** implemented  
 **Date:** 2026-04-05  
 **Design reference:** [devctl-update-architecture.md](../../design/devctl-update-architecture.md)  
 **Constraint:** System must remain operational after each chunk.  
