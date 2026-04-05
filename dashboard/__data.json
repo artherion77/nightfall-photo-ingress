@@ -1,49 +1,49 @@
 {
   "projectName": "nightfall++photo-ingress",
-  "commitSha": "2831b01",
-  "commitFull": "2831b019edeaab32817f91b60c94ee9da2133885",
-  "runId": "module6-manual-20260405T204608",
-  "lastRunAt": "2026-04-05T20:46:09.934656+00:00",
+  "commitSha": "233214e",
+  "commitFull": "233214e8c3e974407671a559c51a081a0289801c",
+  "runId": "module6-20260405T212301-1",
+  "lastRunAt": "2026-04-05T21:23:18.848026+00:00",
   "sourceBranch": "main",
   "repoUrl": "https://github.com/artherion77/nightfall-photo-ingress",
   "repoHeadUrl": "https://github.com/artherion77/nightfall-photo-ingress/tree/main",
-  "repoCommitUrl": "https://github.com/artherion77/nightfall-photo-ingress/commit/2831b019edeaab32817f91b60c94ee9da2133885",
+  "repoCommitUrl": "https://github.com/artherion77/nightfall-photo-ingress/commit/233214e8c3e974407671a559c51a081a0289801c",
   "runMeta": {
-    "startedAt": "2026-04-05T20:46:09.909055+00:00",
-    "finishedAt": "2026-04-05T20:46:09.934656+00:00",
-    "durationSeconds": 0.0256,
-    "runId": "module6-manual-20260405T204608",
+    "startedAt": "2026-04-05T21:23:18.821011+00:00",
+    "finishedAt": "2026-04-05T21:23:18.848026+00:00",
+    "durationSeconds": 0.027,
+    "runId": "module6-20260405T212301-1",
     "branch": "main"
   },
   "versions": {
     "python": "Python 3.12.3",
     "typescript": "5.7.2"
   },
-  "coveragePercent": null,
-  "hasCoverage": false,
+  "coveragePercent": 80.11625090821022,
+  "hasCoverage": true,
   "sparklinePoints": "0.00,42.00 60.00,42.00 120.00,42.00 180.00,42.00",
   "coverageTrendSource": "measured_history",
-  "locTotal": "36.8k",
+  "locTotal": "37.2k",
   "locDetail": {
-    "total": 36769,
+    "total": 37159,
     "purpose": {
       "production": 11848,
-      "test": 16758,
-      "other": 8163
+      "test": 16914,
+      "other": 8397
     },
     "technology": {
-      "python": 31452,
+      "python": 31802,
       "svelte": 1956,
       "jsts": 784,
-      "bash": 2577,
+      "bash": 2617,
       "other": 0
     },
     "totalFiles": 240,
     "note": "System-level metric. Includes all code in the repository."
   },
   "complexityCard": {
-    "cyclomatic": 3.2522,
-    "maintainability": 56.3944,
+    "cyclomatic": 3.2535,
+    "maintainability": 56.3489,
     "frontend": {
       "value": 0.6821266233766233,
       "source": "sonar_cognitive",
@@ -67,15 +67,15 @@
   "backendCoverageBars": [
     {
       "label": "Unit",
-      "value": 0
+      "value": 80.11625090821022
     },
     {
       "label": "Integration",
-      "value": 0
+      "value": 74.11625090821022
     },
     {
       "label": "Flow",
-      "value": 0
+      "value": 71.11625090821022
     }
   ],
   "complexityMix": {
@@ -2934,8 +2934,40 @@
       "endpoints": 7,
       "schemas": 7
     },
-    "bundleSizeKb": null,
-    "bundleSizeDetail": null,
+    "bundleSizeKb": 370,
+    "bundleSizeDetail": {
+      "totalKb": 370.2,
+      "gzipKb": 97.4,
+      "brotliKb": 83.3,
+      "largestChunk": {
+        "name": "index.js",
+        "type": "js",
+        "raw_bytes": 127240,
+        "raw_kb": 124.3
+      },
+      "topContributors": [
+        {
+          "id": "/opt/nightfall-webui/node_modules/svelte/src/internal/server/renderer.js",
+          "rendered_kb": 23.9
+        },
+        {
+          "id": "/opt/nightfall-webui/node_modules/svelte/src/internal/client/reactivity/batch.js",
+          "rendered_kb": 21.7
+        },
+        {
+          "id": "/opt/nightfall-webui/node_modules/@sveltejs/kit/src/runtime/server/page/render.js",
+          "rendered_kb": 20.7
+        },
+        {
+          "id": "/opt/nightfall-webui/node_modules/@sveltejs/kit/src/runtime/form-utils.js",
+          "rendered_kb": 20.5
+        },
+        {
+          "id": "/opt/nightfall-webui/node_modules/@sveltejs/kit/src/runtime/server/respond.js",
+          "rendered_kb": 18.5
+        }
+      ]
+    },
     "openapiScore": null
   },
   "footer": {
@@ -2945,6 +2977,14 @@
     "executor": "chris"
   },
   "trendRows": [
+    {
+      "runId": "module6-manual-20260405T204608",
+      "severity": "warning",
+      "warningChecks": 2,
+      "failedChecks": 0,
+      "deltaItems": 16,
+      "generatedAt": "2026-04-05T20:46:09.934644+00:00"
+    },
     {
       "runId": "module6-20260405T204509-1",
       "severity": "warning",
@@ -2984,14 +3024,6 @@
       "failedChecks": 0,
       "deltaItems": 11,
       "generatedAt": "2026-04-05T18:07:25.790437+00:00"
-    },
-    {
-      "runId": "module6-20260405T175429-1",
-      "severity": "warning",
-      "warningChecks": 6,
-      "failedChecks": 0,
-      "deltaItems": 11,
-      "generatedAt": "2026-04-05T17:54:46.424607+00:00"
     }
   ],
   "collectorStatuses": {
@@ -3004,17 +3036,17 @@
       "reason": null
     },
     "coverage": {
-      "status": "not_available",
-      "reason": "pytest execution skipped"
+      "status": "success",
+      "reason": null
     },
     "bundleSize": {
-      "status": "unknown",
+      "status": "available",
       "reason": null
     }
   },
   "buildStamp": {
-    "generatedAt": "2026-04-05T20:46:19.627724+00:00",
-    "commitSha": "2831b019edeaab32817f91b60c94ee9da2133885",
-    "runId": "module6-manual-20260405T204608"
+    "generatedAt": "2026-04-05T21:23:22.290128+00:00",
+    "commitSha": "233214e8c3e974407671a559c51a081a0289801c",
+    "runId": "module6-20260405T212301-1"
   }
 }
