@@ -36,5 +36,5 @@ def test_variant_b_contract_is_backed_by_real_devctl_and_mcp_mappings() -> None:
     assert "cmd_test_web_e2e" in devctl
     assert "E2E_ARTIFACT_PATH=" in devctl
 
-    assert model["mappings"]["web.test.e2e"][-1] == "./dev/devctl test-web-e2e"
-    assert model["mappings"]["web.test.integration"][-1] == "./dev/devctl test-web-e2e"
+    assert model["mappings"]["web.test.e2e"][-1] == "./dev/bin/devctl test-web-e2e"
+    assert model["mappings"]["web.test.integration"][-1] == "./dev/bin/devctl test-web-e2e"

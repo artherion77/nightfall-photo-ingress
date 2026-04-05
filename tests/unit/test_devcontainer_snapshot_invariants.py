@@ -14,7 +14,7 @@ def test_snapshot_create_only_in_prepare_like_mappings() -> None:
     }
 
     for mapping_name, commands in mappings.items():
-        has_snapshot_create = "./dev/devctl snapshot-create" in commands
+        has_snapshot_create = "./dev/bin/devctl snapshot-create" in commands
         if mapping_name in allowed_with_snapshot_create:
             assert has_snapshot_create, f"{mapping_name} must include snapshot-create"
         else:
@@ -28,11 +28,11 @@ def test_web_test_unit_mapping_uses_reset_fast_loop() -> None:
     model = json.loads((workspace_root / ".mcp" / "model.json").read_text(encoding="utf-8"))
     commands = model["mappings"]["web.test.unit"]
 
-    assert "./dev/devctl reset" in commands
-    assert "./dev/devctl assert-cached-ready" in commands
-    assert "./dev/devctl test-web-typecheck" in commands
-    assert "./dev/devctl test-metrics-dashboard-typecheck" in commands
-    assert "./dev/devctl snapshot-create" not in commands
+    assert "./dev/bin/devctl reset" in commands
+    assert "./dev/bin/devctl assert-cached-ready" in commands
+    assert "./dev/bin/devctl test-web-typecheck" in commands
+    assert "./dev/bin/devctl test-metrics-dashboard-typecheck" in commands
+    assert "./dev/bin/devctl snapshot-create" not in commands
 
 
 def test_devctl_does_not_install_web_deps_during_runtime_checks() -> None:

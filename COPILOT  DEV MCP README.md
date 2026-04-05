@@ -40,25 +40,25 @@ The dev container setup configures these bind-mount caches:
 
 ## devctl Commands (Cached Install Flow)
 
-- ./dev/devctl setup
-- ./dev/devctl bootstrap-python
-- ./dev/devctl bootstrap-webui
-- ./dev/devctl bootstrap-playwright
-- ./dev/devctl snapshot-create
-- ./dev/devctl reset
-- ./dev/devctl assert-cached-ready
-- ./dev/devctl status
+- ./dev/bin/devctl setup
+- ./dev/bin/devctl bootstrap-python
+- ./dev/bin/devctl bootstrap-webui
+- ./dev/bin/devctl bootstrap-playwright
+- ./dev/bin/devctl snapshot-create
+- ./dev/bin/devctl reset
+- ./dev/bin/devctl assert-cached-ready
+- ./dev/bin/devctl status
 
 Typical flow:
 
 ```bash
-./dev/devctl setup
-./dev/devctl bootstrap-python
-./dev/devctl bootstrap-webui
-./dev/devctl bootstrap-playwright
-./dev/devctl snapshot-create
-./dev/devctl reset
-./dev/devctl status
+./dev/bin/devctl setup
+./dev/bin/devctl bootstrap-python
+./dev/bin/devctl bootstrap-webui
+./dev/bin/devctl bootstrap-playwright
+./dev/bin/devctl snapshot-create
+./dev/bin/devctl reset
+./dev/bin/devctl status
 ```
 
 ## MCP Tasks (devctl-first)
@@ -175,12 +175,12 @@ curl -sS -X POST http://<server>/mcp/extensions/propose \
 ## Troubleshooting
 
 - Container missing:
-  - Run ./dev/devctl setup
+  - Run ./dev/bin/devctl setup
 - Cache mounts missing:
-  - Run ./dev/devctl setup and then ./dev/devctl status
+  - Run ./dev/bin/devctl setup and then ./dev/bin/devctl status
 - Snapshot missing:
-  - Run ./dev/devctl snapshot-create
+  - Run ./dev/bin/devctl snapshot-create
 - Reset fails:
-  - Ensure clean snapshot exists and run ./dev/devctl assert-cached-ready
+  - Ensure clean snapshot exists and run ./dev/bin/devctl assert-cached-ready
 - Test task unavailable:
   - Verify task key exists in .mcp/model.json under mappings

@@ -18,7 +18,7 @@ P2 tests one-time interactive device-code setup.
 
 ### Prerequisites
 
-- Staging container running (`./staging/stagingctl create`)
+- Staging container running (`./dev/bin/stagingctl create`)
 - Wheel package built (`python -m build --wheel`)
 - Real Azure app registration client ID (see [cli-guide.md](cli-guide.md))
 - Personal Microsoft account to authenticate with
@@ -27,7 +27,7 @@ P2 tests one-time interactive device-code setup.
 
 ```bash
 export STAGING_CLIENT_ID="58996ba4-b840-498f-8ccc-7d1a98c071a0"  # your app client ID
-./staging/stagingctl install dist/nightfall_photo_ingress-0.1.0-py3-none-any.whl
+./dev/bin/stagingctl install dist/nightfall_photo_ingress-0.1.0-py3-none-any.whl
 
 tests/staging-flow/flowctl run --phase p2
 ```
@@ -108,8 +108,8 @@ For P3 troubleshooting, see [troubleshooting.md](troubleshooting.md#troubleshoot
 Live systemd smoke testing must run in the staging container, not on the host.
 
 ```bash
-./staging/stagingctl create
-./staging/stagingctl install
+./dev/bin/stagingctl create
+./dev/bin/stagingctl install
 pytest tests/staging/test_smoke_contracts.py -m staging
 ```
 

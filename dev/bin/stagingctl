@@ -20,7 +20,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+STAGING_ROOT="$PROJECT_ROOT/staging"
 source "$PROJECT_ROOT/lib/container-common.sh"
 
 # ── container identity ────────────────────────────────────────────────────────
@@ -37,7 +38,7 @@ SERVICE_NAME="nightfall-photo-ingress"
 TRASH_PATH_NAME="nightfall-photo-ingress-trash.path"
 TRASH_SERVICE_NAME="nightfall-photo-ingress-trash.service"
 SYSTEMD_SOURCE_DIR="$PROJECT_ROOT/systemd"
-STAGING_SYSTEMD_DIR="$SCRIPT_DIR/systemd"
+STAGING_SYSTEMD_DIR="$STAGING_ROOT/systemd"
 
 if [[ "$STAGING_VOLATILE" == "1" ]]; then
     # Volatile mode: host /run is tmpfs, so evidence/logs are ephemeral.
@@ -141,7 +142,7 @@ cmd_create() {
 
     _info "Running container bootstrap ..."
     lxc exec "$CONTAINER" -- mkdir -p "$CT_TMP_DIR"
-    lxc file push "$SCRIPT_DIR/container/setup.sh" "$CONTAINER$CT_TMP_DIR/setup.sh"
+    lxc file push "$STAGING_ROOT/container/setup.sh" "$CONTAINER$CT_TMP_DIR/setup.sh"
     lxc exec "$CONTAINER" -- env STAGING_VOLATILE="$STAGING_VOLATILE" bash "$CT_TMP_DIR/setup.sh"
     # Required by hardened unit ReadWritePaths sandboxing.
     lxc exec "$CONTAINER" -- mkdir -p /run/nightfall-status.d
@@ -220,7 +221,7 @@ cmd_install() {
     lxc file push "$wheel_path" "$CONTAINER$CT_TMP_DIR/$whl_name"
 
     # Prepare staging config: substitute real client_id if provided
-    local conf_src="$SCRIPT_DIR/container/photo-ingress.conf"
+    local conf_src="$STAGING_ROOT/container/photo-ingress.conf"
     local tmp_conf
     local existing_client_id=""
     tmp_conf="$(mktemp /tmp/photo-ingress-staging-XXXXXX.conf)"
@@ -419,7 +420,7 @@ cmd_smoke() {
 
     # ── 5. secret scan ───────────────────────────────────────────────────────
     _info "Step 5/5: secret scan"
-    lxc file push "$SCRIPT_DIR/evidence/secret_scan.py" \
+    lxc file push "$STAGING_ROOT/evidence/secret_scan.py" \
         "$CONTAINER$CT_TMP_DIR/staging_secret_scan.py"
     lxc exec "$CONTAINER" -- \
         "$VENV_ROOT/bin/python3" "$CT_TMP_DIR/staging_secret_scan.py" \
@@ -590,7 +591,7 @@ PY
 
     # ── 3. secret scan ────────────────────────────────────────────────────────
     _info "Step 3/3: secret scan"
-    lxc file push "$SCRIPT_DIR/evidence/secret_scan.py" \
+    lxc file push "$STAGING_ROOT/evidence/secret_scan.py" \
         "$CONTAINER$CT_TMP_DIR/staging_secret_scan.py"
     lxc exec "$CONTAINER" -- \
         "$VENV_ROOT/bin/python3" "$CT_TMP_DIR/staging_secret_scan.py" \

@@ -78,7 +78,7 @@ Field notes:
 - References:
   - [design/rationale/e2e-test-architecture-consolidation.md](e2e-test-architecture-consolidation.md)
   - [planning/implemented/e2e-test-architecture-migration-plan.md](../../planning/implemented/e2e-test-architecture-migration-plan.md)
-  - `dev/devctl`
+  - `dev/bin/devctl`
   - `.mcp/model.json`
 
 ## DEC-20260331-01: Primary service naming policy
@@ -492,7 +492,7 @@ Field notes:
 - Consequences:
   - Documentation now separates environment responsibilities across dev, staging,
     and production.
-  - A new dev lifecycle controller is expected (proposed `dev/devctl`).
+  - A new dev lifecycle controller is expected (proposed `dev/bin/devctl`).
   - Shared helper extraction is required to prevent maintenance duplication between
     controllers.
 - Implementation Notes:

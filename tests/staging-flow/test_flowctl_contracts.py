@@ -138,7 +138,7 @@ class TestStagingctlIntegration:
 
     def test_stagingctl_path_is_relative_to_project_root(self, flowctl_text: str) -> None:
         assert 'PROJECT_ROOT' in flowctl_text
-        assert 'staging/stagingctl' in flowctl_text
+        assert 'dev/bin/stagingctl' in flowctl_text
 
     def test_p2_auth_setup_not_piped(self, flowctl_text: str) -> None:
         # auth-setup must not be piped — a pipe breaks TTY pass-through for device-code

@@ -46,60 +46,60 @@
   "domains": {
     "backend": {
       "test.unit": [
-        "./dev/devctl setup",
-        "./dev/devctl assert-cached-ready",
-        "./dev/devctl reset",
+        "./dev/bin/devctl setup",
+        "./dev/bin/devctl assert-cached-ready",
+        "./dev/bin/devctl reset",
         "./.venv/bin/python -m pytest tests/unit"
       ],
       "test.integration": [
-        "./dev/devctl setup",
-        "./dev/devctl assert-cached-ready",
-        "./dev/devctl reset",
+        "./dev/bin/devctl setup",
+        "./dev/bin/devctl assert-cached-ready",
+        "./dev/bin/devctl reset",
         "./.venv/bin/python -m pytest tests/integration"
       ],
       "build": [
         "python -m build"
       ],
       "deploy.dev": [
-        "./dev/devctl setup",
-        "./dev/devctl run-api"
+        "./dev/bin/devctl setup",
+        "./dev/bin/devctl run-api"
       ],
       "deploy.staging": [
-        "./staging/stagingctl install"
+        "./dev/bin/stagingctl install"
       ],
       "e2e": [
-        "./staging/stagingctl smoke"
+        "./dev/bin/stagingctl smoke"
       ]
     },
     "web": {
       "test.unit": [
-        "./dev/devctl setup",
-        "./dev/devctl assert-cached-ready",
-        "./dev/devctl reset",
-        "./dev/devctl test-web-typecheck",
-        "./dev/devctl test-metrics-dashboard-typecheck",
-        "./dev/devctl test-web-unit"
+        "./dev/bin/devctl setup",
+        "./dev/bin/devctl assert-cached-ready",
+        "./dev/bin/devctl reset",
+        "./dev/bin/devctl test-web-typecheck",
+        "./dev/bin/devctl test-metrics-dashboard-typecheck",
+        "./dev/bin/devctl test-web-unit"
       ],
       "test.integration": [
-        "./dev/devctl test-web-e2e"
+        "./dev/bin/devctl test-web-e2e"
       ],
       "build": [
         "npm --prefix webui run build"
       ],
       "deploy.dev": [
-        "./dev/devctl setup",
-        "./dev/devctl run-webui"
+        "./dev/bin/devctl setup",
+        "./dev/bin/devctl run-webui"
       ],
       "deploy.staging": [
-        "./dev/devctl setup"
+        "./dev/bin/devctl setup"
       ],
       "e2e": [
-        "./dev/devctl test-web-e2e"
+        "./dev/bin/devctl test-web-e2e"
       ]
     }
   },
   "devctl": {
-    "path": "./dev/devctl",
+    "path": "./dev/bin/devctl",
     "commands": [
       "setup",
       "create",
@@ -126,7 +126,7 @@
     }
   },
   "stagectl": {
-    "path": "./staging/stagingctl",
+    "path": "./dev/bin/stagingctl",
     "commands": [
       "create",
       "install",
@@ -141,14 +141,14 @@
   },
   "devcontainer": {
     "prepare": [
-      "./dev/devctl setup",
-      "./dev/devctl assert-cached-ready",
-      "./dev/devctl status"
+      "./dev/bin/devctl setup",
+      "./dev/bin/devctl assert-cached-ready",
+      "./dev/bin/devctl status"
     ],
     "reset": [
-      "./dev/devctl reset",
-      "./dev/devctl assert-cached-ready",
-      "./dev/devctl status"
+      "./dev/bin/devctl reset",
+      "./dev/bin/devctl assert-cached-ready",
+      "./dev/bin/devctl status"
     ]
   },
   "staging": {
@@ -164,40 +164,40 @@
   },
   "mappings": {
     "devcontainer.prepare": [
-      "./dev/devctl setup",
-      "./dev/devctl assert-cached-ready",
-      "./dev/devctl status"
+      "./dev/bin/devctl setup",
+      "./dev/bin/devctl assert-cached-ready",
+      "./dev/bin/devctl status"
     ],
     "devcontainer.reset": [
-      "./dev/devctl reset",
-      "./dev/devctl assert-cached-ready",
-      "./dev/devctl status"
+      "./dev/bin/devctl reset",
+      "./dev/bin/devctl assert-cached-ready",
+      "./dev/bin/devctl status"
     ],
     "backend.test.unit": [
-      "./dev/devctl setup",
-      "./dev/devctl assert-cached-ready",
-      "./dev/devctl reset",
+      "./dev/bin/devctl setup",
+      "./dev/bin/devctl assert-cached-ready",
+      "./dev/bin/devctl reset",
       "./.venv/bin/python -m pytest tests/unit"
     ],
     "backend.test.integration": [
-      "./dev/devctl setup",
-      "./dev/devctl assert-cached-ready",
-      "./dev/devctl reset",
+      "./dev/bin/devctl setup",
+      "./dev/bin/devctl assert-cached-ready",
+      "./dev/bin/devctl reset",
       "./.venv/bin/python -m pytest tests/integration"
     ],
     "web.test.unit": [
-      "./dev/devctl setup",
-      "./dev/devctl assert-cached-ready",
-      "./dev/devctl reset",
-      "./dev/devctl test-web-typecheck",
-      "./dev/devctl test-metrics-dashboard-typecheck",
-      "./dev/devctl test-web-unit"
+      "./dev/bin/devctl setup",
+      "./dev/bin/devctl assert-cached-ready",
+      "./dev/bin/devctl reset",
+      "./dev/bin/devctl test-web-typecheck",
+      "./dev/bin/devctl test-metrics-dashboard-typecheck",
+      "./dev/bin/devctl test-web-unit"
     ],
     "web.test.integration": [
-      "./dev/devctl test-web-e2e"
+      "./dev/bin/devctl test-web-e2e"
     ],
     "web.test.e2e": [
-      "./dev/devctl test-web-e2e"
+      "./dev/bin/devctl test-web-e2e"
     ],
     "mcp.smoke.success": [
       "echo '[mcp.smoke.success] ok'"
@@ -221,43 +221,43 @@
       "./metricsctl stop"
     ],
     "web.e2e": [
-      "./staging/stagingctl smoke"
+      "./dev/bin/stagingctl smoke"
     ]
   },
   "verifications": {
     "unit": {
       "backend": [
-        "./dev/devctl setup",
-        "./dev/devctl assert-cached-ready",
-        "./dev/devctl reset",
+        "./dev/bin/devctl setup",
+        "./dev/bin/devctl assert-cached-ready",
+        "./dev/bin/devctl reset",
         "./.venv/bin/python -m pytest tests/unit"
       ],
       "web": [
-        "./dev/devctl setup",
-        "./dev/devctl assert-cached-ready",
-        "./dev/devctl reset",
-        "./dev/devctl test-web-typecheck",
-        "./dev/devctl test-metrics-dashboard-typecheck",
-        "./dev/devctl test-web-unit"
+        "./dev/bin/devctl setup",
+        "./dev/bin/devctl assert-cached-ready",
+        "./dev/bin/devctl reset",
+        "./dev/bin/devctl test-web-typecheck",
+        "./dev/bin/devctl test-metrics-dashboard-typecheck",
+        "./dev/bin/devctl test-web-unit"
       ]
     },
     "integration": {
       "backend": [
-        "./dev/devctl setup",
-        "./dev/devctl assert-cached-ready",
-        "./dev/devctl reset",
+        "./dev/bin/devctl setup",
+        "./dev/bin/devctl assert-cached-ready",
+        "./dev/bin/devctl reset",
         "./.venv/bin/python -m pytest tests/integration"
       ],
       "web": [
-        "./dev/devctl test-web-e2e"
+        "./dev/bin/devctl test-web-e2e"
       ]
     },
     "e2e": {
       "backend": [
-        "./staging/stagingctl smoke"
+        "./dev/bin/stagingctl smoke"
       ],
       "web": [
-        "./dev/devctl test-web-e2e"
+        "./dev/bin/devctl test-web-e2e"
       ]
     }
   }

@@ -21,7 +21,7 @@ Evidence:
 - Unit/integration suites: [tests/unit](../../tests/unit), [tests/integration](../../tests/integration)
 - UI integration tests (pytest): [tests/integration/ui](../../tests/integration/ui)
 - API integration tests (pytest + ASGI/httpx): [tests/integration/api](../../tests/integration/api), [tests/integration/api/conftest.py](../../tests/integration/api/conftest.py)
-- Dev container lifecycle (LXC-based): [dev/devctl](../../dev/devctl), [docs/deployment/dev-container-workflow.md](../../docs/deployment/dev-container-workflow.md)
+- Dev container lifecycle (LXC-based): [dev/bin/devctl](../../dev/bin/devctl), [docs/deployment/dev-container-workflow.md](../../docs/deployment/dev-container-workflow.md)
 - MCP mappings/tasks: [.mcp/model.json](../../.mcp/model.json)
 
 Measured runtime in this analysis turn:
@@ -47,10 +47,10 @@ Important frontend gaps:
 - Toast store exists, but a visible toast-rendering component is currently missing as a browser assertion target: [webui/src/lib/stores/toast.svelte.js](../../webui/src/lib/stores/toast.svelte.js)
 
 Devcontainer/MCP/devctl status:
-- devctl can install Node, Vitest, Playwright, and cache browser binaries: [dev/devctl](../../dev/devctl)
-- Cache mounts are already defined (npm/pip/playwright): [dev/devctl](../../dev/devctl), [.mcp/model.json](../../.mcp/model.json)
-- Chunk 1 delivery: `devctl test-web-unit` and `devctl test-web-e2e` now use strict, non-placeholder contracts with deterministic failure behavior and explicit logs/artifact path output: [dev/devctl](../../dev/devctl)
-- Chunk 1 delivery: MCP mappings `web.test.e2e` and `web.test.integration` now resolve to real command paths (`./dev/devctl test-web-e2e`) without placeholder echo paths: [.mcp/model.json](../../.mcp/model.json)
+- devctl can install Node, Vitest, Playwright, and cache browser binaries: [dev/bin/devctl](../../dev/bin/devctl)
+- Cache mounts are already defined (npm/pip/playwright): [dev/bin/devctl](../../dev/bin/devctl), [.mcp/model.json](../../.mcp/model.json)
+- Chunk 1 delivery: `devctl test-web-unit` and `devctl test-web-e2e` now use strict, non-placeholder contracts with deterministic failure behavior and explicit logs/artifact path output: [dev/bin/devctl](../../dev/bin/devctl)
+- Chunk 1 delivery: MCP mappings `web.test.e2e` and `web.test.integration` now resolve to real command paths (`./dev/bin/devctl test-web-e2e`) without placeholder echo paths: [.mcp/model.json](../../.mcp/model.json)
 
 ## 2. Playwright Potential (Pros/Cons + Concrete Scenarios)
 

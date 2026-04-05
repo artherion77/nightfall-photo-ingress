@@ -61,8 +61,8 @@ This proposal introduces a dedicated development container named
 
 ### 6.1 Tooling split
 
-- Keep `staging/stagingctl` focused on staging lifecycle only.
-- Introduce a dedicated dev lifecycle tool (proposed path: `dev/devctl`) for
+- Keep `dev/bin/stagingctl` focused on staging lifecycle only.
+- Introduce a dedicated dev lifecycle tool (proposed path: `dev/bin/devctl`) for
   `dev-photo-ingress`.
 
 ### 6.2 Avoiding code duplication
@@ -165,7 +165,7 @@ During migration:
 
 ### Phase B: Tooling scaffold
 
-1. create `dev/devctl` command surface for `dev-photo-ingress`
+1. create `dev/bin/devctl` command surface for `dev-photo-ingress`
 2. extract shared helpers into `lib/container-common.sh`
 3. update `stagingctl` to consume shared helpers without behavior drift
 

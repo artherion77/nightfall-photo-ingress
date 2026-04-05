@@ -8,8 +8,8 @@ Scope: Execute Sections 4 and 5 from the E2E test architecture consolidation as 
 
 - Variant B intent delivered: pytest-first remains primary, with selective Playwright contract and policy integration.
 - Implementation anchors delivered and validated:
-	- `dev/devctl`: strict `test-web-unit` and `test-web-e2e` contracts with deterministic behavior and `E2E_ARTIFACT_PATH` output.
-	- `.mcp/model.json`: `web.test.e2e` and `web.test.integration` map to real `./dev/devctl test-web-e2e` execution.
+	- `dev/bin/devctl`: strict `test-web-unit` and `test-web-e2e` contracts with deterministic behavior and `E2E_ARTIFACT_PATH` output.
+	- `.mcp/model.json`: `web.test.e2e` and `web.test.integration` map to real `./dev/bin/devctl test-web-e2e` execution.
 	- `tests/unit/test_devctl_contracts.py` and `tests/unit/test_mcp_web_tasks.py`: contract coverage for devctl and MCP task execution semantics.
 - Reusable browser capability-chain harness added for extension:
 	- `tests/integration/browser_chain_harness/`.
@@ -29,8 +29,8 @@ Delivered summary:
 - Implemented strict `devctl test-web-unit` contract: no placeholder pass path, deterministic fail on missing tests, deterministic logs.
 - Implemented strict `devctl test-web-e2e` contract: deterministic exit behavior, deterministic logs, explicit `E2E_ARTIFACT_PATH` output.
 - Added real MCP mappings:
-	- `web.test.e2e` -> `./dev/devctl test-web-e2e`
-	- `web.test.integration` -> `./dev/devctl test-web-e2e`
+	- `web.test.e2e` -> `./dev/bin/devctl test-web-e2e`
+	- `web.test.integration` -> `./dev/bin/devctl test-web-e2e`
 - Added isolated pytest coverage for devctl contracts and MCP task execution semantics.
 - Performed drift audit across devctl implementation, MCP mappings, and task execution behavior; drift resolved.
 
@@ -38,7 +38,7 @@ Delivered summary:
 Define strict, non-placeholder execution contracts for frontend test commands and MCP mappings.
 
 ### Inputs
-- [dev/devctl](../../dev/devctl)
+- [dev/bin/devctl](../../dev/bin/devctl)
 - [.mcp/model.json](../../.mcp/model.json)
 - [design/rationale/e2e-test-architecture-consolidation.md](../../design/rationale/e2e-test-architecture-consolidation.md)
 

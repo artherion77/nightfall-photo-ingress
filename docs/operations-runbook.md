@@ -342,7 +342,7 @@ The staging test flow validates authentication and polling before production dep
 
 ### Prerequisites
 
-- Staging container running (`./staging/stagingctl create`)
+- Staging container running (`./dev/bin/stagingctl create`)
 - Wheel package built (`python -m build --wheel`)
 - Real Azure app registration client ID (see *How To: Register Entra App for Graph*)
 - Personal Microsoft account to authenticate with
@@ -351,7 +351,7 @@ The staging test flow validates authentication and polling before production dep
 
 ```bash
 export STAGING_CLIENT_ID="58996ba4-b840-498f-8ccc-7d1a98c071a0"  # your app client ID
-./staging/stagingctl install dist/nightfall_photo_ingress-0.1.0-py3-none-any.whl
+./dev/bin/stagingctl install dist/nightfall_photo_ingress-0.1.0-py3-none-any.whl
 
 tests/staging-flow/flowctl run --phase p2
 ```
@@ -468,8 +468,8 @@ Review log files in `/mnt/ssd/staging/photo-ingress/logs/<run-id>` for leaked to
 Live systemd smoke testing must run in the staging container, not on the host. Use the staging workflow:
 
 ```bash
-./staging/stagingctl create
-./staging/stagingctl install
+./dev/bin/stagingctl create
+./dev/bin/stagingctl install
 pytest tests/staging/test_smoke_contracts.py -m staging
 ```
 

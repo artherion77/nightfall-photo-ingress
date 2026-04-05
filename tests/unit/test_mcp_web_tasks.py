@@ -39,17 +39,17 @@ def test_model_exposes_real_web_task_mappings() -> None:
     mappings = model["mappings"]
     assert "web.test.e2e" in mappings
     assert "web.test.integration" in mappings
-    assert mappings["web.test.e2e"][-1] == "./dev/devctl test-web-e2e"
-    assert mappings["web.test.integration"][-1] == "./dev/devctl test-web-e2e"
+    assert mappings["web.test.e2e"][-1] == "./dev/bin/devctl test-web-e2e"
+    assert mappings["web.test.integration"][-1] == "./dev/bin/devctl test-web-e2e"
 
 
 def test_web_mcp_tasks_execute_successfully_in_isolated_workspace(tmp_path: Path) -> None:
     workspace_root = tmp_path
     (workspace_root / ".mcp").mkdir(parents=True, exist_ok=True)
-    (workspace_root / "dev").mkdir(parents=True, exist_ok=True)
+    (workspace_root / "dev" / "bin").mkdir(parents=True, exist_ok=True)
 
     # Minimal deterministic devctl shim for MCP task execution tests.
-    devctl = workspace_root / "dev" / "devctl"
+    devctl = workspace_root / "dev" / "bin" / "devctl"
     devctl.write_text(
         "#!/usr/bin/env bash\n"
         "set -euo pipefail\n"
@@ -64,14 +64,14 @@ def test_web_mcp_tasks_execute_successfully_in_isolated_workspace(tmp_path: Path
 
     model = {
         "mappings": {
-            "web.test.e2e": ["./dev/devctl test-web-e2e"],
-            "web.test.integration": ["./dev/devctl test-web-e2e"],
+            "web.test.e2e": ["./dev/bin/devctl test-web-e2e"],
+            "web.test.integration": ["./dev/bin/devctl test-web-e2e"],
         }
     }
     (workspace_root / ".mcp" / "model.json").write_text(json.dumps(model), encoding="utf-8")
 
     prior_path = os.environ.get("PATH", "")
-    os.environ["PATH"] = f"{workspace_root / 'dev'}:{prior_path}"
+    os.environ["PATH"] = f"{workspace_root / 'dev' / 'bin'}:{prior_path}"
 
     server = _start_test_server(workspace_root)
     try:

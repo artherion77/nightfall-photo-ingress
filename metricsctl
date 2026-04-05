@@ -59,7 +59,7 @@ def _devctl_dashboard_drift_preflight(repo_root: Path) -> None:
     We invoke devctl in lock-reentry mode so both tools share one global lock
     without deadlocking.
     """
-    devctl_path = repo_root / "dev" / "devctl"
+    devctl_path = repo_root / "dev" / "bin" / "devctl"
     if not devctl_path.exists():
         raise RuntimeError(f"Missing devctl at {devctl_path}")
 

@@ -32,7 +32,7 @@ change production packaging requirements.
 
 ## Command Surface
 
-An initial dedicated dev lifecycle scaffold exists at `dev/devctl`.
+An initial dedicated dev lifecycle scaffold exists at `dev/bin/devctl`.
 
 Current high-level commands:
 
@@ -67,12 +67,12 @@ path restores that snapshot instead of rebuilding the container from scratch.
 Typical loop:
 
 ```bash
-./dev/devctl create
-./dev/devctl bootstrap-python
-./dev/devctl bootstrap-webui
+./dev/bin/devctl create
+./dev/bin/devctl bootstrap-python
+./dev/bin/devctl bootstrap-webui
 
 # iterate ...
-./dev/devctl reset
+./dev/bin/devctl reset
 ```
 
 ---
@@ -106,6 +106,6 @@ Proposed helper categories:
 
 ## Current State
 
-`dev/devctl` is intentionally minimal and provides a starting command surface.
+`dev/bin/devctl` is intentionally minimal and provides a starting command surface.
 Future iterations will harden reset behavior, API run orchestration, and shared
 helper coverage with staging controller parity.
