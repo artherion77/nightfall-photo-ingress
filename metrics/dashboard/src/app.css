@@ -453,7 +453,6 @@ h4 {
 
 .scale-bar .marker {
   position: absolute;
-  top: -8px;
   width: 0;
   height: 0;
   border-left: 5px solid transparent;
@@ -462,7 +461,9 @@ h4 {
 }
 
 .scale-bar .marker.project {
-  border-bottom: 8px solid #4a8f4b;
+  /* ▼ points down onto the bar */
+  top: -9px;
+  border-top: 8px solid #4a8f4b;
 }
 
 .scale-bar .marker.median {
