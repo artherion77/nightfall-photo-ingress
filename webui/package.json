@@ -19,6 +19,7 @@
     "@testing-library/svelte": "^5.2.8",
     "@types/node": "^22.10.7",
     "jsdom": "^25.0.0",
+    "rollup-plugin-visualizer": "^5.14.0",
     "svelte-check": "^4.1.0",
     "svelte": "^5.0.0",
     "typescript": "^5.7.2",

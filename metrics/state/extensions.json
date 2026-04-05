@@ -3,7 +3,7 @@
   "collectors": [
     {
       "name": "bundle_size",
-      "enabled": false,
+      "enabled": true,
       "optional": true
     },
     {

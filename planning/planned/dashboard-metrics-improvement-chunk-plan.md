@@ -29,7 +29,7 @@ This plan decomposes improvements into independent chunks with hard acceptance c
 | 2 | Python complexity enablement | Ensure backend complexity is collected in dev runtime | **Done** ✅ | 0 |
 | 3A | Design Sonar Cognitive Complexity | Design methodology and parser choice | Blocked | 0 |
 | 3B | Implement Sonar Cognitive Complexity | Frontend cognitive complexity via AST traversal | Pending | 3A |
-| 4 | Bundle analysis collector (with pipeline) | Add bundle-size metrics via test pipeline integration | Deferred | pipeline |
+| 4 | Bundle analysis collector (with pipeline) | Add bundle-size metrics via test pipeline integration | **Done** ✅ | pipeline |
 | 5 | Dependency graph actionable UX | Surface node metadata and meaningful hover details | Done | 0 |
 | 6 | Optional collector hardening | Promote optional metrics from mostly unavailable to useful | Pending | 2,3B |
 | 7 | New metric set expansion | Add high-value quality and delivery metrics | Pending | 1,6 |
@@ -195,26 +195,40 @@ Implement the AST-based Sonar Cognitive Complexity collector and integrate into 
 
 ---
 
-## Chunk 4: Bundle analysis collector — Deferred (requires pipeline support)
+## Chunk 4: Bundle analysis collector
 
-Implementation status: **Code implemented, but end-to-end pipeline incomplete** (2026-04-05)
+Implementation status: **Implemented (2026-04-05)** ✅
 
 ### Current state
 
-- Collector parser code exists in `metrics/runner/module8_ops.py`
-- Dashboard generator correctly surfaces `bundleSizeDetail` payload
-- Unit tests pass against fixture
-- **But:** `bundle_size` collector is disabled, and no `bundle-stats.json` file exists
-- No Vite/Rollup build step produces the required input artifact
-- Dashboard shows **N/A** for bundle size
+- Producer contract implemented in `webui/vite.config.js` with JSON bundle stats emission
+- Build dependency added in `webui/package.json` (`rollup-plugin-visualizer`)
+- Handover contract documented in `metrics/docs/bundle-stats-handover-contract.md`
+- `bundle_size` collector enabled in `metrics/state/extensions.json`
+- Optional collector emits `status: available` when `webui/dist/bundle-stats.json` is present
+- Dashboard payload now carries populated `system.bundleSizeKb` and `system.bundleSizeDetail`
 
 ### Goal
 
 Establish a complete handover contract between frontend build pipeline (test/package step) and metrics collector (consumption step).
 
-### New requirement: Build pipeline integration
+### Verification evidence
 
-Before Chunk 4 can be marked complete, the **test/build pipeline** must be updated to produce `bundle-stats.json` as a side effect of `pnpm build`:
+1. **Producer output path:**
+  - `webui/dist/bundle-stats.json` generated via `pnpm build`
+
+2. **Schema compatibility:**
+  - `bundle-stats.json` validates with `_parse_bundle_stats()` in `metrics/runner/module8_ops.py`
+  - Parser returns `status: available`
+
+3. **Collector and dashboard propagation:**
+  - `modules.optional_collectors.collectors.bundle_size.status == "available"` in run artifacts
+  - `metrics/output/dashboard/<run-id>/__data.json` contains non-null `system.bundleSizeKb`
+  - `system.bundleSizeDetail` populated with total/gzip/brotli/largest chunk/top contributors
+
+### Producer contract
+
+The **test/build pipeline** produces `bundle-stats.json` as a side effect of `pnpm build`:
 
 #### Producer: Frontend build step
 
@@ -234,9 +248,9 @@ Before Chunk 4 can be marked complete, the **test/build pipeline** must be updat
 
 ### Work items
 
-1. **Update build configuration:** Add `rollup-plugin-visualizer`, configure to JSON output
-2. **Enable collector:** After build step verified
-3. **Document handover:** Define schema contract between producer and consumer
+1. **Update build configuration:** Done
+2. **Enable collector:** Done
+3. **Document handover:** Done
 
 ### Testable acceptance criteria
 
@@ -333,17 +347,17 @@ Updated execution order (as of 2026-04-05 drift review):
 2. ✅ **Chunk 1** (sparkline correctness) — DONE
 3. ✅ **Chunk 2** (Python complexity enablement) — DONE
 4. ✅ **Chunk 5** (dependency graph actionable UX) — DONE
-5. 🔧 **Pipeline support** (build -> bundle-stats.json) — **NEXT**, prerequisite for Chunk 4
-6. ⏳ **Chunk 4** (bundle analysis) — after pipeline producer is ready
-7. 📋 **Chunk 3A** (design Sonar) — next design gate for frontend complexity v2
+5. ✅ **Pipeline support** (build -> bundle-stats.json) — DONE
+6. ✅ **Chunk 4** (bundle analysis) — DONE
+7. 📋 **Chunk 3A** (design Sonar) — **NEXT** design gate for frontend complexity v2
 8. ⏳ **Chunk 3B** (implement Sonar) — after 3A design approved
 9. ⏳ **Chunk 6** (optional collector hardening) — after 3B (and validated optional collector paths)
 10. ⏳ **Chunk 7** (new metric expansion) — after 1 and 6 are done
 
 Rationale:
 - **Chunk 2 and Chunk 5 are complete:** keep only regression checks, no new implementation work required there
-- **Pipeline support now first actionable item:** Chunk 4 cannot complete until bundle-stats producer contract exists
-- **Chunk 3 remains redesign-driven:** execute 3A design before any implementation work in 3B
+- **Pipeline support and Chunk 4 are complete:** bundle metrics now have a producer/consumer contract and verified data flow
+- **Chunk 3 remains redesign-driven and is now next:** execute 3A design before any implementation work in 3B
 - **Chunk 6 and 7 remain downstream:** complete after frontend complexity v2 and optional collector paths stabilize
 
 ---
