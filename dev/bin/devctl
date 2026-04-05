@@ -1348,13 +1348,13 @@ Commands:
   setup                             Atomic bootstrap: create/start container, install exact Node
                                     (nvm), Python toolchain, both web stacks (npm ci), snapshot.
   destroy                           Delete development container.
-    reset [--base]                    Restore from snapshot '$SNAPSHOT_CURRENT' when present,
-                                                                        otherwise '$SNAPSHOT_BASE'. With --base, always restore '$SNAPSHOT_BASE'.
-    update [--scope S] [--simulate]   Unified update flow with lockfile regeneration and regression gate.
-                                                                        Scope: node|webui|dashboard|all (default auto-detect).
-    check                             Read-only drift report (Node, manifests, snapshots, toolchain majors).
+  reset [--base]                    Restore from snapshot '$SNAPSHOT_CURRENT' when present,
+                                    otherwise '$SNAPSHOT_BASE'. With --base, always restore '$SNAPSHOT_BASE'.
+  update [--scope S] [--simulate]   Unified update flow with lockfile regeneration and regression gate.
+                                    Scope: node|webui|dashboard|all (default auto-detect).
+  check                             Read-only drift report (Node, manifests, snapshots, toolchain majors).
   ensure-stack-ready [target]       Sync sources and drift-check; target: webui|dashboard|all.
-    assert-cached-ready               Verify cache mounts and snapshot readiness are present.
+    assert-cached-ready             Verify cache mounts and snapshot readiness are present.
   run-api                           API run scaffold (not yet implemented).
   run-webui                         Sync webui sources and start Vite dev server.
   test-web-typecheck                Run webui Svelte/TypeScript typecheck.
@@ -1365,17 +1365,14 @@ Commands:
   shell                             Open interactive shell in development container.
 
 Environment variables:
-  DEV_WEBUI_PORT            Vite dev server port (default: 5173).
-  DEVCTL_E2E_ARTIFACT_DIR   Playwright artifact directory (default: test-results/playwright).
-  DEVCTL_GLOBAL_LOCK_HELD   Set to 1 by callers that already hold the global repo lock.
-  REPO_LOCK_TIMEOUT_SEC     Global repo lock wait timeout in seconds (default: 300).
-    DEVCTL_CONTRACT_TEST_ROOT Contract-test mode root path (host execution; bypasses container).
-    DEVCTL_TEST_WEB_TYPECHECK_RUNNER
-                                                        Contract-test override for web typecheck command (default: npm exec -- svelte-check --fail-on-warnings).
-    DEVCTL_TEST_WEB_UNIT_RUNNER
-                                                        Contract-test override for web unit test command (default: npx vitest run).
-    DEVCTL_TEST_WEB_E2E_RUNNER
-                                                        Contract-test override for web e2e command (default: npx playwright test --reporter=line).
+  DEV_WEBUI_PORT                    Vite dev server port (default: 5173).
+  DEVCTL_E2E_ARTIFACT_DIR           Playwright artifact directory (default: test-results/playwright).
+  DEVCTL_GLOBAL_LOCK_HELD           Set to 1 by callers that already hold the global repo lock.
+  REPO_LOCK_TIMEOUT_SEC             Global repo lock wait timeout in seconds (default: 300).
+    DEVCTL_CONTRACT_TEST_ROOT       Contract-test mode root path (host execution; bypasses container).
+    DEVCTL_TEST_WEB_TYPECHECK_RUNNER Contract-test override for web typecheck command (default: npm exec -- svelte-check --fail-on-warnings).
+    DEVCTL_TEST_WEB_UNIT_RUNNER     Contract-test override for web unit test command (default: npx vitest run).
+    DEVCTL_TEST_WEB_E2E_RUNNER      Contract-test override for web e2e command (default: npx playwright test --reporter=line).
 
 Notes:
     Contract-test overrides are intended for unit/contract harnesses only.
