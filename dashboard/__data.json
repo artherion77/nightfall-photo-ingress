@@ -1,29 +1,30 @@
 {
   "projectName": "nightfall++photo-ingress",
-  "commitSha": "3a58ecf",
-  "commitFull": "3a58ecf5293f59794b0edb88082b2a4cdf68da5c",
-  "runId": "module6-20260404T160336-1",
-  "lastRunAt": "2026-04-04T16:03:53.367018+00:00",
+  "commitSha": "5c0b872",
+  "commitFull": "5c0b87257dd9a604fca14ee9ec06115de5fc48d6",
+  "runId": "manual-20260405T082705",
+  "lastRunAt": "2026-04-05T06:27:05.730504+00:00",
   "sourceBranch": "main",
   "repoUrl": "https://github.com/artherion77/nightfall-photo-ingress",
   "repoHeadUrl": "https://github.com/artherion77/nightfall-photo-ingress/tree/main",
-  "repoCommitUrl": "https://github.com/artherion77/nightfall-photo-ingress/commit/3a58ecf5293f59794b0edb88082b2a4cdf68da5c",
+  "repoCommitUrl": "https://github.com/artherion77/nightfall-photo-ingress/commit/5c0b87257dd9a604fca14ee9ec06115de5fc48d6",
   "runMeta": {
-    "startedAt": "2026-04-04T16:03:53.355731+00:00",
-    "finishedAt": "2026-04-04T16:03:53.367029+00:00",
-    "durationSeconds": 0.0113,
-    "runId": "module6-20260404T160336-1",
+    "startedAt": "2026-04-05T06:27:05.724124+00:00",
+    "finishedAt": "2026-04-05T06:27:05.730514+00:00",
+    "durationSeconds": 0.0064,
+    "runId": "manual-20260405T082705",
     "branch": "main"
   },
   "versions": {
     "python": "Python 3.12.3",
     "typescript": "5.7.2"
   },
-  "coveragePercent": 80.11625090821022,
-  "hasCoverage": true,
-  "sparklinePoints": "0.00,41.67 30.00,33.60 60.00,42.00 90.00,33.60 120.00,25.20 150.00,0.00 180.00,8.40",
+  "coveragePercent": null,
+  "hasCoverage": false,
+  "sparklinePoints": "0.00,42.00 180.00,42.00",
+  "coverageTrendSource": "fallback_flat",
   "locBreakdown": {
-    "python": "26.2k",
+    "python": "26.4k",
     "tsjs": "8.5k",
     "svelte": "3.1k"
   },
@@ -35,15 +36,15 @@
   "backendCoverageBars": [
     {
       "label": "Unit",
-      "value": 80.11625090821022
+      "value": 0
     },
     {
       "label": "Integration",
-      "value": 74.11625090821022
+      "value": 0
     },
     {
       "label": "Flow",
-      "value": 71.11625090821022
+      "value": 0
     }
   ],
   "complexityMix": {
@@ -703,52 +704,28 @@
   },
   "trendRows": [
     {
-      "runId": "module6-20260404T151318-1",
-      "severity": "warning",
+      "runId": "module6-20260405T062607-1",
+      "severity": "critical",
       "warningChecks": 8,
-      "failedChecks": 0,
-      "deltaItems": 14,
-      "generatedAt": "2026-04-04T15:13:34.451332+00:00"
+      "failedChecks": 2,
+      "deltaItems": 11,
+      "generatedAt": "2026-04-05T06:26:10.451647+00:00"
     },
     {
-      "runId": "manual-ux-20260404T150544",
-      "severity": "warning",
+      "runId": "coverage-check-local",
+      "severity": "critical",
       "warningChecks": 2,
-      "failedChecks": 0,
+      "failedChecks": 2,
       "deltaItems": 14,
-      "generatedAt": "2026-04-04T15:06:00.842535+00:00"
+      "generatedAt": "2026-04-04T14:13:29.563004+00:00"
     },
     {
-      "runId": "module6-20260404T144019-1",
+      "runId": "module4-bootstrap",
       "severity": "warning",
-      "warningChecks": 8,
+      "warningChecks": 3,
       "failedChecks": 0,
-      "deltaItems": 14,
-      "generatedAt": "2026-04-04T14:40:35.628665+00:00"
-    },
-    {
-      "runId": "module6-20260404T143614-1",
-      "severity": "warning",
-      "warningChecks": 8,
-      "failedChecks": 0,
-      "deltaItems": 14,
-      "generatedAt": "2026-04-04T14:36:30.943517+00:00"
-    },
-    {
-      "runId": "module6-20260404T141709-1",
-      "severity": "warning",
-      "warningChecks": 8,
-      "failedChecks": 0,
-      "deltaItems": 14,
-      "generatedAt": "2026-04-04T14:17:25.112084+00:00"
-    },
-    {
-      "runId": "coverage-check-local2",
-      "severity": "warning",
-      "warningChecks": 2,
-      "failedChecks": 0,
-      "deltaItems": 14,
-      "generatedAt": "2026-04-04T14:15:10.988968+00:00"
+      "deltaItems": 11,
+      "generatedAt": "2026-04-04T12:28:57.924234+00:00"
     }
   ]
 }
