@@ -403,12 +403,16 @@
       </article>
 
       <article class="card metric-card">
-        <h2>Python Complexity</h2>
-        <dl class="kv">
+        <h2>Complexity</h2>
+        <dl class="kv kv-compact">
+          <div>
+            <dt><span class="tip-anchor">Web Frontend<br>Cognitive<span class="tip-bubble">Heuristic cognitive complexity from webui/ (frontend_collector). Branching tokens weighted by nesting depth. Typical range: 12–40 mean. Lower is easier to maintain.</span></span></dt>
+            <dd>{frontendComplexityText}</dd>
+          </div>
           <div>
             <dt>
               <span class="tip-anchor">
-                Cyclomatic
+                Backend<br>Cyclomatic
                 <span class="tip-bubble scale-tip">
                   <strong>Cyclomatic Complexity (McCabe via radon)</strong><br />
                   Scale: {data.pythonComplexityReference.cyclomatic.scale.min}-{data.pythonComplexityReference.cyclomatic.scale.max} (lower is simpler).<br />
@@ -418,7 +422,7 @@
                     <span class="marker project" style={`left:${cyclomaticProjectPct}%; border-bottom-color:${cyclomaticProjectColor};`}></span>
                     <span class="marker median" style={`left:${cyclomaticMedianPct}%; border-bottom-color:${cyclomaticMedianColor};`}></span>
                   </span>
-                  <span class="scale-legend">▲ Project value &nbsp; ▲ Industry median</span>
+                  <span class="scale-legend">▼ Project value &nbsp; ▲ Industry median</span>
                 </span>
               </span>
             </dt>
@@ -427,7 +431,7 @@
           <div>
             <dt>
               <span class="tip-anchor">
-                Maintainability
+                Backend<br>Maintainability
                 <span class="tip-bubble scale-tip">
                   <strong>Maintainability Index (radon)</strong><br />
                   Scale: {data.pythonComplexityReference.maintainability.scale.min}-{data.pythonComplexityReference.maintainability.scale.max} (higher is better).<br />
@@ -437,7 +441,7 @@
                     <span class="marker project" style={`left:${maintainabilityProjectPct}%; border-bottom-color:${maintainabilityProjectColor};`}></span>
                     <span class="marker median" style={`left:${maintainabilityMedianPct}%; border-bottom-color:${maintainabilityMedianColor};`}></span>
                   </span>
-                  <span class="scale-legend">▲ Project value &nbsp; ▲ Industry median</span>
+                  <span class="scale-legend">▼ Project value &nbsp; ▲ Industry median</span>
                 </span>
               </span>
             </dt>
@@ -446,19 +450,7 @@
         </dl>
       </article>
 
-      <article class="card metric-card">
-        <h2>Complexity</h2>
-        <dl class="kv">
-          <div>
-            <dt><span class="tip-anchor">Web Frontend<span class="tip-bubble">Heuristic cognitive complexity from webui/ (frontend_collector). Branching tokens weighted by nesting depth. Typical range: 12–40 mean. Lower is easier to maintain.</span></span></dt>
-            <dd>{frontendComplexityText}</dd>
-          </div>
-          <div>
-            <dt><span class="tip-anchor">Backend<span class="tip-bubble">McCabe cyclomatic complexity from src/ (radon). Measures decision paths per function. Lower is simpler. Industry median ≈ 4.5.</span></span></dt>
-            <dd>{cyclomaticText}</dd>
-          </div>
-        </dl>
-      </article>
+      <article class="card metric-card"></article>
     </section>
 
     <section class="section-block">

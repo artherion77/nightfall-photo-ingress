@@ -185,6 +185,19 @@ h2 {
   font-size: 38px;
 }
 
+.kv.kv-compact {
+  gap: 7px;
+}
+
+.kv.kv-compact dt {
+  font-size: 14px;
+  line-height: 1.25;
+}
+
+.kv.kv-compact dd {
+  font-size: 26px;
+}
+
 .section-block {
   margin-top: 24px;
 }
