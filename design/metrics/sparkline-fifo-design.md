@@ -569,104 +569,139 @@ schema and would mix concerns (run-scoped measurement artifacts vs. dashboard tr
 `dashboard_generator.py`. Moving it upstream creates an implicit dependency between dashboard
 generation logic and the aggregation schema that does not currently exist.
 
-Critical Design Review: Sparkline FIFO
-1. Drift Risk Assessment
-1.1 _dashboard_payload() side-effect injection — SIGNIFICANT
-The design places _update_coverage_trend() and _update_loc_trend() inside _dashboard_payload(). This converts a previously pure, side-effect-free transformation function into one that reads and writes files on every invocation. This has three downstream consequences the document does not fully resolve:
+---
 
-a) measured_at overwrite semantics on same-commit are unspecified. The FIFO update rule says "overwrite slots[-1] in-place" when commit_sha matches. The schema definition shows measured_at as a diagnostic field. The document does not say whether measured_at is updated during a same-commit overwrite. In practice, publish_metrics() calls run_dashboard_generation(), which calls _update_coverage_trend() which would overwrite slots[-1] with measured_at = now (publish time), replacing the original run time. If measured_at is subsequently used for diagnostics, it silently points to the last publish rather than the last measurement. The implementation spec must explicitly state that measured_at is not updated on a same-commit overwrite.
+## 9. Critical Design Review Addendum
 
-b) The module 7 test fixtures monkeypatch run_dashboard_generation entirely. Reading the actual test code in test_module7_publish_writes_publication_state_and_syncs_worktree, test_module7_publish_reports_push_failure, and both fingerprint tests: all of them use monkeypatch.setattr(poller_runner, "run_dashboard_generation", _fake_dashboard_gen). The _fake_dashboard_gen only writes a minimal __data.json — it never calls _dashboard_payload(). This means the two new module 7 tests described in §7.3 (test_publish_same_day_does_not_grow_loc_trend and test_publish_same_commit_does_not_grow_coverage_trend) cannot exercise the FIFO logic at all if they follow the same monkeypatching pattern. If they do NOT monkeypatch, they require full artifact seeding equivalent to the module 5 integration tests. The test plan does not resolve this tension. The two module 7 tests as described are either testing a code path that doesn't run (via monkeypatch) or require a structural departure from the module 7 fixture pattern.
+This addendum captures a deterministic pre-implementation review focused on drift prevention,
+migration safety, and operational stability.
 
-c) Test isolation through tmp_path is correct. Since every test receives a distinct tmp_path, FIFO file accumulation across tests is not a risk. This is correctly handled.
+### 9.1 Drift-risk assessment
 
-1.2 Build-stamp / fingerprint interaction — CLEAN
-The design correctly identifies that coverage_trend.json and loc_trend.json affect only __data.json content. They are not hashed by _compute_dashboard_source_fingerprint() (which hashes only .svelte, .ts, .js, .css and four config files). The LOC sparkline element in +page.svelte does change the fingerprint, triggering exactly one sync_local publish. All subsequent unchanged-source publishes revert to reuse_published. No hidden churn. ✓
+#### 9.1.1 `_dashboard_payload()` side-effect injection
 
-The lastPublishedAt injection in publish_metrics() happens after run_dashboard_generation() returns — i.e., after both FIFOs are updated. This ordering is correct and the FIFO-written values are not disturbed by the lastPublishedAt injection. ✓
+Risk level: **medium**
 
-1.3 .gitignore gap — CORRECTLY IDENTIFIED, INCOMPLETELY MITIGATED
-The document correctly flags this as a mandatory blocker. However, it does not specify the recovery procedure if either trend file is accidentally committed before the gitignore entry lands. Given that runtime.json IS git-tracked, a developer doing git add metrics/state/ accidentally pulls in the trend files. The review recommendation: both gitignore entries and the new state files should land in the same atomic commit; the PR checklist should include an explicit git status --porcelain validation step confirming the trend files are untracked (the §6.5 checklist already has this, which is good). No additional mitigation is needed beyond what is specified, but the accidental-commit recovery path should be documented.
+The design places `_update_coverage_trend()` and `_update_loc_trend()` inside
+`_dashboard_payload()`, turning payload construction into a state-mutating operation.
 
-1.4 UTC day-boundary — CORRECT
-datetime.now(timezone.utc).date() evaluated at generation time is correct. The "run at 23:59, publish at 00:01" edge case is handled by the same-day overwrite rule for the intra-day path and correctly appends a new slot on the next day. The document's characterization ("No visual artifact; the sparkline adds a duplicate data point") is accurate and benign. ✓
+Required guardrails:
 
-1.5 Same-commit overwrite — CORRECT WITH ONE CAVEAT
-The coverage FIFO same-commit overwrite is idempotent for coverage_percent (same commit always produces same value). The only non-idempotent field is measured_at — see §1.1(a) above.
+- Define overwrite semantics for `measured_at` during same-commit coverage updates.
+- Preserve deterministic behavior when `publish_metrics()` regenerates payload on the same commit.
 
-1.6 cleanup_runtime_artifacts() interaction — CORRECT
-Verified against the actual code: cleanup_runtime_artifacts() removes output and optionally history. state is untouched. Both trend files survive all cleanup invocations. This is a genuine durability improvement over the current history-scan approach. ✓
+Decision:
 
-1.7 Publish-pipeline lock gap — UNADDRESSED IN DOCUMENT
-run_now() holds poller.lock (exclusive flock). publish_metrics() does NOT acquire the lock. Both now call run_dashboard_generation(), which writes the FIFO state files. If publish_metrics() is invoked manually while a timer-triggered run_now() is active, both processes write to the same FIFO files without synchronization. In practice this is a low-probability event (publish is an operator command, not a timer call), and the risk is bounded (worst case: a slot is overwritten with a slightly different measured_at or loc_total). This is correctly an inherited constraint from the existing architecture. However, the document should explicitly acknowledge it rather than leaving it unstated.
+- Same-commit overwrite remains valid and idempotent for trend shape.
+- `measured_at` semantics must be explicitly defined in implementation notes before coding.
 
-2. Migration Risk Assessment
-2.1 Coverage trend seeding from history — POOR COMPLEXITY/BENEFIT RATIO
-The seeding logic performs the history scan that the entire refactor is designed to eliminate, running exactly once. On this installation, 16 distinct commits exist in history, all with coverage_percent = 80.12. Seeding produces a 10-slot FIFO where every slot has the same value. The resulting sparkline is a flat line at 80.12 — visually identical to the fallback_flat path (also a flat line, just at 0 rather than at the real value, but both render as flat). The practical benefit of seeding on this installation is: the coverageTrendSource field becomes "measured_history" instead of "fallback_flat" after the first post-PR run. That's the entire gain.
+#### 9.1.2 Build-stamp / fingerprint interactions
 
-The seeding adds ~30-40 lines of history-scanning code that fires exactly once, implements a deduplication step (keep latest run per commit), handles the max_slots - 1 truncation, and must be tested with its own cases. This complexity is misaligned with the gain for the initial PR.
+Risk level: **low**
 
-Recommendation: defer migration seeding entirely from the initial PR. Accept the flat-line period (which is visually identical to the current behavior anyway since all coverage is at 80.12 and the sparkline is currently flat). The seeding path can be added in a follow-up if coverage starts varying and the ramp-up period becomes noticeable.
+`coverage_trend.json` and `loc_trend.json` are runtime state files and do not alter dashboard
+source fingerprinting. The LOC sparkline UI addition in `+page.svelte` triggers one expected
+fingerprint change, then normal `reuse_published` behavior resumes.
 
-2.2 LOC trend starting empty — NO RISK
-Flat fallback for the first run is safe, expected, and visually equivalent to having no sparkline. ✓
+Decision: no additional design change required.
 
-2.3 Coverage rendering direction change — VISUAL STATE CHANGE, NOT JUST AN IMPROVEMENT
-The document characterizes the direction fix as "a deliberate improvement, not a risk." This framing is partially correct but incomplete. On any installation where coverage has a visible slope (i.e., coverage is not a flat line), the sparkline shape would visually flip on the first post-PR publish: a previously downward-sloping line would become upward-sloping and vice versa. On this specific installation, coverage is flat — the flip is invisible. But the review should note this explicitly as a visual state change in deployed dashboards, not merely an implementation detail. Any existing screenshots, runbooks, or monitoring documentation about the sparkline direction would be invalidated.
+#### 9.1.3 Publish pipeline interactions
 
-2.4 sparklinePoints key preservation — NO REGRESSION RISK
-The payload key is unchanged. The <polyline> element in +page.svelte is unchanged. Old compiled JS on the metrics branch (before the +page.svelte rebuild) reads sparklinePoints and continues to render correctly with the new FIFO-generated values. ✓
+Risk level: **low-to-medium**
 
-3. Missing Considerations
-3.1 test_coverage_trend_direction_oldest_first — CONSTRUCTION TRAP
-This test as described in §7.1 ("Seed FIFO with ascending coverage values [70.0, 75.0, 80.0]; verify sparklinePoints encodes monotonically decreasing y-coordinates from left to right") has a structural flaw if it proceeds through run_dashboard_generation().
+`publish_metrics()` always calls `run_dashboard_generation()`, so both FIFOs will update during
+publish flows as well as run flows.
 
-_update_coverage_trend() inside _dashboard_payload() checks slots[-1]["commit_sha"] against commit_full from summary["source"]["commit_sha"]. If the test seeds three slots with fake commit SHAs ("aaa...", "bbb...", "ccc...") and then provides a summary.json with commit "ddd...", the function appends a fourth slot with the real coverage_percent value (from the test's metrics.json), not the seeded 70/75/80 values. The sparkline then reflects [70.0, 75.0, 80.0, real_coverage] — not the clean ascending series the test claims to verify.
+Observed behavior is acceptable:
 
-This test must either:
+- Same-commit publish: coverage slot overwrite (no growth).
+- Same-day publish: LOC slot overwrite (no growth).
+- Next-day publish without code change: LOC appends one new day with same value (expected by
+  day-sampled semantics).
 
-Be implemented as a pure unit test of _update_coverage_trend() + _sparkline() directly, without going through run_dashboard_generation(), OR
-Seed the FIFO with the first two slots using fake SHAs, and use the third slot's SHA as the current commit's SHA in the test's manifest.json/summary.json, so the current run overwrites slot 3 with the known coverage value and the direction is validated against [70.0, 75.0, current].
-The test plan must specify which approach is taken.
+Residual caveat:
 
-3.2 Empty commit_sha guard for coverage FIFO — UNADDRESSED
-commit_full = str((summary.get("source") or {}).get("commit_sha", "")) returns empty string when commit_sha is missing. If all runs share commit_sha = "", the FIFO permanently overwrites slots[-1] without ever appending a new slot. The sparkline never advances beyond 1 slot and remains on the flat-line fallback indefinitely. This scenario occurs on bootstrap runs and malformed test fixtures. The implementation of _update_coverage_trend() should guard: if commit_full is empty or fewer than 7 hex characters (a sanity check), skip the FIFO write and return the existing slots unmodified.
+- `publish_metrics()` does not currently take the poller lock used by `run_now()`. Concurrent
+  execution is an inherited architectural constraint and should be documented as such.
 
-3.3 Zero _loc_total in LOC FIFO — UNADDRESSED
-If all collectors fail and _loc_total = 0, the LOC FIFO records a slot with loc_total: 0. On the sparkline, this produces a spike to zero that may be mistaken for a real code deletion event. The LOC FIFO should treat _loc_total <= 0 as a sentinel indicating "no usable measurement" and store the slot as "loc_total": null — consistent with how coverage_percent: null is handled. The filter in the series derivation step ([[float(slot["loc_total"]) for slot in loc_trend_slots]](http://vscodecontentref/62)) then excludes null slots. This guard is cheap to add and prevents a misleading visual artifact.
+#### 9.1.4 State persistence and `.gitignore`
 
-3.4 _history_trend() still O(n) for trendRows — CORRECTLY OUT OF SCOPE, BUT NEEDS ACKNOWLEDGEMENT
-After the refactor, _history_trend() drops the metrics.json read per run. It still reads summary.json + manifest.json per run for trendRows. The O(n) scan persists for this consumer. As the retention limit grows toward 120 runs, this remains a cost center. The document correctly leaves this out of scope, but should add a note that trendRows will be addressed in a subsequent optimization PR to avoid ambiguity about whether the O(n) claim (§0 executive summary: "eliminates O(n) disk I/O") is fully accurate. O(n × 2) is still O(n).
+Risk level: **high if omitted; low if implemented**
 
-3.5 _collect_extra_loc() scan scope — CONFIRMED SAFE, NOT DOCUMENTED
-_collect_extra_loc() scans Python files in metrics and shell scripts in install, bin, staging. The new trend files are .json files in state — they are not .py files and are excluded from the LOC count. The LOC metric is not contaminated by the new state files. This should be confirmed explicitly in the design document (under §5 or §3.1) as a one-line note, since the state files live inside the metrics directory that _collect_extra_loc() scans.
+`metrics/state/runtime.json` and related config files are tracked on `main`, while ephemeral
+state is selectively gitignored. Both new trend files must be explicitly ignored:
 
-4. Verdict
-The design is sound in principle but not yet implementation-ready as written. The FIFO data model, schema definitions, day boundaries, same-key overwrite rules, gitignore requirements, and migration paths for LOC are all correct. The rationale for the coverage FIFO refactor is well-argued and the four problems it eliminates are real.
+```text
+metrics/state/loc_trend.json
+metrics/state/coverage_trend.json
+```
 
-Three issues require resolution before code is written:
+Decision: this remains a release-blocking checklist item.
 
-The module 7 test plan is structurally incompatible with the module 7 fixture pattern. Tests test_publish_same_day_does_not_grow_loc_trend and test_publish_same_commit_does_not_grow_coverage_trend either need to avoid monkeypatching run_dashboard_generation (requiring full artifact seeding) or need to be moved into the module 5 test suite as pure generator-level tests, and replaced in module 7 with simpler idempotency checks at the publish layer.
+#### 9.1.5 UTC boundaries and overwrite behavior
 
-measured_at overwrite semantics are unspecified. The implementation spec must say whether measured_at is preserved or updated on same-commit overwrite.
+Risk level: **low**
 
-test_coverage_trend_direction_oldest_first cannot be written as described without careful SHA coordination between the seeded FIFO and the test's manifest. The test plan needs to specify the exact construction approach.
+UTC day boundaries for LOC are correct and deterministic. Same-commit and same-day overwrite
+rules are sound and drift-safe.
 
-Two further additions are recommended before coding begins:
+#### 9.1.6 `cleanup_runtime_artifacts` interactions
 
-Remove migration seeding from the initial PR scope. It adds implementation complexity for zero visual benefit on this installation. Mark it "deferred" in the design.
+Risk level: **low**
 
-Add the empty commit_sha and zero _loc_total guards to the specified behavior of _update_coverage_trend() and _update_loc_trend() respectively.
+`cleanup_runtime_artifacts()` removes `metrics/output` and optional history paths, not
+`metrics/state`. Trend persistence therefore survives cleanup and is an intended durability
+improvement.
 
-5. Recommended Safeguards Before Implementation
-#	Safeguard	Applies to
-S1	Specify measured_at is NOT updated on same-commit overwrite in §2.2	Design doc
-S2	Add empty/invalid commit_sha guard to _update_coverage_trend() spec in §2.2	Design doc
-S3	Add loc_total <= 0 → store as null rule to _update_loc_trend() spec in §3.4	Design doc
-S4	Remove migration seeding from initial PR; defer to follow-up	Design doc §2.5
-S5	Resolve module 7 test plan conflict — clarify that test_publish_same_* tests call real run_dashboard_generation(), document the full seeding they require, and restructure accordingly	Design doc §7.3
-S6	Specify the exact SHA-matching construction pattern for test_coverage_trend_direction_oldest_first	Design doc §7.1
-S7	Add one-line note confirming .json state files are below the _collect_extra_loc() filter threshold	Design doc §3 or §5
-S8	Add explicit note that the coverage direction change is a visual state change on deployed non-flat installations, not only an implementation correction	Design doc §5.2
-S9	Document the publish-lock gap as an acknowledged inherited constraint	Design doc §5
-S10	Clarify O(n) claim scope: "sparkline I/O is now O(1); trendRows via _history_trend() remains O(n × 2)"	Design doc §0 or §1.1
+### 9.2 Migration-risk assessment
+
+#### 9.2.1 Coverage seeding from history
+
+Risk level: **medium (complexity), low (runtime danger)**
+
+One-time seeding is operationally safe but adds implementation and testing complexity. It is not
+required for correctness, and fallback behavior is already defined.
+
+Recommendation:
+
+- Keep seeding optional and defer if implementation scope must stay minimal.
+
+#### 9.2.2 LOC trend starts empty
+
+Risk level: **low**
+
+Expected behavior is flat fallback until enough samples accumulate. No backward-compatibility
+risk.
+
+#### 9.2.3 Sparkline rendering regressions
+
+Risk level: **low-to-medium**
+
+Coverage direction correction (left-to-right chronology) may visually change non-flat historical
+trends. This is a semantic fix, but should be acknowledged as a visible behavior change.
+
+### 9.3 Minimality, reversibility, safety verdict
+
+Verdict: **acceptable with safeguards**.
+
+The design is minimal in footprint (two runtime files, payload additive keys, one UI insertion),
+reversible (remove FIFO readers/writers and payload keys without affecting persisted artifacts),
+and operationally safe once the documented safeguards are enforced.
+
+### 9.4 Required safeguards before coding
+
+1. Keep `.gitignore` additions mandatory in the same commit as implementation.
+2. Pin overwrite semantics for coverage `measured_at` in same-commit writes.
+3. Document inherited concurrency caveat (`run_now` lock vs `publish_metrics` no-lock).
+4. Ensure tests that assert publish-driven trend behavior execute real dashboard generation logic
+   (avoid stubbing away FIFO update paths in those specific tests).
+5. Treat coverage seeding as optional scope; do not block core FIFO rollout on seeding logic.
+
+### 9.5 Additional considerations to track
+
+- Clarify whether empty/invalid commit SHA should skip coverage FIFO mutation.
+- Clarify behavior for unusable LOC observations (e.g., zeroed collection outcomes) to prevent
+  misleading trend points.
+- Explicitly state that trend files do not contribute to LOC counting in `_collect_extra_loc()`.
+
+
