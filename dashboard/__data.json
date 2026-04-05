@@ -1,18 +1,18 @@
 {
   "projectName": "nightfall++photo-ingress",
-  "commitSha": "a392f15",
-  "commitFull": "a392f159390eee64095aab7a42fa014793f24948",
-  "runId": "module6-20260405T170434-1",
-  "lastRunAt": "2026-04-05T17:04:51.771807+00:00",
+  "commitSha": "06acbce",
+  "commitFull": "06acbceb81f7d7089632038cc8124cca1199632b",
+  "runId": "module6-20260405T174239-1",
+  "lastRunAt": "2026-04-05T17:42:55.838943+00:00",
   "sourceBranch": "main",
   "repoUrl": "https://github.com/artherion77/nightfall-photo-ingress",
   "repoHeadUrl": "https://github.com/artherion77/nightfall-photo-ingress/tree/main",
-  "repoCommitUrl": "https://github.com/artherion77/nightfall-photo-ingress/commit/a392f159390eee64095aab7a42fa014793f24948",
+  "repoCommitUrl": "https://github.com/artherion77/nightfall-photo-ingress/commit/06acbceb81f7d7089632038cc8124cca1199632b",
   "runMeta": {
-    "startedAt": "2026-04-05T17:04:51.756673+00:00",
-    "finishedAt": "2026-04-05T17:04:51.771817+00:00",
-    "durationSeconds": 0.0151,
-    "runId": "module6-20260405T170434-1",
+    "startedAt": "2026-04-05T17:42:55.820673+00:00",
+    "finishedAt": "2026-04-05T17:42:55.838955+00:00",
+    "durationSeconds": 0.0183,
+    "runId": "module6-20260405T174239-1",
     "branch": "main"
   },
   "versions": {
@@ -42,16 +42,16 @@
     "note": "System-level metric. Includes all code in the repository."
   },
   "complexityCard": {
-    "cyclomatic": 3.2477,
-    "maintainability": 56.4808,
+    "cyclomatic": null,
+    "maintainability": null,
     "frontend": {
-      "value": 0.6821266233766233,
+      "value": null,
       "source": "sonar_cognitive",
-      "status": "partial",
-      "parser_version_label": "tree-sitter 0.25.2"
+      "status": "error",
+      "parser_version_label": null
     }
   },
-  "frontendComplexity": 0.6821266233766233,
+  "frontendComplexity": null,
   "frontendComplexityReference": {
     "method": "Sonar Cognitive Complexity (tree-sitter AST; nesting-penalised increments)",
     "scale": {
@@ -79,166 +79,25 @@
     }
   ],
   "complexityMix": {
-    "low": 6,
-    "moderate": 1,
-    "high": 24
+    "low": 0,
+    "moderate": 0,
+    "high": 0
   },
   "complexityBreakdownDetail": {
     "high": {
       "category": "high",
-      "totalModules": 3,
-      "topModules": [
-        {
-          "module": "tests/unit/test_metrics_module5_dashboard.py",
-          "type": "backend",
-          "score": 24.5,
-          "category": "high"
-        },
-        {
-          "module": "tests/integration/test_pending_lifecycle_integration.py",
-          "type": "backend",
-          "score": 22.0,
-          "category": "high"
-        },
-        {
-          "module": "tests/integration/test_m3_m4_operator_semantics.py",
-          "type": "backend",
-          "score": 11.0,
-          "category": "high"
-        }
-      ]
+      "totalModules": 0,
+      "topModules": []
     },
     "moderate": {
       "category": "moderate",
-      "totalModules": 24,
-      "topModules": [
-        {
-          "module": "tests/unit/test_status_export.py",
-          "type": "backend",
-          "score": 9.0,
-          "category": "moderate"
-        },
-        {
-          "module": "tests/unit/test_metrics_module2_backend.py",
-          "type": "backend",
-          "score": 8.5,
-          "category": "moderate"
-        },
-        {
-          "module": "tests/integration/test_m3_m4_happy_path.py",
-          "type": "backend",
-          "score": 7.4,
-          "category": "moderate"
-        },
-        {
-          "module": "api/services/audit_service.py",
-          "type": "backend",
-          "score": 7.0,
-          "category": "moderate"
-        },
-        {
-          "module": "src/nightfall_photo_ingress/adapters/onedrive/safe_logging.py",
-          "type": "backend",
-          "score": 7.0,
-          "category": "moderate"
-        },
-        {
-          "module": "tests/integration/browser_chain_harness/test_browser_chain_harness.py",
-          "type": "backend",
-          "score": 7.0,
-          "category": "moderate"
-        },
-        {
-          "module": "tests/integration/test_m3_m4_idempotency.py",
-          "type": "backend",
-          "score": 7.0,
-          "category": "moderate"
-        },
-        {
-          "module": "tests/integration/ui/test_dashboard.py",
-          "type": "backend",
-          "score": 7.0,
-          "category": "moderate"
-        },
-        {
-          "module": "src/nightfall_photo_ingress/domain/ingest.py",
-          "type": "backend",
-          "score": 6.79,
-          "category": "moderate"
-        },
-        {
-          "module": "tests/integration/test_live_photo_integration.py",
-          "type": "backend",
-          "score": 6.5,
-          "category": "moderate"
-        }
-      ]
+      "totalModules": 0,
+      "topModules": []
     },
     "low": {
       "category": "low",
-      "totalModules": 137,
-      "topModules": [
-        {
-          "module": "api/app.py",
-          "type": "backend",
-          "score": 4.67,
-          "category": "low"
-        },
-        {
-          "module": "tests/integration/test_m3_m4_crash_recovery.py",
-          "type": "backend",
-          "score": 4.6,
-          "category": "low"
-        },
-        {
-          "module": "api/services/health_service.py",
-          "type": "backend",
-          "score": 4.5,
-          "category": "low"
-        },
-        {
-          "module": "api/services/staging_service.py",
-          "type": "backend",
-          "score": 4.5,
-          "category": "low"
-        },
-        {
-          "module": "tests/integration/api/test_staging.py",
-          "type": "backend",
-          "score": 4.5,
-          "category": "low"
-        },
-        {
-          "module": "tests/integration/test_m3_m4_duplicates_and_replay.py",
-          "type": "backend",
-          "score": 4.5,
-          "category": "low"
-        },
-        {
-          "module": "tests/unit/test_metrics_module1_schema.py",
-          "type": "backend",
-          "score": 4.5,
-          "category": "low"
-        },
-        {
-          "module": "src/nightfall_photo_ingress/config.py",
-          "type": "backend",
-          "score": 4.48,
-          "category": "low"
-        },
-        {
-          "module": "src/nightfall_photo_ingress/cli.py",
-          "type": "backend",
-          "score": 4.41,
-          "category": "low"
-        },
-        {
-          "module": "tests/integration/api/test_blocklist.py",
-          "type": "backend",
-          "score": 4.33,
-          "category": "low"
-        }
-      ]
+      "totalModules": 0,
+      "topModules": []
     }
   },
   "frontendLocRows": [
@@ -2978,6 +2837,14 @@
   },
   "trendRows": [
     {
+      "runId": "module6-20260405T170434-1",
+      "severity": "warning",
+      "warningChecks": 5,
+      "failedChecks": 0,
+      "deltaItems": 15,
+      "generatedAt": "2026-04-05T17:04:51.771807+00:00"
+    },
+    {
       "runId": "module6-20260405T170149-1",
       "severity": "warning",
       "warningChecks": 5,
@@ -3016,14 +2883,6 @@
       "failedChecks": 0,
       "deltaItems": 17,
       "generatedAt": "2026-04-05T15:58:46.628844+00:00"
-    },
-    {
-      "runId": "module6-20260405T145657-1",
-      "severity": "warning",
-      "warningChecks": 7,
-      "failedChecks": 0,
-      "deltaItems": 17,
-      "generatedAt": "2026-04-05T14:57:14.573277+00:00"
     }
   ]
 }
