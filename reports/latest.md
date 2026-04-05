@@ -1,18 +1,18 @@
 # Nightfall Metrics Executive Summary
 
-- Run ID: chunk2-2026-04-05
-- Generated At: 2026-04-05T06:32:49.353270+00:00
+- Run ID: module6-20260405T145657-1
+- Generated At: 2026-04-05T14:57:14.573277+00:00
 - Branch: main
-- Commit: 5c0b87257dd9a604fca14ee9ec06115de5fc48d6
+- Commit: 1489bd2caefbef857b999b816ba9b700f1ebe8f9
 - Collection Status: partial
 - Severity: warning
-- Previous Successful Run: manual-20260405T082705
+- Previous Successful Run: chunk2-2026-04-05
 
 ## Indicators
 
 - Failed checks: 0
-- Warning checks: 2
-- Delta items: 14
+- Warning checks: 7
+- Delta items: 17
 
 ## Artifact Links
 
@@ -22,8 +22,13 @@
 
 ## Warnings
 
-- modules.backend.metrics.complexity not available
 - modules.frontend.metrics.test_coverage not available
+- modules.optional_collectors not available
+- modules.optional_collectors.collectors.bundle_size not available
+- modules.optional_collectors.collectors.openapi_complexity not available
+- modules.optional_collectors.collectors.api_surface_diff not available
+- modules.optional_collectors.collectors.vitest_coverage not available
+- modules.optional_collectors.collectors.playwright_coverage not available
 
 ## Failures
 

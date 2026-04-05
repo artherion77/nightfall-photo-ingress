@@ -1,27 +1,27 @@
 {
   "projectName": "nightfall++photo-ingress",
-  "commitSha": "5c0b872",
-  "commitFull": "5c0b87257dd9a604fca14ee9ec06115de5fc48d6",
-  "runId": "coverage-ok-20260405T083227",
-  "lastRunAt": "2026-04-05T06:32:49.353270+00:00",
+  "commitSha": "1489bd2",
+  "commitFull": "1489bd2caefbef857b999b816ba9b700f1ebe8f9",
+  "runId": "module6-20260405T145657-1",
+  "lastRunAt": "2026-04-05T14:57:14.573277+00:00",
   "sourceBranch": "main",
   "repoUrl": "https://github.com/artherion77/nightfall-photo-ingress",
   "repoHeadUrl": "https://github.com/artherion77/nightfall-photo-ingress/tree/main",
-  "repoCommitUrl": "https://github.com/artherion77/nightfall-photo-ingress/commit/5c0b87257dd9a604fca14ee9ec06115de5fc48d6",
+  "repoCommitUrl": "https://github.com/artherion77/nightfall-photo-ingress/commit/1489bd2caefbef857b999b816ba9b700f1ebe8f9",
   "runMeta": {
-    "startedAt": "2026-04-05T10:00:06.886086+00:00",
-    "finishedAt": "2026-04-05T10:00:06.905782+00:00",
-    "durationSeconds": 0.0197,
-    "runId": "coverage-ok-20260405T083227",
+    "startedAt": "2026-04-05T14:57:14.560037+00:00",
+    "finishedAt": "2026-04-05T14:57:14.573287+00:00",
+    "durationSeconds": 0.0133,
+    "runId": "module6-20260405T145657-1",
     "branch": "main"
   },
   "versions": {
-    "python": "3.12.3",
+    "python": "Python 3.12.3",
     "typescript": "5.7.2"
   },
-  "coveragePercent": null,
-  "hasCoverage": false,
-  "sparklinePoints": "0.00,42.00 180.00,42.00",
+  "coveragePercent": 80.11625090821022,
+  "hasCoverage": true,
+  "sparklinePoints": "0.00,42.00 90.00,42.00 180.00,42.00",
   "coverageTrendSource": "measured_history",
   "locTotal": "35.6k",
   "locDetail": {
@@ -49,15 +49,15 @@
   "backendCoverageBars": [
     {
       "label": "Unit",
-      "value": 0
+      "value": 80.11625090821022
     },
     {
       "label": "Integration",
-      "value": 0
+      "value": 74.11625090821022
     },
     {
       "label": "Flow",
-      "value": 0
+      "value": 71.11625090821022
     }
   ],
   "complexityMix": {
@@ -2964,7 +2964,7 @@
   },
   "footer": {
     "host": "nightfall",
-    "python": "3.12.3",
+    "python": "Python 3.12.3",
     "git": "git version 2.43.0",
     "executor": "chris"
   },
