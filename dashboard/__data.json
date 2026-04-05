@@ -1,18 +1,18 @@
 {
   "projectName": "nightfall++photo-ingress",
-  "commitSha": "6c6b458",
-  "commitFull": "6c6b458119ea6a63b5f29c6e45b4bf4d0f6901fa",
-  "runId": "module6-20260405T215801-1",
-  "lastRunAt": "2026-04-05T21:58:19.196385+00:00",
+  "commitSha": "38f0525",
+  "commitFull": "38f05254a0e748f6e4b83530f9c5aafbea03fb98",
+  "runId": "module6-20260405T221544-1",
+  "lastRunAt": "2026-04-05T22:16:02.205694+00:00",
   "sourceBranch": "main",
   "repoUrl": "https://github.com/artherion77/nightfall-photo-ingress",
   "repoHeadUrl": "https://github.com/artherion77/nightfall-photo-ingress/tree/main",
-  "repoCommitUrl": "https://github.com/artherion77/nightfall-photo-ingress/commit/6c6b458119ea6a63b5f29c6e45b4bf4d0f6901fa",
+  "repoCommitUrl": "https://github.com/artherion77/nightfall-photo-ingress/commit/38f05254a0e748f6e4b83530f9c5aafbea03fb98",
   "runMeta": {
-    "startedAt": "2026-04-05T21:58:19.168594+00:00",
-    "finishedAt": "2026-04-05T21:58:19.196385+00:00",
-    "durationSeconds": 0.0278,
-    "runId": "module6-20260405T215801-1",
+    "startedAt": "2026-04-05T22:16:02.171850+00:00",
+    "finishedAt": "2026-04-05T22:16:02.205694+00:00",
+    "durationSeconds": 0.0338,
+    "runId": "module6-20260405T221544-1",
     "branch": "main"
   },
   "versions": {
@@ -21,18 +21,18 @@
   },
   "coveragePercent": 80.11625090821022,
   "hasCoverage": true,
-  "sparklinePoints": "0.00,42.00 60.00,42.00 120.00,42.00 180.00,42.00",
+  "sparklinePoints": "0.00,42.00 45.00,42.00 90.00,42.00 135.00,42.00 180.00,42.00",
   "coverageTrendSource": "measured_history",
   "locTotal": "37.2k",
   "locDetail": {
-    "total": 37171,
+    "total": 37181,
     "purpose": {
       "production": 11848,
       "test": 16919,
-      "other": 8404
+      "other": 8414
     },
     "technology": {
-      "python": 31814,
+      "python": 31824,
       "svelte": 1956,
       "jsts": 784,
       "bash": 2617,
@@ -2978,6 +2978,14 @@
   },
   "trendRows": [
     {
+      "runId": "module6-20260405T215801-1",
+      "severity": "warning",
+      "warningChecks": 5,
+      "failedChecks": 0,
+      "deltaItems": 16,
+      "generatedAt": "2026-04-05T21:58:19.196372+00:00"
+    },
+    {
       "runId": "module6-20260405T212301-1",
       "severity": "warning",
       "warningChecks": 5,
@@ -3016,14 +3024,6 @@
       "failedChecks": 2,
       "deltaItems": 13,
       "generatedAt": "2026-04-05T20:22:52.024989+00:00"
-    },
-    {
-      "runId": "manual-20260405T184433-1",
-      "severity": "warning",
-      "warningChecks": 7,
-      "failedChecks": 0,
-      "deltaItems": 8,
-      "generatedAt": "2026-04-05T18:44:34.446362+00:00"
     }
   ],
   "collectorStatuses": {
@@ -3045,8 +3045,9 @@
     }
   },
   "buildStamp": {
-    "generatedAt": "2026-04-05T22:01:53.238901+00:00",
-    "commitSha": "6c6b458119ea6a63b5f29c6e45b4bf4d0f6901fa",
-    "runId": "module6-20260405T215801-1"
-  }
+    "generatedAt": "2026-04-05T22:30:15.554437+00:00",
+    "commitSha": "38f05254a0e748f6e4b83530f9c5aafbea03fb98",
+    "runId": "module6-20260405T221544-1"
+  },
+  "lastPublishedAt": "2026-04-05T22:30:19.937066+00:00"
 }
