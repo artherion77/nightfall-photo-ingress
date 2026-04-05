@@ -25,14 +25,14 @@
   "coverageTrendSource": "measured_history",
   "locTotal": "35.6k",
   "locDetail": {
-    "total": 35631,
+    "total": 35639,
     "purpose": {
       "production": 11849,
       "test": 15982,
-      "other": 7800
+      "other": 7808
     },
     "technology": {
-      "python": 30313,
+      "python": 30321,
       "svelte": 1956,
       "jsts": 785,
       "bash": 2577,
@@ -46,6 +46,18 @@
     "maintainability": 56.5529
   },
   "frontendComplexity": 26.8036,
+  "frontendComplexityReference": {
+    "method": "Heuristic cognitive complexity from frontend_collector (branch tokens weighted by nesting depth)",
+    "scale": {
+      "min": 0.0,
+      "max": 60.0
+    },
+    "industryMedian": 26.0,
+    "industryMeanRange": {
+      "min": 12.0,
+      "max": 40.0
+    }
+  },
   "backendCoverageBars": [
     {
       "label": "Unit",
