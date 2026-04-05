@@ -882,6 +882,16 @@ def publish_metrics(repo_root: Path) -> dict[str, Any]:
         raise RuntimeError(f"publish aborted: generated __data.json not found at {generated_dashboard_data}")
     _validate_publish_payload(generated_dashboard_data, run_id, commit_sha)
 
+    published_at = _utc_now_iso()
+    try:
+        dashboard_payload = json.loads(generated_dashboard_data.read_text(encoding="utf-8"))
+    except Exception as exc:
+        raise RuntimeError(f"publish aborted: generated __data.json unreadable: {exc}") from exc
+    if not isinstance(dashboard_payload, dict):
+        raise RuntimeError("publish aborted: generated __data.json must be a JSON object")
+    dashboard_payload["lastPublishedAt"] = published_at
+    generated_dashboard_data.write_text(json.dumps(dashboard_payload, indent=2) + "\n", encoding="utf-8")
+
     if not reused_published_dashboard:
         _copy_tree(_dashboard_static_dir(repo_root), worktree / "dashboard")
     _copy_tree(generated_dashboard_data, worktree / "dashboard" / "__data.json")
@@ -905,7 +915,7 @@ def publish_metrics(repo_root: Path) -> dict[str, Any]:
 
     payload = {
         "status": "published" if (committed and pushed) else ("published_commit_only" if committed else "no_changes"),
-        "published_at": _utc_now_iso(),
+        "published_at": published_at,
         "metrics_branch": branch,
         "run_id": run_id,
         "source_commit": commit_sha,

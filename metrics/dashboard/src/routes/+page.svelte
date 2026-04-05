@@ -7,6 +7,7 @@
     commitFull: 'unknown',
     runId: 'unknown',
     lastRunAt: 'unknown',
+    lastPublishedAt: 'unknown',
     coveragePercent: null,
     hasCoverage: false,
     sparklinePoints: '0,36 180,36',
@@ -67,6 +68,7 @@
   let commitHref = null;
   let footerCommitHref = null;
   let lastRunDisplay = 'unknown';
+  let lastPublishedDisplay = 'unknown';
   let lastRunDetail = '';
   let metricsFolderHref = null;
   let purposeDonut = [];
@@ -185,47 +187,44 @@
   $: footerCommitHref = commitHref;
   $: metricsFolderHref = data.repoHeadUrl ? `${data.repoHeadUrl}/metrics` : null;
 
+  function formatLocalTimestamp(value) {
+    if (typeof value !== 'string' || !value || value === 'unknown') {
+      return 'unknown';
+    }
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      return value;
+    }
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'local';
+    return `${parsed.toLocaleString('en-US')} (${tz})`;
+  }
+
   $: {
-    if (typeof data.lastRunAt !== 'string' || !data.lastRunAt || data.lastRunAt === 'unknown') {
-      lastRunDisplay = 'unknown';
+    lastRunDisplay = formatLocalTimestamp(data.lastRunAt);
+    lastPublishedDisplay = formatLocalTimestamp(data.lastPublishedAt);
+
+    if (lastRunDisplay === 'unknown') {
       lastRunDetail = '';
     } else {
-      const parsed = new Date(data.lastRunAt);
-      if (Number.isNaN(parsed.getTime())) {
-        lastRunDisplay = data.lastRunAt;
-        lastRunDetail = '';
-      } else {
-        const weekday = parsed.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' });
-        const yyyy = String(parsed.getUTCFullYear());
-        const mm = String(parsed.getUTCMonth() + 1).padStart(2, '0');
-        const dd = String(parsed.getUTCDate()).padStart(2, '0');
-        const hh = String(parsed.getUTCHours()).padStart(2, '0');
-        const min = String(parsed.getUTCMinutes()).padStart(2, '0');
-        lastRunDisplay = `${weekday}, ${yyyy}-${mm}-${dd} ${hh}:${min} UTC`;
-
-        const parts = [];
-        parts.push(`Run: ${data.runId}`);
-        parts.push(`Branch: ${data.sourceBranch}`);
-        if (data.commitFull && data.commitFull !== 'unknown') {
-          parts.push(`Commit: ${data.commitFull}`);
-        }
-        if (data.runMeta?.durationSeconds !== null && data.runMeta?.durationSeconds !== undefined) {
-          parts.push(`Duration: ${Number(data.runMeta.durationSeconds).toFixed(2)}s`);
-        }
-        if (data.footer?.host) {
-          parts.push(`Host: ${data.footer.host}`);
-        }
-        if (data.footer?.executor) {
-          parts.push(`Executor: ${data.footer.executor}`);
-        }
-        if (data.footer?.git) {
-          parts.push(data.footer.git);
-        }
-        if (data.footer?.python && data.footer.python !== 'unknown') {
-          parts.push(`Python: ${data.footer.python}`);
-        }
-        lastRunDetail = parts.join(' | ');
+      const parts = [];
+      parts.push(`Run: ${data.runId}`);
+      parts.push(`Branch: ${data.sourceBranch}`);
+      if (data.runMeta?.durationSeconds !== null && data.runMeta?.durationSeconds !== undefined) {
+        parts.push(`Duration: ${Number(data.runMeta.durationSeconds).toFixed(2)}s`);
       }
+      if (data.footer?.host) {
+        parts.push(`Host: ${data.footer.host}`);
+      }
+      if (data.footer?.executor) {
+        parts.push(`Executor: ${data.footer.executor}`);
+      }
+      if (data.footer?.git) {
+        parts.push(data.footer.git);
+      }
+      if (data.footer?.python && data.footer.python !== 'unknown') {
+        parts.push(`Python: ${data.footer.python}`);
+      }
+      lastRunDetail = parts.join(' | ');
     }
   }
 
@@ -429,8 +428,8 @@
           </div>
         {/if}
         <div class="meta-pill tip-anchor" tabindex="0" role="button" aria-label="Show run metadata">
-          <span>Last Run:</span>
-          <span>{lastRunDisplay}</span>
+          <span>Last Run: {lastRunDisplay}</span>
+          <span>Last Published: {lastPublishedDisplay}</span>
           {#if lastRunDetail}
             <span class="tip-bubble">{lastRunDetail}</span>
           {/if}
