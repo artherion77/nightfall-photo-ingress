@@ -7,6 +7,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import threading
 import time
 import uuid
@@ -600,11 +601,259 @@ def make_handler(state: MCPServerState):
     return MCPHandler
 
 
+def _stdio_write(payload: dict[str, Any]) -> None:
+    body = json.dumps(payload).encode("utf-8")
+    header = f"Content-Length: {len(body)}\r\n\r\n".encode("ascii")
+    sys.stdout.buffer.write(header)
+    sys.stdout.buffer.write(body)
+    sys.stdout.buffer.flush()
+
+
+def _stdio_read() -> dict[str, Any] | None:
+    headers: dict[str, str] = {}
+    while True:
+        line = sys.stdin.buffer.readline()
+        if not line:
+            return None
+        if line in (b"\r\n", b"\n"):
+            break
+        key, _, value = line.decode("ascii", errors="replace").partition(":")
+        headers[key.strip().lower()] = value.strip()
+
+    content_length = int(headers.get("content-length", "0") or "0")
+    if content_length <= 0:
+        return None
+    raw = sys.stdin.buffer.read(content_length)
+    if not raw:
+        return None
+    parsed = json.loads(raw.decode("utf-8"))
+    if not isinstance(parsed, dict):
+        return None
+    return parsed
+
+
+def _mcp_tool_list() -> list[dict[str, Any]]:
+    return [
+        {
+            "name": "mcp.exec",
+            "description": "Queue a mapped MCP task from .mcp/model.json mappings.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "task": {"type": "string"},
+                    "args": {"type": "array", "items": {"type": "string"}},
+                    "env": {"type": "object", "additionalProperties": {"type": "string"}},
+                    "cwd": {"type": "string"},
+                    "dependsOn": {"type": "array", "items": {"type": "string"}},
+                    "significantTask": {"type": "boolean"},
+                    "extensionRecommendation": {"type": "string"},
+                },
+                "required": ["task"],
+            },
+        },
+        {
+            "name": "mcp.status",
+            "description": "Get task status by taskId.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {"taskId": {"type": "string"}},
+                "required": ["taskId"],
+            },
+        },
+        {
+            "name": "mcp.log",
+            "description": "Get task log by taskId.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "taskId": {"type": "string"},
+                    "tail": {"type": "integer"},
+                },
+                "required": ["taskId"],
+            },
+        },
+        {
+            "name": "mcp.context",
+            "description": "Return MCP model and runtime context.",
+            "inputSchema": {"type": "object", "properties": {}},
+        },
+        {
+            "name": "mcp.verify",
+            "description": "Run verification commands from .mcp/model.json verifications.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "verify": {"type": "string"},
+                    "target": {"type": "string"},
+                },
+                "required": ["verify", "target"],
+            },
+        },
+        {
+            "name": "mcp.extensions.list",
+            "description": "List extension proposals backlog.",
+            "inputSchema": {"type": "object", "properties": {}},
+        },
+        {
+            "name": "mcp.extensions.propose",
+            "description": "Add an extension proposal.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "recommendation": {"type": "string"},
+                    "relatedTaskId": {"type": "string"},
+                    "task": {"type": "string"},
+                },
+                "required": ["recommendation"],
+            },
+        },
+    ]
+
+
+def _tool_text(payload: dict[str, Any], is_error: bool = False) -> dict[str, Any]:
+    return {
+        "content": [{"type": "text", "text": json.dumps(payload, indent=2)}],
+        "structuredContent": payload,
+        "isError": is_error,
+    }
+
+
+def run_stdio_server(state: MCPServerState) -> None:
+    while True:
+        msg = _stdio_read()
+        if msg is None:
+            break
+
+        method = msg.get("method")
+        msg_id = msg.get("id")
+        params = msg.get("params") if isinstance(msg.get("params"), dict) else {}
+
+        if method == "notifications/initialized":
+            continue
+        if method == "exit":
+            break
+
+        if msg_id is None:
+            continue
+
+        try:
+            if method == "initialize":
+                _stdio_write(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": msg_id,
+                        "result": {
+                            "protocolVersion": "2024-11-05",
+                            "capabilities": {"tools": {}},
+                            "serverInfo": {"name": "nightfall-mcp", "version": "1.0.0"},
+                        },
+                    }
+                )
+                continue
+
+            if method == "tools/list":
+                _stdio_write({"jsonrpc": "2.0", "id": msg_id, "result": {"tools": _mcp_tool_list()}})
+                continue
+
+            if method == "tools/call":
+                tool_name = params.get("name")
+                arguments = params.get("arguments") if isinstance(params.get("arguments"), dict) else {}
+
+                if tool_name == "mcp.exec":
+                    task_name = arguments.get("task")
+                    if not isinstance(task_name, str):
+                        raise ValueError("mcp.exec requires string argument 'task'")
+                    task_id = state.enqueue_task(
+                        task_name=task_name,
+                        args=arguments.get("args") if isinstance(arguments.get("args"), list) else None,
+                        env=arguments.get("env") if isinstance(arguments.get("env"), dict) else None,
+                        cwd=arguments.get("cwd") if isinstance(arguments.get("cwd"), str) else None,
+                        depends_on=arguments.get("dependsOn") if isinstance(arguments.get("dependsOn"), list) else None,
+                        significant_task=bool(arguments.get("significantTask", False)),
+                        extension_recommendation=(
+                            arguments.get("extensionRecommendation")
+                            if isinstance(arguments.get("extensionRecommendation"), str)
+                            else None
+                        ),
+                    )
+                    result = _tool_text({"taskId": task_id, "status": "queued"})
+                elif tool_name == "mcp.status":
+                    task_id = arguments.get("taskId")
+                    if not isinstance(task_id, str):
+                        raise ValueError("mcp.status requires string argument 'taskId'")
+                    status_payload = state.status(task_id)
+                    if status_payload is None:
+                        result = _tool_text({"error": "taskId not found"}, is_error=True)
+                    else:
+                        result = _tool_text(status_payload)
+                elif tool_name == "mcp.log":
+                    task_id = arguments.get("taskId")
+                    if not isinstance(task_id, str):
+                        raise ValueError("mcp.log requires string argument 'taskId'")
+                    tail = arguments.get("tail")
+                    log_text = state.read_log(task_id, tail=tail if isinstance(tail, int) else None)
+                    if log_text is None:
+                        result = _tool_text({"error": "log not found"}, is_error=True)
+                    else:
+                        result = _tool_text({"taskId": task_id, "log": log_text})
+                elif tool_name == "mcp.context":
+                    result = _tool_text(state.context())
+                elif tool_name == "mcp.verify":
+                    verify_key = arguments.get("verify")
+                    target = arguments.get("target")
+                    if not isinstance(verify_key, str) or not isinstance(target, str):
+                        raise ValueError("mcp.verify requires string arguments 'verify' and 'target'")
+                    result = _tool_text(state.verify(verify_key, target))
+                elif tool_name == "mcp.extensions.list":
+                    result = _tool_text({"extensions": state.extensions})
+                elif tool_name == "mcp.extensions.propose":
+                    recommendation = arguments.get("recommendation")
+                    if not isinstance(recommendation, str) or not recommendation.strip():
+                        raise ValueError("mcp.extensions.propose requires non-empty string 'recommendation'")
+                    related_task_id = arguments.get("relatedTaskId")
+                    task_name = arguments.get("task")
+                    result = _tool_text(
+                        state.propose_extension(
+                            recommendation=recommendation.strip(),
+                            related_task_id=related_task_id if isinstance(related_task_id, str) else None,
+                            task_name=task_name if isinstance(task_name, str) else None,
+                            source="manual",
+                        )
+                    )
+                else:
+                    raise ValueError(f"Unknown tool: {tool_name}")
+
+                _stdio_write({"jsonrpc": "2.0", "id": msg_id, "result": result})
+                continue
+
+            if method == "shutdown":
+                _stdio_write({"jsonrpc": "2.0", "id": msg_id, "result": None})
+                continue
+
+            _stdio_write(
+                {
+                    "jsonrpc": "2.0",
+                    "id": msg_id,
+                    "error": {"code": -32601, "message": f"Method not found: {method}"},
+                }
+            )
+        except Exception as exc:
+            _stdio_write(
+                {
+                    "jsonrpc": "2.0",
+                    "id": msg_id,
+                    "error": {"code": -32000, "message": str(exc)},
+                }
+            )
+
+
 def parse_args() -> argparse.Namespace:
+    script_root = Path(__file__).resolve().parent
     parser = argparse.ArgumentParser(description="Nightfall MCP orchestrator server")
+    parser.add_argument("--transport", choices=["http", "stdio"], default=os.environ.get("MCP_TRANSPORT", "http"))
     parser.add_argument("--host", default=os.environ.get("MCP_HOST", "127.0.0.1"))
     parser.add_argument("--port", type=int, default=int(os.environ.get("MCP_PORT", "8765")))
-    parser.add_argument("--workspace", default=os.environ.get("MCP_WORKSPACE", "."))
+    parser.add_argument("--workspace", default=os.environ.get("MCP_WORKSPACE", str(script_root)))
     parser.add_argument("--model", default=os.environ.get("MCP_MODEL_PATH", ".mcp/model.json"))
     return parser.parse_args()
 
@@ -614,6 +863,10 @@ def main() -> None:
     workspace_root = Path(args.workspace).resolve()
     model_path = (workspace_root / args.model).resolve()
     state = MCPServerState(workspace_root=workspace_root, model_path=model_path)
+    if args.transport == "stdio":
+        run_stdio_server(state)
+        return
+
     handler = make_handler(state)
     server = ThreadingHTTPServer((args.host, args.port), handler)
     print(f"MCP server listening on http://{args.host}:{args.port}")

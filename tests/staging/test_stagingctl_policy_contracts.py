@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 
-STAGINGCTL_PATH = Path(__file__).resolve().parents[2] / "staging" / "stagingctl"
+STAGINGCTL_PATH = Path(__file__).resolve().parents[2] / "dev" / "bin" / "stagingctl"
 SETUP_PATH = Path(__file__).resolve().parents[2] / "staging" / "container" / "setup.sh"
 README_PATH = Path(__file__).resolve().parents[2] / "staging" / "README.md"
 

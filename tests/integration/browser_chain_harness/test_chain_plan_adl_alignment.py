@@ -29,7 +29,7 @@ def test_adl_variant_b_matches_plan_and_consolidation() -> None:
 def test_variant_b_contract_is_backed_by_real_devctl_and_mcp_mappings() -> None:
     root = Path(__file__).resolve().parents[3]
 
-    devctl = _read(root / "dev" / "devctl")
+    devctl = _read(root / "dev" / "bin" / "devctl")
     model = json.loads(_read(root / ".mcp" / "model.json"))
 
     assert "cmd_test_web_unit" in devctl
