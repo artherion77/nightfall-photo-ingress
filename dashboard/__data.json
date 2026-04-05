@@ -52,6 +52,206 @@
     "moderate": 54,
     "high": 24
   },
+  "complexityBreakdownDetail": {
+    "high": {
+      "category": "high",
+      "totalModules": 15,
+      "topModules": [
+        {
+          "module": "webui/src/lib/stores/blocklist.svelte.js",
+          "type": "frontend",
+          "score": 151.0,
+          "category": "high"
+        },
+        {
+          "module": "webui/src/lib/stores/stagingQueue.svelte.js",
+          "type": "frontend",
+          "score": 128.0,
+          "category": "high"
+        },
+        {
+          "module": "webui/src/routes/blocklist/+page.svelte",
+          "type": "frontend",
+          "score": 127.0,
+          "category": "high"
+        },
+        {
+          "module": "webui/src/lib/stores/health.svelte.js",
+          "type": "frontend",
+          "score": 95.0,
+          "category": "high"
+        },
+        {
+          "module": "webui/src/routes/staging/+page.svelte",
+          "type": "frontend",
+          "score": 93.0,
+          "category": "high"
+        },
+        {
+          "module": "webui/src/lib/stores/auditLog.svelte.js",
+          "type": "frontend",
+          "score": 91.0,
+          "category": "high"
+        },
+        {
+          "module": "webui/src/routes/audit/+page.svelte",
+          "type": "frontend",
+          "score": 90.0,
+          "category": "high"
+        },
+        {
+          "module": "webui/src/lib/components/blocklist/BlockRuleForm.svelte",
+          "type": "frontend",
+          "score": 77.0,
+          "category": "high"
+        },
+        {
+          "module": "webui/src/lib/components/staging/PhotoWheel.svelte",
+          "type": "frontend",
+          "score": 56.0,
+          "category": "high"
+        },
+        {
+          "module": "webui/src/lib/components/layout/AppFooter.svelte",
+          "type": "frontend",
+          "score": 53.0,
+          "category": "high"
+        }
+      ]
+    },
+    "moderate": {
+      "category": "moderate",
+      "totalModules": 33,
+      "topModules": [
+        {
+          "module": "webui/src/lib/components/blocklist/BlockRuleList.svelte",
+          "type": "frontend",
+          "score": 38.0,
+          "category": "moderate"
+        },
+        {
+          "module": "webui/tests/component/KpiCard.test.ts",
+          "type": "frontend",
+          "score": 35.0,
+          "category": "moderate"
+        },
+        {
+          "module": "webui/src/lib/components/layout/AppHeader.svelte",
+          "type": "frontend",
+          "score": 30.0,
+          "category": "moderate"
+        },
+        {
+          "module": "webui/src/lib/api/client.ts",
+          "type": "frontend",
+          "score": 29.0,
+          "category": "moderate"
+        },
+        {
+          "module": "webui/src/lib/api/audit.ts",
+          "type": "frontend",
+          "score": 24.0,
+          "category": "moderate"
+        },
+        {
+          "module": "webui/src/lib/api/triage.ts",
+          "type": "frontend",
+          "score": 23.0,
+          "category": "moderate"
+        },
+        {
+          "module": "webui/src/lib/components/staging/TriageControls.svelte",
+          "type": "frontend",
+          "score": 22.0,
+          "category": "moderate"
+        },
+        {
+          "module": "webui/src/lib/api/blocklist.ts",
+          "type": "frontend",
+          "score": 20.0,
+          "category": "moderate"
+        },
+        {
+          "module": "webui/src/lib/components/common/LoadMoreButton.svelte",
+          "type": "frontend",
+          "score": 20.0,
+          "category": "moderate"
+        },
+        {
+          "module": "tests/unit/test_status_export.py",
+          "type": "backend",
+          "score": 9.0,
+          "category": "moderate"
+        }
+      ]
+    },
+    "low": {
+      "category": "low",
+      "totalModules": 171,
+      "topModules": [
+        {
+          "module": "webui/src/lib/stores/config.svelte.js",
+          "type": "frontend",
+          "score": 19.0,
+          "category": "low"
+        },
+        {
+          "module": "webui/src/lib/components/common/KpiCard.svelte",
+          "type": "frontend",
+          "score": 17.0,
+          "category": "low"
+        },
+        {
+          "module": "webui/src/lib/components/staging/PhotoCard.svelte",
+          "type": "frontend",
+          "score": 16.0,
+          "category": "low"
+        },
+        {
+          "module": "webui/src/lib/components/common/ConfirmDialog.svelte",
+          "type": "frontend",
+          "score": 15.0,
+          "category": "low"
+        },
+        {
+          "module": "webui/src/lib/components/common/EmptyState.svelte",
+          "type": "frontend",
+          "score": 12.0,
+          "category": "low"
+        },
+        {
+          "module": "webui/src/lib/components/staging/ItemMetaPanel.svelte",
+          "type": "frontend",
+          "score": 12.0,
+          "category": "low"
+        },
+        {
+          "module": "webui/src/lib/stores/toast.svelte.js",
+          "type": "frontend",
+          "score": 12.0,
+          "category": "low"
+        },
+        {
+          "module": "webui/src/lib/components/audit/AuditTimeline.svelte",
+          "type": "frontend",
+          "score": 10.0,
+          "category": "low"
+        },
+        {
+          "module": "webui/src/lib/components/dashboard/HealthBar.svelte",
+          "type": "frontend",
+          "score": 10.0,
+          "category": "low"
+        },
+        {
+          "module": "webui/src/lib/components/common/ActionButton.svelte",
+          "type": "frontend",
+          "score": 8.0,
+          "category": "low"
+        }
+      ]
+    }
+  },
   "frontendLocRows": [
     {
       "name": "webui/src/lib/stores/blocklist.svelte.js",
@@ -208,6 +408,24 @@
       19
     ]
   ],
+  "pythonComplexityReference": {
+    "cyclomatic": {
+      "method": "McCabe cyclomatic complexity via radon",
+      "scale": {
+        "min": 1.0,
+        "max": 20.0
+      },
+      "industryMedian": 4.5
+    },
+    "maintainability": {
+      "method": "Maintainability Index via radon",
+      "scale": {
+        "min": 0.0,
+        "max": 100.0
+      },
+      "industryMedian": 65.0
+    }
+  },
   "backendGraph": {
     "nodes": [
       {
