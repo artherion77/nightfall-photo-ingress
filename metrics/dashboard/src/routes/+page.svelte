@@ -43,7 +43,7 @@
       industryMedian: 26,
       industryMeanRange: { min: 12, max: 40 },
     },
-    system: { apiSurface: { endpoints: 0, schemas: 0 }, bundleSizeKb: null, openapiScore: null },
+    system: { apiSurface: { endpoints: 0, schemas: 0 }, bundleSizeKb: null, bundleSizeDetail: null, openapiScore: null },
     footer: { host: 'unknown', python: 'unknown', git: 'unknown', executor: 'unknown' },
     trendRows: [],
     sourceBranch: 'main',
@@ -85,6 +85,17 @@
   let maintainabilityProjectColor = '#4a8f4b';
   let maintainabilityMedianColor = '#d8b33f';
   let frontendProjectColor = '#4a8f4b';
+  let bundleRawKb = null;
+  let bundleGzipKb = null;
+  let bundleBrotliKb = null;
+  let bundleRawDisplay = 'N/A';
+  let bundleGzipDisplay = 'N/A';
+  let bundleBrotliDisplay = 'N/A';
+  let bundleSubLabel = 'Raw: N/A';
+  let bundleProjectPct = 0;
+  let bundleIndustryMedianPct = 25;
+  let bundleProjectColor = '#4a8f4b';
+  let bundleRelation = 'near median';
   let activeComplexitySegment = null;
   let complexityTotalModules = 0;
   let backendNodeHover = null;
@@ -267,6 +278,20 @@
     return '#4a8f4b';
   }
 
+  function bundleMarkerColor(rawKb) {
+    if (typeof rawKb !== 'number' || !Number.isFinite(rawKb)) return '#d8b33f';
+    if (rawKb < 250) return '#4a8f4b';
+    if (rawKb <= 500) return '#d8b33f';
+    return '#cc3f38';
+  }
+
+  function bundleClassification(rawKb) {
+    if (typeof rawKb !== 'number' || !Number.isFinite(rawKb)) return 'near median';
+    if (rawKb < 250) return 'below median';
+    if (rawKb <= 500) return 'near median';
+    return 'above warning threshold';
+  }
+
   function graphNodeTooltip(detail, graphType) {
     if (!detail) {
       return `Module: unknown\nType: ${graphType}\nFan-in/Fan-out: n/a\nCycle: n/a`;
@@ -315,6 +340,29 @@
     complexityTotalModules = Number(detail.high?.totalModules || 0)
       + Number(detail.moderate?.totalModules || 0)
       + Number(detail.low?.totalModules || 0);
+  }
+
+  $: {
+    const detail = data.system?.bundleSizeDetail;
+    const raw = typeof detail?.totalKb === 'number'
+      ? detail.totalKb
+      : (typeof data.system?.bundleSizeKb === 'number' ? data.system.bundleSizeKb : null);
+    const gzip = typeof detail?.gzipKb === 'number' ? detail.gzipKb : null;
+    const brotli = typeof detail?.brotliKb === 'number' ? detail.brotliKb : null;
+
+    bundleRawKb = raw;
+    bundleGzipKb = gzip;
+    bundleBrotliKb = brotli;
+
+    bundleRawDisplay = typeof bundleRawKb === 'number' ? bundleRawKb.toFixed(1) : 'N/A';
+    bundleGzipDisplay = typeof bundleGzipKb === 'number' ? bundleGzipKb.toFixed(1) : 'N/A';
+    bundleBrotliDisplay = typeof bundleBrotliKb === 'number' ? bundleBrotliKb.toFixed(1) : 'N/A';
+    bundleSubLabel = `Raw: ${bundleRawDisplay} KB`;
+
+    bundleProjectPct = metricToScalePercent(bundleRawKb, 0, 1000);
+    bundleIndustryMedianPct = metricToScalePercent(250, 0, 1000);
+    bundleProjectColor = bundleMarkerColor(bundleRawKb);
+    bundleRelation = bundleClassification(bundleRawKb);
   }
 
   $: {
@@ -392,7 +440,7 @@
 
     <section class="cards-row">
       <article class="card metric-card">
-        <h2>Python Test Coverage <span class="tip-anchor hint-inline" tabindex="0" role="button" aria-label="Coverage sparkline source details">i<span class="tip-bubble">Measured via pytest + pytest-cov with coverage.py aggregation (unit suite baseline).<br />Coverage ranking hint:<br />50-60%: risky / weak<br />60-70%: industry median<br />70-80%: good<br />80-90%: very good<br />&gt;90%: exceptional / library-grade</span></span></h2>
+        <h2>Python Test Coverage <span class="tip-anchor hint-inline" tabindex="0" role="button" aria-label="Coverage sparkline source details">i<span class="tip-bubble">Measured via pytest + pytest-cov with coverage.py aggregation (unit suite baseline).<br />Coverage ranking hint:<br />&lt;50%: risky<br />50-60%: weak<br />60-70%: industry median<br />70-80%: good<br />80-90%: very good<br />&gt;90%: exceptional</span></span></h2>
         <div class="hero-value">{coverageText}</div>
         <svg viewBox="0 0 180 42" aria-label="Coverage sparkline" class="sparkline">
           <polyline points={data.sparklinePoints} fill="none" stroke="#9bf77a" stroke-width="2.5" stroke-linecap="round" />
@@ -738,7 +786,43 @@
 
         <article class="card panel">
           <h4>Bundle Size</h4>
-          <div class="hero-value compact"><strong>{data.system.bundleSizeKb !== null ? `${data.system.bundleSizeKb} KB` : 'N/A'}</strong></div>
+          <div class="hero-value compact">
+            <strong>
+              <span class="tip-anchor">
+                {bundleRawDisplay !== 'N/A' ? `${bundleRawDisplay} KB` : 'N/A'}
+                <span class="tip-bubble scale-tip">
+                  <strong>Bundle Size (Production Build)</strong><br />
+                  Measured size of the frontend production bundle after tree-shaking and code-splitting.<br />
+                  <br />
+                  This metric reflects the amount of JavaScript delivered to the browser and primarily impacts:<br />
+                  • initial load time<br />
+                  • time-to-interactive on cold cache<br />
+                  <br />
+                  Values shown:<br />
+                  • Raw: {bundleRawDisplay} KB (uncompressed build output)<br />
+                  • Gzip: {bundleGzipDisplay} KB (typical network transfer)<br />
+                  • Brotli: {bundleBrotliDisplay} KB (modern browser transfer)<br />
+                  <br />
+                  Industry reference (frontend applications):<br />
+                  • Median raw bundle size: ~250–300 KB<br />
+                  • Median gzip size: ~90–120 KB<br />
+                  • Warning threshold: &gt;500 KB raw or &gt;200 KB gzip<br />
+                  <br />
+                  Lower values generally improve load performance, especially on mobile and low-bandwidth connections.<br />
+                  <br />
+                  Scale anchors: 0 KB (minimal), 250 KB (industry median), 500 KB (warning threshold), 1000 KB (critical).<br />
+                  Color semantics: green below median, yellow near median, red above warning threshold.<br />
+                  <br />Classification: {bundleRelation}
+                  <span class="scale-bar cyclomatic">
+                    <span class="marker project" style={`left:${bundleProjectPct}%; border-top-color:${bundleProjectColor};`}></span>
+                    <span class="marker median" style={`left:${bundleIndustryMedianPct}%; border-bottom-color:#d8b33f;`}></span>
+                  </span>
+                  <span class="scale-legend">▼ Project value &nbsp; ▲ Industry median (250 KB)</span>
+                </span>
+              </span>
+            </strong>
+          </div>
+          <p class="panel-subtle">{bundleSubLabel}{#if bundleGzipDisplay !== 'N/A' || bundleBrotliDisplay !== 'N/A'} · Gzip: {bundleGzipDisplay} KB · Brotli: {bundleBrotliDisplay} KB{/if}</p>
         </article>
 
         <article class="card panel">
