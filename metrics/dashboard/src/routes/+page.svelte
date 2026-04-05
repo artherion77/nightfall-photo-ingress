@@ -76,11 +76,10 @@
   let maintainabilityProjectPct = 0;
   let maintainabilityMedianPct = 0;
   let frontendProjectPct = 0;
-  let frontendRangeMinPct = 0;
-  let frontendRangeMaxPct = 0;
+  let frontendIndustryMeanPct = 0;
   let cyclomaticRelation = 'near median';
   let maintainabilityRelation = 'near median';
-  let frontendRelation = 'within typical range';
+  let frontendRelation = 'near industry mean';
   let cyclomaticProjectColor = '#4a8f4b';
   let cyclomaticMedianColor = '#d8b33f';
   let maintainabilityProjectColor = '#4a8f4b';
@@ -246,13 +245,14 @@
     return 'near median';
   }
 
-  function classifyAgainstRange(value, min, max) {
-    if (typeof value !== 'number' || !Number.isFinite(value) || !Number.isFinite(min) || !Number.isFinite(max)) {
-      return 'within typical range';
+  function classifyAgainstMean(value, mean) {
+    if (typeof value !== 'number' || !Number.isFinite(value) || !Number.isFinite(mean)) {
+      return 'near industry mean';
     }
-    if (value < min) return 'below typical range';
-    if (value > max) return 'above typical range';
-    return 'within typical range';
+    const threshold = Math.max(0.5, Math.abs(mean) * 0.1);
+    if (value < mean - threshold) return 'below industry mean';
+    if (value > mean + threshold) return 'above industry mean';
+    return 'near industry mean';
   }
 
   function cyclomaticGradientColor(pct) {
@@ -301,17 +301,14 @@
 
     const frontendRef = data.frontendComplexityReference || {
       scale: { min: 0, max: 60 },
-      industryMedian: 26,
-      industryMeanRange: { min: 12, max: 40 },
+      industryMedian: 5,
     };
     const frontendMin = Number(frontendRef.scale?.min ?? 0);
     const frontendMax = Number(frontendRef.scale?.max ?? 60);
-    const frontendRangeMin = Number(frontendRef.industryMeanRange?.min ?? 12);
-    const frontendRangeMax = Number(frontendRef.industryMeanRange?.max ?? 40);
+    const frontendIndustryMean = 5.0;
     frontendProjectPct = metricToScalePercent(data.frontendComplexity, frontendMin, frontendMax);
-    frontendRangeMinPct = metricToScalePercent(frontendRangeMin, frontendMin, frontendMax);
-    frontendRangeMaxPct = metricToScalePercent(frontendRangeMax, frontendMin, frontendMax);
-    frontendRelation = classifyAgainstRange(data.frontendComplexity, frontendRangeMin, frontendRangeMax);
+    frontendIndustryMeanPct = metricToScalePercent(frontendIndustryMean, frontendMin, frontendMax);
+    frontendRelation = classifyAgainstMean(data.frontendComplexity, frontendIndustryMean);
     frontendProjectColor = cyclomaticGradientColor(frontendProjectPct);
 
     const detail = data.complexityBreakdownDetail || {};
@@ -395,7 +392,7 @@
 
     <section class="cards-row">
       <article class="card metric-card">
-        <h2>Python Test Coverage <span class="tip-anchor hint-inline" tabindex="0" role="button" aria-label="Coverage sparkline source details">i<span class="tip-bubble">Sparkline source: synthetic trend heuristic in Module 5 baseline. It is not measured historical coverage yet.</span></span></h2>
+        <h2>Python Test Coverage <span class="tip-anchor hint-inline" tabindex="0" role="button" aria-label="Coverage sparkline source details">i<span class="tip-bubble">Measured via pytest + pytest-cov with coverage.py aggregation (unit suite baseline).<br />Coverage ranking hint:<br />50-60%: risky / weak<br />60-70%: industry median<br />70-80%: good<br />80-90%: very good<br />&gt;90%: exceptional / library-grade</span></span></h2>
         <div class="hero-value">{coverageText}</div>
         <svg viewBox="0 0 180 42" aria-label="Coverage sparkline" class="sparkline">
           <polyline points={data.sparklinePoints} fill="none" stroke="#9bf77a" stroke-width="2.5" stroke-linecap="round" />
@@ -451,18 +448,16 @@
                 <span class="tip-bubble scale-tip">
                   <strong>{data.frontendComplexityReference.method}</strong><br />
                   Scale: {data.frontendComplexityReference.scale.min}-{data.frontendComplexityReference.scale.max} (lower is simpler).<br />
-                  Industry mean (typical frontend projects): {data.frontendComplexityReference.industryMedian}<br />
-                  Industry mean range (typical frontend projects): {data.frontendComplexityReference.industryMeanRange.min}-{data.frontendComplexityReference.industryMeanRange.max}
+                  Per-file industry mean (typical frontend, JS/TS/Svelte): 5.0
                   {#if data.complexityCard?.frontend?.source}<br />Source: {data.complexityCard.frontend.source}{/if}
                   {#if data.complexityCard?.frontend?.status}<br />Status: {data.complexityCard.frontend.status}{/if}
                   {#if data.complexityCard?.frontend?.parser_version_label}<br />Parser: {data.complexityCard.frontend.parser_version_label}{/if}
                   <br />Classification: {frontendRelation}
                   <span class="scale-bar cyclomatic">
                     <span class="marker project" style={`left:${frontendProjectPct}%; border-top-color:${frontendProjectColor};`}></span>
-                    <span class="marker median" style={`left:${frontendRangeMinPct}%;`}></span>
-                    <span class="marker median" style={`left:${frontendRangeMaxPct}%;`}></span>
+                    <span class="marker median" style={`left:${frontendIndustryMeanPct}%;`}></span>
                   </span>
-                  <span class="scale-legend">▼ Project value &nbsp; ▲▲ Industry mean range</span>
+                  <span class="scale-legend">▼ Project value &nbsp; ▲ Industry mean</span>
                 </span>
               </span>
             </dt>
