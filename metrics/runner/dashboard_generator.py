@@ -363,6 +363,76 @@ def _dashboard_payload(repo_root: Path, manifest: dict[str, Any], metrics: dict[
         "high": max(0, round(_as_number((backend_complexity.get("cyclomatic") or {}).get("max"), 0) / 2)),
     }
 
+    backend_complexity_per_file = (backend_complexity.get("per_file") or {}) if isinstance(backend_complexity, dict) else {}
+    frontend_complexity_per_file = (frontend_cognitive.get("per_file") or {}) if isinstance(frontend_cognitive, dict) else {}
+
+    def _complexity_category(source: str, score: float) -> str:
+        if source == "backend":
+            if score >= 10.0:
+                return "high"
+            if score >= 5.0:
+                return "moderate"
+            return "low"
+        if score >= 40.0:
+            return "high"
+        if score >= 20.0:
+            return "moderate"
+        return "low"
+
+    complexity_items: list[dict[str, Any]] = []
+    if isinstance(backend_complexity_per_file, dict):
+        for path, payload in backend_complexity_per_file.items():
+            if not isinstance(payload, dict):
+                continue
+            score = _as_number(payload.get("cyclomatic_avg"), None)
+            if score is None:
+                continue
+            complexity_items.append({
+                "module": str(path),
+                "type": "backend",
+                "score": round(float(score), 2),
+                "category": _complexity_category("backend", float(score)),
+            })
+    if isinstance(frontend_complexity_per_file, dict):
+        for path, score_raw in frontend_complexity_per_file.items():
+            score = _as_number(score_raw, None)
+            if score is None:
+                continue
+            complexity_items.append({
+                "module": str(path),
+                "type": "frontend",
+                "score": round(float(score), 2),
+                "category": _complexity_category("frontend", float(score)),
+            })
+
+    def _top_modules(category: str) -> dict[str, Any]:
+        bucket = [item for item in complexity_items if item.get("category") == category]
+        bucket.sort(key=lambda item: item.get("score", 0), reverse=True)
+        return {
+            "category": category,
+            "totalModules": len(bucket),
+            "topModules": bucket[:10],
+        }
+
+    complexity_breakdown_detail = {
+        "high": _top_modules("high"),
+        "moderate": _top_modules("moderate"),
+        "low": _top_modules("low"),
+    }
+
+    python_complexity_reference = {
+        "cyclomatic": {
+            "method": "McCabe cyclomatic complexity via radon",
+            "scale": {"min": 1.0, "max": 20.0},
+            "industryMedian": 4.5,
+        },
+        "maintainability": {
+            "method": "Maintainability Index via radon",
+            "scale": {"min": 0.0, "max": 100.0},
+            "industryMedian": 65.0,
+        },
+    }
+
     backend_dep_graph = (backend_metrics.get("dependency_graph") or {}) if isinstance(backend_metrics, dict) else {}
     backend_dep_nodes_list = backend_dep_graph.get("nodes", []) if isinstance(backend_dep_graph, dict) else []
     backend_node_details_raw = backend_dep_graph.get("node_details", []) if isinstance(backend_dep_graph, dict) else []
@@ -460,8 +530,10 @@ def _dashboard_payload(repo_root: Path, manifest: dict[str, Any], metrics: dict[
             {"label": "Flow", "value": max(0, min(100, (coverage_percent - 9) if coverage_percent is not None else 0))},
         ],
         "complexityMix": complexity_mix,
+        "complexityBreakdownDetail": complexity_breakdown_detail,
         "frontendLocRows": frontend_rows,
         "heatmap": heatmap,
+        "pythonComplexityReference": python_complexity_reference,
         "backendGraph": {
             "nodes": backend_graph_nodes,
             "edges": _edges(len(backend_graph_nodes)),

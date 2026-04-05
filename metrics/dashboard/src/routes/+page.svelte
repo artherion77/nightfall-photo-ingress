@@ -19,10 +19,19 @@
       { label: 'Flow', value: 0 },
     ],
     complexityMix: { low: 0, moderate: 0, high: 0 },
+    complexityBreakdownDetail: {
+      high: { category: 'high', totalModules: 0, topModules: [] },
+      moderate: { category: 'moderate', totalModules: 0, topModules: [] },
+      low: { category: 'low', totalModules: 0, topModules: [] },
+    },
     frontendLocRows: [],
     heatmap: Array.from({ length: 8 }, () => Array.from({ length: 14 }, () => 0)),
-    backendGraph: { nodes: [], edges: [] },
-    frontendGraph: { nodes: [], edges: [] },
+    backendGraph: { nodes: [], edges: [], nodeDetails: [] },
+    frontendGraph: { nodes: [], edges: [], nodeDetails: [] },
+    pythonComplexityReference: {
+      cyclomatic: { method: 'McCabe cyclomatic complexity via radon', scale: { min: 1, max: 20 }, industryMedian: 4.5 },
+      maintainability: { method: 'Maintainability Index via radon', scale: { min: 0, max: 100 }, industryMedian: 65 },
+    },
     system: { apiSurface: { endpoints: 0, schemas: 0 }, bundleSizeKb: null, openapiScore: null },
     footer: { host: 'unknown', python: 'unknown', git: 'unknown', executor: 'unknown' },
     trendRows: [],
@@ -51,6 +60,10 @@
   let tsjsLabelDetail = 'TypeScript / JavaScript';
   let pythonLocDetail = 'Python';
   let metricsFolderHref = null;
+  let cyclomaticProjectPct = 0;
+  let cyclomaticMedianPct = 0;
+  let maintainabilityProjectPct = 0;
+  let maintainabilityMedianPct = 0;
 
   onMount(async () => {
     try {
@@ -202,6 +215,40 @@
     if (value >= 6) return '#9ebf3e';
     return '#4a8f4b';
   }
+
+  function metricToScalePercent(value, min, max) {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      return 0;
+    }
+    const span = Math.max(1, max - min);
+    const clamped = Math.min(max, Math.max(min, value));
+    return ((clamped - min) / span) * 100;
+  }
+
+  function graphNodeTooltip(detail, graphType) {
+    if (!detail) {
+      return `Module: unknown\nType: ${graphType}\nFan-in/Fan-out: n/a\nCycle: n/a`;
+    }
+    const modulePath = detail.path || detail.module || 'unknown';
+    const fanIn = typeof detail.fan_in === 'number' ? detail.fan_in : 'n/a';
+    const fanOut = typeof detail.fan_out === 'number' ? detail.fan_out : 'n/a';
+    const cycle = detail.in_cycle ? 'yes' : 'no';
+    return `Module: ${modulePath}\nType: ${graphType}\nFan-in: ${fanIn} / Fan-out: ${fanOut}\nCycle: ${cycle}`;
+  }
+
+  $: {
+    const cycloRef = data.pythonComplexityReference?.cyclomatic || { scale: { min: 1, max: 20 }, industryMedian: 4.5 };
+    const cycloMin = Number(cycloRef.scale?.min ?? 1);
+    const cycloMax = Number(cycloRef.scale?.max ?? 20);
+    cyclomaticProjectPct = metricToScalePercent(data.complexityCard?.cyclomatic, cycloMin, cycloMax);
+    cyclomaticMedianPct = metricToScalePercent(Number(cycloRef.industryMedian ?? 4.5), cycloMin, cycloMax);
+
+    const miRef = data.pythonComplexityReference?.maintainability || { scale: { min: 0, max: 100 }, industryMedian: 65 };
+    const miMin = Number(miRef.scale?.min ?? 0);
+    const miMax = Number(miRef.scale?.max ?? 100);
+    maintainabilityProjectPct = metricToScalePercent(data.complexityCard?.maintainability, miMin, miMax);
+    maintainabilityMedianPct = metricToScalePercent(Number(miRef.industryMedian ?? 65), miMin, miMax);
+  }
 </script>
 
 <svelte:head>
@@ -279,8 +326,42 @@
       <article class="card metric-card">
         <h2>Python Complexity</h2>
         <dl class="kv">
-          <div><dt>Cyclomatic</dt><dd>{cyclomaticText}</dd></div>
-          <div><dt>Maintainability</dt><dd>{maintainabilityText}</dd></div>
+          <div>
+            <dt>
+              <span class="tip-anchor">
+                Cyclomatic
+                <span class="tip-bubble scale-tip">
+                  <strong>Cyclomatic Complexity (McCabe via radon)</strong><br />
+                  Scale: {data.pythonComplexityReference.cyclomatic.scale.min}-{data.pythonComplexityReference.cyclomatic.scale.max} (lower is simpler).<br />
+                  Industry median (typical Python projects): {data.pythonComplexityReference.cyclomatic.industryMedian}
+                  <span class="scale-bar">
+                    <span class="marker project" style={`left:${cyclomaticProjectPct}%`}></span>
+                    <span class="marker median" style={`left:${cyclomaticMedianPct}%`}></span>
+                  </span>
+                  <span class="scale-legend">▲ Project value &nbsp; ▲ Industry median</span>
+                </span>
+              </span>
+            </dt>
+            <dd>{cyclomaticText}</dd>
+          </div>
+          <div>
+            <dt>
+              <span class="tip-anchor">
+                Maintainability
+                <span class="tip-bubble scale-tip">
+                  <strong>Maintainability Index (radon)</strong><br />
+                  Scale: {data.pythonComplexityReference.maintainability.scale.min}-{data.pythonComplexityReference.maintainability.scale.max} (higher is better).<br />
+                  Industry median (typical Python projects): {data.pythonComplexityReference.maintainability.industryMedian}
+                  <span class="scale-bar">
+                    <span class="marker project" style={`left:${maintainabilityProjectPct}%`}></span>
+                    <span class="marker median" style={`left:${maintainabilityMedianPct}%`}></span>
+                  </span>
+                  <span class="scale-legend">▲ Project value &nbsp; ▲ Industry median</span>
+                </span>
+              </span>
+            </dt>
+            <dd>{maintainabilityText}</dd>
+          </div>
         </dl>
       </article>
 
@@ -331,7 +412,45 @@
         </article>
 
         <article class="card panel">
-          <h4>Complexity Distribution</h4>
+          <h4>
+            Complexity Breakdown
+            <span class="tip-anchor hint-inline" tabindex="0" role="button" aria-label="Complexity contribution details">
+              i
+              <span class="tip-bubble complexity-breakdown-tip">
+                <strong>Top 10 / {data.complexityBreakdownDetail.high.totalModules} modules contributing to complexity</strong>
+                <div class="tip-section">
+                  <em>High</em>
+                  {#if data.complexityBreakdownDetail.high.topModules.length === 0}
+                    <div>None</div>
+                  {:else}
+                    {#each data.complexityBreakdownDetail.high.topModules as mod}
+                      <div>{mod.module} ({mod.type}, {mod.score})</div>
+                    {/each}
+                  {/if}
+                </div>
+                <div class="tip-section">
+                  <strong>Top 10 / {data.complexityBreakdownDetail.moderate.totalModules} modules contributing to complexity</strong>
+                  {#if data.complexityBreakdownDetail.moderate.topModules.length === 0}
+                    <div>None</div>
+                  {:else}
+                    {#each data.complexityBreakdownDetail.moderate.topModules as mod}
+                      <div>{mod.module} ({mod.type}, {mod.score})</div>
+                    {/each}
+                  {/if}
+                </div>
+                <div class="tip-section">
+                  <strong>Top 10 / {data.complexityBreakdownDetail.low.totalModules} modules contributing to complexity</strong>
+                  {#if data.complexityBreakdownDetail.low.topModules.length === 0}
+                    <div>None</div>
+                  {:else}
+                    {#each data.complexityBreakdownDetail.low.topModules as mod}
+                      <div>{mod.module} ({mod.type}, {mod.score})</div>
+                    {/each}
+                  {/if}
+                </div>
+              </span>
+            </span>
+          </h4>
           <svg viewBox="0 0 300 300" class="chart donut-chart">
             {#each donut as segment}
               <path d={segment.d} fill={segment.color}></path>
@@ -357,8 +476,11 @@
                 stroke-opacity="0.32"
               />
             {/each}
-            {#each data.backendGraph.nodes as node}
-              <circle cx={node.x} cy={node.y} r={node.r} fill="#cfd9ea" fill-opacity="0.78" />
+            {#each data.backendGraph.nodes as node, idx}
+              {@const nodeDetail = data.backendGraph.nodeDetails?.[idx]}
+              <circle cx={node.x} cy={node.y} r={node.r} fill="#cfd9ea" fill-opacity="0.78">
+                <title>{graphNodeTooltip(nodeDetail, 'backend')}</title>
+              </circle>
             {/each}
           </svg>
         </article>
@@ -414,8 +536,11 @@
                 stroke-opacity="0.31"
               />
             {/each}
-            {#each data.frontendGraph.nodes as node}
-              <circle cx={node.x} cy={node.y} r={node.r} fill="#dce6f5" fill-opacity="0.8" />
+            {#each data.frontendGraph.nodes as node, idx}
+              {@const nodeDetail = data.frontendGraph.nodeDetails?.[idx]}
+              <circle cx={node.x} cy={node.y} r={node.r} fill="#dce6f5" fill-opacity="0.8">
+                <title>{graphNodeTooltip(nodeDetail, 'frontend')}</title>
+              </circle>
             {/each}
           </svg>
         </article>
