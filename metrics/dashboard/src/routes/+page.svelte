@@ -561,6 +561,8 @@
                 d={segment.d}
                 fill={segment.color}
                 class="donut-segment"
+                role="button"
+                aria-label={`Show ${segment.label} complexity breakdown details`}
                 on:mouseenter={() => (activeComplexitySegment = segment.key)}
                 on:mouseleave={() => (activeComplexitySegment = null)}
                 on:focus={() => (activeComplexitySegment = segment.key)}
@@ -573,6 +575,8 @@
             {#each donutParts as part}
               <span
                 class="legend-item"
+                role="button"
+                aria-label={`Show ${part.label} complexity breakdown details`}
                 on:mouseenter={() => (activeComplexitySegment = part.key)}
                 on:mouseleave={() => (activeComplexitySegment = null)}
                 on:focus={() => (activeComplexitySegment = part.key)}
@@ -621,6 +625,8 @@
                   fill="#cfd9ea"
                   fill-opacity="0.78"
                   class="graph-node"
+                  role="button"
+                  aria-label={`Show backend dependency node details for ${(nodeDetail?.path || 'unknown')}`}
                   on:mouseenter={() => (backendNodeHover = nodeDetail || { path: 'unknown', fan_in: 'n/a', fan_out: 'n/a', in_cycle: false })}
                   on:mouseleave={() => (backendNodeHover = null)}
                   on:focus={() => (backendNodeHover = nodeDetail || { path: 'unknown', fan_in: 'n/a', fan_out: 'n/a', in_cycle: false })}
@@ -701,6 +707,8 @@
                   fill="#dce6f5"
                   fill-opacity="0.8"
                   class="graph-node"
+                  role="button"
+                  aria-label={`Show frontend dependency node details for ${(nodeDetail?.path || 'unknown')}`}
                   on:mouseenter={() => (frontendNodeHover = nodeDetail || { path: 'unknown', fan_in: 'n/a', fan_out: 'n/a', in_cycle: false })}
                   on:mouseleave={() => (frontendNodeHover = null)}
                   on:focus={() => (frontendNodeHover = nodeDetail || { path: 'unknown', fan_in: 'n/a', fan_out: 'n/a', in_cycle: false })}
