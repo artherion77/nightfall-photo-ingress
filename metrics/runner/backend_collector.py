@@ -182,7 +182,7 @@ def collect_complexity_and_maintainability(repo_root: Path, roots: list[str]) ->
     except Exception as exc:
         return {
             "status": "not_available",
-            "reason": f"radon unavailable: {exc}",
+            "reason": f"radon not installed or unavailable ({exc}); install with: pip install radon>=6.0.1",
         }
 
     files = _iter_python_files(repo_root, roots)

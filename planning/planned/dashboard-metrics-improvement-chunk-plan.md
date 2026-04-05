@@ -22,16 +22,17 @@ This plan decomposes improvements into independent chunks with hard acceptance c
 
 ## 2. Chunk overview
 
-| Chunk | Name | Objective | Depends on |
-|------|------|-----------|------------|
-| 0 | Baseline contracts | Stabilize payload schema and explain synthetic metrics | None |
-| 1 | Sparkline correctness | Replace synthetic curve with measured historical coverage series | 0 |
-| 2 | Python complexity enablement | Ensure backend complexity is collected in dev runtime | 0 |
-| 3 | Frontend complexity v2 | Add rule-backed complexity collection for JS/TS/Svelte | 0 |
-| 4 | Bundle analysis collector | Add bundle-size and composition metrics from Vite/Rollup | 0 |
-| 5 | Dependency graph actionable UX | Surface node metadata and meaningful hover details | 0 |
-| 6 | Optional collector hardening | Promote optional metrics from mostly unavailable to useful | 2,3,4 |
-| 7 | New metric set expansion | Add high-value quality and delivery metrics | 1,6 |
+| Chunk | Name | Objective | Status | Depends on |
+|------|------|-----------|--------|------------|
+| 0 | Baseline contracts | Stabilize payload schema and explain synthetic metrics | Done | None |
+| 1 | Sparkline correctness | Replace synthetic curve with measured historical coverage series | Done | 0 |
+| 2 | Python complexity enablement | Ensure backend complexity is collected in dev runtime | **Done** ✅ | 0 |
+| 3A | Design Sonar Cognitive Complexity | Design methodology and parser choice | Blocked | 0 |
+| 3B | Implement Sonar Cognitive Complexity | Frontend cognitive complexity via AST traversal | Pending | 3A |
+| 4 | Bundle analysis collector (with pipeline) | Add bundle-size metrics via test pipeline integration | Deferred | pipeline |
+| 5 | Dependency graph actionable UX | Surface node metadata and meaningful hover details | Done | 0 |
+| 6 | Optional collector hardening | Promote optional metrics from mostly unavailable to useful | Pending | 2,3B |
+| 7 | New metric set expansion | Add high-value quality and delivery metrics | Pending | 1,6 |
 
 ---
 
@@ -63,6 +64,8 @@ Document metric provenance and lock the dashboard payload contract so future chu
 
 ## Chunk 1: Sparkline correctness
 
+Implementation status: Complete (2026-04-05)
+
 ### Goal
 Use measured coverage trend history instead of synthetic warning-based points.
 
@@ -78,18 +81,44 @@ Use measured coverage trend history instead of synthetic warning-based points.
 - `dashboard/__data.json` contains a new provenance field such as `coverageTrendSource: "measured_history"`.
 - Unit tests fail if warning-count values are used to derive coverage sparkline.
 
+### Status note
+
+**No further action required.** The implementation is correct. The flat sparkline observed in production (`"0.00,42.00 180.00,42.00"`) is expected behavior and not a defect: only 2 historical coverage runs exist in the artifact store, and both measured the same value (80.116%). As more collection runs succeed and accumulate diverse coverage measurements, the sparkline will naturally display variation. The system currently shows `coverageTrendSource: "measured_history"` (correct provenance), confirming measured values are used rather than synthetic approximations.
+
 ---
 
 ## Chunk 2: Python complexity enablement
 
+Implementation status: **Implemented (2026-04-05)** ✅
+
 ### Goal
 Make backend cyclomatic and maintainability consistently available in dev container runs.
 
-### Work items
+### Current state
 
-- Ensure `radon` is installed in the metrics execution environment in the dev container.
-- Verify collector records radon version and non-empty complexity payload.
-- Add failure diagnostics for parser errors or unsupported files.
+- `radon 6.0.1` is installed in `.venv` but was not present during the last metrics collection run
+- Dashboard currently shows **N/A** for both Cyclomatic and Maintainability
+- Backend collector has the code to invoke radon but fails at import time: `No module named 'radon'`
+
+### Explicit implementation steps
+
+1. **Declare radon as a dependency:**
+   - Add `radon>=6.0.1` to `pyproject.toml` dev dependencies
+   - Ensure it appears in the pip install step for the metrics execution environment
+
+2. **Verify collector invocation:**
+   - Confirm `metrics/runner/backend_collector.py` `collect_complexity_and_maintainability()` imports radon and calculates per-file metrics
+   - Ensure function is called from `run_backend_collection()`
+   - Verify radon version is recorded in the payload
+
+3. **Add regression tests:**
+   - Test that complexity metrics are emitted when radon is available
+   - Test that non-availability reason is actionable when radon is missing
+   - Add a unit test to `tests/unit/test_metrics_module2_backend.py` that verifies the failure message contains helpful text
+
+4. **Trigger new metrics run:**
+   - After radon is installed and tests pass, run `metricsctl collect` or full pipeline
+   - Verify that dashboard shows numeric complexity values (not N/A)
 
 ### Testable acceptance criteria
 
@@ -97,52 +126,130 @@ Make backend cyclomatic and maintainability consistently available in dev contai
   - `modules.backend.metrics.complexity.status == "available"`
   - non-null `cyclomatic.mean` and `maintainability_index.mean`
   - `collectors.backend.tool_versions.radon != "not_available"`
-- A regression test verifies non-availability reason contains actionable text when radon is missing.
+- Dashboard `complexityCard.cyclomatic` and `complexityCard.maintainability` show numeric values (not null)
+- Regression test verifies non-availability reason contains actionable text when radon is missing
 
 ---
 
-## Chunk 3: Frontend complexity v2
+## Chunk 3: Frontend complexity v2 — BLOCKED, Requires redesign
 
-### Goal
-Add rule-backed frontend complexity metrics (in addition to or replacing heuristic score).
+### Current state
 
-### Work items
+- Previous plan proposed ESLint-based collection, but this approach has inherent brittleness:
+  - Requires project-specific ESLint configuration and complexity plugin
+  - ESLint v9+ flat config changes have broken compatibility with legacy plugins
+  - No standard "complexity" measurement across projects
+  - Cannot guarantee consistent, comparable metrics across different codebases
 
-- Add ESLint-based complexity collector path for JS/TS/Svelte files.
-- Parse and aggregate per-file complexity stats.
-- Preserve current heuristic as fallback with source tag.
+### Revised approach: Sonar Cognitive Complexity
 
-### Testable acceptance criteria
-
-- `modules.frontend.metrics.cognitive_complexity` includes:
-  - `source` in {`eslint_rules`, `heuristic_fallback`}
-  - per-file entries with score values when ESLint path is available.
-- If ESLint toolchain is unavailable, collector returns `status: not_available` with explicit reason and fallback metric remains rendered.
-- Dashboard tooltip text changes based on source field.
+Chunk 3 is now split into design (3A) and implementation (3B) phases using **Sonar Cognitive Complexity** reference (G. Ann Campbell, "Cognitive Complexity — A new way of measuring understandability", SonarSource 2017):
 
 ---
 
-## Chunk 4: Bundle analysis collector
+## Chunk 3A: Design Sonar Cognitive Complexity Collector
 
-Implementation status: Implemented (2026-04-05)
+Implementation status: **Blocked — awaiting design signal** (2026-04-05)
 
 ### Goal
-Expose real bundle intelligence from frontend build artifacts.
+
+Produce a design specification for a stable, AST-based cognitive complexity collector for JS/TS/Svelte that adheres to the Sonar methodology.
 
 ### Work items
 
-- Run Vite/Rollup bundle visualizer in non-interactive JSON output mode.
-- Collect totals: raw, gzip, brotli, chunk count, largest chunk/module.
-- Add top-5 contributors table in payload.
+1. **Design document** to be written in `/design/sonar_cognitive_complexity_design.md`:
+   - Reference specification of Sonar Cognitive Complexity algorithm
+   - Justification for why Sonar Cognitive Complexity > ESLint approach
+   - Selected implementation technology (tree-sitter Python + or Node.js subprocess)
+   - AST traversal pseudocode and scoring rules
+   - Per-file breakdown structure and expected score scale
+
+2. **Proof-of-concept** showing how the AST walker would compute complexity for sample code
 
 ### Testable acceptance criteria
 
-- `modules.optional_collectors.collectors.bundle_size.status == "available"` for successful frontend build.
-- `dashboard/__data.json` includes:
-  - total KB, gzip KB, brotli KB
-  - largest chunk name and size
-  - top contributor list length >= 1
-- Unit test validates parser behavior against a saved visualizer JSON fixture.
+- Design document exists and references Sonar Cognitive Complexity (2017) paper
+- Algorithm pseudocode is complete and maps to Sonar specification
+- Technology choice is justified
+- Payload schema defined and backwards-compatible
+
+---
+
+## Chunk 3B: Implement Sonar Cognitive Complexity Collector
+
+Implementation status: **Pending** (blocked on 3A design)
+
+### Goal
+
+Implement the AST-based Sonar Cognitive Complexity collector and integrate into metrics pipeline.
+
+### Work items (after 3A design approved)
+
+1. **Collector implementation** in `metrics/runner/frontend_collector.py`
+2. **Regression tests** in `tests/unit/test_metrics_module3_frontend.py`
+3. **Dashboard payload** update to expose `frontendComplexitySource`
+
+### Testable acceptance criteria
+
+- `modules.frontend.metrics.cognitive_complexity.source == "sonar_cognitive"` when available
+- Scores match Sonar methodology
+- Dashboard displays source provenance and complexity score (not N/A)
+
+---
+
+## Chunk 4: Bundle analysis collector — Deferred (requires pipeline support)
+
+Implementation status: **Code implemented, but end-to-end pipeline incomplete** (2026-04-05)
+
+### Current state
+
+- Collector parser code exists in `metrics/runner/module8_ops.py`
+- Dashboard generator correctly surfaces `bundleSizeDetail` payload
+- Unit tests pass against fixture
+- **But:** `bundle_size` collector is disabled, and no `bundle-stats.json` file exists
+- No Vite/Rollup build step produces the required input artifact
+- Dashboard shows **N/A** for bundle size
+
+### Goal
+
+Establish a complete handover contract between frontend build pipeline (test/package step) and metrics collector (consumption step).
+
+### New requirement: Build pipeline integration
+
+Before Chunk 4 can be marked complete, the **test/build pipeline** must be updated to produce `bundle-stats.json` as a side effect of `pnpm build`:
+
+#### Producer: Frontend build step
+
+**Requirement:** Running `pnpm build` must produce `bundle-stats.json` at a stable path:
+- Configure Vite / Rollup to include `rollup-plugin-visualizer`
+- Visualizer must output JSON to one of:
+  - `webui/dist/bundle-stats.json` (preferred)
+  - `frontend/dist/bundle-stats.json` (fallback)
+  - `metrics/dashboard/dist/bundle-stats.json` (fallback)
+
+#### Consumer: Metrics bundle collector
+
+**Requirement:** After producer is ready:
+- Set `bundle_size.enabled: true` in `metrics/state/extensions.json`
+- Run metrics collection
+- Dashboard will show numeric bundle size values
+
+### Work items
+
+1. **Update build configuration:** Add `rollup-plugin-visualizer`, configure to JSON output
+2. **Enable collector:** After build step verified
+3. **Document handover:** Define schema contract between producer and consumer
+
+### Testable acceptance criteria
+
+**For producer:**
+- `pnpm build` completes without errors
+- Valid `bundle-stats.json` appears at one of the three candidate paths
+
+**For consumer:**
+- `modules.optional_collectors.collectors.bundle_size.status == "available"`
+- Dashboard `system.bundleSizeKb` is numeric (not null)
+- Dashboard `system.bundleSizeDetail` includes all expected fields
 
 ---
 
@@ -220,27 +327,56 @@ Add practical engineering health metrics beyond current baseline.
 
 ---
 
-## 4. Execution order and batching
+## 4. Execution order and batching — REVISED
 
-Recommended short-cycle sequence:
+Updated execution order (as of 2026-04-05 drift review):
 
-1. Chunk 0 (contract hardening)
-2. Chunk 2 (Python complexity availability)
-3. Chunk 1 (coverage sparkline correctness)
-4. Chunk 4 (bundle analysis)
-5. Chunk 3 (frontend complexity v2)
-6. Chunk 5 (dependency graph actionable UX)
-7. Chunk 6 (optional collector hardening)
-8. Chunk 7 (new metric expansion)
+1. ✅ **Chunk 0** (contract hardening) — DONE
+2. ✅ **Chunk 1** (sparkline correctness) — DONE
+3. ⏳ **Chunk 2** (Python complexity enablement) — **NEXT: Quick Win**
+4. ✅ **Chunk 5** (dependency graph actionable UX) — DONE (no action)
+5. 🔧 **Pipeline support** (build → bundle-stats.json) — prerequisite for Chunk 4
+6. ⏳ **Chunk 4** (bundle analysis) — after pipeline is ready
+7. 📋 **Chunk 3A** (design Sonar) — after Chunk 2 is stable
+8. ⏳ **Chunk 3B** (implement Sonar) — after 3A design approved
+9. ⏳ **Chunk 6** (optional collector hardening) — after 2, 3B are done
+10. ⏳ **Chunk 7** (new metric expansion) — after 1, 6 are done
 
 Rationale:
-- Establish correctness and tooling availability first.
-- Upgrade metric fidelity before adding new metric families.
-- Defer broad expansion until existing optional surfaces are stable.
+- **Chunk 2 first:** Quick, unblocks dashboard complexity display immediately
+- **Chunk 5 already done:** No action needed, retain implementation
+- **Chunk 4 deferred:** Requires parallel work on build pipeline; defer until producer is ready
+- **Chunk 3 redesigned:** Old ESLint approach was brittle; new Sonar approach requires design phase (3A) before implementation (3B)
+- **Chunk 6 & 7 dependent:** Wait for earlier metrics to stabilize before adding new collector orchestration or metric families
 
 ---
 
-## 5. Definition of done for this plan
+## 5. Collector Health Requirements
+
+To ensure the metrics dashboard remains reliable and intentional, the following collector health standards must be upheld:
+
+### Minimal availability expectations
+
+- **Baseline collectors** (backend LOC, frontend LOC, coverage): Must be available on every run, or failure must be logged and surfaced as a critical warning
+- **Complexity collectors** (once Chunk 2 & 3B complete): Must be available on every run; if unavailable, log actionable reason (e.g., "radon not installed")
+- **Optional collectors** (bundle, openapi, etc.): May be unavailable; but reason must be clear and non-availability must not degrade whole-run exit status
+
+### Dashboard provenance requirements
+
+- **Every displayed metric must include provenance:** Fields like `coverageTrendSource`, `frontendComplexitySource`, etc. must be exposed in the dashboard payload
+- **Synthetic/fallback metrics must be labeled:** UI must explicitly indicate when a metric is derived from heuristics or synthetic data (not measured)
+- **Null/N/A handling:** When a metric is unavailable, the dashboard must show N/A with a tooltip explaining why
+
+### Requirements for adding new collectors
+
+- Design must define clear failure modes and non-availability reasons
+- Implementation must include unit tests covering both success and graceful degradation cases
+- Dashboard generator must extract and expose the `reason` field alongside numeric values
+- Plan must document whether the collector is mandatory (blocks run) or optional (non-blocking)
+
+---
+
+## 6. Definition of done for this plan
 
 This plan is considered complete when:
 

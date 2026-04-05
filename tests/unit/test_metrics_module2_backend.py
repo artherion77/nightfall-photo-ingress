@@ -137,7 +137,9 @@ def test_complexity_unavailable_if_radon_missing(monkeypatch, tmp_path: Path) ->
     from metrics.runner import backend_collector
     result = backend_collector.collect_complexity_and_maintainability(tmp_path, ["src"])  # src can be empty
     assert result["status"] == "not_available"
-    assert "radon unavailable" in result["reason"]
+    assert "radon" in result["reason"].lower()
+    # Verify error message is actionable (includes installation hint)
+    assert "pip install" in result["reason"].lower() or "install" in result["reason"].lower()
 
 
 def test_collect_pytest_coverage_prefers_repo_venv_python(tmp_path: Path, monkeypatch) -> None:
