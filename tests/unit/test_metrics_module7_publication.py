@@ -44,6 +44,11 @@ def _seed_runtime_and_latest(repo_root: Path, run_id: str = "module6-run") -> No
 
     (repo_root / "dashboard").mkdir(parents=True, exist_ok=True)
     (repo_root / "dashboard" / "index.html").write_text("<html>dashboard</html>", encoding="utf-8")
+    (repo_root / "metrics" / "dashboard" / "src" / "routes").mkdir(parents=True, exist_ok=True)
+    (repo_root / "metrics" / "dashboard" / "src" / "routes" / "+page.svelte").write_text(
+        "<h1>dashboard source</h1>\n",
+        encoding="utf-8",
+    )
     (repo_root / "metrics" / "output" / "dashboard" / "latest").mkdir(parents=True, exist_ok=True)
     (repo_root / "metrics" / "output" / "dashboard" / "latest" / "__data.json").write_text("{}", encoding="utf-8")
     (repo_root / "metrics" / "output" / "reports").mkdir(parents=True, exist_ok=True)
@@ -127,3 +132,78 @@ def test_module7_publish_reports_push_failure(tmp_path: Path, monkeypatch) -> No
     assert payload["status"] == "published_commit_only"
     assert payload["push_succeeded"] is False
     assert payload["push_error"] == "remote rejected"
+
+
+def test_module7_publish_reuses_published_dashboard_when_fingerprint_matches(tmp_path: Path, monkeypatch) -> None:
+    _seed_runtime_and_latest(tmp_path, run_id="module6-reuse")
+    worktree = tmp_path / "worktree"
+    (worktree / "dashboard").mkdir(parents=True, exist_ok=True)
+    (worktree / "dashboard" / "index.html").write_text("<html>published</html>", encoding="utf-8")
+
+    source_fp = poller_runner._compute_dashboard_source_fingerprint(tmp_path)
+    (worktree / "dashboard" / ".build-stamp").write_text(
+        json.dumps({"source_fingerprint": source_fp, "built_at": "2026-04-05T00:00:00+00:00"}),
+        encoding="utf-8",
+    )
+
+    def _fake_dashboard_gen(repo_root, run_id):
+        data_dir = repo_root / "metrics" / "output" / "dashboard" / "latest"
+        data_dir.mkdir(parents=True, exist_ok=True)
+        _write_json(data_dir / "__data.json", {"runId": "module6-reuse", "commitFull": "a" * 40})
+        return {"run_id": run_id}
+
+    monkeypatch.setattr(poller_runner, "_ensure_publication_worktree", lambda _root, _branch: worktree)
+    monkeypatch.setattr(poller_runner, "_commit_if_needed", lambda _root, _worktree, _message: (True, "e" * 40))
+    monkeypatch.setattr(poller_runner, "_push_publication_branch", lambda _root, _worktree, _branch: (True, None))
+    monkeypatch.setattr(poller_runner, "run_dashboard_generation", _fake_dashboard_gen)
+    monkeypatch.setattr(
+        poller_runner,
+        "_build_static_dashboard",
+        lambda _repo_root: (_ for _ in ()).throw(AssertionError("build should not run when published fingerprint matches")),
+    )
+
+    payload = poller_runner.publish_metrics(tmp_path)
+    assert payload["status"] == "published"
+    assert payload["dashboard_sync_mode"] == "reuse_published"
+    assert payload["dashboard_source_fingerprint"] == source_fp
+
+
+def test_module7_publish_builds_when_published_dashboard_fingerprint_differs(tmp_path: Path, monkeypatch) -> None:
+    _seed_runtime_and_latest(tmp_path, run_id="module6-rebuild")
+    worktree = tmp_path / "worktree"
+    (worktree / "dashboard").mkdir(parents=True, exist_ok=True)
+    (worktree / "dashboard" / "index.html").write_text("<html>published old</html>", encoding="utf-8")
+    (worktree / "dashboard" / ".build-stamp").write_text(
+        json.dumps({"source_fingerprint": "old-fingerprint", "built_at": "2026-04-04T00:00:00+00:00"}),
+        encoding="utf-8",
+    )
+    # Force local drift so publish needs a local rebuild before syncing.
+    (tmp_path / "dashboard" / ".build-stamp").write_text(
+        json.dumps({"source_fingerprint": "stale-local-fingerprint", "built_at": "2026-04-04T00:00:00+00:00"}),
+        encoding="utf-8",
+    )
+
+    def _fake_dashboard_gen(repo_root, run_id):
+        data_dir = repo_root / "metrics" / "output" / "dashboard" / "latest"
+        data_dir.mkdir(parents=True, exist_ok=True)
+        _write_json(data_dir / "__data.json", {"runId": "module6-rebuild", "commitFull": "a" * 40})
+        return {"run_id": run_id}
+
+    built = {"count": 0}
+
+    def _fake_build(repo_root):
+        built["count"] += 1
+        (repo_root / "dashboard").mkdir(parents=True, exist_ok=True)
+        (repo_root / "dashboard" / "index.html").write_text("<html>new local build</html>", encoding="utf-8")
+        poller_runner._write_dashboard_build_stamp(repo_root)
+
+    monkeypatch.setattr(poller_runner, "_ensure_publication_worktree", lambda _root, _branch: worktree)
+    monkeypatch.setattr(poller_runner, "_commit_if_needed", lambda _root, _worktree, _message: (True, "f" * 40))
+    monkeypatch.setattr(poller_runner, "_push_publication_branch", lambda _root, _worktree, _branch: (True, None))
+    monkeypatch.setattr(poller_runner, "run_dashboard_generation", _fake_dashboard_gen)
+    monkeypatch.setattr(poller_runner, "_build_static_dashboard", _fake_build)
+
+    payload = poller_runner.publish_metrics(tmp_path)
+    assert payload["status"] == "published"
+    assert payload["dashboard_sync_mode"] == "sync_local"
+    assert built["count"] == 1

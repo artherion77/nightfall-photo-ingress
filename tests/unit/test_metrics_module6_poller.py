@@ -110,6 +110,7 @@ def test_module6_run_now_enables_backend_coverage(tmp_path: Path, monkeypatch) -
     monkeypatch.setattr(poller_runner, "run_frontend_collection", lambda **_: None)
     monkeypatch.setattr(poller_runner, "run_optional_collectors", lambda **_: None)
     monkeypatch.setattr(poller_runner, "run_aggregation", lambda **_: None)
+    monkeypatch.setattr(poller_runner, "_validate_post_collection_outputs", lambda **_: None)
     monkeypatch.setattr(poller_runner, "run_dashboard_generation", lambda **_: None)
     monkeypatch.setattr(poller_runner, "apply_retention_policy", lambda **_: {"kept": 0, "pruned": []})
 
@@ -178,3 +179,78 @@ class TestValidatePublishPayload:
         )
         # Empty expected_commit → commit check skipped
         poller_runner._validate_publish_payload(data_path, "run-1", "")
+
+
+def test_module6_dashboard_drift_check_ignores_hashed_dist_churn(tmp_path: Path) -> None:
+    # Seed dashboard source and existing dist.
+    src_file = tmp_path / "metrics" / "dashboard" / "src" / "routes" / "+page.svelte"
+    _write_text(src_file, "<h1>metrics</h1>\n")
+    _write_text(tmp_path / "dashboard" / "index.html", "<html>built</html>\n")
+
+    # Write a valid stamp for current source.
+    poller_runner._write_dashboard_build_stamp(tmp_path)
+
+    # Simulate nondeterministic Vite hash churn in dist filenames.
+    _write_text(tmp_path / "dashboard" / "_app" / "immutable" / "entry" / "app.AAAAAAAA.js", "a\n")
+    _write_text(tmp_path / "dashboard" / "_app" / "immutable" / "entry" / "app.BBBBBBBB.js", "b\n")
+
+    assert poller_runner._dashboard_needs_rebuild(tmp_path) is False
+
+
+def test_module6_dashboard_drift_check_detects_real_source_change(tmp_path: Path) -> None:
+    src_file = tmp_path / "metrics" / "dashboard" / "src" / "routes" / "+page.svelte"
+    _write_text(src_file, "<h1>v1</h1>\n")
+    _write_text(tmp_path / "dashboard" / "index.html", "<html>built</html>\n")
+
+    poller_runner._write_dashboard_build_stamp(tmp_path)
+    assert poller_runner._dashboard_needs_rebuild(tmp_path) is False
+
+    # Real source change should trigger rebuild requirement.
+    _write_text(src_file, "<h1>v2</h1>\n")
+    assert poller_runner._dashboard_needs_rebuild(tmp_path) is True
+
+
+def test_module6_run_now_fails_when_complexity_tool_unavailable(tmp_path: Path, monkeypatch) -> None:
+    _write_text(tmp_path / "metrics" / "state" / "last_processed_commit", "0" * 40)
+    _write_text(tmp_path / "metrics" / "state" / "runtime.json", json.dumps(poller_runner._runtime_defaults()))
+
+    monkeypatch.setattr(poller_runner, "_git_head_sha", lambda _: "e" * 40)
+    monkeypatch.setattr(poller_runner, "_git_branch", lambda _: "main")
+    monkeypatch.setattr(poller_runner, "run_backend_collection", lambda **_: None)
+    monkeypatch.setattr(poller_runner, "run_frontend_collection", lambda **_: None)
+    monkeypatch.setattr(poller_runner, "run_optional_collectors", lambda **_: None)
+
+    def _fake_aggregation(**_: object) -> None:
+        payload = {
+            "modules": {
+                "backend": {
+                    "metrics": {
+                        "complexity": {
+                            "status": "not_available",
+                            "reason": "radon import failed",
+                        }
+                    }
+                },
+                "frontend": {
+                    "metrics": {
+                        "cognitive_complexity": {
+                            "status": "success",
+                            "mean": 10.0,
+                        }
+                    }
+                },
+            }
+        }
+        path = tmp_path / "artifacts" / "metrics" / "latest" / "metrics.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload), encoding="utf-8")
+
+    monkeypatch.setattr(poller_runner, "run_aggregation", _fake_aggregation)
+    monkeypatch.setattr(poller_runner, "run_dashboard_generation", lambda **_: None)
+    monkeypatch.setattr(poller_runner, "apply_retention_policy", lambda **_: {"kept": 0, "pruned": []})
+
+    result = poller_runner.run_now(tmp_path, max_retries=0, timeout_seconds=60)
+    assert result["status"] == "failed"
+    assert "Backend complexity tool unavailable" in result["error"]
+    # last_processed_commit must remain unchanged when critical tool output is unavailable.
+    assert (tmp_path / "metrics" / "state" / "last_processed_commit").read_text(encoding="utf-8") == "0" * 40

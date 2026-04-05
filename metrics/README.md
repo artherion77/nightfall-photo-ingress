@@ -89,6 +89,9 @@ Module 6 adds poller and orchestration responsibilities:
 
 - lock-protected single-run execution loop via `metricsctl run-now`
 - unchanged commit fast-exit using `metrics/state/last_processed_commit`
+- explicit post-collection validation for critical complexity collectors
+  - backend complexity `status=not_available` is treated as run failure
+  - frontend cognitive complexity `status=not_available` is treated as run failure
 - retry and timeout policy for unattended operation
 - failure manifest emission on failed runs
 - runtime control surface for install/reconfigure/start/stop/status/uninstall/publish
@@ -104,6 +107,10 @@ Module 7 adds publication pipeline responsibilities:
 
 - maintain a dedicated `metrics` branch worktree for publication commits
 - sync latest successful dashboard/report/artifacts into the publication worktree
+- fingerprint-driven dashboard drift-check (`dashboard/.build-stamp`)
+  - compares dashboard source fingerprint to the published worktree stamp
+  - reuses published static dashboard when source is unchanged
+  - avoids rebuilds caused only by hashed bundle filename churn
 - create deterministic publication commits with run metadata
 - preserve run history snapshots under published `artifacts/metrics/history/<run-id>/`
 

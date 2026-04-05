@@ -53,6 +53,9 @@ from metrics.runner.frontend_collector import run_frontend_collection
 from metrics.runner.module1_init import initialize_module1
 from metrics.runner.module8_ops import apply_retention_policy, ensure_ops_state
 from metrics.runner.poller_runner import (
+    _compute_dashboard_source_fingerprint,
+    _dashboard_needs_rebuild,
+    _read_dashboard_build_stamp,
     cleanup_runtime_artifacts,
     install_poller,
     poller_status,
@@ -292,6 +295,19 @@ def cmd_cleanup_runtime(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_dashboard_build_stamp(_: argparse.Namespace) -> int:
+    """Report dashboard build stamp and whether source drift requires rebuild."""
+    root = _repo_root()
+    payload = {
+        "dashboard_index_exists": (root / "dashboard" / "index.html").exists(),
+        "build_stamp": _read_dashboard_build_stamp(root),
+        "current_source_fingerprint": _compute_dashboard_source_fingerprint(root),
+        "needs_rebuild": _dashboard_needs_rebuild(root),
+    }
+    print(json.dumps(payload, indent=2))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Construct CLI command surface and wire handlers."""
     parser = argparse.ArgumentParser(description="Nightfall metrics administrative entrypoint")
@@ -365,6 +381,12 @@ def build_parser() -> argparse.ArgumentParser:
     cleanup_parser = sub.add_parser("cleanup-runtime", help="Clean ephemeral metrics runtime artifacts in workspace")
     cleanup_parser.add_argument("--include-history", action="store_true")
     cleanup_parser.set_defaults(func=cmd_cleanup_runtime)
+
+    build_stamp_parser = sub.add_parser(
+        "dashboard-build-stamp",
+        help="Show dashboard build stamp and rebuild requirement",
+    )
+    build_stamp_parser.set_defaults(func=cmd_dashboard_build_stamp)
 
     return parser
 

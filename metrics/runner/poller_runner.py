@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import fcntl
 import getpass
+import hashlib
 import json
 import shutil
 import socket
@@ -47,6 +48,140 @@ def _read_text(path: Path) -> str:
     if not path.exists():
         return ""
     return path.read_text(encoding="utf-8").strip()
+
+
+# ── Dashboard source fingerprint / drift-check ────────────────────────────────
+
+def _compute_dashboard_source_fingerprint(repo_root: Path) -> str:
+    """SHA-256 of all dashboard source files that affect the Vite/Rollup output.
+
+    Deterministic: files are sorted by their repo-relative path before hashing,
+    so directory-listing order doesn't affect the result.
+    """
+    dashboard_src = repo_root / "metrics" / "dashboard"
+    hasher = hashlib.sha256()
+    paths: list[Path] = []
+    # Svelte/TS/JS/CSS source files
+    for pattern in ("**/*.svelte", "**/*.ts", "**/*.js", "**/*.css"):
+        paths.extend(dashboard_src.glob(pattern))
+    # Config files that directly influence the build
+    for name in ("svelte.config.js", "vite.config.js", "package.json", "package-lock.json"):
+        candidate = dashboard_src / name
+        if candidate.exists():
+            paths.append(candidate)
+    # Exclude node_modules and .svelte-kit from the fingerprint
+    paths = [
+        p for p in paths
+        if "node_modules" not in p.parts and ".svelte-kit" not in p.parts and p.is_file()
+    ]
+    for path in sorted(set(paths), key=lambda p: str(p.relative_to(repo_root))):
+        hasher.update(str(path.relative_to(repo_root)).encode())
+        hasher.update(path.read_bytes())
+    return hasher.hexdigest()
+
+
+_BUILD_STAMP_FILE = ".build-stamp"
+
+
+def _read_dashboard_build_stamp(repo_root: Path) -> dict[str, Any] | None:
+    """Return the stored build stamp, or None if absent/corrupt."""
+    stamp_path = repo_root / "dashboard" / _BUILD_STAMP_FILE
+    if not stamp_path.exists():
+        return None
+    try:
+        return json.loads(stamp_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+def _write_dashboard_build_stamp(repo_root: Path) -> str:
+    """Compute and persist the source fingerprint alongside the built dashboard.
+
+    Returns the fingerprint string so callers can log or validate it.
+    """
+    fingerprint = _compute_dashboard_source_fingerprint(repo_root)
+    stamp: dict[str, Any] = {
+        "source_fingerprint": fingerprint,
+        "built_at": _utc_now_iso(),
+    }
+    stamp_path = repo_root / "dashboard" / _BUILD_STAMP_FILE
+    stamp_path.write_text(json.dumps(stamp, indent=2) + "\n", encoding="utf-8")
+    return fingerprint
+
+
+def _dashboard_needs_rebuild(repo_root: Path) -> bool:
+    """True when the static dashboard is absent or stale w.r.t. source files.
+
+    Decision logic:
+    - Missing dashboard/index.html → definitely needs build.
+    - Missing .build-stamp → dashboard existed before stamp tracking was added;
+      assume it is fresh to avoid spurious rebuilds on first upgrade.
+    - Stamp fingerprint mismatch → source changed since last build → rebuild.
+    """
+    dist_index = repo_root / "dashboard" / "index.html"
+    if not dist_index.exists():
+        return True
+    stamp = _read_dashboard_build_stamp(repo_root)
+    if stamp is None:
+        # No stamp file: pre-existing build present; treat as fresh (safe default).
+        return False
+    current_fp = _compute_dashboard_source_fingerprint(repo_root)
+    return stamp.get("source_fingerprint") != current_fp
+
+
+def _require_prebuilt_dashboard(repo_root: Path) -> None:
+    """Hard-fail if dashboard/index.html is absent (build prerequisite)."""
+    dist_index = repo_root / "dashboard" / "index.html"
+    if not dist_index.exists():
+        raise RuntimeError(
+            "publish aborted: dashboard/index.html not found. "
+            "Build the static dashboard first: ./dev/bin/build-metrics-dashboard"
+        )
+
+
+# ── Post-collection output validation ─────────────────────────────────────────
+
+def _validate_post_collection_outputs(repo_root: Path, run_id: str) -> None:
+    """Raise explicitly when critical collector dependencies were unavailable.
+
+    Prevents writing last_processed_commit when the pipeline ran without
+    essential tools (radon, tree-sitter), which would produce zeroed metrics
+    while appearing successful.  Called after aggregation, before dashboard gen.
+    """
+    metrics_path = repo_root / "artifacts" / "metrics" / "latest" / "metrics.json"
+    if not metrics_path.exists():
+        raise RuntimeError(
+            f"[MISSING_ARTIFACTS] aggregate metrics.json absent after collection "
+            f"(run_id={run_id}); pipeline may not have run in the correct Python "
+            "environment — ensure .venv is active and radon>=6.0.1 is installed"
+        )
+    try:
+        metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        raise RuntimeError(f"[CORRUPT_ARTIFACTS] metrics.json unreadable: {exc}") from exc
+
+    modules = metrics.get("modules", {})
+    backend = modules.get("backend", {}) if isinstance(modules, dict) else {}
+    backend_metrics = backend.get("metrics", {}) if isinstance(backend, dict) else {}
+    complexity = backend_metrics.get("complexity") if isinstance(backend_metrics, dict) else None
+    if isinstance(complexity, dict) and complexity.get("status") == "not_available":
+        reason = complexity.get("reason", "radon not importable")
+        raise RuntimeError(
+            f"[TOOL_UNAVAILABLE] Backend complexity tool unavailable: {reason}. "
+            "Ensure .venv/bin/python has radon>=6.0.1 installed."
+        )
+
+    frontend = modules.get("frontend", {}) if isinstance(modules, dict) else {}
+    frontend_metrics = frontend.get("metrics", {}) if isinstance(frontend, dict) else {}
+    frontend_cognitive = (
+        frontend_metrics.get("cognitive_complexity") if isinstance(frontend_metrics, dict) else None
+    )
+    if isinstance(frontend_cognitive, dict) and frontend_cognitive.get("status") == "not_available":
+        reason = frontend_cognitive.get("reason", "tree-sitter not importable")
+        raise RuntimeError(
+            f"[TOOL_UNAVAILABLE] Frontend complexity tool unavailable: {reason}. "
+            "Ensure .venv/bin/python has tree-sitter installed."
+        )
 
 
 @dataclass(frozen=True)
@@ -314,7 +449,34 @@ def _validate_publish_payload(data_path: Path, expected_run_id: str, expected_co
         raise RuntimeError(f"publish aborted: stale __data.json — {'; '.join(errors)}")
 
 
+def _validate_publish_dashboard_static(dashboard_root: Path) -> None:
+    """Validate static dashboard prerequisites before sync/commit."""
+    index_path = dashboard_root / "index.html"
+    if not index_path.exists():
+        raise RuntimeError(f"publish aborted: dashboard static index missing at {index_path}")
+    stamp_path = dashboard_root / _BUILD_STAMP_FILE
+    if not stamp_path.exists():
+        raise RuntimeError(
+            f"publish aborted: dashboard build stamp missing at {stamp_path}; "
+            "run ./dev/bin/build-metrics-dashboard to produce deterministic statics"
+        )
+    try:
+        stamp_payload = json.loads(stamp_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        raise RuntimeError(f"publish aborted: unreadable dashboard build stamp: {exc}") from exc
+    fingerprint = stamp_payload.get("source_fingerprint")
+    if not isinstance(fingerprint, str) or len(fingerprint) < 16:
+        raise RuntimeError("publish aborted: dashboard build stamp missing source_fingerprint")
+
+
 def _build_static_dashboard(repo_root: Path) -> None:
+    """Run the SvelteKit production build and write a source fingerprint stamp.
+
+    The build stamp written here lets _dashboard_needs_rebuild() detect whether a
+    subsequent publish can skip the build (source unchanged) or must trigger a
+    new one.  Callers should prefer _dashboard_needs_rebuild() before calling
+    this function.
+    """
     build_script = repo_root / "dev" / "bin" / "build-metrics-dashboard"
     devctl_script = repo_root / "dev" / "bin" / "devctl"
     if not build_script.exists():
@@ -328,6 +490,7 @@ def _build_static_dashboard(repo_root: Path) -> None:
         text=True,
     )
     if result.returncode == 0:
+        _write_dashboard_build_stamp(repo_root)
         return
 
     if "is not running" in result.stderr and devctl_script.exists():
@@ -346,6 +509,7 @@ def _build_static_dashboard(repo_root: Path) -> None:
             text=True,
         )
         if retry.returncode == 0:
+            _write_dashboard_build_stamp(repo_root)
             return
         raise RuntimeError(retry.stderr.strip() or retry.stdout.strip() or "dashboard build failed after devctl setup")
 
@@ -539,6 +703,10 @@ def run_now(repo_root: Path, max_retries: int = 1, timeout_seconds: int = 1800) 
                 _enforce_timeout(deadline, "aggregate")
                 run_aggregation(repo_root=repo_root, run_id=run_id)
 
+                # Ensure critical collector outputs exist and are usable before
+                # generating dashboard artifacts or writing last_processed_commit.
+                _validate_post_collection_outputs(repo_root=repo_root, run_id=run_id)
+
                 _enforce_timeout(deadline, "generate_dashboard")
                 run_dashboard_generation(repo_root=repo_root, run_id=run_id)
 
@@ -671,11 +839,34 @@ def publish_metrics(repo_root: Path) -> dict[str, Any]:
         append_event_log(repo_root, {"event": "publish", "timestamp": _utc_now_iso(), "status": payload["status"], "run_id": run_id})
         return payload
 
-    # Regenerate dashboard payload and rebuild the static dashboard before publication sync.
+    # Regenerate dashboard payload for the latest successful run.
     run_dashboard_generation(repo_root=repo_root, run_id=run_id)
-    _build_static_dashboard(repo_root)
 
     worktree = _ensure_publication_worktree(repo_root, branch)
+    current_source_fingerprint = _compute_dashboard_source_fingerprint(repo_root)
+    published_stamp = _read_dashboard_build_stamp(worktree)
+    published_fingerprint = None
+    if isinstance(published_stamp, dict):
+        value = published_stamp.get("source_fingerprint")
+        if isinstance(value, str):
+            published_fingerprint = value
+
+    # Drift check compares source fingerprint against the published dashboard
+    # version in the worktree, not against local hashed dist filenames.
+    reused_published_dashboard = published_fingerprint == current_source_fingerprint
+
+    if not reused_published_dashboard:
+        if _dashboard_needs_rebuild(repo_root):
+            _build_static_dashboard(repo_root)
+        else:
+            # Legacy dashboard build without stamp: preserve current output and
+            # stamp it instead of rebuilding and churning hashed bundles.
+            _require_prebuilt_dashboard(repo_root)
+            _write_dashboard_build_stamp(repo_root)
+
+        # Ensure the locally staged static build is publish-safe.
+        _validate_publish_dashboard_static(repo_root / "dashboard")
+
     generated_dashboard_data = repo_root / "metrics" / "output" / "dashboard" / "latest" / "__data.json"
     generated_report = repo_root / "metrics" / "output" / "reports" / "latest.md"
 
@@ -684,7 +875,8 @@ def publish_metrics(repo_root: Path) -> dict[str, Any]:
         raise RuntimeError(f"publish aborted: generated __data.json not found at {generated_dashboard_data}")
     _validate_publish_payload(generated_dashboard_data, run_id, commit_sha)
 
-    _copy_tree(repo_root / "dashboard", worktree / "dashboard")
+    if not reused_published_dashboard:
+        _copy_tree(repo_root / "dashboard", worktree / "dashboard")
     _copy_tree(generated_dashboard_data, worktree / "dashboard" / "__data.json")
 
     if generated_report.exists():
@@ -716,6 +908,8 @@ def publish_metrics(repo_root: Path) -> dict[str, Any]:
         "push_error": push_error,
         "dashboard_url_path": str(runtime.get("dashboard_relative_path", "/dashboard/")),
         "worktree_path": str(worktree.relative_to(repo_root)),
+        "dashboard_sync_mode": "reuse_published" if reused_published_dashboard else "sync_local",
+        "dashboard_source_fingerprint": current_source_fingerprint,
     }
     _write_json(paths.publication_json, payload)
     append_event_log(
