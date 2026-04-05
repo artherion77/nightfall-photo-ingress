@@ -25,20 +25,20 @@
   "coverageTrendSource": "measured_history",
   "locTotal": "35.6k",
   "locDetail": {
-    "total": 35560,
+    "total": 35634,
     "purpose": {
       "production": 11849,
       "test": 15982,
-      "other": 7729
+      "other": 7803
     },
     "technology": {
       "python": 30313,
       "svelte": 1956,
       "jsts": 785,
-      "bash": 2506,
+      "bash": 2580,
       "other": 0
     },
-    "totalFiles": 239,
+    "totalFiles": 240,
     "note": "System-level metric. Includes all code in the repository."
   },
   "complexityCard": {
