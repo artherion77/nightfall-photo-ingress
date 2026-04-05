@@ -25,17 +25,17 @@
   "coverageTrendSource": "measured_history",
   "locTotal": "35.6k",
   "locDetail": {
-    "total": 35634,
+    "total": 35631,
     "purpose": {
       "production": 11849,
       "test": 15982,
-      "other": 7803
+      "other": 7800
     },
     "technology": {
       "python": 30313,
       "svelte": 1956,
       "jsts": 785,
-      "bash": 2580,
+      "bash": 2577,
       "other": 0
     },
     "totalFiles": 240,
