@@ -55,6 +55,7 @@ from metrics.runner.module8_ops import apply_retention_policy, ensure_ops_state
 from metrics.runner.poller_runner import (
     _compute_dashboard_source_fingerprint,
     _dashboard_needs_rebuild,
+    _dashboard_static_dir,
     _read_dashboard_build_stamp,
     cleanup_runtime_artifacts,
     install_poller,
@@ -299,8 +300,8 @@ def cmd_dashboard_build_stamp(_: argparse.Namespace) -> int:
     """Report dashboard build stamp and whether source drift requires rebuild."""
     root = _repo_root()
     payload = {
-        "dashboard_index_exists": (root / "dashboard" / "index.html").exists(),
-        "build_stamp": _read_dashboard_build_stamp(root),
+        "dashboard_index_exists": (_dashboard_static_dir(root) / "index.html").exists(),
+        "build_stamp": _read_dashboard_build_stamp(_dashboard_static_dir(root)),
         "current_source_fingerprint": _compute_dashboard_source_fingerprint(root),
         "needs_rebuild": _dashboard_needs_rebuild(root),
     }

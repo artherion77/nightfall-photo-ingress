@@ -42,8 +42,8 @@ def _seed_runtime_and_latest(repo_root: Path, run_id: str = "module6-run") -> No
     _write_json(repo_root / "artifacts" / "metrics" / "history" / run_id / "summary.json", {"schema_version": 1, "run_id": run_id})
     _write_json(repo_root / "artifacts" / "metrics" / "history" / run_id / "metrics.json", {"schema_version": 1, "run_id": run_id})
 
-    (repo_root / "dashboard").mkdir(parents=True, exist_ok=True)
-    (repo_root / "dashboard" / "index.html").write_text("<html>dashboard</html>", encoding="utf-8")
+    (repo_root / "metrics" / "output" / "dashboard" / "static").mkdir(parents=True, exist_ok=True)
+    (repo_root / "metrics" / "output" / "dashboard" / "static" / "index.html").write_text("<html>dashboard</html>", encoding="utf-8")
     (repo_root / "metrics" / "dashboard" / "src" / "routes").mkdir(parents=True, exist_ok=True)
     (repo_root / "metrics" / "dashboard" / "src" / "routes" / "+page.svelte").write_text(
         "<h1>dashboard source</h1>\n",
@@ -178,7 +178,9 @@ def test_module7_publish_builds_when_published_dashboard_fingerprint_differs(tmp
         encoding="utf-8",
     )
     # Force local drift so publish needs a local rebuild before syncing.
-    (tmp_path / "dashboard" / ".build-stamp").write_text(
+    static_dir = tmp_path / "metrics" / "output" / "dashboard" / "static"
+    static_dir.mkdir(parents=True, exist_ok=True)
+    (static_dir / ".build-stamp").write_text(
         json.dumps({"source_fingerprint": "stale-local-fingerprint", "built_at": "2026-04-04T00:00:00+00:00"}),
         encoding="utf-8",
     )
@@ -193,8 +195,9 @@ def test_module7_publish_builds_when_published_dashboard_fingerprint_differs(tmp
 
     def _fake_build(repo_root):
         built["count"] += 1
-        (repo_root / "dashboard").mkdir(parents=True, exist_ok=True)
-        (repo_root / "dashboard" / "index.html").write_text("<html>new local build</html>", encoding="utf-8")
+        sd = repo_root / "metrics" / "output" / "dashboard" / "static"
+        sd.mkdir(parents=True, exist_ok=True)
+        (sd / "index.html").write_text("<html>new local build</html>", encoding="utf-8")
         poller_runner._write_dashboard_build_stamp(repo_root)
 
     monkeypatch.setattr(poller_runner, "_ensure_publication_worktree", lambda _root, _branch: worktree)

@@ -185,14 +185,15 @@ def test_module6_dashboard_drift_check_ignores_hashed_dist_churn(tmp_path: Path)
     # Seed dashboard source and existing dist.
     src_file = tmp_path / "metrics" / "dashboard" / "src" / "routes" / "+page.svelte"
     _write_text(src_file, "<h1>metrics</h1>\n")
-    _write_text(tmp_path / "dashboard" / "index.html", "<html>built</html>\n")
+    static_dir = tmp_path / "metrics" / "output" / "dashboard" / "static"
+    _write_text(static_dir / "index.html", "<html>built</html>\n")
 
     # Write a valid stamp for current source.
     poller_runner._write_dashboard_build_stamp(tmp_path)
 
     # Simulate nondeterministic Vite hash churn in dist filenames.
-    _write_text(tmp_path / "dashboard" / "_app" / "immutable" / "entry" / "app.AAAAAAAA.js", "a\n")
-    _write_text(tmp_path / "dashboard" / "_app" / "immutable" / "entry" / "app.BBBBBBBB.js", "b\n")
+    _write_text(static_dir / "_app" / "immutable" / "entry" / "app.AAAAAAAA.js", "a\n")
+    _write_text(static_dir / "_app" / "immutable" / "entry" / "app.BBBBBBBB.js", "b\n")
 
     assert poller_runner._dashboard_needs_rebuild(tmp_path) is False
 
@@ -200,7 +201,8 @@ def test_module6_dashboard_drift_check_ignores_hashed_dist_churn(tmp_path: Path)
 def test_module6_dashboard_drift_check_detects_real_source_change(tmp_path: Path) -> None:
     src_file = tmp_path / "metrics" / "dashboard" / "src" / "routes" / "+page.svelte"
     _write_text(src_file, "<h1>v1</h1>\n")
-    _write_text(tmp_path / "dashboard" / "index.html", "<html>built</html>\n")
+    static_dir = tmp_path / "metrics" / "output" / "dashboard" / "static"
+    _write_text(static_dir / "index.html", "<html>built</html>\n")
 
     poller_runner._write_dashboard_build_stamp(tmp_path)
     assert poller_runner._dashboard_needs_rebuild(tmp_path) is False

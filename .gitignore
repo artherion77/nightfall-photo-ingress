@@ -29,7 +29,6 @@ metrics/state/poller_status.json
 metrics/state/poller.lock
 
 # Metrics generated runtime artifacts
-dashboard/__data.json
 reports/latest.md
 artifacts/metrics/latest/
 artifacts/metrics/history/*
@@ -46,3 +45,6 @@ artifacts/metrics/history/*
 !artifacts/metrics/history/module4-bootstrap/manifest.json
 !artifacts/metrics/history/module4-bootstrap/metrics.json
 !artifacts/metrics/history/module4-bootstrap/summary.json
+
+# Dashboard static build output (legacy path — output now under metrics/output/)
+/dashboard/

@@ -82,10 +82,17 @@ def _compute_dashboard_source_fingerprint(repo_root: Path) -> str:
 
 _BUILD_STAMP_FILE = ".build-stamp"
 
+_DASHBOARD_STATIC_REL = Path("metrics") / "output" / "dashboard" / "static"
 
-def _read_dashboard_build_stamp(repo_root: Path) -> dict[str, Any] | None:
+
+def _dashboard_static_dir(repo_root: Path) -> Path:
+    """Canonical runtime path for dashboard static build output (not tracked on main)."""
+    return repo_root / _DASHBOARD_STATIC_REL
+
+
+def _read_dashboard_build_stamp(dashboard_dir: Path) -> dict[str, Any] | None:
     """Return the stored build stamp, or None if absent/corrupt."""
-    stamp_path = repo_root / "dashboard" / _BUILD_STAMP_FILE
+    stamp_path = dashboard_dir / _BUILD_STAMP_FILE
     if not stamp_path.exists():
         return None
     try:
@@ -104,7 +111,7 @@ def _write_dashboard_build_stamp(repo_root: Path) -> str:
         "source_fingerprint": fingerprint,
         "built_at": _utc_now_iso(),
     }
-    stamp_path = repo_root / "dashboard" / _BUILD_STAMP_FILE
+    stamp_path = _dashboard_static_dir(repo_root) / _BUILD_STAMP_FILE
     stamp_path.write_text(json.dumps(stamp, indent=2) + "\n", encoding="utf-8")
     return fingerprint
 
@@ -118,10 +125,10 @@ def _dashboard_needs_rebuild(repo_root: Path) -> bool:
       assume it is fresh to avoid spurious rebuilds on first upgrade.
     - Stamp fingerprint mismatch → source changed since last build → rebuild.
     """
-    dist_index = repo_root / "dashboard" / "index.html"
+    dist_index = _dashboard_static_dir(repo_root) / "index.html"
     if not dist_index.exists():
         return True
-    stamp = _read_dashboard_build_stamp(repo_root)
+    stamp = _read_dashboard_build_stamp(_dashboard_static_dir(repo_root))
     if stamp is None:
         # No stamp file: pre-existing build present; treat as fresh (safe default).
         return False
@@ -130,11 +137,11 @@ def _dashboard_needs_rebuild(repo_root: Path) -> bool:
 
 
 def _require_prebuilt_dashboard(repo_root: Path) -> None:
-    """Hard-fail if dashboard/index.html is absent (build prerequisite)."""
-    dist_index = repo_root / "dashboard" / "index.html"
+    """Hard-fail if index.html is absent from the runtime static path."""
+    dist_index = _dashboard_static_dir(repo_root) / "index.html"
     if not dist_index.exists():
         raise RuntimeError(
-            "publish aborted: dashboard/index.html not found. "
+            "publish aborted: dashboard index.html not found in runtime static path. "
             "Build the static dashboard first: ./dev/bin/build-metrics-dashboard"
         )
 
@@ -844,7 +851,7 @@ def publish_metrics(repo_root: Path) -> dict[str, Any]:
 
     worktree = _ensure_publication_worktree(repo_root, branch)
     current_source_fingerprint = _compute_dashboard_source_fingerprint(repo_root)
-    published_stamp = _read_dashboard_build_stamp(worktree)
+    published_stamp = _read_dashboard_build_stamp(worktree / "dashboard")
     published_fingerprint = None
     if isinstance(published_stamp, dict):
         value = published_stamp.get("source_fingerprint")
@@ -865,7 +872,7 @@ def publish_metrics(repo_root: Path) -> dict[str, Any]:
             _write_dashboard_build_stamp(repo_root)
 
         # Ensure the locally staged static build is publish-safe.
-        _validate_publish_dashboard_static(repo_root / "dashboard")
+        _validate_publish_dashboard_static(_dashboard_static_dir(repo_root))
 
     generated_dashboard_data = repo_root / "metrics" / "output" / "dashboard" / "latest" / "__data.json"
     generated_report = repo_root / "metrics" / "output" / "reports" / "latest.md"
@@ -876,7 +883,7 @@ def publish_metrics(repo_root: Path) -> dict[str, Any]:
     _validate_publish_payload(generated_dashboard_data, run_id, commit_sha)
 
     if not reused_published_dashboard:
-        _copy_tree(repo_root / "dashboard", worktree / "dashboard")
+        _copy_tree(_dashboard_static_dir(repo_root), worktree / "dashboard")
     _copy_tree(generated_dashboard_data, worktree / "dashboard" / "__data.json")
 
     if generated_report.exists():

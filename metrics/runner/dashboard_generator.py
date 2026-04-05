@@ -734,7 +734,7 @@ def run_dashboard_generation(repo_root: Path, run_id: str) -> dict[str, Any]:
     dashboard_data = _dashboard_payload(repo_root=repo_root, manifest=manifest, metrics=metrics, summary=summary, trends=trends)
     _validate_dashboard_payload_contract(dashboard_data)
 
-    dashboard_dir = repo_root / "dashboard"
+    dashboard_dir = repo_root / "metrics" / "output" / "dashboard" / "static"
     output_dashboard_latest = repo_root / "metrics" / "output" / "dashboard" / "latest"
     output_reports_latest = repo_root / "metrics" / "output" / "reports"
     dashboard_data_path = output_dashboard_latest / "__data.json"

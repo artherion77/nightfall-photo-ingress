@@ -79,12 +79,12 @@ def test_module5_dashboard_generation_from_artifacts_only(tmp_path: Path) -> Non
         },
     )
 
-    (tmp_path / "dashboard").mkdir(parents=True, exist_ok=True)
-    (tmp_path / "dashboard" / "index.html").write_text("<html>static-frame</html>", encoding="utf-8")
+    (tmp_path / "metrics" / "output" / "dashboard" / "static").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "metrics" / "output" / "dashboard" / "static" / "index.html").write_text("<html>static-frame</html>", encoding="utf-8")
 
     result = dashboard_generator.run_dashboard_generation(tmp_path, run_id="module5-bootstrap")
 
-    dashboard_path = tmp_path / "dashboard" / "index.html"
+    dashboard_path = tmp_path / "metrics" / "output" / "dashboard" / "static" / "index.html"
     dashboard_data_path = tmp_path / "metrics" / "output" / "dashboard" / "latest" / "__data.json"
     report_path = tmp_path / "metrics" / "output" / "reports" / "latest.md"
     staged_dashboard = tmp_path / "metrics" / "output" / "dashboard" / "module5-bootstrap" / "index.html"
@@ -97,7 +97,7 @@ def test_module5_dashboard_generation_from_artifacts_only(tmp_path: Path) -> Non
     assert staged_dashboard.exists()
     assert staged_dashboard_data.exists()
     assert staged_report.exists()
-    assert result["dashboard"] == "dashboard/index.html"
+    assert result["dashboard"] == "metrics/output/dashboard/static/index.html"
     assert result["report"] == "metrics/output/reports/latest.md"
 
     dashboard_html = dashboard_path.read_text(encoding="utf-8")

@@ -4,7 +4,7 @@
 # Syncs sources into the dev container, ensures the dashboard Node stack is
 # up to date (auto-fixes drift via ensure-stack-ready), runs the SvelteKit
 # production build inside the container, and copies the output back to
-# dashboard/ in the repository root.
+# metrics/output/dashboard/static/ in the repository.
 #
 # Usage:
 #   ./dev/bin/build-metrics-dashboard          # sync + build + copy output
@@ -28,7 +28,7 @@ CONTAINER="dev-photo-ingress"
 DEVCTL="$SCRIPT_DIR/devctl"
 CONTAINER_DASHBOARD_SRC="/opt/nightfall-metrics-dashboard"
 CONTAINER_BUILD_OUTPUT="/dashboard"
-HOST_OUTPUT_DIR="$PROJECT_ROOT/dashboard"
+HOST_OUTPUT_DIR="$PROJECT_ROOT/metrics/output/dashboard/static"
 
 # ── Argument parsing ──────────────────────────────────────────────────────────
 
@@ -107,8 +107,8 @@ stamp = {
     "built_at": datetime.now(timezone.utc).isoformat(),
 }
 
-stamp_path = repo_root / "dashboard" / ".build-stamp"
+stamp_path = repo_root / "metrics" / "output" / "dashboard" / "static" / ".build-stamp"
 stamp_path.write_text(json.dumps(stamp, indent=2) + "\n", encoding="utf-8")
 PY
 
-nf_log_ok "$SCOPE" "Dashboard statics built → dashboard/"
+nf_log_ok "$SCOPE" "Dashboard statics built → metrics/output/dashboard/static/"
