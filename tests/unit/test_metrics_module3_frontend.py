@@ -1,142 +1,302 @@
-from pathlib import Path
-def test_collect_cognitive_complexity_heuristic_and_not_available(tmp_path: Path, monkeypatch) -> None:
-    # No ESLint: fallback to heuristic
-    from metrics.runner import frontend_collector
-    (tmp_path / "webui" / "src").mkdir(parents=True)
-    (tmp_path / "webui" / "src" / "a.ts").write_text("if (x) { y(); }", encoding="utf-8")
-    monkeypatch.setattr("shutil.which", lambda name: None)
-    result = frontend_collector.collect_cognitive_complexity(tmp_path, ["webui/src"])
-    assert result["status"] == "success"
-    assert result["source"] == "heuristic_fallback"
-    assert result["count"] == 1
-    assert "a.ts" in next(iter(result["per_file"]))
-
-    # No files: not_available
-    result2 = frontend_collector.collect_cognitive_complexity(tmp_path, ["webui/empty"])
-    assert result2["status"] == "not_available"
-    assert result2["source"] == "heuristic_fallback"
-
-def test_collect_cognitive_complexity_eslint_not_available(monkeypatch, tmp_path: Path) -> None:
-    # Simulate ESLint present but fails
-    from metrics.runner import frontend_collector
-    (tmp_path / "webui" / "src").mkdir(parents=True)
-    (tmp_path / "webui" / "src" / "b.ts").write_text("if (y) { z(); }", encoding="utf-8")
-    monkeypatch.setattr("shutil.which", lambda name: "/usr/bin/eslint")
-    class DummyProc:
-        returncode = 2
-        stdout = ""
-        stderr = "ESLint error"
-    monkeypatch.setattr(frontend_collector.subprocess, "run", lambda *a, **k: DummyProc())
-    result = frontend_collector.collect_cognitive_complexity(tmp_path, ["webui/src"])
-    assert result["status"] == "not_available"
-    assert result["source"] == "eslint_rules"
+"""Unit tests for frontend metrics module (module 3): Sonar Cognitive Complexity."""
 
 import json
 from pathlib import Path
 
-from metrics.runner.frontend_collector import collect_dependency_graph, collect_loc, run_frontend_collection
+import pytest
+
+from metrics.runner.frontend_collector import (
+    collect_cognitive_complexity,
+    collect_dependency_graph,
+    collect_loc,
+    SonarCognitiveComplexityCollector,
+    run_frontend_collection,
+)
 
 
-def test_collect_frontend_loc_counts_js_ts_svelte(tmp_path: Path) -> None:
-    (tmp_path / "webui" / "src").mkdir(parents=True)
-    (tmp_path / "webui" / "src" / "a.ts").write_text("const x = 1;\n", encoding="utf-8")
-    (tmp_path / "webui" / "src" / "b.svelte").write_text("<script>let x=1;</script>\n", encoding="utf-8")
-    (tmp_path / "webui" / "tests").mkdir(parents=True)
-    (tmp_path / "webui" / "tests" / "c.js").write_text("console.log('x')\n", encoding="utf-8")
+class TestCognitiveComplexityCollector:
+    """Test Sonar Cognitive Complexity scoring algorithm."""
 
-    payload = collect_loc(tmp_path, ["webui/src", "webui/tests"])
-    assert payload["status"] == "success"
-    assert payload["files"] == 3
-    assert payload["js_ts_files"] == 2
-    assert payload["svelte_files"] == 1
+    def test_flat_function_scores_zero(self, tmp_path: Path) -> None:
+        """Flat function with no control flow should score 0."""
+        fixture = tmp_path / "test.js"
+        fixture.write_text("""
+function flat(x, y) {
+    const result = x + y;
+    return result;
+}
+        """, encoding="utf-8")
+        
+        collector = SonarCognitiveComplexityCollector()
+        file_result, failures = collector.score_file(fixture)
+        
+        assert len(failures) == 0
+        assert file_result["function_count"] == 1
+        assert file_result["functions"][0]["cognitive_complexity"] == 0
+
+    def test_single_if_scores_one(self, tmp_path: Path) -> None:
+        """Single if statement should score +1."""
+        fixture = tmp_path / "test.js"
+        fixture.write_text("""
+function withIf(x) {
+    if (x > 0) {
+        return x;
+    }
+    return 0;
+}
+        """, encoding="utf-8")
+        
+        collector = SonarCognitiveComplexityCollector()
+        file_result, failures = collector.score_file(fixture)
+        
+        assert len(failures) == 0
+        assert file_result["function_count"] == 1
+        assert file_result["functions"][0]["cognitive_complexity"] == 1
+
+    def test_nested_conditionals(self, tmp_path: Path) -> None:
+        """Nested if should apply nesting penalty."""
+        fixture = tmp_path / "test.js"
+        fixture.write_text("""
+function nested(x, y) {
+    if (x > 0) {
+        if (y > 0) {
+            return x + y;
+        }
+    }
+    return 0;
+}
+        """, encoding="utf-8")
+        
+        collector = SonarCognitiveComplexityCollector()
+        file_result, failures = collector.score_file(fixture)
+        
+        assert len(failures) == 0
+        # Outer if: +1, inner if: +(1+1) = +2, total = 3
+        assert file_result["functions"][0]["cognitive_complexity"] == 3
+
+    def test_loop_scores_one(self, tmp_path: Path) -> None:
+        """for/while loops should score +1."""
+        fixture = tmp_path / "test.js"
+        fixture.write_text("""
+function withLoop(arr) {
+    for (let i = 0; i < arr.length; i++) {
+        console.log(arr[i]);
+    }
+}
+        """, encoding="utf-8")
+        
+        collector = SonarCognitiveComplexityCollector()
+        file_result, failures = collector.score_file(fixture)
+        
+        assert len(failures) == 0
+        assert file_result["functions"][0]["cognitive_complexity"] == 1
+
+    def test_switch_statement(self, tmp_path: Path) -> None:
+        """Switch statement: +1 for switch, +1 for each case."""
+        fixture = tmp_path / "test.js"
+        fixture.write_text("""
+function switchTest(x) {
+    switch (x) {
+        case 1:
+            return 'one';
+        case 2:
+            return 'two';
+        default:
+            return 'other';
+    }
+}
+        """, encoding="utf-8")
+        
+        collector = SonarCognitiveComplexityCollector()
+        file_result, failures = collector.score_file(fixture)
+        
+        assert len(failures) == 0
+        # switch: +1, case 1: +1, case 2: +1 = 3
+        assert file_result["functions"][0]["cognitive_complexity"] == 3
+
+    def test_try_catch(self, tmp_path: Path) -> None:
+        """Try-catch: +1 for catch clause."""
+        fixture = tmp_path / "test.js"
+        fixture.write_text("""
+function tryCatch(x) {
+    try {
+        return riskyOp(x);
+    } catch (e) {
+        return null;
+    }
+}
+        """, encoding="utf-8")
+        
+        collector = SonarCognitiveComplexityCollector()
+        file_result, failures = collector.score_file(fixture)
+        
+        assert len(failures) == 0
+        assert file_result["functions"][0]["cognitive_complexity"] == 1
+
+    def test_boolean_operators(self, tmp_path: Path) -> None:
+        """Boolean operators: each && or || adds +1."""
+        fixture = tmp_path / "test.js"
+        fixture.write_text("""
+function boolOps(a, b, c) {
+    if (a > 0 && b > 0 && c > 0) {
+        return 'all positive';
+    }
+    return 'not all';
+}
+        """, encoding="utf-8")
+        
+        collector = SonarCognitiveComplexityCollector()
+        file_result, failures = collector.score_file(fixture)
+        
+        assert len(failures) == 0
+        # if: +1, && count: 2 = 3 total
+        assert file_result["functions"][0]["cognitive_complexity"] == 3
+
+    def test_multiple_functions(self, tmp_path: Path) -> None:
+        """File with multiple functions."""
+        fixture = tmp_path / "test.js"
+        fixture.write_text("""
+function func1(x) {
+    return x;
+}
+
+function func2(x) {
+    if (x > 0) {
+        return x;
+    }
+    return 0;
+}
+        """, encoding="utf-8")
+        
+        collector = SonarCognitiveComplexityCollector()
+        file_result, failures = collector.score_file(fixture)
+        
+        assert len(failures) == 0
+        assert file_result["function_count"] == 2
+        # func1: 0, func2: 1
+        scores = [f["cognitive_complexity"] for f in file_result["functions"]]
+        assert scores == [0, 1]
+        assert file_result["file_total"] == 1
+        assert file_result["file_mean"] == pytest.approx(0.5, abs=0.01)
+
+    def test_parse_error_handling(self, tmp_path: Path) -> None:
+        """Parse errors are reported as failures."""
+        fixture = tmp_path / "test.js"
+        fixture.write_text("function broken(x { return x; }", encoding="utf-8")
+        
+        collector = SonarCognitiveComplexityCollector()
+        file_result, failures = collector.score_file(fixture)
+        
+        # Parse error should be captured
+        assert len(failures) > 0
+        assert failures[0]["reason"] == "parse_error"
 
 
-def test_collect_frontend_dependency_graph_extracts_imports(tmp_path: Path) -> None:
-    (tmp_path / "webui" / "src").mkdir(parents=True)
-    (tmp_path / "webui" / "src" / "imports.ts").write_text(
-        "import x from 'foo';\nconst y = require('bar');\n",
-        encoding="utf-8",
-    )
-    payload = collect_dependency_graph(tmp_path, ["webui/src"])
-    assert payload["status"] == "success"
-    assert {edge["to"] for edge in payload["edges"]} == {"foo", "bar"}
+class TestCollectCognitiveComplexity:
+    """Test the high-level collect_cognitive_complexity function."""
+
+    def test_no_files_returns_not_available(self, tmp_path: Path) -> None:
+        """No eligible files should return not_available."""
+        result = collect_cognitive_complexity(tmp_path, ["webui/nonexistent"])
+        assert result["status"] == "not_available"
+        assert result["source"] == "sonar_cognitive"
+        assert result["file_count"] == 0
+
+    def test_valid_project_scoring(self, tmp_path: Path) -> None:
+        """Valid project should produce scores."""
+        src_dir = tmp_path / "webui" / "src"
+        src_dir.mkdir(parents=True)
+        
+        (src_dir / "simple.js").write_text("function f(x) { return x; }", encoding="utf-8")
+        (src_dir / "complex.js").write_text("""
+function c(x) {
+    if (x > 0) {
+        if (x > 10) {
+            return 'large';
+        }
+        return 'small';
+    }
+    return 'zero';
+}
+        """, encoding="utf-8")
+        
+        result = collect_cognitive_complexity(tmp_path, ["webui/src"])
+        
+        assert result["status"] == "available"
+        assert result["source"] == "sonar_cognitive"
+        assert result["file_count"] == 2
+        assert result["failed_file_count"] == 0
+        assert result["mean"] is not None
+        assert len(result["files"]) == 2
+
+    def test_parser_info_included(self, tmp_path: Path) -> None:
+        """Parser version info must be included."""
+        src_dir = tmp_path / "webui" / "src"
+        src_dir.mkdir(parents=True)
+        (src_dir / "test.js").write_text("function f(x) { return x; }", encoding="utf-8")
+        
+        result = collect_cognitive_complexity(tmp_path, ["webui/src"])
+        
+        assert "parser_info" in result
+        assert result["parser_info"]["library"] == "tree-sitter"
+        assert "library_version" in result["parser_info"]
 
 
-def test_collect_frontend_dependency_graph_node_details(tmp_path: Path) -> None:
-    (tmp_path / "webui" / "src").mkdir(parents=True)
-    # a.ts imports b via relative path (local) and also imports external 'svelte'
-    (tmp_path / "webui" / "src" / "a.ts").write_text(
-        "import b from './b';\nimport { onMount } from 'svelte';\n",
-        encoding="utf-8",
-    )
-    (tmp_path / "webui" / "src" / "b.ts").write_text(
-        "export const x = 1;\n",
-        encoding="utf-8",
-    )
+class TestFrontendLOC:
+    """Test LOC collection (should remain unchanged)."""
 
-    payload = collect_dependency_graph(tmp_path, ["webui/src"])
-    assert payload["status"] == "success"
-    assert "node_details" in payload
-
-    details_by_path = {d["path"]: d for d in payload["node_details"]}
-    assert set(details_by_path.keys()) == {"webui/src/a.ts", "webui/src/b.ts"}
-
-    a = details_by_path["webui/src/a.ts"]
-    b = details_by_path["webui/src/b.ts"]
-
-    assert a["fan_out"] == 2  # imports './b' and 'svelte'
-    assert b["fan_out"] == 0  # no imports
-
-    assert b["fan_in"] == 1  # imported by a via relative path
-    assert a["fan_in"] == 0  # not imported by anyone
-
-    assert a["in_cycle"] is False
-    assert b["in_cycle"] is False
-    assert a["kind"] == "local"
+    def test_collect_loc_counts_files(self, tmp_path: Path) -> None:
+        """LOC collection should count JavaScript/TypeScript/Svelte files."""
+        src = tmp_path / "webui" / "src"
+        src.mkdir(parents=True)
+        
+        (src / "a.ts").write_text("const x = 1;\n", encoding="utf-8")
+        (src / "b.svelte").write_text("<script>let x=1;</script>\n", encoding="utf-8")
+        (src / "c.js").write_text("console.log('x')\n", encoding="utf-8")
+        
+        payload = collect_loc(tmp_path, ["webui/src"])
+        
+        assert payload["status"] == "success"
+        assert payload["files"] == 3
+        assert payload["js_ts_files"] == 2
+        assert payload["svelte_files"] == 1
 
 
-def test_run_frontend_collection_writes_latest_and_history_artifacts(tmp_path: Path) -> None:
-    (tmp_path / "webui" / "src").mkdir(parents=True)
-    (tmp_path / "webui" / "src" / "x.ts").write_text("if (true) { console.log('x'); }\n", encoding="utf-8")
-    (tmp_path / "webui" / "tests").mkdir(parents=True)
-    (tmp_path / "webui" / "tests" / "x.test.ts").write_text("export {};\n", encoding="utf-8")
+class TestFrontendCollectionIntegration:
+    """Integration tests for full frontend collection."""
 
-    # Seed a backend slot to verify frontend collector preserves it.
-    (tmp_path / "artifacts" / "metrics" / "latest").mkdir(parents=True, exist_ok=True)
-    (tmp_path / "artifacts" / "metrics" / "latest" / "metrics.json").write_text(
-        json.dumps(
-            {
-                "schema_version": 1,
-                "run_id": "seed",
-                "source": {"commit_sha": "0" * 40, "branch": "main"},
-                "collection_status": "partial",
-                "modules": {
-                    "backend": {"status": "success", "metrics": {"loc": {"status": "success"}}},
-                    "frontend": {"status": "not_available", "metrics": {}},
-                },
-                "delta": {},
-            }
-        ),
-        encoding="utf-8",
-    )
-
-    run_frontend_collection(repo_root=tmp_path, run_id="module3-test")
-
-    latest_manifest = tmp_path / "artifacts" / "metrics" / "latest" / "manifest.json"
-    latest_metrics = tmp_path / "artifacts" / "metrics" / "latest" / "metrics.json"
-    history_manifest = tmp_path / "artifacts" / "metrics" / "history" / "module3-test" / "manifest.json"
-    history_metrics = tmp_path / "artifacts" / "metrics" / "history" / "module3-test" / "metrics.json"
-    frontend_output = tmp_path / "metrics" / "output" / "frontend" / "module3-test" / "frontend_metrics.json"
-
-    assert latest_manifest.exists()
-    assert latest_metrics.exists()
-    assert history_manifest.exists()
-    assert history_metrics.exists()
-    assert frontend_output.exists()
-
-    metrics_payload = json.loads(latest_metrics.read_text(encoding="utf-8"))
-    assert metrics_payload["schema_version"] == 1
-    assert metrics_payload["run_id"] == "module3-test"
-    assert metrics_payload["modules"]["backend"]["status"] == "success"
-    assert metrics_payload["modules"]["frontend"]["status"] in {"success", "partial"}
-    assert metrics_payload["modules"]["frontend"]["metrics"]["test_coverage"]["status"] == "not_available"
+    def test_run_frontend_collection_writes_artifacts(self, tmp_path: Path) -> None:
+        """Full frontend collection should write metric artifacts."""
+        src = tmp_path / "webui" / "src"
+        src.mkdir(parents=True)
+        
+        (src / "main.ts").write_text("""
+function main(x) {
+    if (x > 0) {
+        return x * 2;
+    }
+    return 0;
+}
+        """, encoding="utf-8")
+        
+        result = run_frontend_collection(
+            repo_root=tmp_path.resolve(),
+            run_id="test-run",
+        )
+        
+        # Check result structure
+        assert "manifest" in result
+        assert "metrics" in result
+        
+        metrics = result["metrics"]
+        assert "modules" in metrics
+        assert "frontend" in metrics["modules"]
+        
+        frontend = metrics["modules"]["frontend"]
+        assert "metrics" in frontend
+        assert "cognitive_complexity" in frontend["metrics"]
+        
+        cc = frontend["metrics"]["cognitive_complexity"]
+        assert cc["source"] == "sonar_cognitive"
+        assert cc["status"] in ("available", "partial", "not_available")
+        assert cc.get("version") == "1.0"

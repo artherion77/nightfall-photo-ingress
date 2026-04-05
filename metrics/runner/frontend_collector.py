@@ -1,6 +1,5 @@
 
 from __future__ import annotations
-import shutil
 
 import argparse
 import getpass
@@ -8,7 +7,6 @@ import importlib.metadata
 import json
 import re
 import socket
-import subprocess
 import sys
 import time
 from datetime import datetime, timezone
@@ -22,9 +20,6 @@ from metrics.runner.schema_contract import validate_manifest_payload, validate_m
 IMPORT_RE = re.compile(
     r"(?:import\s+(?:.+?)\s+from\s+|import\(\s*|require\(\s*)(['\"])(?P<module>[^'\"]+)\1"
 )
-COGNITIVE_TOKENS = ("if", "for", "while", "switch", "case", "catch", "&&", "||", "?", "=>")
-
-
 def utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -44,11 +39,19 @@ def _tool_version(distribution: str) -> str | None:
 def _iter_frontend_files(repo_root: Path, roots: list[str]) -> list[Path]:
     files: list[Path] = []
     suffixes = {".js", ".ts", ".svelte", ".jsx", ".tsx"}
+    exclude_dirs = {"node_modules", "dist", ".svelte-kit", "build", "coverage"}
+    
     for root in roots:
         start = repo_root / root
         if not start.exists():
             continue
         for file_path in start.rglob("*"):
+            # Skip excluded directories
+            if any(part in exclude_dirs for part in file_path.parts):
+                continue
+            # Skip .d.ts files
+            if file_path.name.endswith(".d.ts"):
+                continue
             if file_path.is_file() and file_path.suffix in suffixes:
                 files.append(file_path)
     return sorted(files)
@@ -95,112 +98,362 @@ def collect_loc(repo_root: Path, roots: list[str]) -> dict[str, Any]:
     }
 
 
-def _estimate_cognitive_complexity(text: str) -> int:
-    complexity = 0
-    nesting = 0
-    for line in text.splitlines():
-        stripped = line.strip()
-        if not stripped:
-            continue
+# ============================================================================
+# SONAR COGNITIVE COMPLEXITY COLLECTOR (tree-sitter based)
+# ============================================================================
 
-        close_braces = stripped.count("}")
-        nesting = max(0, nesting - close_braces)
+class SonarCognitiveComplexityCollector:
+    """AST-based Sonar Cognitive Complexity scorer for JS/TS/Svelte."""
 
-        token_hits = sum(stripped.count(token) for token in COGNITIVE_TOKENS)
-        if token_hits:
-            complexity += token_hits * (1 + nesting)
+    def __init__(self):
+        try:
+            from tree_sitter import Language, Parser
+            from tree_sitter_javascript import language as js_language
+            from tree_sitter_typescript import language_typescript as ts_language
+        except ImportError as e:
+            raise RuntimeError(f"tree-sitter not available: {e}") from e
 
-        open_braces = stripped.count("{")
-        nesting += open_braces
-    return complexity
+        self.parser = Parser()
+        self.languages = {
+            ".js": Language(js_language()),
+            ".jsx": Language(js_language()),
+            ".ts": Language(ts_language()),
+            ".tsx": Language(ts_language()),
+            ".svelte": Language(js_language()),  # Svelte uses JS grammar
+        }
+
+    def _parser_info(self) -> dict[str, str]:
+        """Return parser library versions."""
+        def get_version(module_name: str) -> str:
+            """Try to get version from importlib.metadata."""
+            try:
+                return importlib.metadata.version(module_name)
+            except Exception:
+                return "unknown"
+
+        js_ver = get_version("tree-sitter-javascript")
+        return {
+            "library": "tree-sitter",
+            "library_version": get_version("tree-sitter"),
+            "grammar_js": js_ver,
+            "grammar_ts": get_version("tree-sitter-typescript"),
+            "grammar_svelte": js_ver,  # Svelte parsed with JS grammar (no tree-sitter-svelte installed)
+        }
+
+    def calculate_javascript_complexity(self, code: str) -> int:
+        """Calculate complexity for a JavaScript code string.
+        
+        Parses the code and finds the first function declaration,
+        then returns its cognitive complexity score.
+        """
+        try:
+            # Parse the code
+            code_bytes = code.encode("utf-8")
+            lang = self.languages.get(".js")
+            if not lang:
+                return 0
+            self.parser.language = lang
+            tree = self.parser.parse(code_bytes)
+            
+            # Find the first function
+            def find_function(node: Any) -> Any | None:
+                if self._is_function_like(node):
+                    return node
+                for child in node.children:
+                    result = find_function(child)
+                    if result:
+                        return result
+                return None
+            
+            func_node = find_function(tree.root_node)
+            if not func_node:
+                return 0
+            
+            return self._score_function(func_node)
+        except Exception:
+            return 0
+
+    def _parse_file(self, file_path: Path) -> Any | None:
+        """Parse file and return AST root or None on parse error."""
+        try:
+            text = file_path.read_bytes()
+            lang = self.languages.get(file_path.suffix)
+            if not lang:
+                return None
+            self.parser.language = lang
+            tree = self.parser.parse(text)
+            if tree.root_node.has_error:
+                return None
+            return tree.root_node
+        except Exception:
+            return None
+
+    def _detect_language(self, file_path: Path) -> str:
+        """Detect language from file suffix."""
+        if file_path.suffix == ".svelte":
+            return "svelte"
+        elif file_path.suffix in {".ts", ".tsx"}:
+            return "typescript"
+        else:
+            return "javascript"
+
+    def _is_function_like(self, node: Any) -> bool:
+        """Check if node is a function-like declaration."""
+        types = {
+            "function_declaration",
+            "function_expression",
+            "arrow_function",
+            "method_definition",
+            "generator_function_declaration",
+            "generator_function_expression",
+        }
+        return node.type in types
+
+    def _extract_function_name(self, node: Any) -> str:
+        """Extract display name from form function node."""
+        # Try to find name child
+        for child in node.children:
+            if child.type == "identifier":
+                try:
+                    return child.text.decode("utf-8", errors="replace")
+                except Exception:
+                    pass
+        
+        # Try property name for methods
+        if node.type == "method_definition":
+            for child in node.children:
+                if child.type in ("property_identifier", "identifier"):
+                    try:
+                        return child.text.decode("utf-8", errors="replace")
+                    except Exception:
+                        pass
+        
+        return f"<{node.type}>"
+
+    def _count_boolean_operators(self, node: Any) -> int:
+        """Count boolean operators in a condition."""
+        count = 0
+        # DFS to find operators in condition
+        def traverse(n: Any) -> None:
+            nonlocal count
+            if n.type in ("&&", "||"):
+                count += 1
+            for child in n.children:
+                traverse(child)
+        
+        traverse(node)
+        return count
+
+    def _score_function(self, func_node: Any) -> int:
+        """Compute Sonar cognitive complexity score for a function."""
+        score = 0
+        
+        def traverse(node: Any, nesting_level: int) -> None:
+            nonlocal score
+            
+            next_nesting = nesting_level
+            
+            # Handle else_clause without nesting penalty
+            if node.type == "else_clause":
+                score += 1  # +1 for else
+                # Special case: else if should not increase nesting
+                # Check if this else contains only an if statement (else if pattern)
+                has_only_if = False
+                for child in node.children:
+                    if child.type == "if_statement":
+                        has_only_if = True
+                    elif child.type not in ("else", "if_statement"):
+                        # Has other statements beside the if
+                        has_only_if = False
+                        break
+                
+                # If this is "else if", pass reduced nesting to avoid double-counting
+                if has_only_if:
+                    # Pass nesting_level - 2 so the if inside gets no nesting penalty
+                    next_nesting = max(0, nesting_level - 2)
+                else:
+                    next_nesting = nesting_level + 1
+            # Handle switch cases without nesting penalty
+            elif node.type == "switch_case":
+                score += 1  # +1 for case, no nesting penalty
+                next_nesting = nesting_level + 1
+            # Handle other flow control structures with nesting penalty
+            elif node.type in ("if_statement", "for_statement", "for_in_statement", 
+                              "while_statement", "do_statement", "switch_statement",
+                              "catch_clause", "ternary_expression"):
+                score += 1 + nesting_level
+                
+                # Count boolean operators in condition (if present)
+                for child in node.children:
+                    if child.type in ("parenthesized_expression", "conditions"):
+                        bool_count = self._count_boolean_operators(child)
+                        score += bool_count
+                
+                next_nesting = nesting_level + 1
+            # Handle jump statements (break, continue, throw)
+            elif node.type in {"break_statement", "continue_statement", "throw_statement"}:
+                score += 1
+                next_nesting = nesting_level
+            
+            # Check for recursion (function calling itself)
+            if node.type == "call_expression":
+                # Try to find callee name
+                for child in node.children:
+                    if child.type == "identifier":
+                        try:
+                            callee_name = child.text.decode("utf-8", errors="replace")
+                            func_name = self._extract_function_name(func_node)
+                            if func_name == callee_name:
+                                score += 1
+                        except Exception:
+                            pass
+            
+            # Recurse to children
+            for child in node.children:
+                traverse(child, next_nesting)
+        
+        # Find body (varies by function type)
+        body = None
+        for child in func_node.children:
+            if child.type in ("block", "statement_block"):
+                body = child
+                break
+        
+        if body:
+            traverse(body, 0)
+        
+        return score
+
+    def score_file(self, file_path: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+        """Score all functions in a file. Returns (file_result, failures)."""
+        failures: list[dict[str, Any]] = []
+        
+        root_node = self._parse_file(file_path)
+        if not root_node:
+            return (
+                {
+                    "path": str(file_path),
+                    "language": self._detect_language(file_path),
+                    "function_count": 0,
+                    "functions": [],
+                    "file_total": 0,
+                    "file_mean": None,
+                },
+                [
+                    {
+                        "path": str(file_path),
+                        "reason": "parse_error",
+                        "detail": "Failed to parse file",
+                        "remediation": "Fix syntax error or exclude file from analysis",
+                    }
+                ],
+            )
+        
+        functions = []
+        
+        def extract_functions(node: Any) -> None:
+            """Recursively extract function-like nodes."""
+            if self._is_function_like(node):
+                score = self._score_function(node)
+                functions.append({
+                    "name": self._extract_function_name(node),
+                    "start_line": node.start_point[0] + 1,
+                    "end_line": node.end_point[0] + 1,
+                    "cognitive_complexity": score,
+                })
+            
+            for child in node.children:
+                extract_functions(child)
+        
+        extract_functions(root_node)
+        
+        file_total = sum(f["cognitive_complexity"] for f in functions)
+        file_mean = (file_total / len(functions)) if functions else None
+        
+        return (
+            {
+                "path": str(file_path),
+                "language": self._detect_language(file_path),
+                "function_count": len(functions),
+                "functions": functions,
+                "file_total": file_total,
+                "file_mean": file_mean,
+            },
+            failures,
+        )
+
+    def score_project(self, files: list[Path]) -> dict[str, Any]:
+        """Score all files in project."""
+        analyzed_files = []
+        all_failures = []
+        
+        for file_path in files:
+            file_result, failures = self.score_file(file_path)
+            analyzed_files.append(file_result)
+            all_failures.extend(failures)
+        
+        # Compute project mean
+        file_means = [f["file_mean"] for f in analyzed_files if f["file_mean"] is not None]
+        project_mean = (sum(file_means) / len(file_means)) if file_means else None
+        
+        # Determine status
+        if all_failures:
+            if all_failures and len(analyzed_files) > len(all_failures):
+                status = "partial"
+            elif len(all_failures) == len(analyzed_files):
+                status = "error"
+            else:
+                status = "partial"
+        elif not analyzed_files:
+            status = "not_available"
+        else:
+            status = "available"
+        
+        return {
+            "source": "sonar_cognitive",
+            "status": status,
+            "version": "1.0",
+            "parser_info": self._parser_info(),
+            "mean": project_mean,
+            "file_count": len(analyzed_files),
+            "failed_file_count": len(all_failures),
+            "files": analyzed_files,
+            "failures": all_failures,
+        }
 
 
 def collect_cognitive_complexity(repo_root: Path, roots: list[str]) -> dict[str, Any]:
+    """Collect frontend cognitive complexity using Sonar Cognitive Complexity."""
     files = _iter_frontend_files(repo_root, roots)
-    eslint_path = shutil.which("eslint")
-    if eslint_path:
-        # Try to run ESLint with complexity plugin and parse results
-        try:
-            # Use --format json for machine-readable output
-            cmd = [eslint_path, "--ext", ".js,.ts,.svelte,.jsx,.tsx", "--format", "json"]
-            for root in roots:
-                cmd.append(str((repo_root / root).resolve()))
-            proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
-            if proc.returncode == 0 or proc.returncode == 1:  # 1 = lint errors, still parseable
-                try:
-                    eslint_results = json.loads(proc.stdout)
-                except Exception as exc:
-                    return {
-                        "status": "not_available",
-                        "reason": f"eslint output parse error: {exc}",
-                        "source": "eslint_rules",
-                    }
-                per_file = {}
-                values = []
-                for file_result in eslint_results:
-                    rel = str(Path(file_result.get("filePath", "")).relative_to(str(repo_root)))
-                    # Look for complexity metrics in messages (plugin must be configured)
-                    complexity_score = None
-                    for msg in file_result.get("messages", []):
-                        if "complexity" in msg.get("ruleId", "") and "value" in msg:
-                            try:
-                                complexity_score = int(msg["value"])
-                            except Exception:
-                                continue
-                    if complexity_score is not None:
-                        per_file[rel] = complexity_score
-                        values.append(complexity_score)
-                if values:
-                    return {
-                        "status": "success",
-                        "source": "eslint_rules",
-                        "count": len(values),
-                        "mean": round((sum(values) / len(values)), 4),
-                        "max": max(values),
-                        "per_file": per_file,
-                    }
-                else:
-                    return {
-                        "status": "not_available",
-                        "reason": "eslint ran but no complexity metrics found (plugin missing?)",
-                        "source": "eslint_rules",
-                    }
-            else:
-                return {
-                    "status": "not_available",
-                    "reason": f"eslint failed: {proc.stderr.strip()}",
-                    "source": "eslint_rules",
-                }
-        except Exception as exc:
-            return {
-                "status": "not_available",
-                "reason": f"eslint invocation error: {exc}",
-                "source": "eslint_rules",
-            }
-    # Fallback: heuristic
-    per_file = {}
-    values = []
-    for file_path in files:
-        rel = str(file_path.relative_to(repo_root))
-        text = file_path.read_text(encoding="utf-8", errors="replace")
-        score = _estimate_cognitive_complexity(text)
-        per_file[rel] = score
-        values.append(score)
-    if values:
+    
+    try:
+        collector = SonarCognitiveComplexityCollector()
+    except RuntimeError as e:
         return {
-            "status": "success",
-            "source": "heuristic_fallback",
-            "count": len(values),
-            "mean": round((sum(values) / len(values)), 4),
-            "max": max(values),
-            "per_file": per_file,
+            "status": "error",
+            "source": "sonar_cognitive",
+            "reason": str(e),
+            "detail": "tree-sitter not available",
+            "remediation": "Install tree-sitter: pip install tree-sitter tree-sitter-javascript tree-sitter-typescript",
         }
-    else:
+    
+    if not files:
         return {
             "status": "not_available",
-            "reason": "no frontend files found for complexity analysis",
-            "source": "heuristic_fallback",
+            "source": "sonar_cognitive",
+            "reason": "no eligible files found",
+            "file_count": 0,
+            "failed_file_count": 0,
+            "files": [],
+            "failures": [],
         }
+    
+    result = collector.score_project(files)
+    
+    # Add collection time
+    result["collection_time_ms"] = 0  # Will be set by orchestrator
+    
+    return result
 
 
 _FRONTEND_EXTS = (".ts", ".tsx", ".js", ".jsx", ".svelte")

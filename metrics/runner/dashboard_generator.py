@@ -488,7 +488,7 @@ def _dashboard_payload(repo_root: Path, manifest: dict[str, Any], metrics: dict[
     }
 
     frontend_complexity_reference = {
-        "method": "Heuristic cognitive complexity from frontend_collector (branch tokens weighted by nesting depth)",
+        "method": "Sonar Cognitive Complexity (tree-sitter AST; nesting-penalised increments)",
         "scale": {"min": 0.0, "max": 60.0},
         "industryMedian": 26.0,
         "industryMeanRange": {"min": 12.0, "max": 40.0},
@@ -630,6 +630,18 @@ def _dashboard_payload(repo_root: Path, manifest: dict[str, Any], metrics: dict[
         "complexityCard": {
             "cyclomatic": (backend_complexity.get("cyclomatic") or {}).get("mean") if isinstance(backend_complexity, dict) else None,
             "maintainability": (backend_complexity.get("maintainability_index") or {}).get("mean") if isinstance(backend_complexity, dict) else None,
+            "frontend": {
+                "value": frontend_cognitive.get("mean") if isinstance(frontend_cognitive, dict) else None,
+                "source": frontend_cognitive.get("source") if isinstance(frontend_cognitive, dict) else None,
+                "status": frontend_cognitive.get("status") if isinstance(frontend_cognitive, dict) else None,
+                "parser_version_label": (
+                    "tree-sitter {}".format(
+                        (frontend_cognitive.get("parser_info") or {}).get("library_version", "unknown")
+                    )
+                    if isinstance(frontend_cognitive, dict) and isinstance(frontend_cognitive.get("parser_info"), dict)
+                    else None
+                ),
+            },
         },
         "frontendComplexity": frontend_cognitive.get("mean") if isinstance(frontend_cognitive, dict) else None,
         "frontendComplexityReference": frontend_complexity_reference,
