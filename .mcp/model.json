@@ -102,11 +102,10 @@
     "path": "./dev/bin/devctl",
     "commands": [
       "setup",
-      "create",
       "destroy",
       "reset",
-      "snapshot-create",
-      "snapshot-refresh",
+      "update",
+      "check",
       "ensure-stack-ready",
       "assert-cached-ready",
       "run-api",
@@ -167,6 +166,12 @@
       "./dev/bin/devctl setup",
       "./dev/bin/devctl assert-cached-ready",
       "./dev/bin/devctl status"
+    ],
+    "devcontainer.check": [
+      "./dev/bin/devctl check"
+    ],
+    "devcontainer.update": [
+      "./dev/bin/devctl update"
     ],
     "devcontainer.reset": [
       "./dev/bin/devctl reset",

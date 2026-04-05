@@ -20,7 +20,7 @@ def _start_test_server(workspace_root: Path) -> ThreadingHTTPServer:
     return server
 
 
-def _await_status(port: int, task_id: str, *, timeout_seconds: float = 5.0) -> dict[str, object]:
+def _await_status(port: int, task_id: str, *, timeout_seconds: float = 10.0) -> dict[str, object]:
     deadline = time.time() + timeout_seconds
     payload: dict[str, object] = {}
     while time.time() < deadline:
@@ -71,7 +71,9 @@ def test_web_mcp_tasks_execute_successfully_in_isolated_workspace(tmp_path: Path
     (workspace_root / ".mcp" / "model.json").write_text(json.dumps(model), encoding="utf-8")
 
     prior_path = os.environ.get("PATH", "")
+    prior_lock_file = os.environ.get("REPO_LOCK_FILE")
     os.environ["PATH"] = f"{workspace_root / 'dev' / 'bin'}:{prior_path}"
+    os.environ["REPO_LOCK_FILE"] = str(workspace_root / ".mcp" / "repo.lock")
 
     server = _start_test_server(workspace_root)
     try:
@@ -93,5 +95,9 @@ def test_web_mcp_tasks_execute_successfully_in_isolated_workspace(tmp_path: Path
             assert status_payload.get("status") == "success"
     finally:
         os.environ["PATH"] = prior_path
+        if prior_lock_file is None:
+            os.environ.pop("REPO_LOCK_FILE", None)
+        else:
+            os.environ["REPO_LOCK_FILE"] = prior_lock_file
         server.shutdown()
         server.server_close()

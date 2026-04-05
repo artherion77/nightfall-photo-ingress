@@ -6,7 +6,7 @@ import subprocess
 from pathlib import Path
 
 
-DEVCTL = Path(__file__).resolve().parents[2] / "dev" / "devctl"
+DEVCTL = Path(__file__).resolve().parents[2] / "dev" / "bin" / "devctl"
 
 
 def _make_web_root(tmp_path: Path) -> Path:

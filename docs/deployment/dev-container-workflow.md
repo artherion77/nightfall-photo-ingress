@@ -32,44 +32,48 @@ change production packaging requirements.
 
 ## Command Surface
 
-An initial dedicated dev lifecycle scaffold exists at `dev/bin/devctl`.
+Current high-level development lifecycle commands:
 
-Current high-level commands:
-
-- `devctl create` — create `dev-photo-ingress` container baseline
-- `devctl bootstrap-python` — install Python runtime and project dependencies
-- `devctl bootstrap-webui` — install Node/npm and web UI dependencies
-- `devctl run-api` — run API process for development
-- `devctl run-webui` — run Vite dev server with host-accessible URL
-- `devctl snapshot-refresh` — refresh the `clean-installed` snapshot from current state
-- `devctl reset` — restore container state from `clean-installed` snapshot
+- `devctl setup` — atomic bootstrap of container, Node, Python, and both web stacks
+- `devctl check` — read-only drift report (Node, manifests, snapshots)
+- `devctl update [--scope node|webui|dashboard|all] [--simulate]` — regenerate lockfiles and run regression gate
+- `devctl reset [--base]` — restore `current` snapshot when present, otherwise `base`
 - `devctl destroy` — remove development container
 
-Some commands are scaffolds/placeholders and are explicitly labeled as such by
-the tool output.
+Runtime/testing helpers remain available (`ensure-stack-ready`, `run-webui`,
+`test-web-*`, `status`, `shell`) and are used by automated workflows.
 
 ---
 
 ## Expected Development Lifecycle
 
-1. create `dev-photo-ingress`
-2. bootstrap runtime/toolchains
-3. run API + web UI dev servers
-4. iterate against source changes
-5. use `devctl reset` for fast rollback to `clean-installed`
-6. destroy when done (optional)
+1. run `devctl setup` to establish baseline (`base` snapshot)
+2. run `devctl check` to verify no drift
+3. iterate on source or dependency changes
+4. run `devctl update --simulate` to preview required work
+5. run `devctl update [--scope ...]` to regenerate lockfiles and run regression
+6. use `devctl reset` for fast rollback to `current` (or `base` if current is absent)
+7. destroy when done (optional)
 
 ### Reset mechanic
 
-Bootstrap commands refresh a `clean-installed` snapshot automatically. The reset
-path restores that snapshot instead of rebuilding the container from scratch.
+`devctl setup` creates a `base` snapshot. `devctl update` creates/replaces the
+`current` snapshot only after regression succeeds.
+
+`devctl reset` restores `current` first and falls back to `base`.
+`devctl reset --base` explicitly restores `base`.
 
 Typical loop:
 
 ```bash
-./dev/bin/devctl create
-./dev/bin/devctl bootstrap-python
-./dev/bin/devctl bootstrap-webui
+./dev/bin/devctl setup
+./dev/bin/devctl check
+
+# preview drift response
+./dev/bin/devctl update --simulate
+
+# apply updates and refresh current snapshot
+./dev/bin/devctl update --scope webui
 
 # iterate ...
 ./dev/bin/devctl reset
@@ -106,6 +110,10 @@ Proposed helper categories:
 
 ## Current State
 
-`dev/bin/devctl` is intentionally minimal and provides a starting command surface.
-Future iterations will harden reset behavior, API run orchestration, and shared
-helper coverage with staging controller parity.
+`dev/bin/devctl` now follows the dual-snapshot update model:
+
+- `base` snapshot from `setup`
+- `current` snapshot from successful `update`
+- explicit drift visibility via `check`
+
+This keeps development iteration fast while preserving deterministic rollback.

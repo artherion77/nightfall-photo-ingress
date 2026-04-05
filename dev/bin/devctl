@@ -23,7 +23,8 @@ source "$PROJECT_ROOT/lib/container-common.sh"
 CONTAINER="dev-photo-ingress"
 PROFILE_DEFAULT="default"
 PROFILE_DEV="staging"
-SNAPSHOT_CLEAN="clean-installed"
+SNAPSHOT_BASE="base"
+SNAPSHOT_CURRENT="current"
 
 # Configure container intnal paths
 DEV_WEBUI_ROOT="/opt/nightfall-webui"
@@ -199,7 +200,7 @@ assert_web_stack_major_consistency() {
 _is_stateful_command() {
     local cmd="$1"
     case "$cmd" in
-        setup|create|destroy|reset|snapshot-create|snapshot-refresh|\
+        setup|destroy|reset|update|\
         ensure-stack-ready|assert-cached-ready|\
         run-api|run-webui|\
         test-web-typecheck|test-metrics-dashboard-typecheck|\
@@ -233,8 +234,12 @@ _wait_ready() {
     done
 }
 
-_has_snapshot_clean() {
-    lxc info "$CONTAINER" 2>/dev/null | grep -Fq "| $SNAPSHOT_CLEAN |"
+_has_snapshot_base() {
+    lxc info "$CONTAINER" 2>/dev/null | grep -Eq "\|[[:space:]]*$SNAPSHOT_BASE[[:space:]]*\|"
+}
+
+_has_snapshot_current() {
+    lxc info "$CONTAINER" 2>/dev/null | grep -Eq "\|[[:space:]]*$SNAPSHOT_CURRENT[[:space:]]*\|"
 }
 
 _ensure_cache_mounts() {
@@ -276,15 +281,67 @@ _cache_mounts_active() {
         && grep -Fq "$CACHE_DEVICE_PLAYWRIGHT:" <<<"$devices"
 }
 
-_refresh_clean_snapshot() {
-    _info "Refreshing snapshot '$SNAPSHOT_CLEAN' ..."
-    lxc delete "$CONTAINER/$SNAPSHOT_CLEAN" 2>/dev/null || true
-    lxc snapshot "$CONTAINER" "$SNAPSHOT_CLEAN"
-    _ok "Snapshot '$SNAPSHOT_CLEAN' refreshed."
+_snapshot_taken_at() {
+    local snapshot_name="$1"
+    lxc info "$CONTAINER" 2>/dev/null \
+        | awk -F'|' -v name="$snapshot_name" '
+            $0 ~ /^\+/ {next}
+            {
+                n=$2
+                gsub(/^[ \t]+|[ \t]+$/, "", n)
+                if (n == name) {
+                    t=$3
+                    gsub(/^[ \t]+|[ \t]+$/, "", t)
+                    print t
+                    exit 0
+                }
+            }
+        '
 }
 
-_require_clean_snapshot() {
-    _has_snapshot_clean || _fail "Snapshot '$SNAPSHOT_CLEAN' not found. Run: devctl snapshot-create"
+_snapshot_age_human() {
+    local taken_at="$1"
+    if [[ -z "$taken_at" ]]; then
+        echo "unknown"
+        return 0
+    fi
+
+    local taken_epoch now_epoch age
+    taken_epoch="$(date -d "$taken_at" +%s 2>/dev/null || true)"
+    now_epoch="$(date +%s)"
+    if [[ -z "$taken_epoch" ]]; then
+        echo "unknown"
+        return 0
+    fi
+
+    age=$((now_epoch - taken_epoch))
+    if (( age < 60 )); then
+        echo "${age}s"
+    elif (( age < 3600 )); then
+        echo "$((age / 60))m"
+    elif (( age < 86400 )); then
+        echo "$((age / 3600))h"
+    else
+        echo "$((age / 86400))d"
+    fi
+}
+
+_refresh_base_snapshot() {
+    _info "Refreshing snapshot '$SNAPSHOT_BASE' ..."
+    lxc delete "$CONTAINER/$SNAPSHOT_BASE" 2>/dev/null || true
+    lxc snapshot "$CONTAINER" "$SNAPSHOT_BASE"
+    _ok "Snapshot '$SNAPSHOT_BASE' refreshed."
+}
+
+_refresh_current_snapshot() {
+    _info "Refreshing snapshot '$SNAPSHOT_CURRENT' ..."
+    lxc delete "$CONTAINER/$SNAPSHOT_CURRENT" 2>/dev/null || true
+    lxc snapshot "$CONTAINER" "$SNAPSHOT_CURRENT"
+    _ok "Snapshot '$SNAPSHOT_CURRENT' refreshed."
+}
+
+_require_base_snapshot() {
+    _has_snapshot_base || _fail "Snapshot '$SNAPSHOT_BASE' not found. Run: devctl setup"
 }
 
 # ── Source sync ───────────────────────────────────────────────────────────────
@@ -365,7 +422,9 @@ _assert_node_matches_strict() {
 # ── Stack install and drift detection ─────────────────────────────────────────
 
 # Full install for one stack: sync full sources → rm node_modules/.svelte-kit
-# → npm ci → write manifest hash.  Used by cmd_setup and Node-drift recovery.
+# → npm ci → write manifest hash. npm ci is lockfile-authoritative and is
+# intentionally used for deterministic replay (setup/ensure-stack-ready paths).
+# Used by cmd_setup and Node-drift recovery.
 _install_stack() {
     local stack="$1"
     local container_root container_hash_file
@@ -386,6 +445,75 @@ rm -rf node_modules .svelte-kit
 npm ci
 cat package.json package-lock.json | sha256sum | awk '{print \$1}' > '$container_hash_file'"
     _ok "$stack stack installed. Hash written."
+}
+
+# Regenerate a stack lockfile from package manifests inside the container.
+# This path is manifest-authoritative by design (npm install), unlike
+# _install_stack which is lockfile-authoritative (npm ci).
+_regenerate_stack() {
+    local stack="$1"
+    local container_root container_hash_file
+    if [[ "$stack" == "webui" ]]; then
+        container_root="$DEV_WEBUI_ROOT"
+        container_hash_file="/opt/nightfall-manifest/webui.hash"
+    elif [[ "$stack" == "dashboard" ]]; then
+        container_root="$DEV_METRICS_DASHBOARD_ROOT"
+        container_hash_file="/opt/nightfall-manifest/dashboard.hash"
+    else
+        _fail "Unknown stack for _regenerate_stack: $stack"
+        return 1
+    fi
+
+    _info "Regenerating lockfile for $stack (npm install) ..."
+    lxc exec "$CONTAINER" -- mkdir -p "$container_root" /opt/nightfall-manifest
+    lxc exec "$CONTAINER" -- bash -c "
+set -euo pipefail
+cd '$container_root'
+rm -rf node_modules .svelte-kit
+npm install
+cat package.json package-lock.json | sha256sum | awk '{print \$1}' > '$container_hash_file'"
+    _ok "$stack lockfile regenerated in container."
+}
+
+_pull_lockfile() {
+    local stack="$1"
+    local container_root host_dir
+    if [[ "$stack" == "webui" ]]; then
+        container_root="$DEV_WEBUI_ROOT"
+        host_dir="$PROJECT_ROOT/webui"
+    elif [[ "$stack" == "dashboard" ]]; then
+        container_root="$DEV_METRICS_DASHBOARD_ROOT"
+        host_dir="$PROJECT_ROOT/metrics/dashboard"
+    else
+        _fail "Unknown stack for _pull_lockfile: $stack"
+        return 1
+    fi
+
+    _info "Pulling $stack package-lock.json from container to host ..."
+    lxc file pull "$CONTAINER$container_root/package-lock.json" "$host_dir/package-lock.json"
+    [[ -f "$host_dir/package-lock.json" ]] \
+        || _fail "Pulled lockfile missing on host for stack '$stack': $host_dir/package-lock.json"
+    _ok "$stack lockfile pulled to host."
+}
+
+_recalculate_host_hash() {
+    local stack="$1"
+    local stack_dir
+    if [[ "$stack" == "webui" ]]; then
+        stack_dir="$PROJECT_ROOT/webui"
+    elif [[ "$stack" == "dashboard" ]]; then
+        stack_dir="$PROJECT_ROOT/metrics/dashboard"
+    else
+        _fail "Unknown stack for _recalculate_host_hash: $stack"
+        return 1
+    fi
+
+    if [[ ! -f "$stack_dir/package.json" || ! -f "$stack_dir/package-lock.json" ]]; then
+        _fail "Missing manifest files for stack '$stack' in $stack_dir"
+        return 1
+    fi
+
+    cat "$stack_dir/package.json" "$stack_dir/package-lock.json" | sha256sum | awk '{print $1}'
 }
 
 # Drift detection for a single stack.
@@ -530,7 +658,7 @@ cmd_create() {
 cmd_setup() {
     # Atomic bootstrap: create container → cache mounts → exact Node (nvm) →
     # Python toolchain → webui stack (npm ci) → dashboard stack (npm ci) →
-    # manifest hashes → clean snapshot.
+    # manifest hashes → base snapshot.
     if lxc info "$CONTAINER" &>/dev/null; then
         _warn "Container '$CONTAINER' already exists. Ensuring cache mounts are configured."
     else
@@ -568,8 +696,12 @@ cmd_setup() {
     _info "Bootstrapping metrics dashboard stack ..."
     _install_stack dashboard
 
-    # Create the clean snapshot that reset/assert-cached-ready depend on.
-    _refresh_clean_snapshot
+    # setup establishes the baseline; remove any rolling snapshot before
+    # refreshing base so reset semantics remain deterministic.
+    lxc delete "$CONTAINER/$SNAPSHOT_CURRENT" 2>/dev/null || true
+
+    # Create the base snapshot that reset/assert-cached-ready depend on.
+    _refresh_base_snapshot
 
     _ok "Atomic bootstrap complete."
     _info "Installed Node.js:       $node_version"
@@ -585,19 +717,41 @@ cmd_destroy() {
 
 cmd_reset() {
     nf_require_container_exists "$CONTAINER" "devctl setup" "devctl"
-    _require_clean_snapshot
+
+    local force_base=0
+    case "${1:-}" in
+        "")
+            ;;
+        --base)
+            force_base=1
+            ;;
+        *)
+            _fail "Usage: devctl reset [--base]"
+            ;;
+    esac
+
+    local restore_snapshot=""
+    if (( force_base )); then
+        _require_base_snapshot
+        restore_snapshot="$SNAPSHOT_BASE"
+    elif _has_snapshot_current; then
+        restore_snapshot="$SNAPSHOT_CURRENT"
+    else
+        _require_base_snapshot
+        restore_snapshot="$SNAPSHOT_BASE"
+    fi
 
     _info "Stopping container ..."
     lxc stop "$CONTAINER" --force 2>/dev/null || true
 
-    _info "Restoring snapshot '$SNAPSHOT_CLEAN' ..."
-    lxc restore "$CONTAINER" "$SNAPSHOT_CLEAN"
+    _info "Restoring snapshot '$restore_snapshot' ..."
+    lxc restore "$CONTAINER" "$restore_snapshot"
 
     _info "Starting container ..."
     lxc start "$CONTAINER"
     _wait_ready
 
-    _ok "Development container restored to '$SNAPSHOT_CLEAN'."
+    _ok "Development container restored to '$restore_snapshot'."
 }
 
 cmd_snapshot_create() {
@@ -621,11 +775,194 @@ cmd_snapshot_create() {
     _assert_stack_no_drift webui
     _assert_stack_no_drift dashboard
 
-    _refresh_clean_snapshot
+    _refresh_base_snapshot
 }
 
 cmd_snapshot_refresh() {
     cmd_snapshot_create
+}
+
+cmd_update() {
+    nf_require_container_running "$CONTAINER" "devctl setup" "devctl"
+
+    local scope=""
+    local simulate=0
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --simulate)
+                simulate=1
+                shift
+                ;;
+            --scope)
+                shift
+                [[ $# -gt 0 ]] || _fail "Usage: devctl update [--scope node|webui|dashboard|all] [--simulate]"
+                scope="$1"
+                shift
+                ;;
+            --scope=*)
+                scope="${1#*=}"
+                shift
+                ;;
+            *)
+                _fail "Usage: devctl update [--scope node|webui|dashboard|all] [--simulate]"
+                ;;
+        esac
+    done
+
+    case "${scope:-auto}" in
+        auto|node|webui|dashboard|all) ;;
+        *) _fail "Invalid --scope value: ${scope}. Use one of: node|webui|dashboard|all" ;;
+    esac
+
+    local expected_node actual_node node_drift=0
+    expected_node="$(get_node_version)"
+    [[ -n "$expected_node" ]] || _fail "No .node-version file found in project root."
+    actual_node="$(_get_container_node_version)"
+    if [[ "$actual_node" != "$expected_node" ]]; then
+        node_drift=1
+    fi
+
+    local _host_manifest_hash _container_manifest_hash
+    _host_manifest_hash() {
+        local stack="$1"
+        local stack_dir
+        if [[ "$stack" == "webui" ]]; then
+            stack_dir="$PROJECT_ROOT/webui"
+        else
+            stack_dir="$PROJECT_ROOT/metrics/dashboard"
+        fi
+        [[ -f "$stack_dir/package.json" && -f "$stack_dir/package-lock.json" ]] || return 1
+        cat "$stack_dir/package.json" "$stack_dir/package-lock.json" | sha256sum | awk '{print $1}'
+    }
+    _container_manifest_hash() {
+        local stack="$1"
+        local hash_file
+        if [[ "$stack" == "webui" ]]; then
+            hash_file="/opt/nightfall-manifest/webui.hash"
+        else
+            hash_file="/opt/nightfall-manifest/dashboard.hash"
+        fi
+        lxc exec "$CONTAINER" -- bash -c "cat '$hash_file' 2>/dev/null | tr -d '[:space:]' || true"
+    }
+
+    local web_host_hash web_container_hash web_drift=0
+    local dashboard_host_hash dashboard_container_hash dashboard_drift=0
+
+    web_host_hash="$(_host_manifest_hash webui || true)"
+    web_container_hash="$(_container_manifest_hash webui || true)"
+    if [[ -z "$web_host_hash" || -z "$web_container_hash" || "$web_host_hash" != "$web_container_hash" ]]; then
+        web_drift=1
+    fi
+
+    dashboard_host_hash="$(_host_manifest_hash dashboard || true)"
+    dashboard_container_hash="$(_container_manifest_hash dashboard || true)"
+    if [[ -z "$dashboard_host_hash" || -z "$dashboard_container_hash" || "$dashboard_host_hash" != "$dashboard_container_hash" ]]; then
+        dashboard_drift=1
+    fi
+
+    local resolved_scope="$scope"
+    if [[ -z "$resolved_scope" ]]; then
+        if (( node_drift )); then
+            resolved_scope="all"
+        elif (( web_drift && dashboard_drift )); then
+            resolved_scope="all"
+        elif (( web_drift )); then
+            resolved_scope="webui"
+        elif (( dashboard_drift )); then
+            resolved_scope="dashboard"
+        else
+            resolved_scope="none"
+        fi
+    fi
+
+    if [[ "$resolved_scope" == "node" ]]; then
+        resolved_scope="all"
+    fi
+    if (( node_drift )) && [[ "$resolved_scope" != "all" ]]; then
+        _warn "Node drift detected; escalating scope to all"
+        resolved_scope="all"
+    fi
+
+    if (( simulate )); then
+        if (( node_drift )); then
+            _warn "Node drift: expected=$expected_node actual=${actual_node:-NONE}"
+        else
+            _ok "Node drift: none ($expected_node)"
+        fi
+
+        if (( web_drift )); then
+            _warn "webui manifest drift: host=${web_host_hash:-MISSING} container=${web_container_hash:-MISSING}"
+        else
+            _ok "webui manifest drift: none (${web_host_hash:-UNKNOWN})"
+        fi
+
+        if (( dashboard_drift )); then
+            _warn "dashboard manifest drift: host=${dashboard_host_hash:-MISSING} container=${dashboard_container_hash:-MISSING}"
+        else
+            _ok "dashboard manifest drift: none (${dashboard_host_hash:-UNKNOWN})"
+        fi
+
+        _info "Effective scope: $resolved_scope"
+        case "$resolved_scope" in
+            none)
+                _info "Planned operations: none" ;;
+            webui)
+                _info "Planned operations: sync/regenerate/pull webui" ;;
+            dashboard)
+                _info "Planned operations: sync/regenerate/pull dashboard" ;;
+            all)
+                _info "Planned operations: sync/regenerate/pull webui+dashboard"
+                if (( node_drift )); then
+                    _info "Planned operations: install exact Node $expected_node"
+                fi
+                ;;
+        esac
+
+        if (( node_drift || web_drift || dashboard_drift )); then
+            _warn "Simulation result: drift detected"
+            return 1
+        fi
+        _ok "Simulation result: no drift detected"
+        return 0
+    fi
+
+    if [[ "$scope" == "" && "$resolved_scope" == "none" ]]; then
+        _ok "No drift detected; update has nothing to do."
+        return 0
+    fi
+
+    if (( node_drift )); then
+        _warn "Node drift: expected=$expected_node actual=${actual_node:-NONE}; reinstalling exact Node"
+        _install_node_exact "$expected_node"
+    fi
+
+    assert_web_stack_major_consistency
+
+    local stack
+    if [[ "$resolved_scope" == "webui" || "$resolved_scope" == "all" ]]; then
+        _sync_webui_sources
+        _regenerate_stack webui
+        _pull_lockfile webui
+        _info "webui host hash after pullback: $(_recalculate_host_hash webui)"
+    fi
+    if [[ "$resolved_scope" == "dashboard" || "$resolved_scope" == "all" ]]; then
+        _sync_metrics_dashboard_sources
+        _regenerate_stack dashboard
+        _pull_lockfile dashboard
+        _info "dashboard host hash after pullback: $(_recalculate_host_hash dashboard)"
+    fi
+
+    _assert_stack_no_drift webui
+    _assert_stack_no_drift dashboard
+
+    if ! _run_regression_gate; then
+        _fail "Update aborted: regression gate failed; current snapshot not refreshed"
+        return 1
+    fi
+
+    _refresh_current_snapshot
+    _ok "Update complete: scope=$resolved_scope node_drift=$node_drift"
 }
 
 # ── Run commands ──────────────────────────────────────────────────────────────
@@ -811,6 +1148,52 @@ npx playwright test --reporter=line"
     _ok "test-web-e2e completed successfully (or skipped when no e2e specs exist)."
 }
 
+# Run the full regression gate used by update flows.
+# Caller is expected to hold the global repo lock.
+_run_regression_gate() {
+    local total_start total_elapsed
+    total_start="$(date +%s)"
+
+    _info "Regression gate: starting"
+
+    local suite_start suite_elapsed
+
+    suite_start="$(date +%s)"
+    if ! cmd_test_web_typecheck; then
+        _fail "Regression gate failed: test-web-typecheck"
+        return 1
+    fi
+    suite_elapsed=$(( $(date +%s) - suite_start ))
+    _info "Regression gate: test-web-typecheck passed (${suite_elapsed}s)"
+
+    suite_start="$(date +%s)"
+    if ! cmd_test_metrics_dashboard_typecheck; then
+        _fail "Regression gate failed: test-metrics-dashboard-typecheck"
+        return 1
+    fi
+    suite_elapsed=$(( $(date +%s) - suite_start ))
+    _info "Regression gate: test-metrics-dashboard-typecheck passed (${suite_elapsed}s)"
+
+    suite_start="$(date +%s)"
+    if ! cmd_test_web_unit; then
+        _fail "Regression gate failed: test-web-unit"
+        return 1
+    fi
+    suite_elapsed=$(( $(date +%s) - suite_start ))
+    _info "Regression gate: test-web-unit passed (${suite_elapsed}s)"
+
+    suite_start="$(date +%s)"
+    if ! DEVCTL_GLOBAL_LOCK_HELD=1 "$PROJECT_ROOT/.venv/bin/python" -m pytest tests/unit; then
+        _fail "Regression gate failed: pytest tests/unit"
+        return 1
+    fi
+    suite_elapsed=$(( $(date +%s) - suite_start ))
+    _info "Regression gate: pytest tests/unit passed (${suite_elapsed}s)"
+
+    total_elapsed=$(( $(date +%s) - total_start ))
+    _ok "Regression gate passed (${total_elapsed}s total)"
+}
+
 # ── Status / utility commands ─────────────────────────────────────────────────
 
 cmd_assert_cached_ready() {
@@ -819,19 +1202,29 @@ cmd_assert_cached_ready() {
     _cache_mounts_active \
         || _fail "Cache mounts not fully configured. Run: devctl setup"
 
-    _has_snapshot_clean \
-        || _fail "Clean snapshot '$SNAPSHOT_CLEAN' missing. Run: devctl snapshot-create"
+    if _has_snapshot_current; then
+        _ok "Snapshot readiness: '$SNAPSHOT_CURRENT' present"
+    elif _has_snapshot_base; then
+        _ok "Snapshot readiness: '$SNAPSHOT_BASE' present"
+    else
+        _fail "No snapshot found ('$SNAPSHOT_CURRENT' or '$SNAPSHOT_BASE'). Run: devctl setup"
+    fi
 
-    _ok "Cache mounts and clean snapshot are ready."
+    _ok "Cache mounts and snapshot state are ready."
 }
 
 cmd_status() {
     if lxc info "$CONTAINER" &>/dev/null; then
         lxc info "$CONTAINER"
-        if _has_snapshot_clean; then
-            _ok  "Snapshot status: '$SNAPSHOT_CLEAN' present"
+        if _has_snapshot_base; then
+            _ok  "Snapshot status: '$SNAPSHOT_BASE' present"
         else
-            _warn "Snapshot status: '$SNAPSHOT_CLEAN' missing"
+            _warn "Snapshot status: '$SNAPSHOT_BASE' missing"
+        fi
+        if _has_snapshot_current; then
+            _ok  "Snapshot status: '$SNAPSHOT_CURRENT' present"
+        else
+            _warn "Snapshot status: '$SNAPSHOT_CURRENT' missing"
         fi
         if _cache_mounts_active; then
             _ok  "Cache mounts: active"
@@ -843,6 +1236,103 @@ cmd_status() {
     else
         _warn "Container '$CONTAINER' does not exist."
     fi
+}
+
+cmd_check() {
+    local has_drift=0
+    local container_running=0
+
+    if [[ "$(lxc list "$CONTAINER" -c s --format csv 2>/dev/null | tr -d '\r')" == "RUNNING" ]]; then
+        container_running=1
+    fi
+
+    _info "Drift check (read-only)"
+
+    # Node drift
+    local expected_node actual_node
+    expected_node="$(get_node_version)"
+    if [[ -z "$expected_node" ]]; then
+        _warn "Node expected version: missing (.node-version/.nvmrc not found)"
+        has_drift=1
+    else
+        if (( container_running )); then
+            actual_node="$(_get_container_node_version)"
+            if [[ "$actual_node" == "$expected_node" ]]; then
+                _ok "Node drift: none ($expected_node)"
+            else
+                _warn "Node drift: expected=$expected_node actual=${actual_node:-NONE}"
+                has_drift=1
+            fi
+        else
+            _warn "Node drift: container not running (expected=$expected_node)"
+            has_drift=1
+        fi
+    fi
+
+    # Per-stack manifest drift
+    local stack stack_dir container_hash_file host_hash container_hash
+    for stack in webui dashboard; do
+        if [[ "$stack" == "webui" ]]; then
+            stack_dir="$PROJECT_ROOT/webui"
+            container_hash_file="/opt/nightfall-manifest/webui.hash"
+        else
+            stack_dir="$PROJECT_ROOT/metrics/dashboard"
+            container_hash_file="/opt/nightfall-manifest/dashboard.hash"
+        fi
+
+        if [[ ! -f "$stack_dir/package.json" || ! -f "$stack_dir/package-lock.json" ]]; then
+            _warn "$stack manifest drift: host manifest files missing"
+            has_drift=1
+            continue
+        fi
+
+        host_hash="$(cat "$stack_dir/package.json" "$stack_dir/package-lock.json" | sha256sum | awk '{print $1}')"
+        if (( container_running )); then
+            container_hash="$(lxc exec "$CONTAINER" -- \
+                bash -c "cat '$container_hash_file' 2>/dev/null | tr -d '[:space:]' || true")"
+            if [[ -n "$container_hash" && "$host_hash" == "$container_hash" ]]; then
+                _ok "$stack manifest drift: none ($host_hash)"
+            else
+                _warn "$stack manifest drift: host=$host_hash container=${container_hash:-MISSING}"
+                has_drift=1
+            fi
+        else
+            _warn "$stack manifest drift: container not running"
+            has_drift=1
+        fi
+    done
+
+    # Snapshot status and age (informational)
+    local taken_base taken_current
+    if _has_snapshot_base; then
+        taken_base="$(_snapshot_taken_at "$SNAPSHOT_BASE")"
+        _ok "Snapshot '$SNAPSHOT_BASE': present (taken='$taken_base', age=$(_snapshot_age_human "$taken_base"))"
+    else
+        _warn "Snapshot '$SNAPSHOT_BASE': missing"
+        has_drift=1
+    fi
+
+    if _has_snapshot_current; then
+        taken_current="$(_snapshot_taken_at "$SNAPSHOT_CURRENT")"
+        _info "Snapshot '$SNAPSHOT_CURRENT': present (taken='$taken_current', age=$(_snapshot_age_human "$taken_current"))"
+    else
+        _info "Snapshot '$SNAPSHOT_CURRENT': not present"
+    fi
+
+    # Stack major consistency check
+    if assert_web_stack_major_consistency >/dev/null 2>&1; then
+        _ok "SvelteKit/Vite major consistency: OK"
+    else
+        _warn "SvelteKit/Vite major consistency: mismatch"
+        has_drift=1
+    fi
+
+    if (( has_drift )); then
+        _warn "Check result: drift detected"
+        return 1
+    fi
+
+    _ok "Check result: no drift detected"
 }
 
 cmd_shell() {
@@ -857,13 +1347,14 @@ Usage: $(basename "$0") <command>
 Commands:
   setup                             Atomic bootstrap: create/start container, install exact Node
                                     (nvm), Python toolchain, both web stacks (npm ci), snapshot.
-  create                            Alias for setup.
   destroy                           Delete development container.
-  reset                             Restore development container from snapshot '$SNAPSHOT_CLEAN'.
-  snapshot-create                   Create/update snapshot; enforces Node + drift-free invariants.
-  snapshot-refresh                  Alias for snapshot-create.
+    reset [--base]                    Restore from snapshot '$SNAPSHOT_CURRENT' when present,
+                                                                        otherwise '$SNAPSHOT_BASE'. With --base, always restore '$SNAPSHOT_BASE'.
+    update [--scope S] [--simulate]   Unified update flow with lockfile regeneration and regression gate.
+                                                                        Scope: node|webui|dashboard|all (default auto-detect).
+    check                             Read-only drift report (Node, manifests, snapshots, toolchain majors).
   ensure-stack-ready [target]       Sync sources and drift-check; target: webui|dashboard|all.
-  assert-cached-ready               Verify cache mounts and clean snapshot are present.
+    assert-cached-ready               Verify cache mounts and snapshot readiness are present.
   run-api                           API run scaffold (not yet implemented).
   run-webui                         Sync webui sources and start Vite dev server.
   test-web-typecheck                Run webui Svelte/TypeScript typecheck.
@@ -902,11 +1393,10 @@ main() {
 
     case "$cmd" in
         setup)                            cmd_setup "$@" ;;
-        create)                           cmd_create "$@" ;;
         destroy)                          cmd_destroy "$@" ;;
         reset)                            cmd_reset "$@" ;;
-        snapshot-create)                  cmd_snapshot_create "$@" ;;
-        snapshot-refresh)                 cmd_snapshot_refresh "$@" ;;
+        update)                           cmd_update "$@" ;;
+        check)                            cmd_check "$@" ;;
         ensure-stack-ready)               cmd_ensure_stack_ready "$@" ;;
         assert-cached-ready)              cmd_assert_cached_ready "$@" ;;
         run-api)                          cmd_run_api "$@" ;;

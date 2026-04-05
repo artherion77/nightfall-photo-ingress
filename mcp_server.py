@@ -7,6 +7,8 @@ Transport: stdin/stdout JSON-RPC with Content-Length framing.
 from __future__ import annotations
 
 import fcntl
+from http import HTTPStatus
+from http.server import BaseHTTPRequestHandler
 import json
 import logging
 import os
@@ -311,7 +313,14 @@ class ServerState:
                 try:
                     os.makedirs(os.path.dirname(REPO_LOCK_FILE), exist_ok=True)
                     with open(REPO_LOCK_FILE, "w") as lock_fh:
-                        fcntl.flock(lock_fh, fcntl.LOCK_EX)
+                        lock_acquired = False
+                        try:
+                            fcntl.flock(lock_fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                            lock_acquired = True
+                        except BlockingIOError:
+                            lf.write(
+                                "[warn] repo lock busy; continuing without exclusive lock\n"
+                            )
                         proc = subprocess.Popen(
                             cmd,
                             shell=True,
@@ -324,6 +333,8 @@ class ServerState:
                         for line in proc.stdout:  # type: ignore[union-attr]
                             lf.write(line)
                         proc.wait()
+                        if lock_acquired:
+                            fcntl.flock(lock_fh, fcntl.LOCK_UN)
                     exit_code = proc.returncode
                 except OSError as exc:
                     lf.write(f"error launching command: {exc}\n")
@@ -429,6 +440,173 @@ class ServerState:
         self._extensions.append(proposal)
         self._save_extensions()
         return proposal
+
+
+# Backward-compatible alias used by legacy tests/imports.
+MCPServerState = ServerState
+
+
+def _json_response(handler: BaseHTTPRequestHandler, status: int, payload: dict[str, Any]) -> None:
+    body = json.dumps(payload).encode("utf-8")
+    handler.send_response(status)
+    handler.send_header("Content-Type", "application/json")
+    handler.send_header("Content-Length", str(len(body)))
+    handler.end_headers()
+    handler.wfile.write(body)
+
+
+def _parse_json_body(handler: BaseHTTPRequestHandler) -> dict[str, Any]:
+    raw_len = handler.headers.get("Content-Length", "0")
+    try:
+        length = int(raw_len)
+    except ValueError as exc:
+        raise ValueError("Invalid Content-Length") from exc
+    raw = handler.rfile.read(length) if length > 0 else b"{}"
+    if not raw:
+        return {}
+    data = json.loads(raw.decode("utf-8"))
+    if not isinstance(data, dict):
+        raise ValueError("JSON body must be an object")
+    return data
+
+
+def make_handler(state: ServerState):
+    class MCPHandler(BaseHTTPRequestHandler):
+        server_version = "NightfallMCPCompat/2.0"
+
+        def log_message(self, fmt: str, *args: Any) -> None:  # noqa: D401
+            # Silence per-request logging in tests.
+            return
+
+        def do_GET(self) -> None:  # noqa: N802
+            if self.path == "/mcp/context":
+                _json_response(self, HTTPStatus.OK, state.context())
+                return
+
+            if self.path.startswith("/mcp/status/"):
+                task_id = self.path.split("/mcp/status/", 1)[1]
+                status_payload = state.task_status(task_id)
+                if status_payload is None:
+                    _json_response(self, HTTPStatus.NOT_FOUND, {"error": "taskId not found"})
+                    return
+                _json_response(self, HTTPStatus.OK, status_payload)
+                return
+
+            if self.path.startswith("/mcp/log/"):
+                task_id = self.path.split("/mcp/log/", 1)[1]
+                log_text = state.task_log(task_id, tail=200)
+                if log_text is None:
+                    _json_response(self, HTTPStatus.NOT_FOUND, {"error": "log not found"})
+                    return
+                _json_response(self, HTTPStatus.OK, {"taskId": task_id, "log": log_text})
+                return
+
+            if self.path == "/mcp/extensions":
+                with state._lock:
+                    exts = list(state._extensions)
+                _json_response(self, HTTPStatus.OK, {"extensions": exts})
+                return
+
+            _json_response(self, HTTPStatus.NOT_FOUND, {"error": "not found"})
+
+        def do_POST(self) -> None:  # noqa: N802
+            try:
+                payload = _parse_json_body(self)
+            except (json.JSONDecodeError, ValueError) as exc:
+                _json_response(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+                return
+
+            if self.path == "/mcp/exec":
+                task_name = payload.get("task")
+                if not isinstance(task_name, str):
+                    _json_response(self, HTTPStatus.BAD_REQUEST, {"error": "task must be a string"})
+                    return
+
+                args = payload.get("args")
+                env = payload.get("env")
+                cwd = payload.get("cwd")
+                depends_on = payload.get("dependsOn")
+                significant = payload.get("significantTask", False)
+                extension_rec = payload.get("extensionRecommendation")
+
+                if args is not None and not isinstance(args, list):
+                    _json_response(self, HTTPStatus.BAD_REQUEST, {"error": "args must be a list"})
+                    return
+                if env is not None and not isinstance(env, dict):
+                    _json_response(self, HTTPStatus.BAD_REQUEST, {"error": "env must be an object"})
+                    return
+                if cwd is not None and not isinstance(cwd, str):
+                    _json_response(self, HTTPStatus.BAD_REQUEST, {"error": "cwd must be a string"})
+                    return
+                if depends_on is not None:
+                    if not isinstance(depends_on, list) or not all(isinstance(x, str) for x in depends_on):
+                        _json_response(self, HTTPStatus.BAD_REQUEST, {"error": "dependsOn must be an array of strings"})
+                        return
+                if not isinstance(significant, bool):
+                    _json_response(self, HTTPStatus.BAD_REQUEST, {"error": "significantTask must be a boolean"})
+                    return
+                if extension_rec is not None and not isinstance(extension_rec, str):
+                    _json_response(self, HTTPStatus.BAD_REQUEST, {"error": "extensionRecommendation must be a string"})
+                    return
+
+                try:
+                    task_id = state.enqueue(
+                        task_name,
+                        args=args if isinstance(args, list) else None,
+                        env=env if isinstance(env, dict) else None,
+                        cwd=cwd if isinstance(cwd, str) else None,
+                        depends_on=depends_on if isinstance(depends_on, list) else None,
+                        significant_task=significant,
+                        extension_recommendation=extension_rec if isinstance(extension_rec, str) else None,
+                    )
+                except ValueError as exc:
+                    _json_response(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+                    return
+
+                _json_response(self, HTTPStatus.ACCEPTED, {"taskId": task_id, "status": "queued"})
+                return
+
+            if self.path == "/mcp/verify":
+                verify_key = payload.get("verify")
+                target = payload.get("target")
+                if not isinstance(verify_key, str) or not isinstance(target, str):
+                    _json_response(self, HTTPStatus.BAD_REQUEST, {"error": "verify and target must be strings"})
+                    return
+                try:
+                    result = state.verify(verify_key, target)
+                except ValueError as exc:
+                    _json_response(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+                    return
+                _json_response(self, HTTPStatus.OK, result)
+                return
+
+            if self.path == "/mcp/extensions/propose":
+                recommendation = payload.get("recommendation")
+                related_task_id = payload.get("relatedTaskId")
+                task_name = payload.get("task")
+
+                if not isinstance(recommendation, str) or not recommendation.strip():
+                    _json_response(self, HTTPStatus.BAD_REQUEST, {"error": "recommendation must be a non-empty string"})
+                    return
+                if related_task_id is not None and not isinstance(related_task_id, str):
+                    _json_response(self, HTTPStatus.BAD_REQUEST, {"error": "relatedTaskId must be a string or null"})
+                    return
+                if task_name is not None and not isinstance(task_name, str):
+                    _json_response(self, HTTPStatus.BAD_REQUEST, {"error": "task must be a string or null"})
+                    return
+
+                proposal = state.propose_extension(
+                    recommendation=recommendation.strip(),
+                    related_task_id=related_task_id if isinstance(related_task_id, str) else None,
+                    task_name=task_name if isinstance(task_name, str) else None,
+                    source="manual",
+                )
+                _json_response(self, HTTPStatus.CREATED, proposal)
+                return
+
+            _json_response(self, HTTPStatus.NOT_FOUND, {"error": "not found"})
+
+    return MCPHandler
 
 
 # ── Tool schema ───────────────────────────────────────────────────────────────
