@@ -9,48 +9,48 @@
   "repoHeadUrl": "https://github.com/artherion77/nightfall-photo-ingress/tree/main",
   "repoCommitUrl": "https://github.com/artherion77/nightfall-photo-ingress/commit/5c0b87257dd9a604fca14ee9ec06115de5fc48d6",
   "runMeta": {
-    "startedAt": "2026-04-05T06:32:49.344485+00:00",
-    "finishedAt": "2026-04-05T06:32:49.353279+00:00",
-    "durationSeconds": 0.0088,
+    "startedAt": "2026-04-05T10:00:06.886086+00:00",
+    "finishedAt": "2026-04-05T10:00:06.905782+00:00",
+    "durationSeconds": 0.0197,
     "runId": "coverage-ok-20260405T083227",
     "branch": "main"
   },
   "versions": {
-    "python": "Python 3.12.3",
+    "python": "3.12.3",
     "typescript": "5.7.2"
   },
-  "coveragePercent": 80.11625090821022,
-  "hasCoverage": true,
+  "coveragePercent": null,
+  "hasCoverage": false,
   "sparklinePoints": "0.00,42.00 180.00,42.00",
   "coverageTrendSource": "measured_history",
   "locBreakdown": {
-    "python": "26.4k",
+    "python": "26.5k",
     "tsjs": "8.5k",
     "svelte": "3.1k"
   },
   "complexityCard": {
-    "cyclomatic": null,
-    "maintainability": null
+    "cyclomatic": 3.2535,
+    "maintainability": 56.5529
   },
   "frontendComplexity": 26.8036,
   "backendCoverageBars": [
     {
       "label": "Unit",
-      "value": 80.11625090821022
+      "value": 0
     },
     {
       "label": "Integration",
-      "value": 74.11625090821022
+      "value": 0
     },
     {
       "label": "Flow",
-      "value": 71.11625090821022
+      "value": 0
     }
   ],
   "complexityMix": {
-    "low": 0,
+    "low": 7,
     "moderate": 54,
-    "high": 0
+    "high": 24
   },
   "frontendLocRows": [
     {
@@ -723,7 +723,1312 @@
         "b": 11
       }
     ],
-    "nodeDetails": []
+    "nodeDetails": [
+      {
+        "path": "api/__init__.py",
+        "fan_in": 0,
+        "fan_out": 0,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/api/__init__.py"
+      },
+      {
+        "path": "api/app.py",
+        "fan_in": 1,
+        "fan_out": 11,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/api/app.py"
+      },
+      {
+        "path": "api/audit_hook.py",
+        "fan_in": 1,
+        "fan_out": 6,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/api/audit_hook.py"
+      },
+      {
+        "path": "api/auth.py",
+        "fan_in": 6,
+        "fan_out": 5,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/api/auth.py"
+      },
+      {
+        "path": "api/dependencies.py",
+        "fan_in": 6,
+        "fan_out": 4,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/api/dependencies.py"
+      },
+      {
+        "path": "api/rapiddoc.py",
+        "fan_in": 1,
+        "fan_out": 3,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/api/rapiddoc.py"
+      },
+      {
+        "path": "api/routers/__init__.py",
+        "fan_in": 1,
+        "fan_out": 0,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/api/routers/__init__.py"
+      },
+      {
+        "path": "api/routers/audit_log.py",
+        "fan_in": 0,
+        "fan_out": 6,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/api/routers/audit_log.py"
+      },
+      {
+        "path": "api/routers/blocklist.py",
+        "fan_in": 0,
+        "fan_out": 8,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/api/routers/blocklist.py"
+      },
+      {
+        "path": "api/routers/config.py",
+        "fan_in": 0,
+        "fan_out": 6,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/api/routers/config.py"
+      },
+      {
+        "path": "api/routers/health.py",
+        "fan_in": 0,
+        "fan_out": 5,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/api/routers/health.py"
+      },
+      {
+        "path": "api/routers/staging.py",
+        "fan_in": 0,
+        "fan_out": 6,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/api/routers/staging.py"
+      },
+      {
+        "path": "api/routers/triage.py",
+        "fan_in": 0,
+        "fan_out": 8,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/api/routers/triage.py"
+      },
+      {
+        "path": "api/schemas/__init__.py",
+        "fan_in": 12,
+        "fan_out": 6,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/api/schemas/__init__.py"
+      },
+      {
+        "path": "api/schemas/audit.py",
+        "fan_in": 1,
+        "fan_out": 2,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/api/schemas/audit.py"
+      },
+      {
+        "path": "api/schemas/blocklist.py",
+        "fan_in": 1,
+        "fan_out": 2,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/api/schemas/blocklist.py"
+      },
+      {
+        "path": "api/schemas/config.py",
+        "fan_in": 1,
+        "fan_out": 2,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/api/schemas/config.py"
+      },
+      {
+        "path": "api/schemas/health.py",
+        "fan_in": 1,
+        "fan_out": 2,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/api/schemas/health.py"
+      },
+      {
+        "path": "api/schemas/staging.py",
+        "fan_in": 1,
+        "fan_out": 2,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/api/schemas/staging.py"
+      },
+      {
+        "path": "api/schemas/triage.py",
+        "fan_in": 1,
+        "fan_out": 2,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/api/schemas/triage.py"
+      },
+      {
+        "path": "api/services/__init__.py",
+        "fan_in": 6,
+        "fan_out": 6,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/api/services/__init__.py"
+      },
+      {
+        "path": "api/services/audit_service.py",
+        "fan_in": 1,
+        "fan_out": 4,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/api/services/audit_service.py"
+      },
+      {
+        "path": "api/services/blocklist_service.py",
+        "fan_in": 1,
+        "fan_out": 5,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/api/services/blocklist_service.py"
+      },
+      {
+        "path": "api/services/config_service.py",
+        "fan_in": 1,
+        "fan_out": 3,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/api/services/config_service.py"
+      },
+      {
+        "path": "api/services/health_service.py",
+        "fan_in": 1,
+        "fan_out": 4,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/api/services/health_service.py"
+      },
+      {
+        "path": "api/services/staging_service.py",
+        "fan_in": 1,
+        "fan_out": 3,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/api/services/staging_service.py"
+      },
+      {
+        "path": "api/services/triage_service.py",
+        "fan_in": 2,
+        "fan_out": 6,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/api/services/triage_service.py"
+      },
+      {
+        "path": "src/nightfall_photo_ingress/__init__.py",
+        "fan_in": 0,
+        "fan_out": 0,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/src/nightfall_photo_ingress/__init__.py"
+      },
+      {
+        "path": "src/nightfall_photo_ingress/__main__.py",
+        "fan_in": 0,
+        "fan_out": 1,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/src/nightfall_photo_ingress/__main__.py"
+      },
+      {
+        "path": "src/nightfall_photo_ingress/adapters/__init__.py",
+        "fan_in": 0,
+        "fan_out": 0,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/src/nightfall_photo_ingress/adapters/__init__.py"
+      },
+      {
+        "path": "src/nightfall_photo_ingress/adapters/onedrive/__init__.py",
+        "fan_in": 0,
+        "fan_out": 0,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/src/nightfall_photo_ingress/adapters/onedrive/__init__.py"
+      },
+      {
+        "path": "src/nightfall_photo_ingress/adapters/onedrive/auth.py",
+        "fan_in": 0,
+        "fan_out": 12,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/src/nightfall_photo_ingress/adapters/onedrive/auth.py"
+      },
+      {
+        "path": "src/nightfall_photo_ingress/adapters/onedrive/cache_lock.py",
+        "fan_in": 0,
+        "fan_out": 5,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/src/nightfall_photo_ingress/adapters/onedrive/cache_lock.py"
+      },
+      {
+        "path": "src/nightfall_photo_ingress/adapters/onedrive/client.py",
+        "fan_in": 0,
+        "fan_out": 21,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/src/nightfall_photo_ingress/adapters/onedrive/client.py"
+      },
+      {
+        "path": "src/nightfall_photo_ingress/adapters/onedrive/errors.py",
+        "fan_in": 0,
+        "fan_out": 3,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/src/nightfall_photo_ingress/adapters/onedrive/errors.py"
+      },
+      {
+        "path": "src/nightfall_photo_ingress/adapters/onedrive/retry.py",
+        "fan_in": 0,
+        "fan_out": 6,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/src/nightfall_photo_ingress/adapters/onedrive/retry.py"
+      },
+      {
+        "path": "src/nightfall_photo_ingress/adapters/onedrive/safe_logging.py",
+        "fan_in": 0,
+        "fan_out": 5,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/src/nightfall_photo_ingress/adapters/onedrive/safe_logging.py"
+      },
+      {
+        "path": "src/nightfall_photo_ingress/cli.py",
+        "fan_in": 0,
+        "fan_out": 19,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/src/nightfall_photo_ingress/cli.py"
+      },
+      {
+        "path": "src/nightfall_photo_ingress/config.py",
+        "fan_in": 0,
+        "fan_out": 6,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/src/nightfall_photo_ingress/config.py"
+      },
+      {
+        "path": "src/nightfall_photo_ingress/domain/__init__.py",
+        "fan_in": 0,
+        "fan_out": 2,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/src/nightfall_photo_ingress/domain/__init__.py"
+      },
+      {
+        "path": "src/nightfall_photo_ingress/domain/ingest.py",
+        "fan_in": 0,
+        "fan_out": 14,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/src/nightfall_photo_ingress/domain/ingest.py"
+      },
+      {
+        "path": "src/nightfall_photo_ingress/domain/journal.py",
+        "fan_in": 0,
+        "fan_out": 6,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/src/nightfall_photo_ingress/domain/journal.py"
+      },
+      {
+        "path": "src/nightfall_photo_ingress/domain/registry.py",
+        "fan_in": 0,
+        "fan_out": 5,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/src/nightfall_photo_ingress/domain/registry.py"
+      },
+      {
+        "path": "src/nightfall_photo_ingress/domain/storage.py",
+        "fan_in": 0,
+        "fan_out": 8,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/src/nightfall_photo_ingress/domain/storage.py"
+      },
+      {
+        "path": "src/nightfall_photo_ingress/live_photo.py",
+        "fan_in": 0,
+        "fan_out": 4,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/src/nightfall_photo_ingress/live_photo.py"
+      },
+      {
+        "path": "src/nightfall_photo_ingress/logging_bootstrap.py",
+        "fan_in": 0,
+        "fan_out": 9,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/src/nightfall_photo_ingress/logging_bootstrap.py"
+      },
+      {
+        "path": "src/nightfall_photo_ingress/migrations/0003_add_blocked_rules.py",
+        "fan_in": 0,
+        "fan_out": 2,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/src/nightfall_photo_ingress/migrations/0003_add_blocked_rules.py"
+      },
+      {
+        "path": "src/nightfall_photo_ingress/migrations/0004_add_ui_action_idempotency.py",
+        "fan_in": 0,
+        "fan_out": 2,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/src/nightfall_photo_ingress/migrations/0004_add_ui_action_idempotency.py"
+      },
+      {
+        "path": "src/nightfall_photo_ingress/migrations/__init__.py",
+        "fan_in": 0,
+        "fan_out": 0,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/src/nightfall_photo_ingress/migrations/__init__.py"
+      },
+      {
+        "path": "src/nightfall_photo_ingress/reject.py",
+        "fan_in": 0,
+        "fan_out": 7,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/src/nightfall_photo_ingress/reject.py"
+      },
+      {
+        "path": "src/nightfall_photo_ingress/runtime/__init__.py",
+        "fan_in": 0,
+        "fan_out": 0,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/src/nightfall_photo_ingress/runtime/__init__.py"
+      },
+      {
+        "path": "src/nightfall_photo_ingress/runtime/process_lock.py",
+        "fan_in": 0,
+        "fan_out": 5,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/src/nightfall_photo_ingress/runtime/process_lock.py"
+      },
+      {
+        "path": "src/nightfall_photo_ingress/status.py",
+        "fan_in": 0,
+        "fan_out": 5,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/src/nightfall_photo_ingress/status.py"
+      },
+      {
+        "path": "src/nightfall_photo_ingress/sync_import.py",
+        "fan_in": 0,
+        "fan_out": 9,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/src/nightfall_photo_ingress/sync_import.py"
+      },
+      {
+        "path": "tests/__init__.py",
+        "fan_in": 0,
+        "fan_out": 0,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/__init__.py"
+      },
+      {
+        "path": "tests/conftest.py",
+        "fan_in": 0,
+        "fan_out": 2,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/conftest.py"
+      },
+      {
+        "path": "tests/integration/api/conftest.py",
+        "fan_in": 0,
+        "fan_out": 10,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/integration/api/conftest.py"
+      },
+      {
+        "path": "tests/integration/api/support.py",
+        "fan_in": 14,
+        "fan_out": 1,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/integration/api/support.py"
+      },
+      {
+        "path": "tests/integration/api/test_api_triage.py",
+        "fan_in": 0,
+        "fan_out": 3,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/integration/api/test_api_triage.py"
+      },
+      {
+        "path": "tests/integration/api/test_audit_log.py",
+        "fan_in": 0,
+        "fan_out": 3,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/integration/api/test_audit_log.py"
+      },
+      {
+        "path": "tests/integration/api/test_auth.py",
+        "fan_in": 0,
+        "fan_out": 3,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/integration/api/test_auth.py"
+      },
+      {
+        "path": "tests/integration/api/test_blocklist.py",
+        "fan_in": 0,
+        "fan_out": 6,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/integration/api/test_blocklist.py"
+      },
+      {
+        "path": "tests/integration/api/test_config.py",
+        "fan_in": 0,
+        "fan_out": 3,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/integration/api/test_config.py"
+      },
+      {
+        "path": "tests/integration/api/test_health.py",
+        "fan_in": 0,
+        "fan_out": 3,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/integration/api/test_health.py"
+      },
+      {
+        "path": "tests/integration/api/test_staging.py",
+        "fan_in": 0,
+        "fan_out": 3,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/integration/api/test_staging.py"
+      },
+      {
+        "path": "tests/integration/browser_chain_harness/__init__.py",
+        "fan_in": 0,
+        "fan_out": 0,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/integration/browser_chain_harness/__init__.py"
+      },
+      {
+        "path": "tests/integration/browser_chain_harness/chain_harness.py",
+        "fan_in": 1,
+        "fan_out": 4,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/integration/browser_chain_harness/chain_harness.py"
+      },
+      {
+        "path": "tests/integration/browser_chain_harness/test_browser_chain_harness.py",
+        "fan_in": 0,
+        "fan_out": 3,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/integration/browser_chain_harness/test_browser_chain_harness.py"
+      },
+      {
+        "path": "tests/integration/browser_chain_harness/test_chain_plan_adl_alignment.py",
+        "fan_in": 0,
+        "fan_out": 3,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/integration/browser_chain_harness/test_chain_plan_adl_alignment.py"
+      },
+      {
+        "path": "tests/integration/conftest.py",
+        "fan_in": 0,
+        "fan_out": 16,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/integration/conftest.py"
+      },
+      {
+        "path": "tests/integration/test_live_photo_integration.py",
+        "fan_in": 0,
+        "fan_out": 1,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/integration/test_live_photo_integration.py"
+      },
+      {
+        "path": "tests/integration/test_m3_m4_crash_recovery.py",
+        "fan_in": 0,
+        "fan_out": 3,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/integration/test_m3_m4_crash_recovery.py"
+      },
+      {
+        "path": "tests/integration/test_m3_m4_duplicates_and_replay.py",
+        "fan_in": 0,
+        "fan_out": 1,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/integration/test_m3_m4_duplicates_and_replay.py"
+      },
+      {
+        "path": "tests/integration/test_m3_m4_fixture_capabilities.py",
+        "fan_in": 0,
+        "fan_out": 6,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/integration/test_m3_m4_fixture_capabilities.py"
+      },
+      {
+        "path": "tests/integration/test_m3_m4_happy_path.py",
+        "fan_in": 0,
+        "fan_out": 2,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/integration/test_m3_m4_happy_path.py"
+      },
+      {
+        "path": "tests/integration/test_m3_m4_idempotency.py",
+        "fan_in": 0,
+        "fan_out": 1,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/integration/test_m3_m4_idempotency.py"
+      },
+      {
+        "path": "tests/integration/test_m3_m4_operator_semantics.py",
+        "fan_in": 0,
+        "fan_out": 1,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/integration/test_m3_m4_operator_semantics.py"
+      },
+      {
+        "path": "tests/integration/test_m3_m4_schema_drift.py",
+        "fan_in": 0,
+        "fan_out": 3,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/integration/test_m3_m4_schema_drift.py"
+      },
+      {
+        "path": "tests/integration/test_m3_m4_storage_commit.py",
+        "fan_in": 0,
+        "fan_out": 6,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/integration/test_m3_m4_storage_commit.py"
+      },
+      {
+        "path": "tests/integration/test_m3_m4_strategy_and_operator_semantics.py",
+        "fan_in": 0,
+        "fan_out": 3,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/integration/test_m3_m4_strategy_and_operator_semantics.py"
+      },
+      {
+        "path": "tests/integration/test_pending_lifecycle_integration.py",
+        "fan_in": 0,
+        "fan_out": 3,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/integration/test_pending_lifecycle_integration.py"
+      },
+      {
+        "path": "tests/integration/test_registry_ingest_filter_integration.py",
+        "fan_in": 0,
+        "fan_out": 3,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/integration/test_registry_ingest_filter_integration.py"
+      },
+      {
+        "path": "tests/integration/test_reject_flow_integration.py",
+        "fan_in": 0,
+        "fan_out": 2,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/integration/test_reject_flow_integration.py"
+      },
+      {
+        "path": "tests/integration/test_sync_import_integration.py",
+        "fan_in": 0,
+        "fan_out": 4,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/integration/test_sync_import_integration.py"
+      },
+      {
+        "path": "tests/integration/ui/conftest.py",
+        "fan_in": 0,
+        "fan_out": 3,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/integration/ui/conftest.py"
+      },
+      {
+        "path": "tests/integration/ui/test_audit.py",
+        "fan_in": 0,
+        "fan_out": 3,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/integration/ui/test_audit.py"
+      },
+      {
+        "path": "tests/integration/ui/test_blocklist_crud.py",
+        "fan_in": 0,
+        "fan_out": 3,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/integration/ui/test_blocklist_crud.py"
+      },
+      {
+        "path": "tests/integration/ui/test_dashboard.py",
+        "fan_in": 0,
+        "fan_out": 3,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/integration/ui/test_dashboard.py"
+      },
+      {
+        "path": "tests/integration/ui/test_error_states.py",
+        "fan_in": 0,
+        "fan_out": 2,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/integration/ui/test_error_states.py"
+      },
+      {
+        "path": "tests/integration/ui/test_settings.py",
+        "fan_in": 0,
+        "fan_out": 3,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/integration/ui/test_settings.py"
+      },
+      {
+        "path": "tests/integration/ui/test_staging_display.py",
+        "fan_in": 0,
+        "fan_out": 3,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/integration/ui/test_staging_display.py"
+      },
+      {
+        "path": "tests/integration/ui/test_triage.py",
+        "fan_in": 0,
+        "fan_out": 3,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/integration/ui/test_triage.py"
+      },
+      {
+        "path": "tests/integration/ui/test_triage_error_recovery.py",
+        "fan_in": 0,
+        "fan_out": 4,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/integration/ui/test_triage_error_recovery.py"
+      },
+      {
+        "path": "tests/staging-flow/test_flowctl_contracts.py",
+        "fan_in": 0,
+        "fan_out": 4,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/staging-flow/test_flowctl_contracts.py"
+      },
+      {
+        "path": "tests/staging/__init__.py",
+        "fan_in": 0,
+        "fan_out": 0,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/staging/__init__.py"
+      },
+      {
+        "path": "tests/staging/conftest.py",
+        "fan_in": 1,
+        "fan_out": 9,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/staging/conftest.py"
+      },
+      {
+        "path": "tests/staging/test_evidence_contracts.py",
+        "fan_in": 0,
+        "fan_out": 6,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/staging/test_evidence_contracts.py"
+      },
+      {
+        "path": "tests/staging/test_secret_scan.py",
+        "fan_in": 0,
+        "fan_out": 6,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/staging/test_secret_scan.py"
+      },
+      {
+        "path": "tests/staging/test_smoke_contracts.py",
+        "fan_in": 0,
+        "fan_out": 5,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/staging/test_smoke_contracts.py"
+      },
+      {
+        "path": "tests/staging/test_stagingctl_policy_contracts.py",
+        "fan_in": 0,
+        "fan_out": 3,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/staging/test_stagingctl_policy_contracts.py"
+      },
+      {
+        "path": "tests/unit/conftest.py",
+        "fan_in": 0,
+        "fan_out": 3,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/conftest.py"
+      },
+      {
+        "path": "tests/unit/test_chunk1_error_taxonomy.py",
+        "fan_in": 0,
+        "fan_out": 4,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_chunk1_error_taxonomy.py"
+      },
+      {
+        "path": "tests/unit/test_chunk2_retry_policy.py",
+        "fan_in": 0,
+        "fan_out": 9,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_chunk2_retry_policy.py"
+      },
+      {
+        "path": "tests/unit/test_chunk3_streaming_download.py",
+        "fan_in": 0,
+        "fan_out": 8,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_chunk3_streaming_download.py"
+      },
+      {
+        "path": "tests/unit/test_chunk4_download_reresolve.py",
+        "fan_in": 0,
+        "fan_out": 6,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_chunk4_download_reresolve.py"
+      },
+      {
+        "path": "tests/unit/test_chunk5_delta_guardrails.py",
+        "fan_in": 0,
+        "fan_out": 8,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_chunk5_delta_guardrails.py"
+      },
+      {
+        "path": "tests/unit/test_chunk6_delta_reducer.py",
+        "fan_in": 0,
+        "fan_out": 6,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_chunk6_delta_reducer.py"
+      },
+      {
+        "path": "tests/unit/test_chunk7_auth_resilience.py",
+        "fan_in": 0,
+        "fan_out": 9,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_chunk7_auth_resilience.py"
+      },
+      {
+        "path": "tests/unit/test_chunk8_path_metadata_validation.py",
+        "fan_in": 0,
+        "fan_out": 7,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_chunk8_path_metadata_validation.py"
+      },
+      {
+        "path": "tests/unit/test_chunk9_observability.py",
+        "fan_in": 0,
+        "fan_out": 6,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_chunk9_observability.py"
+      },
+      {
+        "path": "tests/unit/test_cli_bootstrap.py",
+        "fan_in": 0,
+        "fan_out": 3,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_cli_bootstrap.py"
+      },
+      {
+        "path": "tests/unit/test_cli_version.py",
+        "fan_in": 0,
+        "fan_out": 2,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_cli_version.py"
+      },
+      {
+        "path": "tests/unit/test_config_check_integration.py",
+        "fan_in": 0,
+        "fan_out": 4,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_config_check_integration.py"
+      },
+      {
+        "path": "tests/unit/test_config_parsing.py",
+        "fan_in": 0,
+        "fan_out": 3,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_config_parsing.py"
+      },
+      {
+        "path": "tests/unit/test_config_validation.py",
+        "fan_in": 0,
+        "fan_out": 4,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_config_validation.py"
+      },
+      {
+        "path": "tests/unit/test_devcontainer_snapshot_invariants.py",
+        "fan_in": 0,
+        "fan_out": 3,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_devcontainer_snapshot_invariants.py"
+      },
+      {
+        "path": "tests/unit/test_devctl_contracts.py",
+        "fan_in": 0,
+        "fan_out": 5,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_devctl_contracts.py"
+      },
+      {
+        "path": "tests/unit/test_imports.py",
+        "fan_in": 0,
+        "fan_out": 3,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_imports.py"
+      },
+      {
+        "path": "tests/unit/test_ingest_decisions.py",
+        "fan_in": 0,
+        "fan_out": 6,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_ingest_decisions.py"
+      },
+      {
+        "path": "tests/unit/test_live_photo_pairing.py",
+        "fan_in": 0,
+        "fan_out": 4,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_live_photo_pairing.py"
+      },
+      {
+        "path": "tests/unit/test_live_photo_registry.py",
+        "fan_in": 0,
+        "fan_out": 3,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_live_photo_registry.py"
+      },
+      {
+        "path": "tests/unit/test_logging_bootstrap.py",
+        "fan_in": 0,
+        "fan_out": 5,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_logging_bootstrap.py"
+      },
+      {
+        "path": "tests/unit/test_m4_h1_atomic_finalize.py",
+        "fan_in": 0,
+        "fan_out": 4,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_m4_h1_atomic_finalize.py"
+      },
+      {
+        "path": "tests/unit/test_m4_h2_journal_replay.py",
+        "fan_in": 0,
+        "fan_out": 6,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_m4_h2_journal_replay.py"
+      },
+      {
+        "path": "tests/unit/test_m4_h3_staging_reconciliation.py",
+        "fan_in": 0,
+        "fan_out": 6,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_m4_h3_staging_reconciliation.py"
+      },
+      {
+        "path": "tests/unit/test_m4_h4_contract_validation.py",
+        "fan_in": 0,
+        "fan_out": 5,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_m4_h4_contract_validation.py"
+      },
+      {
+        "path": "tests/unit/test_m4_h5_storage_hardening.py",
+        "fan_in": 0,
+        "fan_out": 4,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_m4_h5_storage_hardening.py"
+      },
+      {
+        "path": "tests/unit/test_m4_h6_integrity_policies.py",
+        "fan_in": 0,
+        "fan_out": 4,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_m4_h6_integrity_policies.py"
+      },
+      {
+        "path": "tests/unit/test_m4_h7_audit_ordering.py",
+        "fan_in": 0,
+        "fan_out": 5,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_m4_h7_audit_ordering.py"
+      },
+      {
+        "path": "tests/unit/test_m4_h8_performance_scaling.py",
+        "fan_in": 0,
+        "fan_out": 5,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_m4_h8_performance_scaling.py"
+      },
+      {
+        "path": "tests/unit/test_m4_h9_security_policies.py",
+        "fan_in": 0,
+        "fan_out": 6,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_m4_h9_security_policies.py"
+      },
+      {
+        "path": "tests/unit/test_mcp_metrics_tasks.py",
+        "fan_in": 0,
+        "fan_out": 9,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_mcp_metrics_tasks.py"
+      },
+      {
+        "path": "tests/unit/test_mcp_server.py",
+        "fan_in": 0,
+        "fan_out": 8,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_mcp_server.py"
+      },
+      {
+        "path": "tests/unit/test_mcp_web_tasks.py",
+        "fan_in": 0,
+        "fan_out": 9,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_mcp_web_tasks.py"
+      },
+      {
+        "path": "tests/unit/test_metrics_module1_schema.py",
+        "fan_in": 0,
+        "fan_out": 4,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_metrics_module1_schema.py"
+      },
+      {
+        "path": "tests/unit/test_metrics_module2_backend.py",
+        "fan_in": 0,
+        "fan_out": 6,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_metrics_module2_backend.py"
+      },
+      {
+        "path": "tests/unit/test_metrics_module3_frontend.py",
+        "fan_in": 0,
+        "fan_out": 4,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_metrics_module3_frontend.py"
+      },
+      {
+        "path": "tests/unit/test_metrics_module4_aggregator.py",
+        "fan_in": 0,
+        "fan_out": 4,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_metrics_module4_aggregator.py"
+      },
+      {
+        "path": "tests/unit/test_metrics_module5_dashboard.py",
+        "fan_in": 0,
+        "fan_out": 4,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_metrics_module5_dashboard.py"
+      },
+      {
+        "path": "tests/unit/test_metrics_module6_poller.py",
+        "fan_in": 0,
+        "fan_out": 5,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_metrics_module6_poller.py"
+      },
+      {
+        "path": "tests/unit/test_metrics_module7_publication.py",
+        "fan_in": 0,
+        "fan_out": 4,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_metrics_module7_publication.py"
+      },
+      {
+        "path": "tests/unit/test_metrics_module8_operations.py",
+        "fan_in": 0,
+        "fan_out": 6,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_metrics_module8_operations.py"
+      },
+      {
+        "path": "tests/unit/test_module8_packaging.py",
+        "fan_in": 0,
+        "fan_out": 2,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_module8_packaging.py"
+      },
+      {
+        "path": "tests/unit/test_onboarding_metadata_config.py",
+        "fan_in": 0,
+        "fan_out": 5,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_onboarding_metadata_config.py"
+      },
+      {
+        "path": "tests/unit/test_onedrive_auth.py",
+        "fan_in": 0,
+        "fan_out": 8,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_onedrive_auth.py"
+      },
+      {
+        "path": "tests/unit/test_onedrive_delta.py",
+        "fan_in": 0,
+        "fan_out": 9,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_onedrive_delta.py"
+      },
+      {
+        "path": "tests/unit/test_onedrive_onboarding_discovery.py",
+        "fan_in": 0,
+        "fan_out": 6,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_onedrive_onboarding_discovery.py"
+      },
+      {
+        "path": "tests/unit/test_onedrive_robustness_regression.py",
+        "fan_in": 0,
+        "fan_out": 7,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_onedrive_robustness_regression.py"
+      },
+      {
+        "path": "tests/unit/test_onedrive_root_configuration.py",
+        "fan_in": 0,
+        "fan_out": 5,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_onedrive_root_configuration.py"
+      },
+      {
+        "path": "tests/unit/test_registry_operations.py",
+        "fan_in": 0,
+        "fan_out": 5,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_registry_operations.py"
+      },
+      {
+        "path": "tests/unit/test_registry_schema.py",
+        "fan_in": 0,
+        "fan_out": 4,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_registry_schema.py"
+      },
+      {
+        "path": "tests/unit/test_reject_cli.py",
+        "fan_in": 0,
+        "fan_out": 8,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_reject_cli.py"
+      },
+      {
+        "path": "tests/unit/test_staging_recovery.py",
+        "fan_in": 0,
+        "fan_out": 7,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_staging_recovery.py"
+      },
+      {
+        "path": "tests/unit/test_status_export.py",
+        "fan_in": 0,
+        "fan_out": 5,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_status_export.py"
+      },
+      {
+        "path": "tests/unit/test_sync_import.py",
+        "fan_in": 0,
+        "fan_out": 7,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_sync_import.py"
+      },
+      {
+        "path": "tests/unit/test_v2_chunk10_contract_stabilization.py",
+        "fan_in": 0,
+        "fan_out": 6,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_v2_chunk10_contract_stabilization.py"
+      },
+      {
+        "path": "tests/unit/test_v2_chunk1_trace_logging.py",
+        "fan_in": 0,
+        "fan_out": 9,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_v2_chunk1_trace_logging.py"
+      },
+      {
+        "path": "tests/unit/test_v2_chunk2_safe_logging.py",
+        "fan_in": 0,
+        "fan_out": 5,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_v2_chunk2_safe_logging.py"
+      },
+      {
+        "path": "tests/unit/test_v2_chunk7_delta_breakers.py",
+        "fan_in": 0,
+        "fan_out": 8,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_v2_chunk7_delta_breakers.py"
+      },
+      {
+        "path": "tests/unit/test_v2_chunk8_token_integrity.py",
+        "fan_in": 0,
+        "fan_out": 10,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_v2_chunk8_token_integrity.py"
+      },
+      {
+        "path": "tests/unit/test_v2_chunk9_throughput_backpressure.py",
+        "fan_in": 0,
+        "fan_out": 9,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_v2_chunk9_throughput_backpressure.py"
+      },
+      {
+        "path": "tests/unit/test_v2_chunks_3_4_5_6.py",
+        "fan_in": 0,
+        "fan_out": 9,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_v2_chunks_3_4_5_6.py"
+      },
+      {
+        "path": "tests/unit/test_v2_config_hardening.py",
+        "fan_in": 0,
+        "fan_out": 4,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_v2_config_hardening.py"
+      }
+    ]
   },
   "frontendGraph": {
     "nodes": [
@@ -964,7 +2269,456 @@
         "b": 12
       }
     ],
-    "nodeDetails": []
+    "nodeDetails": [
+      {
+        "path": "webui/src/app.d.ts",
+        "fan_in": 0,
+        "fan_out": 0,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/app.d.ts"
+      },
+      {
+        "path": "webui/src/lib/api/audit.ts",
+        "fan_in": 0,
+        "fan_out": 1,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/lib/api/audit.ts"
+      },
+      {
+        "path": "webui/src/lib/api/blocklist.ts",
+        "fan_in": 0,
+        "fan_out": 1,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/lib/api/blocklist.ts"
+      },
+      {
+        "path": "webui/src/lib/api/client.ts",
+        "fan_in": 6,
+        "fan_out": 1,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/lib/api/client.ts"
+      },
+      {
+        "path": "webui/src/lib/api/config.ts",
+        "fan_in": 0,
+        "fan_out": 1,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/lib/api/config.ts"
+      },
+      {
+        "path": "webui/src/lib/api/health.ts",
+        "fan_in": 0,
+        "fan_out": 1,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/lib/api/health.ts"
+      },
+      {
+        "path": "webui/src/lib/api/staging.ts",
+        "fan_in": 0,
+        "fan_out": 1,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/lib/api/staging.ts"
+      },
+      {
+        "path": "webui/src/lib/api/triage.ts",
+        "fan_in": 0,
+        "fan_out": 1,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/lib/api/triage.ts"
+      },
+      {
+        "path": "webui/src/lib/components/audit/AuditEvent.svelte",
+        "fan_in": 1,
+        "fan_out": 1,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/lib/components/audit/AuditEvent.svelte"
+      },
+      {
+        "path": "webui/src/lib/components/audit/AuditTimeline.svelte",
+        "fan_in": 0,
+        "fan_out": 4,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/lib/components/audit/AuditTimeline.svelte"
+      },
+      {
+        "path": "webui/src/lib/components/blocklist/BlockRuleForm.svelte",
+        "fan_in": 0,
+        "fan_out": 0,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/lib/components/blocklist/BlockRuleForm.svelte"
+      },
+      {
+        "path": "webui/src/lib/components/blocklist/BlockRuleList.svelte",
+        "fan_in": 0,
+        "fan_out": 1,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/lib/components/blocklist/BlockRuleList.svelte"
+      },
+      {
+        "path": "webui/src/lib/components/common/ActionButton.svelte",
+        "fan_in": 0,
+        "fan_out": 0,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/lib/components/common/ActionButton.svelte"
+      },
+      {
+        "path": "webui/src/lib/components/common/ConfirmDialog.svelte",
+        "fan_in": 0,
+        "fan_out": 0,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/lib/components/common/ConfirmDialog.svelte"
+      },
+      {
+        "path": "webui/src/lib/components/common/EmptyState.svelte",
+        "fan_in": 0,
+        "fan_out": 0,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/lib/components/common/EmptyState.svelte"
+      },
+      {
+        "path": "webui/src/lib/components/common/ErrorBanner.svelte",
+        "fan_in": 0,
+        "fan_out": 0,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/lib/components/common/ErrorBanner.svelte"
+      },
+      {
+        "path": "webui/src/lib/components/common/KpiCard.svelte",
+        "fan_in": 0,
+        "fan_out": 0,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/lib/components/common/KpiCard.svelte"
+      },
+      {
+        "path": "webui/src/lib/components/common/LoadMoreButton.svelte",
+        "fan_in": 0,
+        "fan_out": 0,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/lib/components/common/LoadMoreButton.svelte"
+      },
+      {
+        "path": "webui/src/lib/components/common/LoadingSkeleton.svelte",
+        "fan_in": 0,
+        "fan_out": 0,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/lib/components/common/LoadingSkeleton.svelte"
+      },
+      {
+        "path": "webui/src/lib/components/common/StatusBadge.svelte",
+        "fan_in": 2,
+        "fan_out": 1,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/lib/components/common/StatusBadge.svelte"
+      },
+      {
+        "path": "webui/src/lib/components/dashboard/AuditPreview.svelte",
+        "fan_in": 0,
+        "fan_out": 1,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/lib/components/dashboard/AuditPreview.svelte"
+      },
+      {
+        "path": "webui/src/lib/components/dashboard/HealthBar.svelte",
+        "fan_in": 0,
+        "fan_out": 1,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/lib/components/dashboard/HealthBar.svelte"
+      },
+      {
+        "path": "webui/src/lib/components/dashboard/KpiGrid.svelte",
+        "fan_in": 0,
+        "fan_out": 1,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/lib/components/dashboard/KpiGrid.svelte"
+      },
+      {
+        "path": "webui/src/lib/components/dashboard/PollRuntimeChart.svelte",
+        "fan_in": 0,
+        "fan_out": 0,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/lib/components/dashboard/PollRuntimeChart.svelte"
+      },
+      {
+        "path": "webui/src/lib/components/layout/AppFooter.svelte",
+        "fan_in": 0,
+        "fan_out": 2,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/lib/components/layout/AppFooter.svelte"
+      },
+      {
+        "path": "webui/src/lib/components/layout/AppHeader.svelte",
+        "fan_in": 0,
+        "fan_out": 3,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/lib/components/layout/AppHeader.svelte"
+      },
+      {
+        "path": "webui/src/lib/components/layout/PageTitle.svelte",
+        "fan_in": 0,
+        "fan_out": 0,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/lib/components/layout/PageTitle.svelte"
+      },
+      {
+        "path": "webui/src/lib/components/settings/ConfigTable.svelte",
+        "fan_in": 0,
+        "fan_out": 0,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/lib/components/settings/ConfigTable.svelte"
+      },
+      {
+        "path": "webui/src/lib/components/staging/ItemMetaPanel.svelte",
+        "fan_in": 0,
+        "fan_out": 0,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/lib/components/staging/ItemMetaPanel.svelte"
+      },
+      {
+        "path": "webui/src/lib/components/staging/PhotoCard.svelte",
+        "fan_in": 1,
+        "fan_out": 0,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/lib/components/staging/PhotoCard.svelte"
+      },
+      {
+        "path": "webui/src/lib/components/staging/PhotoWheel.svelte",
+        "fan_in": 0,
+        "fan_out": 2,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/lib/components/staging/PhotoWheel.svelte"
+      },
+      {
+        "path": "webui/src/lib/components/staging/TriageControls.svelte",
+        "fan_in": 0,
+        "fan_out": 1,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/lib/components/staging/TriageControls.svelte"
+      },
+      {
+        "path": "webui/src/lib/stores/auditLog.svelte.js",
+        "fan_in": 0,
+        "fan_out": 2,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/lib/stores/auditLog.svelte.js"
+      },
+      {
+        "path": "webui/src/lib/stores/blocklist.svelte.js",
+        "fan_in": 0,
+        "fan_out": 3,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/lib/stores/blocklist.svelte.js"
+      },
+      {
+        "path": "webui/src/lib/stores/config.svelte.js",
+        "fan_in": 0,
+        "fan_out": 2,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/lib/stores/config.svelte.js"
+      },
+      {
+        "path": "webui/src/lib/stores/health.svelte.js",
+        "fan_in": 0,
+        "fan_out": 2,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/lib/stores/health.svelte.js"
+      },
+      {
+        "path": "webui/src/lib/stores/kpis.svelte.js",
+        "fan_in": 0,
+        "fan_out": 3,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/lib/stores/kpis.svelte.js"
+      },
+      {
+        "path": "webui/src/lib/stores/stagingQueue.svelte.js",
+        "fan_in": 0,
+        "fan_out": 4,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/lib/stores/stagingQueue.svelte.js"
+      },
+      {
+        "path": "webui/src/lib/stores/toast.svelte.js",
+        "fan_in": 0,
+        "fan_out": 1,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/lib/stores/toast.svelte.js"
+      },
+      {
+        "path": "webui/src/routes/+error.svelte",
+        "fan_in": 0,
+        "fan_out": 1,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/routes/+error.svelte"
+      },
+      {
+        "path": "webui/src/routes/+layout.js",
+        "fan_in": 0,
+        "fan_out": 0,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/routes/+layout.js"
+      },
+      {
+        "path": "webui/src/routes/+layout.svelte",
+        "fan_in": 0,
+        "fan_out": 3,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/routes/+layout.svelte"
+      },
+      {
+        "path": "webui/src/routes/+page.js",
+        "fan_in": 0,
+        "fan_out": 4,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/routes/+page.js"
+      },
+      {
+        "path": "webui/src/routes/+page.svelte",
+        "fan_in": 0,
+        "fan_out": 8,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/routes/+page.svelte"
+      },
+      {
+        "path": "webui/src/routes/audit/+page.js",
+        "fan_in": 0,
+        "fan_out": 1,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/routes/audit/+page.js"
+      },
+      {
+        "path": "webui/src/routes/audit/+page.svelte",
+        "fan_in": 0,
+        "fan_out": 2,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/routes/audit/+page.svelte"
+      },
+      {
+        "path": "webui/src/routes/blocklist/+page.js",
+        "fan_in": 0,
+        "fan_out": 1,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/routes/blocklist/+page.js"
+      },
+      {
+        "path": "webui/src/routes/blocklist/+page.svelte",
+        "fan_in": 0,
+        "fan_out": 4,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/routes/blocklist/+page.svelte"
+      },
+      {
+        "path": "webui/src/routes/settings/+page.js",
+        "fan_in": 0,
+        "fan_out": 1,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/routes/settings/+page.js"
+      },
+      {
+        "path": "webui/src/routes/settings/+page.svelte",
+        "fan_in": 0,
+        "fan_out": 2,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/routes/settings/+page.svelte"
+      },
+      {
+        "path": "webui/src/routes/staging/+page.js",
+        "fan_in": 0,
+        "fan_out": 1,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/routes/staging/+page.js"
+      },
+      {
+        "path": "webui/src/routes/staging/+page.svelte",
+        "fan_in": 0,
+        "fan_out": 4,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/routes/staging/+page.svelte"
+      },
+      {
+        "path": "webui/tests/component/ErrorBanner.test.ts",
+        "fan_in": 0,
+        "fan_out": 1,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/tests/component/ErrorBanner.test.ts"
+      },
+      {
+        "path": "webui/tests/component/KpiCard.test.ts",
+        "fan_in": 0,
+        "fan_out": 1,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/tests/component/KpiCard.test.ts"
+      },
+      {
+        "path": "webui/tests/component/StatusBadge.test.ts",
+        "fan_in": 0,
+        "fan_out": 1,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/tests/component/StatusBadge.test.ts"
+      },
+      {
+        "path": "webui/tests/setup.ts",
+        "fan_in": 0,
+        "fan_out": 0,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/tests/setup.ts"
+      }
+    ]
   },
   "system": {
     "apiSurface": {
@@ -977,11 +2731,19 @@
   },
   "footer": {
     "host": "nightfall",
-    "python": "Python 3.12.3",
+    "python": "3.12.3",
     "git": "git version 2.43.0",
     "executor": "chris"
   },
   "trendRows": [
+    {
+      "runId": "coverage-ok-20260405T083227",
+      "severity": "warning",
+      "warningChecks": 2,
+      "failedChecks": 0,
+      "deltaItems": 14,
+      "generatedAt": "2026-04-05T06:32:49.353270+00:00"
+    },
     {
       "runId": "module2-coverage-20260405T083040",
       "severity": "critical",
