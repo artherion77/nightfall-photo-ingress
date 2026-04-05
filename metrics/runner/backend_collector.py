@@ -67,19 +67,53 @@ def collect_loc(repo_root: Path, roots: list[str]) -> dict[str, Any]:
     }
 
 
-def collect_dependency_graph(repo_root: Path, roots: list[str]) -> dict[str, Any]:
-    files = _iter_python_files(repo_root, roots)
-    edges: list[dict[str, str]] = []
-    nodes: list[str] = []
+def _detect_cycles(adj: dict[str, list[str]]) -> set[str]:
+    """Return the set of node keys that participate in any cycle (DFS with gray-set tracking)."""
+    in_cycle: set[str] = set()
+    visited: set[str] = set()
+    gray: set[str] = set()
 
-    for file_path in files:
+    def _dfs(node: str, path: list[str]) -> None:
+        visited.add(node)
+        gray.add(node)
+        path.append(node)
+        for neighbor in adj.get(node, []):
+            if neighbor not in adj:
+                continue
+            if neighbor in gray:
+                idx = path.index(neighbor)
+                for cycle_node in path[idx:]:
+                    in_cycle.add(cycle_node)
+            elif neighbor not in visited:
+                _dfs(neighbor, path)
+        path.pop()
+        gray.discard(node)
+
+    for start_node in list(adj.keys()):
+        if start_node not in visited:
+            _dfs(start_node, [])
+    return in_cycle
+
+
+def collect_dependency_graph(repo_root: Path, roots: list[str]) -> dict[str, Any]:
+    all_files = _iter_python_files(repo_root, roots)
+    nodes: list[str] = [str(f.relative_to(repo_root)) for f in all_files]
+
+    def _path_to_module(p: str) -> str:
+        mod = p.replace("/", ".").removesuffix(".py")
+        if mod.endswith(".__init__"):
+            mod = mod[: -len(".__init__")]
+        return mod
+
+    module_to_path: dict[str, str] = {_path_to_module(p): p for p in nodes}
+
+    edges: list[dict[str, str]] = []
+    for file_path in all_files:
         rel = str(file_path.relative_to(repo_root))
-        nodes.append(rel)
         try:
             tree = ast.parse(file_path.read_text(encoding="utf-8", errors="replace"))
         except SyntaxError:
             continue
-
         imports: set[str] = set()
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
@@ -91,10 +125,37 @@ def collect_dependency_graph(repo_root: Path, roots: list[str]) -> dict[str, Any
         for imported in sorted(imports):
             edges.append({"from": rel, "to": imported})
 
+    fan_out: dict[str, int] = {n: 0 for n in nodes}
+    fan_in: dict[str, int] = {n: 0 for n in nodes}
+    local_adj: dict[str, list[str]] = {n: [] for n in nodes}
+    for edge in edges:
+        fan_out[edge["from"]] = fan_out.get(edge["from"], 0) + 1
+        target_path = module_to_path.get(edge["to"])
+        if target_path:
+            fan_in[target_path] = fan_in.get(target_path, 0) + 1
+            local_adj[edge["from"]].append(target_path)
+
+    in_cycle = _detect_cycles(local_adj)
+
+    node_details = sorted(
+        [
+            {
+                "path": path,
+                "fan_in": fan_in.get(path, 0),
+                "fan_out": fan_out.get(path, 0),
+                "kind": "local",
+                "in_cycle": path in in_cycle,
+            }
+            for path in nodes
+        ],
+        key=lambda d: d["path"],
+    )
+
     return {
         "status": "success",
         "nodes": sorted(nodes),
         "edges": edges,
+        "node_details": node_details,
     }
 
 

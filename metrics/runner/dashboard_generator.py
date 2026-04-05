@@ -363,8 +363,12 @@ def _dashboard_payload(repo_root: Path, manifest: dict[str, Any], metrics: dict[
         "high": max(0, round(_as_number((backend_complexity.get("cyclomatic") or {}).get("max"), 0) / 2)),
     }
 
-    backend_dep_nodes = (backend_metrics.get("dependency_graph") or {}).get("nodes", {}) if isinstance(backend_metrics, dict) else {}
-    backend_graph_nodes = _nodes(len(backend_dep_nodes) if isinstance(backend_dep_nodes, dict) else 0)
+    backend_dep_graph = (backend_metrics.get("dependency_graph") or {}) if isinstance(backend_metrics, dict) else {}
+    backend_dep_nodes_list = backend_dep_graph.get("nodes", []) if isinstance(backend_dep_graph, dict) else []
+    backend_node_details_raw = backend_dep_graph.get("node_details", []) if isinstance(backend_dep_graph, dict) else []
+    backend_graph_nodes = _nodes(len(backend_dep_nodes_list) if isinstance(backend_dep_nodes_list, list) else 0)
+    frontend_dep_graph = (frontend_metrics.get("dependency_graph") or {}) if isinstance(frontend_metrics, dict) else {}
+    frontend_node_details_raw = frontend_dep_graph.get("node_details", []) if isinstance(frontend_dep_graph, dict) else []
     frontend_graph_nodes = _nodes(len(frontend_rows))
 
     # Build trend series from measured historical coverage if available
@@ -396,6 +400,14 @@ def _dashboard_payload(repo_root: Path, manifest: dict[str, Any], metrics: dict[
     repo_url = _origin_repo_url(repo_root)
     repo_head_url = f"{repo_url}/tree/{source_branch}" if repo_url else None
     repo_commit_url = f"{repo_url}/commit/{commit_full}" if repo_url and commit_full else None
+    backend_node_details = [
+        {**d, "repoFileUrl": f"{repo_url}/blob/{source_branch}/{d['path']}" if repo_url else None}
+        for d in backend_node_details_raw if isinstance(d, dict)
+    ]
+    frontend_node_details = [
+        {**d, "repoFileUrl": f"{repo_url}/blob/{source_branch}/{d['path']}" if repo_url else None}
+        for d in frontend_node_details_raw if isinstance(d, dict)
+    ]
     execution = manifest.get("execution") if isinstance(manifest, dict) else {}
     started_at = str((execution or {}).get("started_at", "")) if isinstance(execution, dict) else ""
     finished_at = str((execution or {}).get("finished_at", "")) if isinstance(execution, dict) else ""
@@ -453,10 +465,12 @@ def _dashboard_payload(repo_root: Path, manifest: dict[str, Any], metrics: dict[
         "backendGraph": {
             "nodes": backend_graph_nodes,
             "edges": _edges(len(backend_graph_nodes)),
+            "nodeDetails": backend_node_details,
         },
         "frontendGraph": {
             "nodes": frontend_graph_nodes,
             "edges": _edges(len(frontend_graph_nodes)),
+            "nodeDetails": frontend_node_details,
         },
         "system": {
             "apiSurface": api_surface,

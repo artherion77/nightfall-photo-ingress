@@ -159,3 +159,9 @@ def test_module5_dashboard_generation_from_artifacts_only(tmp_path: Path) -> Non
     assert "bundleSizeDetail" in dashboard_data["system"]
     assert dashboard_data["system"]["bundleSizeDetail"] is None
     assert dashboard_data["system"]["bundleSizeKb"] is None
+
+    # Chunk 5: nodeDetails must be present in both graph payload sections.
+    assert "backendGraph" in dashboard_data
+    assert "frontendGraph" in dashboard_data
+    assert isinstance(dashboard_data["backendGraph"]["nodeDetails"], list)
+    assert isinstance(dashboard_data["frontendGraph"]["nodeDetails"], list)

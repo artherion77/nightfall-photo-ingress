@@ -148,6 +148,8 @@ Expose real bundle intelligence from frontend build artifacts.
 
 ## Chunk 5: Dependency graph actionable UX
 
+Implementation status: Implemented (2026-04-05)
+
 ### Goal
 Make graph tiles informative and debuggable rather than decorative.
 

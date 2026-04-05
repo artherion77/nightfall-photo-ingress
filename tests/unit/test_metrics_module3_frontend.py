@@ -62,6 +62,39 @@ def test_collect_frontend_dependency_graph_extracts_imports(tmp_path: Path) -> N
     assert {edge["to"] for edge in payload["edges"]} == {"foo", "bar"}
 
 
+def test_collect_frontend_dependency_graph_node_details(tmp_path: Path) -> None:
+    (tmp_path / "webui" / "src").mkdir(parents=True)
+    # a.ts imports b via relative path (local) and also imports external 'svelte'
+    (tmp_path / "webui" / "src" / "a.ts").write_text(
+        "import b from './b';\nimport { onMount } from 'svelte';\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "webui" / "src" / "b.ts").write_text(
+        "export const x = 1;\n",
+        encoding="utf-8",
+    )
+
+    payload = collect_dependency_graph(tmp_path, ["webui/src"])
+    assert payload["status"] == "success"
+    assert "node_details" in payload
+
+    details_by_path = {d["path"]: d for d in payload["node_details"]}
+    assert set(details_by_path.keys()) == {"webui/src/a.ts", "webui/src/b.ts"}
+
+    a = details_by_path["webui/src/a.ts"]
+    b = details_by_path["webui/src/b.ts"]
+
+    assert a["fan_out"] == 2  # imports './b' and 'svelte'
+    assert b["fan_out"] == 0  # no imports
+
+    assert b["fan_in"] == 1  # imported by a via relative path
+    assert a["fan_in"] == 0  # not imported by anyone
+
+    assert a["in_cycle"] is False
+    assert b["in_cycle"] is False
+    assert a["kind"] == "local"
+
+
 def test_run_frontend_collection_writes_latest_and_history_artifacts(tmp_path: Path) -> None:
     (tmp_path / "webui" / "src").mkdir(parents=True)
     (tmp_path / "webui" / "src" / "x.ts").write_text("if (true) { console.log('x'); }\n", encoding="utf-8")

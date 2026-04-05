@@ -203,21 +203,104 @@ def collect_cognitive_complexity(repo_root: Path, roots: list[str]) -> dict[str,
         }
 
 
+_FRONTEND_EXTS = (".ts", ".tsx", ".js", ".jsx", ".svelte")
+
+
+def _resolve_local_import(from_path: str, to_module: str, node_set: set[str], repo_root: Path) -> str | None:
+    """Resolve a relative JS/TS import specifier to its project node path, or None if unresolvable."""
+    if not to_module.startswith("."):
+        return None
+    src_dir = (repo_root / from_path).parent
+    resolved_base = (src_dir / to_module).resolve()
+    for ext in _FRONTEND_EXTS:
+        try:
+            candidate = str(resolved_base.with_suffix(ext).relative_to(repo_root))
+            if candidate in node_set:
+                return candidate
+        except ValueError:
+            continue
+    if resolved_base.suffix in set(_FRONTEND_EXTS):
+        try:
+            candidate = str(resolved_base.relative_to(repo_root))
+            if candidate in node_set:
+                return candidate
+        except ValueError:
+            pass
+    return None
+
+
+def _detect_cycles(adj: dict[str, list[str]]) -> set[str]:
+    """Return the set of node keys that participate in any cycle (DFS with gray-set tracking)."""
+    in_cycle: set[str] = set()
+    visited: set[str] = set()
+    gray: set[str] = set()
+
+    def _dfs(node: str, path: list[str]) -> None:
+        visited.add(node)
+        gray.add(node)
+        path.append(node)
+        for neighbor in adj.get(node, []):
+            if neighbor not in adj:
+                continue
+            if neighbor in gray:
+                idx = path.index(neighbor)
+                for cycle_node in path[idx:]:
+                    in_cycle.add(cycle_node)
+            elif neighbor not in visited:
+                _dfs(neighbor, path)
+        path.pop()
+        gray.discard(node)
+
+    for start_node in list(adj.keys()):
+        if start_node not in visited:
+            _dfs(start_node, [])
+    return in_cycle
+
+
 def collect_dependency_graph(repo_root: Path, roots: list[str]) -> dict[str, Any]:
-    files = _iter_frontend_files(repo_root, roots)
-    nodes: list[str] = []
+    all_files = _iter_frontend_files(repo_root, roots)
+    nodes: list[str] = [str(f.relative_to(repo_root)) for f in all_files]
+    node_set = set(nodes)
+
     edges: list[dict[str, str]] = []
-    for file_path in files:
+    for file_path in all_files:
         rel = str(file_path.relative_to(repo_root))
-        nodes.append(rel)
         text = file_path.read_text(encoding="utf-8", errors="replace")
         modules = {match.group("module") for match in IMPORT_RE.finditer(text)}
         for module in sorted(modules):
             edges.append({"from": rel, "to": module})
+
+    fan_out: dict[str, int] = {n: 0 for n in nodes}
+    fan_in: dict[str, int] = {n: 0 for n in nodes}
+    local_adj: dict[str, list[str]] = {n: [] for n in nodes}
+    for edge in edges:
+        fan_out[edge["from"]] = fan_out.get(edge["from"], 0) + 1
+        resolved = _resolve_local_import(edge["from"], edge["to"], node_set, repo_root)
+        if resolved:
+            fan_in[resolved] = fan_in.get(resolved, 0) + 1
+            local_adj[edge["from"]].append(resolved)
+
+    in_cycle = _detect_cycles(local_adj)
+
+    node_details = sorted(
+        [
+            {
+                "path": path,
+                "fan_in": fan_in.get(path, 0),
+                "fan_out": fan_out.get(path, 0),
+                "kind": "local",
+                "in_cycle": path in in_cycle,
+            }
+            for path in nodes
+        ],
+        key=lambda d: d["path"],
+    )
+
     return {
         "status": "success",
         "nodes": sorted(nodes),
         "edges": edges,
+        "node_details": node_details,
     }
 
 

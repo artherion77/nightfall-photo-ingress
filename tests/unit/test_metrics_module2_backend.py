@@ -33,6 +33,40 @@ def test_collect_dependency_graph_extracts_imports(tmp_path: Path) -> None:
     assert {edge["to"] for edge in payload["edges"]} == {"os", "collections"}
 
 
+def test_collect_dependency_graph_node_details_fan_in_fan_out_cycle(tmp_path: Path) -> None:
+    (tmp_path / "src").mkdir(parents=True)
+    # a.py imports b; b.py imports a → mutual cycle
+    (tmp_path / "src" / "a.py").write_text("from src.b import x\n", encoding="utf-8")
+    (tmp_path / "src" / "b.py").write_text("from src.a import y\n", encoding="utf-8")
+    # c.py imports a only; no cycle
+    (tmp_path / "src" / "c.py").write_text("from src.a import z\n", encoding="utf-8")
+
+    payload = collect_dependency_graph(tmp_path, ["src"])
+    assert payload["status"] == "success"
+    assert "node_details" in payload
+
+    details_by_path = {d["path"]: d for d in payload["node_details"]}
+    assert set(details_by_path.keys()) == {"src/a.py", "src/b.py", "src/c.py"}
+
+    a = details_by_path["src/a.py"]
+    b = details_by_path["src/b.py"]
+    c = details_by_path["src/c.py"]
+
+    assert a["fan_out"] == 1  # imports src.b
+    assert b["fan_out"] == 1  # imports src.a
+    assert c["fan_out"] == 1  # imports src.a
+
+    assert a["fan_in"] == 2  # imported by b and c
+    assert b["fan_in"] == 1  # imported by a
+    assert c["fan_in"] == 0  # not imported by anyone
+
+    assert a["in_cycle"] is True
+    assert b["in_cycle"] is True
+    assert c["in_cycle"] is False
+
+    assert a["kind"] == "local"
+
+
 def test_run_backend_collection_writes_latest_and_history_artifacts(tmp_path: Path) -> None:
     (tmp_path / "src").mkdir(parents=True)
     (tmp_path / "src" / "m.py").write_text("def f():\n    return 1\n", encoding="utf-8")
