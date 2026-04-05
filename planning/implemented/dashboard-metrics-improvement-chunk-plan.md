@@ -1,7 +1,7 @@
 # Dashboard Metrics Improvement Plan (Chunked)
 
-Status: In Progress
-Date: 2026-04-04
+Status: Implemented
+Date: 2026-04-05
 Owner: Systems Engineering
 Scope: Metrics dashboard quality, metric correctness, collector enablement, and observability upgrades
 
@@ -87,7 +87,7 @@ Make backend cyclomatic and maintainability consistently available in dev contai
 
 ### Work items
 
-- Ensure `radon` is installed in the metrics execution environment.
+- Ensure `radon` is installed in the metrics execution environment in the dev container.
 - Verify collector records radon version and non-empty complexity payload.
 - Add failure diagnostics for parser errors or unsupported files.
 
