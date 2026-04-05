@@ -1,18 +1,18 @@
 # Nightfall Metrics Executive Summary
 
-- Run ID: module6-20260405T145657-1
-- Generated At: 2026-04-05T14:57:14.573277+00:00
+- Run ID: module6-20260405T170149-1
+- Generated At: 2026-04-05T17:02:06.510188+00:00
 - Branch: main
-- Commit: 1489bd2caefbef857b999b816ba9b700f1ebe8f9
+- Commit: e2e45126fffda54b86bb4db23369c02388fc9ec6
 - Collection Status: partial
 - Severity: warning
-- Previous Successful Run: chunk2-2026-04-05
+- Previous Successful Run: module6-20260405T165133-1
 
 ## Indicators
 
 - Failed checks: 0
-- Warning checks: 7
-- Delta items: 17
+- Warning checks: 5
+- Delta items: 15
 
 ## Artifact Links
 
@@ -23,8 +23,6 @@
 ## Warnings
 
 - modules.frontend.metrics.test_coverage not available
-- modules.optional_collectors not available
-- modules.optional_collectors.collectors.bundle_size not available
 - modules.optional_collectors.collectors.openapi_complexity not available
 - modules.optional_collectors.collectors.api_surface_diff not available
 - modules.optional_collectors.collectors.vitest_coverage not available
@@ -36,9 +34,9 @@
 
 ## Trend Snippets
 
+- module6-20260405T165133-1: severity=warning, status=partial, warnings=5, failures=0, delta_items=17
+- chunk4-bundle-20260405T160008: severity=warning, status=partial, warnings=5, failures=0, delta_items=17
+- chunk4-bundle-20260405T155944: severity=warning, status=partial, warnings=1, failures=0, delta_items=17
+- module6-20260405T155829-1: severity=warning, status=partial, warnings=7, failures=0, delta_items=17
+- module6-20260405T145657-1: severity=warning, status=partial, warnings=7, failures=0, delta_items=17
 - coverage-ok-20260405T083227: severity=warning, status=partial, warnings=2, failures=0, delta_items=14
-- module2-coverage-20260405T083040: severity=critical, status=failed, warnings=2, failures=2, delta_items=11
-- manual-20260405T082705: severity=warning, status=partial, warnings=3, failures=0, delta_items=11
-- module6-20260405T062607-1: severity=critical, status=failed, warnings=8, failures=2, delta_items=11
-- coverage-check-local: severity=critical, status=failed, warnings=2, failures=2, delta_items=14
-- module4-bootstrap: severity=warning, status=partial, warnings=3, failures=0, delta_items=11

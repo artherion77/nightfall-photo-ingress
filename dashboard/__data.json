@@ -1,18 +1,18 @@
 {
   "projectName": "nightfall++photo-ingress",
-  "commitSha": "1489bd2",
-  "commitFull": "1489bd2caefbef857b999b816ba9b700f1ebe8f9",
-  "runId": "module6-20260405T145657-1",
-  "lastRunAt": "2026-04-05T14:57:14.573277+00:00",
+  "commitSha": "e2e4512",
+  "commitFull": "e2e45126fffda54b86bb4db23369c02388fc9ec6",
+  "runId": "module6-20260405T170149-1",
+  "lastRunAt": "2026-04-05T17:02:06.510188+00:00",
   "sourceBranch": "main",
   "repoUrl": "https://github.com/artherion77/nightfall-photo-ingress",
   "repoHeadUrl": "https://github.com/artherion77/nightfall-photo-ingress/tree/main",
-  "repoCommitUrl": "https://github.com/artherion77/nightfall-photo-ingress/commit/1489bd2caefbef857b999b816ba9b700f1ebe8f9",
+  "repoCommitUrl": "https://github.com/artherion77/nightfall-photo-ingress/commit/e2e45126fffda54b86bb4db23369c02388fc9ec6",
   "runMeta": {
-    "startedAt": "2026-04-05T14:57:14.560037+00:00",
-    "finishedAt": "2026-04-05T14:57:14.573287+00:00",
-    "durationSeconds": 0.0133,
-    "runId": "module6-20260405T145657-1",
+    "startedAt": "2026-04-05T17:02:06.495031+00:00",
+    "finishedAt": "2026-04-05T17:02:06.510199+00:00",
+    "durationSeconds": 0.0152,
+    "runId": "module6-20260405T170149-1",
     "branch": "main"
   },
   "versions": {
@@ -21,20 +21,20 @@
   },
   "coveragePercent": 80.11625090821022,
   "hasCoverage": true,
-  "sparklinePoints": "0.00,42.00 90.00,42.00 180.00,42.00",
+  "sparklinePoints": "0.00,42.00 30.00,42.00 60.00,42.00 90.00,42.00 120.00,42.00 150.00,42.00 180.00,42.00",
   "coverageTrendSource": "measured_history",
-  "locTotal": "35.6k",
+  "locTotal": "36.3k",
   "locDetail": {
-    "total": 35639,
+    "total": 36292,
     "purpose": {
-      "production": 11849,
-      "test": 15982,
-      "other": 7808
+      "production": 11848,
+      "test": 16332,
+      "other": 8112
     },
     "technology": {
-      "python": 30321,
+      "python": 30975,
       "svelte": 1956,
-      "jsts": 785,
+      "jsts": 784,
       "bash": 2577,
       "other": 0
     },
@@ -42,12 +42,18 @@
     "note": "System-level metric. Includes all code in the repository."
   },
   "complexityCard": {
-    "cyclomatic": 3.2535,
-    "maintainability": 56.5529
+    "cyclomatic": 3.2477,
+    "maintainability": 56.4808,
+    "frontend": {
+      "value": 0.6821266233766233,
+      "source": "sonar_cognitive",
+      "status": "partial",
+      "parser_version_label": "tree-sitter 0.25.2"
+    }
   },
-  "frontendComplexity": 26.8036,
+  "frontendComplexity": 0.6821266233766233,
   "frontendComplexityReference": {
-    "method": "Heuristic cognitive complexity from frontend_collector (branch tokens weighted by nesting depth)",
+    "method": "Sonar Cognitive Complexity (tree-sitter AST; nesting-penalised increments)",
     "scale": {
       "min": 0.0,
       "max": 60.0
@@ -73,205 +79,163 @@
     }
   ],
   "complexityMix": {
-    "low": 7,
-    "moderate": 54,
+    "low": 6,
+    "moderate": 1,
     "high": 24
   },
   "complexityBreakdownDetail": {
     "high": {
       "category": "high",
-      "totalModules": 15,
+      "totalModules": 3,
       "topModules": [
         {
-          "module": "webui/src/lib/stores/blocklist.svelte.js",
-          "type": "frontend",
-          "score": 151.0,
+          "module": "tests/unit/test_metrics_module5_dashboard.py",
+          "type": "backend",
+          "score": 24.5,
           "category": "high"
         },
         {
-          "module": "webui/src/lib/stores/stagingQueue.svelte.js",
-          "type": "frontend",
-          "score": 128.0,
+          "module": "tests/integration/test_pending_lifecycle_integration.py",
+          "type": "backend",
+          "score": 22.0,
           "category": "high"
         },
         {
-          "module": "webui/src/routes/blocklist/+page.svelte",
-          "type": "frontend",
-          "score": 127.0,
-          "category": "high"
-        },
-        {
-          "module": "webui/src/lib/stores/health.svelte.js",
-          "type": "frontend",
-          "score": 95.0,
-          "category": "high"
-        },
-        {
-          "module": "webui/src/routes/staging/+page.svelte",
-          "type": "frontend",
-          "score": 93.0,
-          "category": "high"
-        },
-        {
-          "module": "webui/src/lib/stores/auditLog.svelte.js",
-          "type": "frontend",
-          "score": 91.0,
-          "category": "high"
-        },
-        {
-          "module": "webui/src/routes/audit/+page.svelte",
-          "type": "frontend",
-          "score": 90.0,
-          "category": "high"
-        },
-        {
-          "module": "webui/src/lib/components/blocklist/BlockRuleForm.svelte",
-          "type": "frontend",
-          "score": 77.0,
-          "category": "high"
-        },
-        {
-          "module": "webui/src/lib/components/staging/PhotoWheel.svelte",
-          "type": "frontend",
-          "score": 56.0,
-          "category": "high"
-        },
-        {
-          "module": "webui/src/lib/components/layout/AppFooter.svelte",
-          "type": "frontend",
-          "score": 53.0,
+          "module": "tests/integration/test_m3_m4_operator_semantics.py",
+          "type": "backend",
+          "score": 11.0,
           "category": "high"
         }
       ]
     },
     "moderate": {
       "category": "moderate",
-      "totalModules": 33,
+      "totalModules": 24,
       "topModules": [
-        {
-          "module": "webui/src/lib/components/blocklist/BlockRuleList.svelte",
-          "type": "frontend",
-          "score": 38.0,
-          "category": "moderate"
-        },
-        {
-          "module": "webui/tests/component/KpiCard.test.ts",
-          "type": "frontend",
-          "score": 35.0,
-          "category": "moderate"
-        },
-        {
-          "module": "webui/src/lib/components/layout/AppHeader.svelte",
-          "type": "frontend",
-          "score": 30.0,
-          "category": "moderate"
-        },
-        {
-          "module": "webui/src/lib/api/client.ts",
-          "type": "frontend",
-          "score": 29.0,
-          "category": "moderate"
-        },
-        {
-          "module": "webui/src/lib/api/audit.ts",
-          "type": "frontend",
-          "score": 24.0,
-          "category": "moderate"
-        },
-        {
-          "module": "webui/src/lib/api/triage.ts",
-          "type": "frontend",
-          "score": 23.0,
-          "category": "moderate"
-        },
-        {
-          "module": "webui/src/lib/components/staging/TriageControls.svelte",
-          "type": "frontend",
-          "score": 22.0,
-          "category": "moderate"
-        },
-        {
-          "module": "webui/src/lib/api/blocklist.ts",
-          "type": "frontend",
-          "score": 20.0,
-          "category": "moderate"
-        },
-        {
-          "module": "webui/src/lib/components/common/LoadMoreButton.svelte",
-          "type": "frontend",
-          "score": 20.0,
-          "category": "moderate"
-        },
         {
           "module": "tests/unit/test_status_export.py",
           "type": "backend",
           "score": 9.0,
+          "category": "moderate"
+        },
+        {
+          "module": "tests/unit/test_metrics_module2_backend.py",
+          "type": "backend",
+          "score": 8.5,
+          "category": "moderate"
+        },
+        {
+          "module": "tests/integration/test_m3_m4_happy_path.py",
+          "type": "backend",
+          "score": 7.4,
+          "category": "moderate"
+        },
+        {
+          "module": "api/services/audit_service.py",
+          "type": "backend",
+          "score": 7.0,
+          "category": "moderate"
+        },
+        {
+          "module": "src/nightfall_photo_ingress/adapters/onedrive/safe_logging.py",
+          "type": "backend",
+          "score": 7.0,
+          "category": "moderate"
+        },
+        {
+          "module": "tests/integration/browser_chain_harness/test_browser_chain_harness.py",
+          "type": "backend",
+          "score": 7.0,
+          "category": "moderate"
+        },
+        {
+          "module": "tests/integration/test_m3_m4_idempotency.py",
+          "type": "backend",
+          "score": 7.0,
+          "category": "moderate"
+        },
+        {
+          "module": "tests/integration/ui/test_dashboard.py",
+          "type": "backend",
+          "score": 7.0,
+          "category": "moderate"
+        },
+        {
+          "module": "src/nightfall_photo_ingress/domain/ingest.py",
+          "type": "backend",
+          "score": 6.79,
+          "category": "moderate"
+        },
+        {
+          "module": "tests/integration/test_live_photo_integration.py",
+          "type": "backend",
+          "score": 6.5,
           "category": "moderate"
         }
       ]
     },
     "low": {
       "category": "low",
-      "totalModules": 171,
+      "totalModules": 137,
       "topModules": [
         {
-          "module": "webui/src/lib/stores/config.svelte.js",
-          "type": "frontend",
-          "score": 19.0,
+          "module": "api/app.py",
+          "type": "backend",
+          "score": 4.67,
           "category": "low"
         },
         {
-          "module": "webui/src/lib/components/common/KpiCard.svelte",
-          "type": "frontend",
-          "score": 17.0,
+          "module": "tests/integration/test_m3_m4_crash_recovery.py",
+          "type": "backend",
+          "score": 4.6,
           "category": "low"
         },
         {
-          "module": "webui/src/lib/components/staging/PhotoCard.svelte",
-          "type": "frontend",
-          "score": 16.0,
+          "module": "api/services/health_service.py",
+          "type": "backend",
+          "score": 4.5,
           "category": "low"
         },
         {
-          "module": "webui/src/lib/components/common/ConfirmDialog.svelte",
-          "type": "frontend",
-          "score": 15.0,
+          "module": "api/services/staging_service.py",
+          "type": "backend",
+          "score": 4.5,
           "category": "low"
         },
         {
-          "module": "webui/src/lib/components/common/EmptyState.svelte",
-          "type": "frontend",
-          "score": 12.0,
+          "module": "tests/integration/api/test_staging.py",
+          "type": "backend",
+          "score": 4.5,
           "category": "low"
         },
         {
-          "module": "webui/src/lib/components/staging/ItemMetaPanel.svelte",
-          "type": "frontend",
-          "score": 12.0,
+          "module": "tests/integration/test_m3_m4_duplicates_and_replay.py",
+          "type": "backend",
+          "score": 4.5,
           "category": "low"
         },
         {
-          "module": "webui/src/lib/stores/toast.svelte.js",
-          "type": "frontend",
-          "score": 12.0,
+          "module": "tests/unit/test_metrics_module1_schema.py",
+          "type": "backend",
+          "score": 4.5,
           "category": "low"
         },
         {
-          "module": "webui/src/lib/components/audit/AuditTimeline.svelte",
-          "type": "frontend",
-          "score": 10.0,
+          "module": "src/nightfall_photo_ingress/config.py",
+          "type": "backend",
+          "score": 4.48,
           "category": "low"
         },
         {
-          "module": "webui/src/lib/components/dashboard/HealthBar.svelte",
-          "type": "frontend",
-          "score": 10.0,
+          "module": "src/nightfall_photo_ingress/cli.py",
+          "type": "backend",
+          "score": 4.41,
           "category": "low"
         },
         {
-          "module": "webui/src/lib/components/common/ActionButton.svelte",
-          "type": "frontend",
-          "score": 8.0,
+          "module": "tests/integration/api/test_blocklist.py",
+          "type": "backend",
+          "score": 4.33,
           "category": "low"
         }
       ]
@@ -1866,6 +1830,14 @@
         "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_cli_version.py"
       },
       {
+        "path": "tests/unit/test_cognitive_complexity.py",
+        "fan_in": 0,
+        "fan_out": 2,
+        "kind": "local",
+        "in_cycle": false,
+        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/tests/unit/test_cognitive_complexity.py"
+      },
+      {
         "path": "tests/unit/test_config_check_integration.py",
         "fan_in": 0,
         "fan_out": 4,
@@ -2516,14 +2488,6 @@
     ],
     "nodeDetails": [
       {
-        "path": "webui/src/app.d.ts",
-        "fan_in": 0,
-        "fan_out": 0,
-        "kind": "local",
-        "in_cycle": false,
-        "repoFileUrl": "https://github.com/artherion77/nightfall-photo-ingress/blob/main/webui/src/app.d.ts"
-      },
-      {
         "path": "webui/src/lib/api/audit.ts",
         "fan_in": 0,
         "fan_out": 1,
@@ -2970,8 +2934,40 @@
       "endpoints": 7,
       "schemas": 7
     },
-    "bundleSizeKb": null,
-    "bundleSizeDetail": null,
+    "bundleSizeKb": 370,
+    "bundleSizeDetail": {
+      "totalKb": 370.2,
+      "gzipKb": 97.4,
+      "brotliKb": 83.3,
+      "largestChunk": {
+        "name": "index.js",
+        "type": "js",
+        "raw_bytes": 127240,
+        "raw_kb": 124.3
+      },
+      "topContributors": [
+        {
+          "id": "/opt/nightfall-webui/node_modules/svelte/src/internal/server/renderer.js",
+          "rendered_kb": 23.9
+        },
+        {
+          "id": "/opt/nightfall-webui/node_modules/svelte/src/internal/client/reactivity/batch.js",
+          "rendered_kb": 21.7
+        },
+        {
+          "id": "/opt/nightfall-webui/node_modules/@sveltejs/kit/src/runtime/server/page/render.js",
+          "rendered_kb": 20.7
+        },
+        {
+          "id": "/opt/nightfall-webui/node_modules/@sveltejs/kit/src/runtime/form-utils.js",
+          "rendered_kb": 20.5
+        },
+        {
+          "id": "/opt/nightfall-webui/node_modules/@sveltejs/kit/src/runtime/server/respond.js",
+          "rendered_kb": 18.5
+        }
+      ]
+    },
     "openapiScore": null
   },
   "footer": {
@@ -2982,52 +2978,52 @@
   },
   "trendRows": [
     {
+      "runId": "module6-20260405T165133-1",
+      "severity": "warning",
+      "warningChecks": 5,
+      "failedChecks": 0,
+      "deltaItems": 17,
+      "generatedAt": "2026-04-05T16:51:50.705961+00:00"
+    },
+    {
+      "runId": "chunk4-bundle-20260405T160008",
+      "severity": "warning",
+      "warningChecks": 5,
+      "failedChecks": 0,
+      "deltaItems": 17,
+      "generatedAt": "2026-04-05T16:00:46.192370+00:00"
+    },
+    {
+      "runId": "chunk4-bundle-20260405T155944",
+      "severity": "warning",
+      "warningChecks": 1,
+      "failedChecks": 0,
+      "deltaItems": 17,
+      "generatedAt": "2026-04-05T16:00:01.681636+00:00"
+    },
+    {
+      "runId": "module6-20260405T155829-1",
+      "severity": "warning",
+      "warningChecks": 7,
+      "failedChecks": 0,
+      "deltaItems": 17,
+      "generatedAt": "2026-04-05T15:58:46.628844+00:00"
+    },
+    {
+      "runId": "module6-20260405T145657-1",
+      "severity": "warning",
+      "warningChecks": 7,
+      "failedChecks": 0,
+      "deltaItems": 17,
+      "generatedAt": "2026-04-05T14:57:14.573277+00:00"
+    },
+    {
       "runId": "coverage-ok-20260405T083227",
       "severity": "warning",
       "warningChecks": 2,
       "failedChecks": 0,
       "deltaItems": 14,
       "generatedAt": "2026-04-05T06:32:49.353270+00:00"
-    },
-    {
-      "runId": "module2-coverage-20260405T083040",
-      "severity": "critical",
-      "warningChecks": 2,
-      "failedChecks": 2,
-      "deltaItems": 11,
-      "generatedAt": "2026-04-05T06:30:42.742935+00:00"
-    },
-    {
-      "runId": "manual-20260405T082705",
-      "severity": "warning",
-      "warningChecks": 3,
-      "failedChecks": 0,
-      "deltaItems": 11,
-      "generatedAt": "2026-04-05T06:27:05.730504+00:00"
-    },
-    {
-      "runId": "module6-20260405T062607-1",
-      "severity": "critical",
-      "warningChecks": 8,
-      "failedChecks": 2,
-      "deltaItems": 11,
-      "generatedAt": "2026-04-05T06:26:10.451647+00:00"
-    },
-    {
-      "runId": "coverage-check-local",
-      "severity": "critical",
-      "warningChecks": 2,
-      "failedChecks": 2,
-      "deltaItems": 14,
-      "generatedAt": "2026-04-04T14:13:29.563004+00:00"
-    },
-    {
-      "runId": "module4-bootstrap",
-      "severity": "warning",
-      "warningChecks": 3,
-      "failedChecks": 0,
-      "deltaItems": 11,
-      "generatedAt": "2026-04-04T12:28:57.924234+00:00"
     }
   ]
 }
