@@ -787,44 +787,42 @@
         <article class="card panel">
           <h4>Bundle Size</h4>
           <div class="hero-value compact">
-            <strong>
-              <span class="tip-anchor">
-                {bundleRawDisplay !== 'N/A' ? `${bundleRawDisplay} KB` : 'N/A'}
-                <span class="tip-bubble scale-tip">
-                  Bundle Size (Production Build)<br />
-                  Measured size of the frontend production bundle after tree-shaking and code-splitting.<br />
-                  <br />
-                  This metric reflects the amount of JavaScript delivered to the browser and primarily impacts:<br />
-                  • initial load time<br />
-                  • time-to-interactive on cold cache<br />
-                  <br />
-                  Values shown:<br />
-                  • Raw: {bundleRawDisplay} KB (uncompressed build output)<br />
-                  • Gzip: {bundleGzipDisplay} KB (typical network transfer)<br />
-                  • Brotli: {bundleBrotliDisplay} KB (modern browser transfer)<br />
-                  <br />
-                  Industry reference (frontend applications):<br />
-                  • Median raw bundle size: ~250–300 KB<br />
-                  • Median gzip size: ~90–120 KB<br />
-                  • Warning threshold: &gt;500 KB raw or &gt;200 KB gzip<br />
-                  <br />
-                  Lower values generally improve load performance, especially on mobile and low-bandwidth connections.<br />
-                  <br />
-                  Classification and scale are based on raw (uncompressed) bundle size.<br />
-                  Scale and classification are based on raw (uncompressed) bundle size.<br />
-                  Compressed sizes are shown for network transfer context.<br />
-                  <br />
-                  Scale anchors: 0 KB (minimal), 250 KB (industry median), 500 KB (warning threshold), 1000 KB (critical).<br />
-                  Color semantics: green below median, yellow near median, red above warning threshold.<br />
-                  <br />Classification: {bundleRelation}
-                  <span class="scale-bar cyclomatic">
-                    <span class="marker project" style={`left:${bundleProjectPct}%; border-top-color:${bundleProjectColor};`}></span>
-                    <span class="marker median" style={`left:${bundleIndustryMedianPct}%; border-bottom-color:#d8b33f;`}></span>
-                  </span>
-                  <span class="scale-legend">▼ Project value &nbsp; ▲ Industry median (250 KB)</span>
+            <span class="tip-anchor">
+              {bundleRawDisplay !== 'N/A' ? `${bundleRawDisplay} KB` : 'N/A'}
+              <span class="tip-bubble scale-tip">
+                Bundle Size (Production Build)<br />
+                Measured size of the frontend production bundle after tree-shaking and code-splitting.<br />
+                <br />
+                This metric reflects the amount of JavaScript delivered to the browser and primarily impacts:<br />
+                • initial load time<br />
+                • time-to-interactive on cold cache<br />
+                <br />
+                Values shown:<br />
+                • Raw: {bundleRawDisplay} KB (uncompressed build output)<br />
+                • Gzip: {bundleGzipDisplay} KB (typical network transfer)<br />
+                • Brotli: {bundleBrotliDisplay} KB (modern browser transfer)<br />
+                <br />
+                Industry reference (frontend applications):<br />
+                • Median raw bundle size: ~250–300 KB<br />
+                • Median gzip size: ~90–120 KB<br />
+                • Warning threshold: &gt;500 KB raw or &gt;200 KB gzip<br />
+                <br />
+                Lower values generally improve load performance, especially on mobile and low-bandwidth connections.<br />
+                <br />
+                Classification and scale are based on raw (uncompressed) bundle size.<br />
+                Scale and classification are based on raw (uncompressed) bundle size.<br />
+                Compressed sizes are shown for network transfer context.<br />
+                <br />
+                Scale anchors: 0 KB (minimal), 250 KB (industry median), 500 KB (warning threshold), 1000 KB (critical).<br />
+                Color semantics: green below median, yellow near median, red above warning threshold.<br />
+                <br />Classification: {bundleRelation}
+                <span class="scale-bar cyclomatic">
+                  <span class="marker project" style={`left:${bundleProjectPct}%; border-top-color:${bundleProjectColor};`}></span>
+                  <span class="marker median" style={`left:${bundleIndustryMedianPct}%; border-bottom-color:#d8b33f;`}></span>
                 </span>
+                <span class="scale-legend">▼ Project value &nbsp; ▲ Industry median (250 KB)</span>
               </span>
-            </strong>
+            </span>
           </div>
           <p class="panel-subtle">{bundleSubLabel}{#if bundleGzipDisplay !== 'N/A' || bundleBrotliDisplay !== 'N/A'} · Gzip: {bundleGzipDisplay} KB · Brotli: {bundleBrotliDisplay} KB{/if}</p>
         </article>

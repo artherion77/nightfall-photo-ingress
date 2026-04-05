@@ -12,8 +12,39 @@ import fcntl
 import json
 import os
 import subprocess
+import sys
 from contextlib import contextmanager
 from pathlib import Path
+
+REPO_LOCK_FILE = "/tmp/nightfall-repo.lock"
+_VENV_REEXEC_GUARD = "NIGHTFALL_METRICSCTL_VENV_REEXEC"
+
+
+def _maybe_reexec_venv() -> None:
+    """Re-exec under repo .venv Python when available for dependency consistency."""
+    script_path = Path(__file__).resolve()
+    repo_root = script_path.parent
+    if os.name == "nt":
+        venv_python = repo_root / ".venv" / "Scripts" / "python.exe"
+    else:
+        venv_python = repo_root / ".venv" / "bin" / "python"
+
+    if not venv_python.exists():
+        return
+
+    current = Path(sys.executable).resolve()
+    target = venv_python.resolve()
+    if current == target:
+        return
+    if os.environ.get(_VENV_REEXEC_GUARD) == "1":
+        return
+
+    env = os.environ.copy()
+    env[_VENV_REEXEC_GUARD] = "1"
+    os.execve(str(target), [str(target), str(script_path), *sys.argv[1:]], env)
+
+
+_maybe_reexec_venv()
 
 from metrics.runner.aggregator import run_aggregation
 from metrics.runner.backend_collector import run_backend_collection
@@ -33,9 +64,6 @@ from metrics.runner.poller_runner import (
     uninstall_poller,
 )
 from metrics.runner.schema_contract import manifest_schema, metrics_schema, validate_manifest_payload, validate_metrics_payload
-
-
-REPO_LOCK_FILE = "/tmp/nightfall-repo.lock"
 
 
 @contextmanager
