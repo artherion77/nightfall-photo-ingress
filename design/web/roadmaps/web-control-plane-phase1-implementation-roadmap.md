@@ -1,6 +1,6 @@
 # Web Control Plane — Phase 1 Implementation Roadmap
 
-Status: In progress — Chunks 0-5 implemented; Chunk 6 active
+Status: Completed — Chunks 0-6 implemented
 Date: 2026-04-06
 Owner: Systems Engineering
 
@@ -752,7 +752,7 @@ tests/integration/ui/
 
 ## 9. Chunk 6 — Security Hardening
 
-Status: In progress (active)
+Status: Completed (2026-04-06)
 
 ### Purpose
 
@@ -958,3 +958,9 @@ The following drift corrections were applied in this update:
   Phase 2 proxy-level LAN gate.
 - Moved Chunk 6 from pending to active and added an explicit execution sequence and
   sign-off evidence checklist.
+- Completed Chunk 6 Step 5 dependency hygiene pass via `pip_audit` with no known
+  vulnerabilities found; evidence captured in
+  `audit/archive/webui-implementation-chunk6-step5-dependency-hygiene-audit.md`.
+- Completed Chunk 6 Step 6 full regression stability pass against
+  `tests/integration/api` and `tests/integration/ui` with all tests green
+  (`60 passed`).
