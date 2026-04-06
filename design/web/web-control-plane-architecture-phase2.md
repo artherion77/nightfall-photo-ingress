@@ -5,7 +5,7 @@ Date: 2026-04-03
 Owner: Systems Engineering
 Depends on: design/web/roadmaps/web-control-plane-phase1-scope.md,
             design/web/roadmaps/web-control-plane-integration-plan.md,
-            design/web/roadmaps/web-control-plane-techstack-decision.md
+            design/web/web-control-plane-techstack-decision.md
 
 ---
 

@@ -6,8 +6,8 @@ Owner: Systems Engineering
 
 Authoritative sources consumed to produce this document:
 - `design/web/roadmaps/web-control-plane-phase1-scope.md` (Phase 1 Re-Evaluation, **authoritative scope**)
-- `design/web/roadmaps/web-control-plane-project-structure.md` (**authoritative structure**)
-- `design/web/roadmaps/web-control-plane-techstack-decision.md` (**authoritative tech stack**)
+- `design/web/web-control-plane-project-structure.md` (**authoritative structure**)
+- `design/web/web-control-plane-techstack-decision.md` (**authoritative tech stack**)
 - `design/web/roadmaps/web-control-plane-integration-plan.md` (detailed endpoint and data-flow spec)
 - `design/web/webui-architecture-phase1.md` (layout, stores, API layer, component hierarchy)
 - `design/web/webui-component-mapping-phase1.md` (mockup analysis, component map)
@@ -104,8 +104,8 @@ processes start without errors. No functional endpoints or UI pages are required
 
 ### Required inputs
 
-- `design/web/roadmaps/web-control-plane-project-structure.md` §2, §5, §6, §7
-- `design/web/roadmaps/web-control-plane-techstack-decision.md` §2, §3
+- `design/web/web-control-plane-project-structure.md` §2, §5, §6, §7
+- `design/web/web-control-plane-techstack-decision.md` §2, §3
 - `design/web/roadmaps/web-control-plane-integration-plan.md` §3
 
 ### Expected output

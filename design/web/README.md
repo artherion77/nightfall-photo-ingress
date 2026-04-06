@@ -18,16 +18,16 @@ layer of the system.
 
 ## Delivery Roadmaps
 
-The execution and decision-tracking documents are now colocated under
-`design/web/roadmaps/`.
+Execution roadmaps are under `design/web/roadmaps/`; design-rationale documents
+remain in `design/web/`.
 
 | File | Purpose |
 |---|---|
 | [roadmaps/web-control-plane-phase1-implementation-roadmap.md](roadmaps/web-control-plane-phase1-implementation-roadmap.md) | Phase 1 chunk sequence, status, and acceptance gates |
 | [roadmaps/web-control-plane-integration-plan.md](roadmaps/web-control-plane-integration-plan.md) | End-to-end phased integration plan |
 | [roadmaps/web-control-plane-phase1-scope.md](roadmaps/web-control-plane-phase1-scope.md) | Phase 1 scope decisions and critique dispositions |
-| [roadmaps/web-control-plane-techstack-decision.md](roadmaps/web-control-plane-techstack-decision.md) | Stack rationale and dependency decisions |
-| [roadmaps/web-control-plane-project-structure.md](roadmaps/web-control-plane-project-structure.md) | Intended and rationale-backed project structure |
+| [web-control-plane-techstack-decision.md](web-control-plane-techstack-decision.md) | Stack rationale and dependency decisions |
+| [web-control-plane-project-structure.md](web-control-plane-project-structure.md) | Intended and rationale-backed project structure |
 
 ## Document Taxonomy
 

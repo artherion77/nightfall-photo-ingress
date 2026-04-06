@@ -4,19 +4,18 @@ Status: Active index
 Date: 2026-04-06
 Owner: Systems Engineering
 
-This folder contains the canonical web-control-plane delivery and sequencing documents.
-These files were migrated from `planning/planned/` to keep design intent and execution
-tracking in one coherent reading path.
+This folder contains the canonical web-control-plane delivery and sequencing roadmaps.
+Design-rationale documents are located one level up in `design/web/`.
 
 ## Indexed planning artifacts
 
 | Document | Role | Current use |
 |---|---|---|
-| web-control-plane-phase1-implementation-roadmap.md | Phase 1 chunk delivery tracker | Primary chunk-status and execution-order tracker |
-| web-control-plane-integration-plan.md | End-to-end integration sequencing | Baseline implementation plus post-Phase-4 replan |
-| web-control-plane-phase1-scope.md | Scope decision log | Records accepted/deferred scope decisions |
-| web-control-plane-techstack-decision.md | Stack and dependency decisions | Rationale for FastAPI/Uvicorn/SvelteKit/RapiDoc choices |
-| web-control-plane-project-structure.md | Intended structure map | Proposed/target structure reference |
+| [web-control-plane-phase1-implementation-roadmap.md](web-control-plane-phase1-implementation-roadmap.md) | Phase 1 chunk delivery tracker | Primary chunk-status and execution-order tracker |
+| [web-control-plane-integration-plan.md](web-control-plane-integration-plan.md) | End-to-end integration sequencing | Baseline implementation plus post-Phase-4 replan |
+| [web-control-plane-phase1-scope.md](web-control-plane-phase1-scope.md) | Scope decision log | Records accepted/deferred scope decisions |
+| [../web-control-plane-techstack-decision.md](../web-control-plane-techstack-decision.md) | Stack and dependency decisions | Rationale for FastAPI/Uvicorn/SvelteKit/RapiDoc choices |
+| [../web-control-plane-project-structure.md](../web-control-plane-project-structure.md) | Intended structure map | Proposed/target structure reference |
 
 ## How to use this index
 
