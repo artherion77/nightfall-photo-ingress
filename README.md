@@ -130,6 +130,7 @@ nightfall-photo-ingress/
 | Document | Purpose |
 |---|---|
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Module structure, key architectural properties, design doc index |
+| [design/web/web-control-plane-project-structure.md](design/web/web-control-plane-project-structure.md) | Web control-plane project/path structure and deployment topology rationale |
 | [docs/operations-runbook.md](docs/operations-runbook.md) | Installation, configuration, day-to-day operator procedures |
 | [staging/README.md](staging/README.md) | Staging container lifecycle and smoke contracts |
 | [docs/deployment/dev-container-workflow.md](docs/deployment/dev-container-workflow.md) | Development container workflow and initial `devctl` scaffold (`dev-photo-ingress`) |

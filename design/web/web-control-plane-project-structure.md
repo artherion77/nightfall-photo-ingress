@@ -1,7 +1,7 @@
 # Project Structure — Web Control Plane Extension
 
-Status: Proposed
-Date: 2026-04-03
+Status: Active (reality-aligned)
+Date: 2026-04-03 (reality alignment: 2026-04-06)
 Owner: Systems Engineering
 
 ---
@@ -11,6 +11,10 @@ Owner: Systems Engineering
 This document describes the folder structure introduced by the Web Control Plane
 extension and explains the rationale for each addition. The existing project structure
 is preserved in full. All new directories are additive.
+
+Reality alignment note (2026-04-06):
+- This document is a design/rationale artifact in `design/web/`.
+- Delivery sequencing remains in `design/web/roadmaps/`.
 
 ---
 
@@ -33,7 +37,6 @@ nightfall-photo-ingress/
 │   ├── app.py
 │   ├── auth.py
 │   ├── dependencies.py
-│   ├── rate_limit.py
 │   ├── audit_hook.py
 │   ├── rapiddoc.py
 │   ├── routers/
@@ -42,8 +45,7 @@ nightfall-photo-ingress/
 │   │   ├── triage.py
 │   │   ├── audit_log.py
 │   │   ├── blocklist.py
-│   │   ├── config.py
-│   │   └── metadata.py
+│   │   └── config.py
 │   ├── services/
 │   │   ├── health_service.py
 │   │   ├── staging_service.py
@@ -95,6 +97,7 @@ nightfall-photo-ingress/
 │   ├── unit/                       # isolated Python tests; run outside staging environment
 │   ├── integration/                # isolated cross-module tests; run outside staging environment
 │   │   └── api/                    # isolated ASGI API contract tests for the web control plane
+│   │   └── ui/                     # isolated UI integration tests for web control plane routes/behavior
 │   ├── staging/                    # staging-environment-only tests with runtime/container deps
 │   └── staging-flow/               # production-flow staging tests against the staging environment
 ├── conf/
@@ -125,9 +128,12 @@ architecture's clean inward dependency direction.
 | `app.py`    | Application factory function and FastAPI lifespan context (connect registry, bind startup/shutdown hooks). |
 | `dependencies.py` | Request-based dependency providers that read `AppConfig` and the registry connection from `request.app.state`. |
 | `auth.py`   | Bearer token validation dependency. Reads `Authorization: Bearer` header and compares against config value. |
-| `rate_limit.py` | Deprecated planning placeholder; request throttling is deferred to mandatory proxy-level controls in Phase 2. |
 | `audit_hook.py` | Decorator/context manager that ensures audit log write precedes state mutation commit. |
 | `rapiddoc.py` | Static HTML route for `/api/docs` plus local RapiDoc asset serving. |
+
+Request-throttling note:
+- No in-process request-throttling module is part of the active Phase 1 API tree.
+- Request throttling is deferred to mandatory proxy-level controls in Phase 2.
 
 ### 3.2 `webui/` — SvelteKit SPA
 
@@ -173,10 +179,13 @@ Current test harness note: isolated FastAPI API tests use in-process ASGI transp
 SQLite connection opened with `check_same_thread=False` so the same test registry can be
 shared safely across the request-handling path exercised by the test client.
 
-### 3.5 `planning/` Extensions
+### 3.5 Roadmap references
 
-New planning documents capture decisions and integration plans. No existing planning
-documents are modified.
+Execution sequencing and phase/chunk status are documented in:
+
+- `design/web/roadmaps/web-control-plane-phase1-implementation-roadmap.md`
+- `design/web/roadmaps/web-control-plane-integration-plan.md`
+- `design/web/roadmaps/web-control-plane-phase1-scope.md`
 
 ---
 
