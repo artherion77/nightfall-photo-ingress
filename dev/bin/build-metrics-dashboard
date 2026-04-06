@@ -74,41 +74,29 @@ lxc exec "$CONTAINER" -- tar -czf - -C "$CONTAINER_BUILD_OUTPUT" . \
 # ── Step 5: Write deterministic build stamp ─────────────────────────────────
 
 nf_log_info "$SCOPE" "Writing dashboard build stamp ..."
-PROJECT_ROOT="$PROJECT_ROOT" python3 - <<'PY'
-import hashlib
+STAMP_TMP="$(mktemp)"
+python3 "$PROJECT_ROOT/dev/lib/source_fingerprint.py" stamp \
+    "$PROJECT_ROOT/metrics/dashboard" \
+    "$STAMP_TMP" \
+    >/dev/null
+PROJECT_ROOT="$PROJECT_ROOT" STAMP_TMP="$STAMP_TMP" python3 - <<'PY'
 import json
 import os
-from datetime import datetime, timezone
 from pathlib import Path
 
 repo_root = Path(os.environ["PROJECT_ROOT"])
-dashboard_src = repo_root / "metrics" / "dashboard"
+tmp_path = Path(os.environ["STAMP_TMP"])
+source_stamp = json.loads(tmp_path.read_text(encoding="utf-8"))
 
-paths = []
-for pattern in ("**/*.svelte", "**/*.ts", "**/*.js", "**/*.css"):
-    paths.extend(dashboard_src.glob(pattern))
-for name in ("svelte.config.js", "vite.config.js", "package.json", "package-lock.json"):
-    candidate = dashboard_src / name
-    if candidate.exists():
-        paths.append(candidate)
-
-paths = [
-    p for p in paths
-    if "node_modules" not in p.parts and ".svelte-kit" not in p.parts and p.is_file()
-]
-
-h = hashlib.sha256()
-for p in sorted(set(paths), key=lambda x: str(x.relative_to(repo_root))):
-    h.update(str(p.relative_to(repo_root)).encode())
-    h.update(p.read_bytes())
-
+# Preserve historical schema consumed by poller/publication flows.
 stamp = {
-    "source_fingerprint": h.hexdigest(),
-    "built_at": datetime.now(timezone.utc).isoformat(),
+    "source_fingerprint": source_stamp["fingerprint"],
+    "built_at": source_stamp["timestamp"],
 }
 
 stamp_path = repo_root / "metrics" / "output" / "dashboard" / "static" / ".build-stamp"
 stamp_path.write_text(json.dumps(stamp, indent=2) + "\n", encoding="utf-8")
+tmp_path.unlink(missing_ok=True)
 PY
 
 nf_log_ok "$SCOPE" "Dashboard statics built → metrics/output/dashboard/static/"
