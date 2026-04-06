@@ -61,40 +61,6 @@ _ok()   { nf_log_ok   "devctl" "$*"; }
 _warn() { nf_log_warn "devctl" "$*"; }
 _fail() { nf_log_fail "devctl" "$*"; }
 
-# Compute a deterministic hash from package.json and package-lock.json.
-# This is used to detect whether a stack's dependency manifest changed.
-compute_manifest_hash() {
-    local stack_dir="$1"
-    local hash_file="$2"
-    local pkg_json="$stack_dir/package.json"
-    local lock_json="$stack_dir/package-lock.json"
-
-    if [[ ! -f "$pkg_json" || ! -f "$lock_json" ]]; then
-        echo "[devctl] Missing manifest files in $stack_dir" >&2
-        return 1
-    fi
-
-    cat "$pkg_json" "$lock_json" | sha256sum | awk '{print $1}' > "$hash_file"
-}
-
-# Read a hash file and strip whitespace/newlines so comparisons are stable.
-read_hash_file() {
-    local path="$1"
-    tr -d '[:space:]' < "$path"
-}
-
-# Compare host and container hash files and return success on exact match.
-compare_manifest_hash() {
-    local host_hash_file="$1"
-    local container_hash_file="$2"
-
-    local host_hash
-    local container_hash
-    host_hash="$(read_hash_file "$host_hash_file")"
-    container_hash="$(read_hash_file "$container_hash_file")"
-    [[ "$host_hash" == "$container_hash" ]]
-}
-
 # Acquire the global repo lock so stateful operations are serialized.
 acquire_repo_lock() {
     exec {REPO_LOCK_FD}>"$REPO_LOCK_FILE"
@@ -513,7 +479,7 @@ _recalculate_host_hash() {
         return 1
     fi
 
-    cat "$stack_dir/package.json" "$stack_dir/package-lock.json" | sha256sum | awk '{print $1}'
+    python3 "$PROJECT_ROOT/dev/lib/manifest_hash.py" compute "$stack_dir"
 }
 
 # Drift detection for a single stack.
@@ -537,8 +503,7 @@ _drift_check_stack() {
         _fail "$stack: missing package.json or package-lock.json in $stack_dir"
     fi
 
-    host_hash="$(cat "$stack_dir/package.json" "$stack_dir/package-lock.json" \
-        | sha256sum | awk '{print $1}')"
+    host_hash="$(python3 "$PROJECT_ROOT/dev/lib/manifest_hash.py" compute "$stack_dir")"
     container_hash="$(lxc exec "$CONTAINER" -- \
         bash -c "cat '$container_hash_file' 2>/dev/null | tr -d '[:space:]' || true")"
 
@@ -570,8 +535,7 @@ _assert_stack_no_drift() {
         container_hash_file="/opt/nightfall-manifest/dashboard.hash"
     fi
 
-    host_hash="$(cat "$stack_dir/package.json" "$stack_dir/package-lock.json" \
-        | sha256sum | awk '{print $1}')"
+    host_hash="$(python3 "$PROJECT_ROOT/dev/lib/manifest_hash.py" compute "$stack_dir")"
     container_hash="$(lxc exec "$CONTAINER" -- \
         bash -c "cat '$container_hash_file' 2>/dev/null | tr -d '[:space:]' || true")"
 
