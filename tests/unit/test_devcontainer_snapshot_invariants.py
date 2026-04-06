@@ -16,15 +16,18 @@ def test_prepare_like_mappings_do_not_use_snapshot_create() -> None:
         )
 
 
-def test_web_test_unit_mapping_uses_reset_fast_loop() -> None:
+def test_web_test_unit_mapping_uses_govctl_fast_loop() -> None:
     workspace_root = Path(__file__).resolve().parents[2]
     model = json.loads((workspace_root / ".mcp" / "model.json").read_text(encoding="utf-8"))
     commands = model["mappings"]["web.test.unit"]
+    direct_commands = model["mappings"]["web.test.unit.direct"]
 
-    assert "./dev/bin/devctl reset" in commands
-    assert "./dev/bin/devctl assert-cached-ready" in commands
-    assert "./dev/bin/devctl test-web-typecheck" in commands
-    assert "./dev/bin/devctl test-metrics-dashboard-typecheck" in commands
+    assert commands == ["./dev/bin/govctl web.test.unit --json"]
+
+    assert "./dev/bin/devctl reset" in direct_commands
+    assert "./dev/bin/devctl assert-cached-ready" in direct_commands
+    assert "./dev/bin/devctl test-web-typecheck" in direct_commands
+    assert "./dev/bin/devctl test-metrics-dashboard-typecheck" in direct_commands
     assert "./dev/bin/devctl snapshot-create" not in commands
 
 
