@@ -1,11 +1,25 @@
 # Phase 2 — devctl & metricsctl Python Module Extraction
 
-**Status:** planned  
+**Status:** implemented  
 **Date:** 2025-07-26  
+**Implemented on:** 2026-04-06  
 **Supersedes:** build-governor-implementation-plan.md Chunks 8–11  
 **Design authority:**
 - [devctl-design.md](../../design/infra/devctl-design.md)
 - [metrics-ctl-design.md](../../design/infra/metrics-ctl-design.md)
+
+---
+
+## Implementation Summary (2026-04-06)
+
+Execution completed in the planned sequence across sub-phases 2.1 through 2.4.
+
+- Added shared modules under `dev/lib/`: `manifest_hash.py`, `package_meta.py`, `repo_lock.py`, `source_fingerprint.py`, `venv_bootstrap.py` with unit coverage.
+- Integrated shared modules into `dev/bin/devctl` (hash + package metadata paths) and `metricsctl` (repo lock + venv bootstrap).
+- Migrated govctl preflights in `dev/lib/govctl-preflights.sh` to shared modules and updated `dev/bin/build-metrics-dashboard` to use `source_fingerprint.py`.
+- Removed superseded dead code from `dev/bin/devctl` after integration completion.
+- Updated `dev/govctl-targets.yaml` to remove redundant dashboard readiness dependency and documented safe overlap.
+- Corrected and stabilized follow-up invariants in unit tests for MCP mapping and metrics history artifact expectations.
 
 ---
 
