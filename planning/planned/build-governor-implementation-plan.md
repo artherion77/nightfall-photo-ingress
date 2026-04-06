@@ -1,25 +1,24 @@
 # Build Governor — Chunk-Wise Implementation Plan
 
-**Status:** planned  
+**Status:** Phase 1 COMPLETED; Phase 2 moved  
 **Date:** 2026-04-06  
 **Design reference:** [build-governor-design.md](../../design/infra/build-governor-design.md)  
 **Companion design:** [devctl-update-architecture.md](../../design/infra/devctl-update-architecture.md)  
 **Constraint:** System must remain operational after each chunk.  
-**Constraint:** No chunk may break existing devctl, stagingctl, metricsctl, or MCP flows.  
-**Constraint:** Design-only — no Phase 2 features, endpoints, or rewrites in Phase 1.
+**Constraint:** No chunk may break existing devctl, stagingctl, metricsctl, or MCP flows.
 
 ---
 
 ## Phase Summary
 
-| Phase | Title | Chunks | Purpose |
-|-------|-------|--------|---------|
-| 1 | Build Governor Introduction | 1–7 | Implement govctl as designed: manifest, graph resolver, preflight checks, executor, JSONL output, MCP integration |
-| 2 | Command Surface Refinement | 8–11 | Targeted improvements to devctl, stagingctl, and build-metrics-dashboard that reduce orchestration-execution coupling |
+| Phase | Title | Chunks | Status |
+|-------|-------|--------|--------|
+| 1 | Build Governor Introduction | 1–7 | **COMPLETED** (2026-04-06). All 147 tests pass. Drift review applied 5 medium/low repairs. |
+| 2 | Python Module Extraction & Command Surface Refinement | — | **Moved to [refactor-devctl-metricsctl.md](refactor-devctl-metricsctl.md)**. The original Chunks 8–11 have been overhauled and re-chunked based on the authoritative design documents: [devctl-design.md](../../design/infra/devctl-design.md) and [metrics-ctl-design.md](../../design/infra/metrics-ctl-design.md). |
 
-Phase 2 is conditional — justified by the command surface assessment in §A
-below. Phase 1 is self-contained and delivers a usable governor without
-requiring Phase 2.
+Phase 1 is self-contained and delivers a usable governor. Phase 2 is planned
+separately and extends the toolchain with shared Python modules and
+command-surface refinements.
 
 ---
 
@@ -597,263 +596,45 @@ to existing tools. The MCP routing is opt-in (old mappings are preserved).
 
 ---
 
-## Phase 2 — Command Surface Refinement
+## Phase 2 — Moved
 
-Phase 2 addresses the coupling issues identified in §A. Each chunk is an
-incremental, non-breaking improvement to an existing tool. Phase 2 is
-independent of Phase 1 in the sense that Phase 1 works without it — but
-Phase 2 reduces redundant work and improves composability.
+Phase 2 (originally Chunks 8–11: command surface refinement) has been
+superseded by a broader Python module extraction plan. The original skip-flag
+approach (Chunks 8–10) is subsumed by the shared-module strategy in the new
+design documents.
 
-### Phase 2 Overview
-
-| Chunk | Title | Risk | Depends On |
-|-------|-------|------|-----------|
-| 8 | devctl ensure-stack-ready: expose skip flags | Medium | Phase 1 |
-| 9 | build-metrics-dashboard: composability flags | Low | Phase 1 |
-| 10 | metricsctl generate-dashboard: skip drift preflight | Low | Phase 1 |
-| 11 | govctl manifest update for refined surfaces | Low | 8, 9, 10 |
+**Authoritative Phase 2 plan:** [refactor-devctl-metricsctl.md](refactor-devctl-metricsctl.md)  
+**Design documents:**
+- [devctl-design.md](../../design/infra/devctl-design.md) — Python module extraction from devctl
+- [metrics-ctl-design.md](../../design/infra/metrics-ctl-design.md) — metricsctl decoupling
 
 ---
 
-### Chunk 8: devctl ensure-stack-ready — Expose Skip Flags
-
-#### Intent
-
-Make `devctl ensure-stack-ready` composable by allowing an external
-orchestrator to skip validation passes that it has already performed.
-
-#### What Is Suboptimal
-
-`ensure-stack-ready` bundles four distinct operations into one call:
-1. SvelteKit/Vite major consistency validation (`assert_web_stack_major_consistency`)
-2. Node version verification (`.node-version` vs container)
-3. Source sync (tar push to container)
-4. Manifest drift check and remediation (`npm ci` on hash mismatch)
-
-An orchestrator that has already run `govctl check` (which verifies node version
-and drift state) must still pay for steps 1–2 again when delegating to devctl.
-
-#### Proposed Improvement
-
-Add environment-variable-based skip flags (not CLI flags, to avoid breaking
-the existing subcommand interface):
-- `DEVCTL_SKIP_CONSISTENCY_CHECK=1` — skip step 1.
-- `DEVCTL_SKIP_NODE_VERSION_CHECK=1` — skip step 2.
-
-Source sync (step 3) and drift remediation (step 4) are never skipped — they
-are the core purpose of the command.
-
-#### Scope Boundary
-
-- Only `ensure-stack-ready` is modified.
-- No changes to any other devctl subcommand.
-- No changes to the function's external contract (same arguments, same exit
-  code semantics).
-- Env vars default to unset (no skip), preserving backward compatibility.
-
-#### Correctness Validation
-
-- Existing devctl tests pass without any skip env vars set.
-- With `DEVCTL_SKIP_CONSISTENCY_CHECK=1`, the consistency assertion is not
-  run (verified by log output absence or test instrumentation).
-- If consistency is genuinely broken and the skip flag is set, the function
-  still succeeds (the skip is a trust signal from the orchestrator).
-
-#### Why Independently Committable
-
-Additive change to one function. Default behavior unchanged. No external
-contract breakage.
-
----
-
-### Chunk 9: build-metrics-dashboard — Composability Flags
-
-#### Intent
-
-Allow an external orchestrator to skip the embedded `devctl ensure-stack-ready`
-call and override the output path.
-
-#### What Is Suboptimal
-
-`build-metrics-dashboard` always calls `devctl ensure-stack-ready dashboard`
-before building. When govctl has already ensured readiness via the
-`dev.stack-ready.dashboard` target, this is redundant. Additionally, the
-output path is hardcoded, limiting flexibility.
-
-#### Proposed Improvement
-
-- `--skip-ensure-ready` flag: bypass the `devctl ensure-stack-ready dashboard`
-  call. The script proceeds directly to `npm run build`.
-- `--output-dir <path>` flag: override `HOST_OUTPUT_DIR`.
-- Both flags are optional with backward-compatible defaults.
-
-#### Scope Boundary
-
-- Only `dev/bin/build-metrics-dashboard` is modified.
-- No changes to devctl, metricsctl, or any other script.
-- The build stamp logic is unchanged.
-
-#### Correctness Validation
-
-- Without new flags: behavior is identical to current.
-- With `--skip-ensure-ready`: script skips the devctl call and proceeds to
-  `npm run build`. If stack is not ready, the build fails (expected — the
-  orchestrator is responsible for readiness).
-- With `--output-dir /tmp/test-output`: build output appears in the specified
-  directory. Build stamp is written relative to the output directory.
-
-#### Why Independently Committable
-
-Additive flags to one script. Default behavior unchanged. No external contract
-breakage.
-
----
-
-### Chunk 10: metricsctl generate-dashboard — Skip Drift Preflight
-
-#### Intent
-
-Allow an external orchestrator to suppress the implicit `devctl
-ensure-stack-ready dashboard` call inside `metricsctl generate-dashboard`.
-
-#### What Is Suboptimal
-
-`generate-dashboard` internally calls `_devctl_dashboard_drift_preflight()`,
-which invokes `devctl ensure-stack-ready dashboard`. When govctl has already
-ensured readiness, this is a redundant container round-trip.
-
-#### Proposed Improvement
-
-- `--skip-drift-preflight` CLI flag on `generate-dashboard`: skip the
-  `_devctl_dashboard_drift_preflight()` call.
-- Backward-compatible: without the flag, behavior is unchanged.
-
-#### Scope Boundary
-
-- Only `metricsctl`'s `generate-dashboard` subcommand is modified.
-- No changes to other metricsctl subcommands.
-- No changes to `_devctl_dashboard_drift_preflight()` itself (it remains
-  available for direct callers).
-
-#### Correctness Validation
-
-- Without the flag: identical behavior.
-- With `--skip-drift-preflight`: the devctl call does not occur. If the
-  dashboard stack has actual drift, the build may fail (expected — orchestrator
-  is responsible).
-- metricsctl's JSON output schema for `generate-dashboard` is unchanged.
-
-#### Why Independently Committable
-
-Additive flag to one subcommand. Default behavior unchanged. JSON output
-contract unchanged.
-
----
-
-### Chunk 11: govctl Manifest Update for Refined Surfaces
-
-#### Intent
-
-Update `govctl-targets.yaml` to leverage the skip flags introduced in
-Chunks 8–10, reducing redundant work in orchestrated runs.
-
-#### Scope
-
-**Included:**
-- Modify target commands to pass skip flags where govctl preflight checks
-  already cover the same ground:
-  - `dev.stack-ready.webui` and `dev.stack-ready.dashboard`: set
-    `DEVCTL_SKIP_CONSISTENCY_CHECK=1` and `DEVCTL_SKIP_NODE_VERSION_CHECK=1`
-    in the command environment (govctl preflight checks `node-version-match`
-    have already verified these).
-  - `metrics.build.dashboard`: change command to
-    `./dev/bin/build-metrics-dashboard --skip-ensure-ready` (the
-    `dev.stack-ready.dashboard` dependency has already ensured readiness).
-  - `metrics.generate.dashboard`: change command to
-    `./metricsctl generate-dashboard --skip-drift-preflight` (the
-    `dev.stack-ready.dashboard` dependency has already ensured readiness).
-
-**Excluded:**
-- No changes to govctl itself (executor, preflights, CLI).
-- No changes to any script. Only the manifest commands change.
-
-#### Dependencies
-
-- Chunks 8, 9, 10 (the skip flags must exist before the manifest references them).
-
-#### Correctness Validation
-
-- `govctl metrics.build.dashboard` completes successfully with the
-  `--skip-ensure-ready` flag. Dashboard build stamp is written.
-- `govctl metrics.generate.dashboard` completes successfully with
-  `--skip-drift-preflight`. Dashboard generation succeeds.
-- Full `govctl all` run completes with no regressions. summary.json shows
-  all targets passed.
-- govctl without Phase 2 flags still works (the targets fall back to default
-  behavior if flags are not recognized — though they should be, since Chunks
-  8–10 precede this chunk).
-
-#### Why Independently Committable
-
-Only `dev/govctl-targets.yaml` is modified. The skip flags are already
-available from Chunks 8–10. If this chunk is reverted, govctl falls back to
-Phase 1 manifest behavior (redundant but correct).
-
----
-
-## Dependency Graph
+## Dependency Graph (Phase 1 only)
 
 ```
-Phase 1:
-  Chunk 1 ──┬──→ Chunk 2 ──┐
-             │               │
-             ├──→ Chunk 3    ├──→ Chunk 5 ──→ Chunk 6 ──→ Chunk 7
-             │               │
-             └──→ Chunk 4 ──┘
-
-Phase 2 (all depend on Phase 1 completion):
-  Chunk 8 ──┐
-  Chunk 9 ──┼──→ Chunk 11
-  Chunk 10 ─┘
+Chunk 1 ──┬──→ Chunk 2 ──┐
+           │               │
+           ├──→ Chunk 3    ├──→ Chunk 5 ──→ Chunk 6 ──→ Chunk 7
+           │               │
+           └──→ Chunk 4 ──┘
 ```
-
-Chunks 1, 3, and 4 have no mutual dependencies and could theoretically be
-committed in parallel. Chunks 8, 9, and 10 are independent of each other.
-
----
-
-## Risk Assessment
-
-| Risk | Likelihood | Impact | Mitigation |
-|------|-----------|--------|------------|
-| YAML parser fragility (Bash ↔ Python bridge) | Medium | Medium | Chunk 1 uses Python yaml.safe_load; tested with fixtures before integration |
-| Lock contention between govctl and nested tools | Low | Medium | DEVCTL_GLOBAL_LOCK_HELD reentry guard already exists; Phase 2 reduces lock nesting |
-| Preflight checks false-positive (check passes but tool fails) | Low | Low | Preflight checks read the same state tools read; divergence is a tool bug |
-| `timeout(1)` kills background LXC processes | Low | Medium | timeout kills the process group; govctl documents that timed-out targets may leave container state dirty |
-| Phase 2 skip flags introduce silent failures | Medium | Medium | Skip flags are opt-in; default is always "run all checks". Documentation warns that skip = trust |
 
 ---
 
 ## Success Criteria
 
-### Phase 1 Complete When
+### Phase 1 — COMPLETED
 
-- `govctl list` enumerates all 21 targets and 7 groups.
-- `govctl test.all --dry-run` prints the correct execution order.
-- `govctl backend.test.unit` runs pytest and produces valid summary.json.
-- `govctl test.all --continue-on-error` runs all test targets and reports
+- ✅ `govctl list` enumerates all 21 targets and 7 groups.
+- ✅ `govctl test.all --dry-run` prints the correct execution order.
+- ✅ `govctl backend.test.unit` runs pytest and produces valid summary.json.
+- ✅ `govctl test.all --continue-on-error` runs all test targets and reports
   aggregate results.
-- `govctl check test.all --format json` emits structured preflight results.
-- `govctl backend.test.unit --json` emits JSONL without human log interleaving.
-- `artifacts/govctl/` is git-ignored.
-- `.mcp/model.json` includes at least one govctl-routed task.
-- `AGENTS.md` documents govctl usage.
-
-### Phase 2 Complete When
-
-- `govctl metrics.build.dashboard` runs without triggering a second
-  `devctl ensure-stack-ready dashboard` call.
-- `govctl metrics.generate.dashboard` runs without triggering
-  `_devctl_dashboard_drift_preflight()`.
-- Wall-clock time for `govctl build.all` is measurably reduced compared to
-  Phase 1 (due to eliminated redundant drift checks).
+- ✅ `govctl check test.all --format json` emits structured preflight results.
+- ✅ `govctl backend.test.unit --json` emits JSONL without human log interleaving.
+- ✅ `artifacts/govctl/` is git-ignored.
+- ✅ `.mcp/model.json` includes govctl-routed tasks.
+- ✅ `AGENTS.md` documents govctl usage.
+- ✅ All 147 tests pass (53 CLI + 42 executor + 41 preflight + 11 Python).
+- ✅ Drift review: no critical/high issues; 5 medium/low repairs applied.
