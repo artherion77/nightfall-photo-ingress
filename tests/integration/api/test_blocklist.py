@@ -134,3 +134,32 @@ async def test_ingest_honors_new_blocklist_rule(api_client, api_token: str, regi
     record = registry.get_file(sha256=result.outcomes[0].sha256 or "")
     assert record is not None
     assert record.status == "rejected"
+
+
+@pytest.mark.anyio
+async def test_create_rule_rejects_invalid_rule_type(api_client, api_token: str) -> None:
+    response = await api_client.post(
+        "/api/v1/blocklist",
+        headers=_idem_headers(api_token, "block-create-invalid-type"),
+        json={"pattern": "bad-*", "rule_type": "unknown", "enabled": True},
+    )
+    assert response.status_code == 422
+
+
+@pytest.mark.anyio
+async def test_blocklist_rejects_too_short_idempotency_key(api_client, api_token: str) -> None:
+    response = await api_client.post(
+        "/api/v1/blocklist",
+        headers=_idem_headers(api_token, "short"),
+        json={"pattern": "short-key-*", "rule_type": "filename", "enabled": True},
+    )
+    assert response.status_code == 422
+
+
+@pytest.mark.anyio
+async def test_blocklist_rejects_invalid_rule_id_path(api_client, api_token: str) -> None:
+    response = await api_client.delete(
+        "/api/v1/blocklist/0",
+        headers=_idem_headers(api_token, "block-delete-invalid-id"),
+    )
+    assert response.status_code == 422

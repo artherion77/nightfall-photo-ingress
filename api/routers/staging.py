@@ -1,6 +1,6 @@
 """Staging queue endpoints."""
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Path, status
 import sqlite3
 
 from api.dependencies import get_registry_connection
@@ -14,8 +14,8 @@ router = APIRouter(prefix="/api/v1", tags=["staging"])
 @router.get("/staging", response_model=StagingPage)
 async def get_staging(
     _: str = Depends(verify_api_token),
-    limit: int = 20,
-    after: str | None = None,
+    limit: int = Query(20, ge=1, le=100),
+    after: str | None = Query(None, min_length=1, max_length=128),
     conn: sqlite3.Connection = Depends(get_registry_connection),
 ) -> StagingPage:
     """Get paginated pending items."""
@@ -25,7 +25,7 @@ async def get_staging(
 
 @router.get("/items/{item_id}", response_model=StagingItem)
 async def get_item(
-    item_id: str,
+    item_id: str = Path(..., min_length=1, max_length=128),
     _: str = Depends(verify_api_token),
     conn: sqlite3.Connection = Depends(get_registry_connection),
 ) -> StagingItem:

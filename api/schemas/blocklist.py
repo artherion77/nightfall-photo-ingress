@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+from typing import Literal
+
+from pydantic import BaseModel, Field
 
 
 class BlockRule(BaseModel):
@@ -26,18 +28,18 @@ class BlockRuleList(BaseModel):
 class BlockRuleCreate(BaseModel):
     """Create payload for a blocklist rule."""
 
-    pattern: str
-    rule_type: str
-    reason: str | None = None
+    pattern: str = Field(min_length=1, max_length=512)
+    rule_type: Literal["filename", "regex"]
+    reason: str | None = Field(default=None, max_length=512)
     enabled: bool = True
 
 
 class BlockRuleUpdate(BaseModel):
     """Partial update payload for a blocklist rule."""
 
-    pattern: str | None = None
-    rule_type: str | None = None
-    reason: str | None = None
+    pattern: str | None = Field(default=None, min_length=1, max_length=512)
+    rule_type: Literal["filename", "regex"] | None = None
+    reason: str | None = Field(default=None, max_length=512)
     enabled: bool | None = None
 
 

@@ -85,6 +85,7 @@ class WebConfig:
     api_token: str = ""
     bind_host: str = "127.0.0.1"
     bind_port: int = 8000
+    cors_allowed_origins: tuple[str, ...] = ("http://localhost:8000",)
 
 
 @dataclass(frozen=True)
@@ -414,10 +415,21 @@ def _parse_web(parser: configparser.ConfigParser, errors: list[str]) -> WebConfi
         return WebConfig()
 
     section = parser["web"]
+    raw_cors = _get_str(
+        section,
+        "cors_allowed_origins",
+        errors,
+        default="http://localhost:8000",
+    )
+    cors_allowed_origins = tuple(
+        origin.strip() for origin in raw_cors.split(",") if origin.strip()
+    ) or ("http://localhost:8000",)
+
     return WebConfig(
         api_token=_get_str(section, "api_token", errors, default=""),
         bind_host=_get_str(section, "bind_host", errors, default="127.0.0.1"),
         bind_port=_get_int(section, "bind_port", errors, default=8000),
+        cors_allowed_origins=cors_allowed_origins,
     )
 
 

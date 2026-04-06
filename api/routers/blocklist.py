@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from typing import Annotated
+
 from fastapi import APIRouter, Depends
-from fastapi import Header, HTTPException, status
+from fastapi import Header, HTTPException, Path, status
 import sqlite3
 from fastapi.responses import JSONResponse
 
@@ -29,7 +31,7 @@ async def get_blocklist(
 async def create_block_rule(
     payload: BlockRuleCreate,
     _: str = Depends(verify_api_token),
-    idempotency_key: str = Header(..., alias="X-Idempotency-Key"),
+    idempotency_key: str = Header(..., alias="X-Idempotency-Key", min_length=8, max_length=128),
     conn: sqlite3.Connection = Depends(get_registry_connection),
 ) -> JSONResponse:
     service = BlocklistService(conn)
@@ -42,10 +44,10 @@ async def create_block_rule(
 
 @router.patch("/blocklist/{rule_id}", response_model=BlockRule)
 async def update_block_rule(
-    rule_id: int,
+    rule_id: Annotated[int, Path(ge=1)],
     payload: BlockRuleUpdate,
     _: str = Depends(verify_api_token),
-    idempotency_key: str = Header(..., alias="X-Idempotency-Key"),
+    idempotency_key: str = Header(..., alias="X-Idempotency-Key", min_length=8, max_length=128),
     conn: sqlite3.Connection = Depends(get_registry_connection),
 ) -> JSONResponse:
     service = BlocklistService(conn)
@@ -64,9 +66,9 @@ async def update_block_rule(
 
 @router.delete("/blocklist/{rule_id}", response_model=BlockRuleDeleteResponse)
 async def delete_block_rule(
-    rule_id: int,
+    rule_id: Annotated[int, Path(ge=1)],
     _: str = Depends(verify_api_token),
-    idempotency_key: str = Header(..., alias="X-Idempotency-Key"),
+    idempotency_key: str = Header(..., alias="X-Idempotency-Key", min_length=8, max_length=128),
     conn: sqlite3.Connection = Depends(get_registry_connection),
 ) -> JSONResponse:
     service = BlocklistService(conn)

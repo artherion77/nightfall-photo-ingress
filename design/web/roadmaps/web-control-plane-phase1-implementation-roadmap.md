@@ -1,6 +1,6 @@
 # Web Control Plane — Phase 1 Implementation Roadmap
 
-Status: In progress — Chunks 0-5 implemented; Chunk 6 remains open
+Status: In progress — Chunks 0-5 implemented; Chunk 6 active
 Date: 2026-04-06
 Owner: Systems Engineering
 
@@ -752,7 +752,7 @@ tests/integration/ui/
 
 ## 9. Chunk 6 — Security Hardening
 
-Status: Pending (next)
+Status: In progress (active)
 
 ### Purpose
 
@@ -771,6 +771,46 @@ Scope alignment note:
 - `design/web/roadmaps/web-control-plane-integration-plan.md` §9 (hardening checklist)
 - `design/web/roadmaps/web-control-plane-phase1-scope.md` §4.1 (in-scope items: CORS, headers, auth-failure audit, input validation; request throttling deferred)
 - Targeted OWASP checklist limited to Phase-1-relevant concerns
+
+### 9.1 Execution plan (active sequence)
+
+Execute Chunk 6 in this exact order to minimize regression risk and keep evidence
+collection straightforward.
+
+1. Auth-failure audit wiring
+- Implement/verify 401 and 403 audit-log writes with IP, path, method, and timestamp.
+- Extend `tests/integration/api/test_auth.py` with explicit side-effect assertions.
+
+2. CORS policy hardening
+- Implement explicit localhost/configured-origin allowlist behavior in `api/app.py`.
+- Add/extend integration assertions for allowed and disallowed origin behavior.
+
+3. Response-header policy hardening
+- Implement explicit response-header policy for localhost deployment mode.
+- Add integration assertions for required headers on API responses.
+
+4. Input-validation audit pass
+- Review every router boundary (path/query/body) for Pydantic/schema coverage.
+- Record any gaps and resolution notes in `audit/open-points/`.
+
+5. Dependency and security hygiene pass
+- Run `pip-audit` for `[web]` dependencies and capture findings.
+- Resolve critical findings or record justified deferrals (if any) with owner/date.
+
+6. Full regression stability pass
+- Run existing integration suites for Chunks 0-5 and confirm no behavioral regressions.
+- Capture command/results summary in this roadmap's drift log.
+
+### 9.2 Chunk 6 sign-off evidence
+
+Chunk 6 is considered complete only when all evidence below exists:
+
+- Passing integration assertions for auth-failure audit side effects.
+- Passing integration assertions for CORS allowlist and disallowed origins.
+- Passing integration assertions for response-header posture.
+- `pip-audit` result with no critical findings in `[web]` dependencies.
+- Targeted OWASP checklist outcome documented; open points tracked in `audit/open-points/`.
+- Regression suite pass across existing API and UI integration tests.
 
 ### Prerequisite state snapshot (post Chunk 5)
 
@@ -916,3 +956,5 @@ The following drift corrections were applied in this update:
   `tests/integration/ui/` structure.
 - Reframed Chunk 6 to defer all request-throttling implementation to the mandatory
   Phase 2 proxy-level LAN gate.
+- Moved Chunk 6 from pending to active and added an explicit execution sequence and
+  sign-off evidence checklist.

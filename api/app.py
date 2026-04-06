@@ -87,6 +87,47 @@ def create_app(
         openapi_url="/api/openapi.json",
     )
 
+    @app.middleware("http")
+    async def cors_and_security_middleware(request, call_next):
+        security_headers = {
+            "X-Content-Type-Options": "nosniff",
+            "X-Frame-Options": "DENY",
+            "Referrer-Policy": "strict-origin-when-cross-origin",
+        }
+
+        origin = request.headers.get("origin")
+        app_cfg = getattr(request.app.state, "app_config", None)
+        allowed_origins = (
+            app_cfg.web.cors_allowed_origins
+            if app_cfg is not None
+            else ("http://localhost:8000",)
+        )
+
+        if (
+            request.method == "OPTIONS"
+            and origin
+            and request.headers.get("access-control-request-method")
+        ):
+            response = Response(status_code=200)
+            if origin in allowed_origins:
+                response.headers["Access-Control-Allow-Origin"] = origin
+                response.headers["Access-Control-Allow-Methods"] = "GET, POST, PATCH, DELETE, OPTIONS"
+                response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type, X-Idempotency-Key"
+                response.headers["Vary"] = "Origin"
+            for key, value in security_headers.items():
+                response.headers[key] = value
+            return response
+
+        response = await call_next(request)
+        if origin and origin in allowed_origins:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Vary"] = "Origin"
+
+        for key, value in security_headers.items():
+            response.headers[key] = value
+
+        return response
+
     app.include_router(health.router)
     app.include_router(staging.router)
     app.include_router(audit_log.router)

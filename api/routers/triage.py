@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import sqlite3
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Path, status
 from fastapi.responses import JSONResponse
 
 from api.auth import verify_api_token
@@ -43,10 +44,10 @@ def _run_triage_action(
 
 @router.post("/triage/{item_id}/accept", response_model=TriageResponse)
 async def triage_accept(
-    item_id: str,
+    item_id: Annotated[str, Path(min_length=1, max_length=128)],
     payload: TriageRequest,
     _: str = Depends(verify_api_token),
-    idempotency_key: str = Header(..., alias="X-Idempotency-Key"),
+    idempotency_key: str = Header(..., alias="X-Idempotency-Key", min_length=8, max_length=128),
     conn: sqlite3.Connection = Depends(get_registry_connection),
 ) -> JSONResponse:
     return _run_triage_action(
@@ -60,10 +61,10 @@ async def triage_accept(
 
 @router.post("/triage/{item_id}/reject", response_model=TriageResponse)
 async def triage_reject(
-    item_id: str,
+    item_id: Annotated[str, Path(min_length=1, max_length=128)],
     payload: TriageRequest,
     _: str = Depends(verify_api_token),
-    idempotency_key: str = Header(..., alias="X-Idempotency-Key"),
+    idempotency_key: str = Header(..., alias="X-Idempotency-Key", min_length=8, max_length=128),
     conn: sqlite3.Connection = Depends(get_registry_connection),
 ) -> JSONResponse:
     return _run_triage_action(
@@ -77,10 +78,10 @@ async def triage_reject(
 
 @router.post("/triage/{item_id}/defer", response_model=TriageResponse)
 async def triage_defer(
-    item_id: str,
+    item_id: Annotated[str, Path(min_length=1, max_length=128)],
     payload: TriageRequest,
     _: str = Depends(verify_api_token),
-    idempotency_key: str = Header(..., alias="X-Idempotency-Key"),
+    idempotency_key: str = Header(..., alias="X-Idempotency-Key", min_length=8, max_length=128),
     conn: sqlite3.Connection = Depends(get_registry_connection),
 ) -> JSONResponse:
     return _run_triage_action(

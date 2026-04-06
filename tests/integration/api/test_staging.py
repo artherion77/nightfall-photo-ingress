@@ -54,3 +54,9 @@ async def test_item_detail_404_for_missing(api_client, api_token: str) -> None:
         headers=auth_headers(api_token),
     )
     assert response.status_code == 404
+
+
+@pytest.mark.anyio
+async def test_staging_rejects_invalid_limit(api_client, api_token: str) -> None:
+    response = await api_client.get("/api/v1/staging?limit=0", headers=auth_headers(api_token))
+    assert response.status_code == 422

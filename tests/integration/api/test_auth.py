@@ -2,24 +2,59 @@
 
 from __future__ import annotations
 
+import json
+import sqlite3
+
 import pytest
 
 from tests.integration.api.support import auth_headers
 
 
+def _latest_auth_failure_row(registry_conn: sqlite3.Connection):
+    return registry_conn.execute(
+        """
+        SELECT action, reason, details_json, actor
+        FROM audit_log
+        WHERE action = 'auth_failure'
+        ORDER BY id DESC
+        LIMIT 1
+        """
+    ).fetchone()
+
+
 @pytest.mark.anyio
-async def test_missing_bearer_returns_401(api_client) -> None:
+async def test_missing_bearer_returns_401(api_client, registry_conn: sqlite3.Connection) -> None:
     response = await api_client.get("/api/v1/health")
     assert response.status_code == 401
 
+    row = _latest_auth_failure_row(registry_conn)
+    assert row is not None
+    assert row["action"] == "auth_failure"
+    assert row["actor"] == "api_auth"
+    assert row["reason"] == "Missing Authorization header"
+    details = json.loads(row["details_json"])
+    assert details["path"] == "/api/v1/health"
+    assert details["method"] == "GET"
+    assert details["status_code"] == 401
+
 
 @pytest.mark.anyio
-async def test_invalid_bearer_returns_401(api_client) -> None:
+async def test_invalid_bearer_returns_401(api_client, registry_conn: sqlite3.Connection) -> None:
     response = await api_client.get(
         "/api/v1/health",
         headers={"Authorization": "Bearer wrong-token"},
     )
     assert response.status_code == 401
+
+    row = _latest_auth_failure_row(registry_conn)
+    assert row is not None
+    assert row["action"] == "auth_failure"
+    assert row["actor"] == "api_auth"
+    assert row["reason"] == "Invalid token"
+    details = json.loads(row["details_json"])
+    assert details["path"] == "/api/v1/health"
+    assert details["method"] == "GET"
+    assert details["status_code"] == 401
 
 
 @pytest.mark.anyio
