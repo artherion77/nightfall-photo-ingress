@@ -1,27 +1,50 @@
 <script lang="ts">
   import ActionButton from '$lib/components/common/ActionButton.svelte';
+  import { generateIdempotencyKey } from '$lib/api/triage';
+
+  type ControlMode = 'inline' | 'cta' | 'both';
 
   interface Props {
     disabled?: boolean;
-    onAccept?: () => void;
-    onReject?: () => void;
+    mode?: ControlMode;
+    onAccept?: (idempotencyKey: string) => void;
+    onReject?: (idempotencyKey: string) => void;
   }
 
-  let { disabled = false, onAccept, onReject }: Props = $props();
+  let { disabled = false, mode = 'both', onAccept, onReject }: Props = $props();
+
+  function acceptWithKey() {
+    onAccept?.(generateIdempotencyKey());
+  }
+
+  function rejectWithKey() {
+    onReject?.(generateIdempotencyKey());
+  }
 </script>
 
-<section class="triage-controls" data-testid="triage-controls">
-  <div class="inline-controls" data-testid="triage-inline-controls">
-    <ActionButton variant="accept" label="Accept" {disabled} onclick={() => onAccept?.()} />
-    <ActionButton variant="reject" label="Reject" {disabled} onclick={() => onReject?.()} />
-  </div>
+<section
+  class="triage-controls"
+  class:inline-only={mode === 'inline'}
+  class:cta-only={mode === 'cta'}
+  data-testid="triage-controls"
+>
+  {#if mode === 'inline' || mode === 'both'}
+    <div class="inline-controls" data-testid="triage-inline-controls">
+      <ActionButton variant="accept" label="Accept" {disabled} onclick={acceptWithKey} />
+      <ActionButton variant="reject" label="Reject" {disabled} onclick={rejectWithKey} />
+    </div>
+  {/if}
 
-  <div class="cta-controls" data-testid="triage-cta-controls">
-    <ActionButton variant="accept" label="Accept Selected" {disabled} onclick={() => onAccept?.()} />
-    <ActionButton variant="reject" label="Reject Selected" {disabled} onclick={() => onReject?.()} />
-  </div>
+  {#if mode === 'cta' || mode === 'both'}
+    <div class="cta-controls" data-testid="triage-cta-controls">
+      <ActionButton variant="accept" label="Accept Selected" {disabled} onclick={acceptWithKey} />
+      <ActionButton variant="reject" label="Reject Selected" {disabled} onclick={rejectWithKey} />
+    </div>
+  {/if}
 
-  <p class="hint">Keyboard: A = Accept, R = Reject, D = Defer, Arrow keys = navigate</p>
+  {#if mode !== 'inline'}
+    <p class="hint">Keyboard: A = Accept, R = Reject, D = Defer, Arrow keys = navigate</p>
+  {/if}
 </section>
 
 <style>
@@ -32,6 +55,13 @@
     border: 1px solid var(--border-default);
     border-radius: var(--radius-md);
     background: var(--surface-card);
+  }
+
+  .triage-controls.inline-only,
+  .triage-controls.cta-only {
+    padding: 0;
+    border: 0;
+    background: transparent;
   }
 
   .inline-controls {

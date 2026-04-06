@@ -13,9 +13,43 @@
     items: Item[];
     activeIndex?: number;
     onSelect?: (index: number) => void;
+    onAccept?: () => void;
+    onReject?: () => void;
+    onDefer?: () => void;
   }
 
-  let { items, activeIndex = 0, onSelect }: Props = $props();
+  let { items, activeIndex = 0, onSelect, onAccept, onReject, onDefer }: Props = $props();
+
+  function handleKeydown(event: KeyboardEvent): void {
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault();
+      onSelect?.(Math.max(activeIndex - 1, 0));
+      return;
+    }
+
+    if (event.key === 'ArrowRight') {
+      event.preventDefault();
+      onSelect?.(Math.min(activeIndex + 1, Math.max(items.length - 1, 0)));
+      return;
+    }
+
+    if (event.key.toLowerCase() === 'a') {
+      event.preventDefault();
+      onAccept?.();
+      return;
+    }
+
+    if (event.key.toLowerCase() === 'r') {
+      event.preventDefault();
+      onReject?.();
+      return;
+    }
+
+    if (event.key.toLowerCase() === 'd') {
+      event.preventDefault();
+      onDefer?.();
+    }
+  }
 
   function slotStyle(index: number): string {
     const dist = Math.abs(index - activeIndex);
@@ -43,6 +77,8 @@
     }
   }
 </script>
+
+<svelte:window on:keydown={handleKeydown} />
 
 <section class="wheel" data-testid="photo-wheel">
   {#if items.length === 0}

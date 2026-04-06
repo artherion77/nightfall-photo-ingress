@@ -6,7 +6,7 @@ from datetime import UTC, datetime, timedelta
 import json
 import sqlite3
 
-from api.audit_hook import triage_audit_hook
+from api.audit_hook import write_triage_compensating_event, write_triage_requested_event
 from api.schemas import TriageResponse
 
 
@@ -47,6 +47,15 @@ class TriageService:
         now = datetime.now(UTC)
         new_state = self._ACTION_TO_STATE[action]
 
+        write_triage_requested_event(
+            self.conn,
+            action=action,
+            item_id=item_id,
+            actor=actor,
+            reason=reason,
+        )
+        self.conn.commit()
+
         self.conn.execute("BEGIN")
         try:
             row = self.conn.execute(
@@ -57,44 +66,45 @@ class TriageService:
                 self.conn.rollback()
                 raise LookupError("Item not found")
 
-            with triage_audit_hook(
-                self.conn,
+            self.conn.execute(
+                "UPDATE files SET status = ?, updated_at = ? WHERE sha256 = ?",
+                (new_state, now.isoformat(), item_id),
+            )
+            details = json.dumps({"item_id": item_id, "state": new_state, "phase": "applied"})
+            self.conn.execute(
+                """
+                INSERT INTO audit_log (sha256, account_name, action, reason, details_json, actor, ts)
+                VALUES (?, NULL, ?, ?, ?, ?, ?)
+                """,
+                (item_id, f"triage_{action}_applied", reason, details, actor, now.isoformat()),
+            )
+
+            response = TriageResponse(
+                action_correlation_id=idempotency_key,
+                item_id=item_id,
+                state=new_state,
+            )
+            self._persist_idempotency(
+                idempotency_key=idempotency_key,
                 action=action,
                 item_id=item_id,
-                actor=actor,
-                reason=reason,
-            ):
-                self.conn.execute(
-                    "UPDATE files SET status = ?, updated_at = ? WHERE sha256 = ?",
-                    (new_state, now.isoformat(), item_id),
-                )
-                details = json.dumps({"item_id": item_id, "state": new_state, "phase": "applied"})
-                self.conn.execute(
-                    """
-                    INSERT INTO audit_log (sha256, account_name, action, reason, details_json, actor, ts)
-                    VALUES (?, NULL, ?, ?, ?, ?, ?)
-                    """,
-                    (item_id, f"triage_{action}_applied", reason, details, actor, now.isoformat()),
-                )
-
-                response = TriageResponse(
-                    action_correlation_id=idempotency_key,
-                    item_id=item_id,
-                    state=new_state,
-                )
-                self._persist_idempotency(
-                    idempotency_key=idempotency_key,
-                    action=action,
-                    item_id=item_id,
-                    response_status=200,
-                    response_body=response.model_dump(),
-                    now=now,
-                )
+                response_status=200,
+                response_body=response.model_dump(),
+                now=now,
+            )
 
             self.conn.commit()
             return 200, response
         except Exception:
             self.conn.rollback()
+            write_triage_compensating_event(
+                self.conn,
+                action=action,
+                item_id=item_id,
+                actor=actor,
+                reason=reason,
+            )
+            self.conn.commit()
             raise
 
     def _replay_if_present(

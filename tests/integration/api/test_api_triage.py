@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from api.services.triage_service import TriageService
 from tests.integration.api.support import auth_headers
 
 
@@ -31,6 +32,27 @@ async def test_accept_transitions_item_to_accepted(api_client, api_token: str, r
     ).fetchone()
     assert row is not None
     assert row["status"] == "accepted"
+
+    events = registry_conn.execute(
+        """
+        SELECT action, actor, sha256, ts
+        FROM audit_log
+        WHERE sha256 = ? AND action IN (?, ?)
+        ORDER BY id ASC
+        """,
+        (
+            "abc123def456",
+            "triage_accept_requested",
+            "triage_accept_applied",
+        ),
+    ).fetchall()
+    assert [event["action"] for event in events] == [
+        "triage_accept_requested",
+        "triage_accept_applied",
+    ]
+    assert all(event["actor"] == "api" for event in events)
+    assert all(event["sha256"] == "abc123def456" for event in events)
+    assert all(event["ts"] for event in events)
 
 
 @pytest.mark.anyio
@@ -121,3 +143,63 @@ async def test_duplicate_idempotency_key_replays_same_response(api_client, api_t
     ).fetchone()
     assert row is not None
     assert int(row["n"]) == 1
+
+
+@pytest.mark.anyio
+async def test_failure_persists_requested_and_compensating_audit_events(
+    api_client,
+    api_token: str,
+    registry_conn,
+    monkeypatch,
+) -> None:
+    original_persist = TriageService._persist_idempotency
+
+    def failing_persist(self, *, idempotency_key, action, item_id, response_status, response_body, now):
+        raise RuntimeError("simulated idempotency persistence failure")
+
+    monkeypatch.setattr(TriageService, "_persist_idempotency", failing_persist)
+
+    response = await api_client.post(
+        "/api/v1/triage/abc123def456/accept",
+        headers=_idempotency_headers(api_token, "triage-fail-audit-1"),
+        json={"reason": "operator_accept"},
+    )
+    assert response.status_code == 500
+
+    row = registry_conn.execute(
+        "SELECT status FROM files WHERE sha256 = ?",
+        ("abc123def456",),
+    ).fetchone()
+    assert row is not None
+    assert row["status"] == "pending"
+
+    events = registry_conn.execute(
+        """
+        SELECT action, actor, sha256, ts
+        FROM audit_log
+        WHERE sha256 = ? AND action IN (?, ?, ?)
+        ORDER BY id ASC
+        """,
+        (
+            "abc123def456",
+            "triage_accept_requested",
+            "triage_accept_applied",
+            "triage_accept_compensating",
+        ),
+    ).fetchall()
+    assert [event["action"] for event in events] == [
+        "triage_accept_requested",
+        "triage_accept_compensating",
+    ]
+    assert all(event["actor"] == "api" for event in events)
+    assert all(event["sha256"] == "abc123def456" for event in events)
+    assert all(event["ts"] for event in events)
+
+    idempotency_row = registry_conn.execute(
+        "SELECT COUNT(*) AS n FROM ui_action_idempotency WHERE idempotency_key = ?",
+        ("triage-fail-audit-1",),
+    ).fetchone()
+    assert idempotency_row is not None
+    assert int(idempotency_row["n"]) == 0
+
+    monkeypatch.setattr(TriageService, "_persist_idempotency", original_persist)

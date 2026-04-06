@@ -1,7 +1,7 @@
 import { writable } from 'svelte/store';
 
 import { getStagingPage } from '$lib/api/staging';
-import { postAccept, postDefer, postReject } from '$lib/api/triage';
+import { generateIdempotencyKey, postAccept, postDefer, postReject } from '$lib/api/triage';
 import { toast } from '$lib/stores/toast.svelte';
 
 const initial = {
@@ -68,8 +68,9 @@ function shiftActive(delta) {
   });
 }
 
-async function triageItem(action, itemId) {
+async function triageItem(action, itemId, idempotencyKey) {
   let snapshot = null;
+  const key = idempotencyKey ?? generateIdempotencyKey();
 
   update((state) => {
     snapshot = state;
@@ -92,15 +93,15 @@ async function triageItem(action, itemId) {
 
   try {
     if (action === 'accept') {
-      await postAccept(itemId);
+      await postAccept(itemId, key);
       return;
     }
     if (action === 'reject') {
-      await postReject(itemId);
+      await postReject(itemId, key);
       return;
     }
     if (action === 'defer') {
-      await postDefer(itemId);
+      await postDefer(itemId, key);
       return;
     }
     throw new Error(`Unsupported triage action: ${action}`);
