@@ -1,4 +1,4 @@
-# CLAUDE DEV MCP README
+# MCP for AGENTS
 
 ## Purpose
 
@@ -24,6 +24,11 @@ Future option (documentation-only):
 - Base image layering can be evaluated later, but is intentionally not implemented in this repository workflow.
 
 ## Files
+
+## Rename Addendum
+
+This file supersedes the former repository guidance file:
+- `COPILOT  DEV MCP README.md` (renamed to `AGENTS.md` on 2026-04-06)
 
 - Model: .mcp/model.json
 - Server: mcp_server.py
@@ -173,6 +178,8 @@ curl -sS -X POST http://<server>/mcp/extensions/propose \
 - MCP server accepts only mapped tasks from .mcp/model.json; no arbitrary command execution.
 
 ## Troubleshooting
+
+Agents are encouraged to augment this list with troubleshooting items discovered when working with the repository and correct any documentation drift vs. new repo state. 
 
 - Container missing:
   - Run ./dev/bin/devctl setup
