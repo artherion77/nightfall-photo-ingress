@@ -1,5 +1,6 @@
 import { writable } from 'svelte/store';
-import { PUBLIC_API_TOKEN } from '$env/static/public';
+import { getHealth } from '$lib/api/health';
+import { ApiError } from '$lib/api/client';
 
 const initialState = {
   polling_ok: { ok: false, message: 'unknown' },
@@ -13,36 +14,29 @@ const initialState = {
 const { subscribe, update } = writable(initialState);
 
 let pollingInterval = null;
+let consecutiveFailures = 0;
+const FAILURE_THRESHOLD = 3;
 
 async function fetchHealth() {
   try {
-    const response = await fetch('/api/v1/health', {
-      headers: {
-        'Authorization': `Bearer ${PUBLIC_API_TOKEN}`
-      }
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      update(() => ({
-        polling_ok: data.polling_ok ?? initialState.polling_ok,
-        auth_ok: data.auth_ok ?? initialState.auth_ok,
-        registry_ok: data.registry_ok ?? initialState.registry_ok,
-        disk_ok: data.disk_ok ?? initialState.disk_ok,
-        last_updated_at: data.last_updated_at,
-        error: data.error || null
-      }));
-    } else {
-      update((state) => ({
-        ...state,
-        error:  `API error: ${response.status}`
-      }));
-    }
-  } catch (err) {
-    update((state) => ({
-      ...state,
-      error: 'Failed to fetch health status'
+    const data = await getHealth();
+    consecutiveFailures = 0;
+    update(() => ({
+      polling_ok: data.polling_ok ?? initialState.polling_ok,
+      auth_ok: data.auth_ok ?? initialState.auth_ok,
+      registry_ok: data.registry_ok ?? initialState.registry_ok,
+      disk_ok: data.disk_ok ?? initialState.disk_ok,
+      last_updated_at: data.last_updated_at,
+      error: null
     }));
+  } catch (err) {
+    consecutiveFailures++;
+    if (consecutiveFailures >= FAILURE_THRESHOLD) {
+      const msg =
+        err instanceof ApiError ? `API error: ${err.status}` : 'Health check failed';
+      update((state) => ({ ...state, error: msg }));
+    }
+    // Silently swallow failures below threshold (transient errors after retry exhaustion)
   }
 }
 
