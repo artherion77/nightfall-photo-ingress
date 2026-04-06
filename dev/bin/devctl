@@ -76,31 +76,6 @@ release_repo_lock() {
     exec {REPO_LOCK_FD}>&-
 }
 
-# Read the project's pinned Node version from .nvmrc or .node-version.
-# Returns the version without a leading "v".
-get_node_version() {
-    local raw=""
-    raw="$(python3 "$PROJECT_ROOT/dev/lib/package_meta.py" node-version "$PROJECT_ROOT" 2>/dev/null || true)"
-    if [[ -n "$raw" ]]; then
-        printf "%s" "$raw"
-    fi
-}
-
-# Ensure web stacks stay aligned on SvelteKit and Vite major versions.
-# This prevents subtle cross-stack tooling incompatibilities.
-assert_web_stack_major_consistency() {
-    local web_pkg="$PROJECT_ROOT/webui/package.json"
-    local dashboard_pkg="$PROJECT_ROOT/metrics/dashboard/package.json"
-
-    [[ -f "$web_pkg" ]] || { echo "Missing $web_pkg" >&2; return 1; }
-    [[ -f "$dashboard_pkg" ]] || { echo "Missing $dashboard_pkg" >&2; return 1; }
-
-    python3 "$PROJECT_ROOT/dev/lib/package_meta.py" \
-        check-consistency "$web_pkg" "$dashboard_pkg" \
-        --packages "@sveltejs/kit" "vite"
-}
-
-
 # ── Lock management ───────────────────────────────────────────────────────────
 
 _is_stateful_command() {
@@ -497,11 +472,13 @@ _ensure_stack_ready() {
     nf_require_container_running "$CONTAINER" "devctl setup" "devctl"
 
     local node_version
-    node_version="$(get_node_version)"
+    node_version="$(python3 "$PROJECT_ROOT/dev/lib/package_meta.py" node-version "$PROJECT_ROOT" 2>/dev/null || true)"
     [[ -n "$node_version" ]] || _fail "No .node-version file found in project root."
 
     # SvelteKit and Vite major versions must be consistent across both stacks.
-    assert_web_stack_major_consistency
+    python3 "$PROJECT_ROOT/dev/lib/package_meta.py" \
+        check-consistency "$PROJECT_ROOT/webui/package.json" "$PROJECT_ROOT/metrics/dashboard/package.json" \
+        --packages "@sveltejs/kit" "vite"
 
     # Node version drift check — ABI-level change requires reinstalling all stacks.
     local actual_node
@@ -582,11 +559,13 @@ cmd_setup() {
     _wait_ready
 
     # Validate SvelteKit/Vite major consistency across both stacks before install.
-    assert_web_stack_major_consistency
+    python3 "$PROJECT_ROOT/dev/lib/package_meta.py" \
+        check-consistency "$PROJECT_ROOT/webui/package.json" "$PROJECT_ROOT/metrics/dashboard/package.json" \
+        --packages "@sveltejs/kit" "vite"
 
     # Exact Node install via nvm — version sourced from .node-version.
     local node_version
-    node_version="$(get_node_version)"
+    node_version="$(python3 "$PROJECT_ROOT/dev/lib/package_meta.py" node-version "$PROJECT_ROOT" 2>/dev/null || true)"
     [[ -n "$node_version" ]] || _fail "No .node-version file found in project root."
     _install_node_exact "$node_version"
 
@@ -720,7 +699,7 @@ cmd_update() {
     esac
 
     local expected_node actual_node node_drift=0
-    expected_node="$(get_node_version)"
+    expected_node="$(python3 "$PROJECT_ROOT/dev/lib/package_meta.py" node-version "$PROJECT_ROOT" 2>/dev/null || true)"
     [[ -n "$expected_node" ]] || _fail "No .node-version file found in project root."
     actual_node="$(_get_container_node_version)"
     if [[ "$actual_node" != "$expected_node" ]]; then
@@ -841,7 +820,9 @@ cmd_update() {
         _install_node_exact "$expected_node"
     fi
 
-    assert_web_stack_major_consistency
+    python3 "$PROJECT_ROOT/dev/lib/package_meta.py" \
+        check-consistency "$PROJECT_ROOT/webui/package.json" "$PROJECT_ROOT/metrics/dashboard/package.json" \
+        --packages "@sveltejs/kit" "vite"
 
     local stack
     if [[ "$resolved_scope" == "webui" || "$resolved_scope" == "all" ]]; then
@@ -1154,7 +1135,7 @@ cmd_check() {
 
     # Node drift
     local expected_node actual_node
-    expected_node="$(get_node_version)"
+    expected_node="$(python3 "$PROJECT_ROOT/dev/lib/package_meta.py" node-version "$PROJECT_ROOT" 2>/dev/null || true)"
     if [[ -z "$expected_node" ]]; then
         _warn "Node expected version: missing (.node-version/.nvmrc not found)"
         has_drift=1
@@ -1224,7 +1205,9 @@ cmd_check() {
     fi
 
     # Stack major consistency check
-    if assert_web_stack_major_consistency >/dev/null 2>&1; then
+    if python3 "$PROJECT_ROOT/dev/lib/package_meta.py" \
+        check-consistency "$PROJECT_ROOT/webui/package.json" "$PROJECT_ROOT/metrics/dashboard/package.json" \
+        --packages "@sveltejs/kit" "vite" >/dev/null 2>&1; then
         _ok "SvelteKit/Vite major consistency: OK"
     else
         _warn "SvelteKit/Vite major consistency: mismatch"
