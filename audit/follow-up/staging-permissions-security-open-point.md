@@ -34,3 +34,8 @@ Target state:
 - Staging tests run without sudo
 - Evidence/log paths are no longer world-writable
 - Behavior documented in staging README and profile notes
+
+## Tracking
+
+Tracking issue: #7 (`Follow-up: tighten staging evidence and log directory permissions`)
+- https://github.com/artherion77/nightfall-photo-ingress/issues/7

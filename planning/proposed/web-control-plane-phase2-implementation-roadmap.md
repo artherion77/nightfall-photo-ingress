@@ -398,7 +398,7 @@ preferred (Settings page accessed over HTTPS).
 
 ### P2-I: Dashboard KPI Summary Counts (Mandatory)
 
-**Origin:** Identified in `audit/open-points/chunk3-ui-drift-analysis.md` — Dashboard
+**Origin:** Identified in `audit/follow-up/chunk3-ui-drift-analysis.md` — Dashboard
 drift items D-A1, D-A2, D-A3. The Dashboard page currently hardcodes
 `accepted_today`, `rejected_today`, `live_photo_pairs`, and `last_poll_duration_s` to
 zero because no existing endpoint supplies these values.
@@ -446,7 +446,7 @@ populate the daily count KPIs and last-poll timing shown in the mockup.
 
 ### P2-J: Poll Runtime History Endpoint + Chart Upgrade (Mandatory)
 
-**Origin:** Identified in `audit/open-points/chunk3-ui-drift-analysis.md` — Dashboard
+**Origin:** Identified in `audit/follow-up/chunk3-ui-drift-analysis.md` — Dashboard
 drift item D-A4. The mock shows a smooth 7-day line chart ("Poll Runtimes (Last 7
 Days)") with a Mon–Sun x-axis. The current `PollRuntimeChart` renders a single bar
 with no history.
@@ -502,7 +502,7 @@ a bar sparkline to a line chart with a 7-day window.
 
 ### P2-K: Filename Field in Audit Events (Mandatory)
 
-**Origin:** Identified in `audit/open-points/chunk3-ui-drift-analysis.md` — drift
+**Origin:** Identified in `audit/follow-up/chunk3-ui-drift-analysis.md` — drift
 items D-A5 and D-V8. The audit event display currently shows a sha256 prefix because
 `AuditEvent` schema has no filename field. The mock shows the original filename (e.g.,
 "IMG_3051.jpg") as the primary identifier in the audit timeline.
@@ -543,7 +543,7 @@ display it in the audit timeline in place of the sha256 prefix.
 
 ### P2-L: Item Thumbnail Endpoint (Mandatory)
 
-**Origin:** Identified in `audit/open-points/chunk3-ui-drift-analysis.md` — staging
+**Origin:** Identified in `audit/follow-up/chunk3-ui-drift-analysis.md` — staging
 drift item S-A1. The `PhotoCard` currently shows a grey placeholder box ("IMG")
 because no image serving endpoint exists. The mock shows actual photo thumbnails as
 the centrepiece of the Staging Queue workflow.

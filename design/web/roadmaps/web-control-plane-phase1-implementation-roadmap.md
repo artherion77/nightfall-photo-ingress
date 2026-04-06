@@ -478,7 +478,7 @@ validation. The two blocking defects are now closed and verified in git history;
 the remaining visual drift items are still within the defined Chunk 3 scope and
 should be corrected before Chunk 4 UI work begins. Chunk 4 backend work may still
 proceed in parallel if desired, consistent with the dependency model in §2. Full
-analysis in `audit/open-points/chunk3-ui-drift-analysis.md`.
+analysis in `audit/follow-up/chunk3-ui-drift-analysis.md`.
 
 **Two blocking bugs (verified fixed in commit `3a94e06`):**
 - `import.meta.env.PUBLIC_API_TOKEN` compiled to `"undefined"` in the Vite bundle;
@@ -791,7 +791,7 @@ collection straightforward.
 
 4. Input-validation audit pass
 - Review every router boundary (path/query/body) for Pydantic/schema coverage.
-- Record any gaps and resolution notes in `audit/open-points/`.
+- Record any gaps and resolution notes in `audit/follow-up/`.
 
 5. Dependency and security hygiene pass
 - Run `pip-audit` for `[web]` dependencies and capture findings.
@@ -809,7 +809,7 @@ Chunk 6 is considered complete only when all evidence below exists:
 - Passing integration assertions for CORS allowlist and disallowed origins.
 - Passing integration assertions for response-header posture.
 - `pip-audit` result with no critical findings in `[web]` dependencies.
-- Targeted OWASP checklist outcome documented; open points tracked in `audit/open-points/`.
+- Targeted OWASP checklist outcome documented; open points tracked in `audit/follow-up/`.
 - Regression suite pass across existing API and UI integration tests.
 
 ### Prerequisite state snapshot (post Chunk 5)
@@ -838,7 +838,7 @@ tests/
 - Review all path parameters, query parameters, and request bodies across all routers.
 - Confirm all string inputs pass through Pydantic models before reaching service layer.
 - Confirm no raw user input is passed to file system operations or SQL queries outside of parameterised ORM/query methods.
-- Document findings in `audit/open-points/` if any gap is found (do not block hardening if issue is minor and fixable immediately).
+- Document findings in `audit/follow-up/` if any gap is found (do not block hardening if issue is minor and fixable immediately).
 
 **Targeted OWASP review (Phase-1-relevant concerns only):**
 
@@ -861,7 +861,7 @@ tests/
 2. CORS behavior is explicit and tested: allowed origins receive expected headers; disallowed origins do not.
 3. Response-header security posture is explicit and tested for the current localhost deployment mode.
 4. `pip-audit` reports no critical vulnerabilities in the `[web]` dependency group.
-5. Targeted OWASP review is completed for Phase-1-relevant concerns; new open points are logged in `audit/open-points/`.
+5. Targeted OWASP review is completed for Phase-1-relevant concerns; new open points are logged in `audit/follow-up/`.
 6. Existing integration suites for Chunks 0–5 continue to pass.
 
 ### Out of scope for this chunk
@@ -943,7 +943,7 @@ At the end of Chunk 6, the following artefacts must exist and be passing tests:
 
 ### Documentation
 - This roadmap document (updated with chunk completion status as work progresses)
-- Targeted OWASP review findings documented in `audit/open-points/` if any gaps remained unresolved
+- Targeted OWASP review findings documented in `audit/follow-up/` if any gaps remained unresolved
 
 ---
 

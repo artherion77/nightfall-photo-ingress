@@ -4,6 +4,9 @@ Status: Open
 Date: 2026-04-01
 Owner: Systems Engineering
 
+Tracking issue: #6 (`Follow-up: implement module6 external library download avoidance`)
+- https://github.com/artherion77/nightfall-photo-ingress/issues/6
+
 ## Summary
 
 The current Module 6 implementation imports advisory SHA1 data from read-only `.hashes.sha1` files in the permanent library and falls back to re-hashing directories for import when those files are missing or invalid.

@@ -235,7 +235,7 @@ Recommended addition to proposed structure: `docs/deployment/testing-guide.md` o
 | `audit/drift-analysis.md` | `/audit/drift-analysis.md` | **1:1 — but currently empty (0 bytes)** |
 | `audit/review-history.md` | `/audit/review-history.md` | **1:1 — but currently empty (0 bytes)** |
 | `audit/security-threat-model.md` | `/audit/threat-model.md` | **Maps cleanly but: (a) empty, (b) was previously misnamed (missing `.md` extension, typo); renamed as housekeeping** |
-| `audit/open-points/` directory | No proposed target | **No mapping — directory was previously misnamed (typo + space in dirname; renamed as housekeeping); content has no home in proposed structure; recommend adding `/audit/open-points/`** |
+| `audit/follow-up/` directory | No proposed target | **No mapping — directory was previously misnamed (typo + space in dirname; renamed as housekeeping); content has no home in proposed structure; recommend adding `/audit/follow-up/`** |
 | `audit/archive/` (10 files) | No proposed target | **No mapping — historical review artifacts; recommend folding into `/audit/review-history.md` as a summary appendix, then archiving** |
 
 ---
@@ -289,7 +289,7 @@ authored from scratch:
 | Defect | Location | Recommended fix |
 |---|---|---|
 | Old security stub had no `.md` extension | `audit/` | Renamed to `security-threat-model.md` ✅ done (was misnamed) |
-| `audit/open-points/` directory contained a typo in the name | `audit/` | Renamed to `audit/open-points/` ✅ done (was misnamed) |
+| `audit/follow-up/` directory contained a typo in the name | `audit/` | Renamed to `audit/follow-up/` ✅ done (was misnamed) |
 | `audit/drift-analysis.md`, `audit/review-history.md`, `audit/security-threat-model.md` are all empty stubs | `audit/` | Author or delete |
 | Web control plane design docs (~2,800 lines) live flat under `design/` alongside core CLI design docs | `design/` | Move to `design/web/` subdirectory |
 | `docs/app-registration-design.md` is named as a design document but is an operator setup guide | `docs/` | Rename and reclassify |
@@ -344,5 +344,5 @@ See Section 6. The highest-priority items for authoring are:
 ### Structural defects to fix immediately (housekeeping, no content work)
 
 1. Rename old misnamed security file → `audit/security-threat-model.md` ✅ done
-2. Rename old misnamed open-points directory → `audit/open-points/` ✅ done
+2. Rename old misnamed open-points directory → `audit/follow-up/` ✅ done
 3. Author or remove the three empty stub files in `audit/`

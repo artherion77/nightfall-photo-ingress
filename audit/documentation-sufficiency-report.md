@@ -185,7 +185,7 @@ The `external_hash_cache` schema is present and accurate.
 
 The narrative in `design/domain-architecture-overview.md §6.3` describes the sync-import
 → download-avoidance optimization pipeline as if it is a working feature. However,
-`audit/open-points/module6-external-library-download-avoidance-open-point.md` explicitly
+`audit/follow-up/module6-external-library-download-avoidance-open-point.md` explicitly
 states the runtime optimization layer **is intentionally not implemented** and the
 advisory hash has not been connected to the prefilter pipeline.
 
@@ -394,7 +394,7 @@ Estimated scope: 2–3 documents (`schema-v2.md`, `upgrade-guide.md`), 100–200
 **R-04: Correct documented drift in §6.3 sync-import narrative**  
 Add a clear annotation to `design/domain-architecture-overview.md §6.3` stating that the
 download-avoidance optimization is not yet implemented and cross-referencing
-`audit/open-points/module6-external-library-download-avoidance-open-point.md`. Close G-04.  
+`audit/follow-up/module6-external-library-download-avoidance-open-point.md`. Close G-04.  
 Estimated scope: 3–5 lines added to existing doc.
 
 **R-05: Author `audit/security-threat-model.md`**  
@@ -464,8 +464,8 @@ These are structural or naming corrections that do not require new content:
 | Action | Closes |
 |---|---|
 | Rename old misnamed security file → `audit/security-threat-model.md` ✅ done | G-05 (partial) |
-| Rename old misnamed open-points dir → `audit/open-points/` ✅ done | Structural defect |
-| Update all cross-references to `audit/open-points/` after rename ✅ done | Consistency |
+| Rename old misnamed open-points dir → `audit/follow-up/` ✅ done | Structural defect |
+| Update all cross-references to `audit/follow-up/` after rename ✅ done | Consistency |
 
 ---
 

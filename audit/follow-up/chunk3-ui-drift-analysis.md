@@ -5,6 +5,9 @@
 **Source:** Visual comparison of live staging preview (`http://192.168.200.184:8000/`)
 against UI mockups in `design/ui-mocks/` during Chunk 3 validation.
 
+Tracking issue: #3 (`Follow-up: complete remaining chunk3 UI drift corrections`)
+- https://github.com/artherion77/nightfall-photo-ingress/issues/3
+
 ---
 
 ## 1. Context

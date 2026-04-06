@@ -118,3 +118,6 @@ the config when an operator genuinely wants to deviate from the convention.
 Open — not assigned, not scheduled.
 
 Raised: 2026-04-03
+
+Tracking issue: #4 (`Follow-up: implement config path base-key derivation rework`)
+- https://github.com/artherion77/nightfall-photo-ingress/issues/4

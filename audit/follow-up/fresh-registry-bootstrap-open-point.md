@@ -153,3 +153,6 @@ callable independently of `poll`. It should:
 Open — not assigned, not scheduled.
 
 Raised: 2026-04-03
+
+Tracking issue: #5 (`Follow-up: design and implement fresh registry bootstrap workflow`)
+- https://github.com/artherion77/nightfall-photo-ingress/issues/5

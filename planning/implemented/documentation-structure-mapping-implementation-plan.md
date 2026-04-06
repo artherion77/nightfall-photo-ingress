@@ -75,7 +75,7 @@ and silently mislead tooling. None of these actions require content authoring.
 |---|--------|----------|-----------------|
 | D-1 | `audit/security-threat-model.md` was missing the `.md` extension (old filename misnamed) | `audit/` | ✅ Renamed to `audit/security-threat-model.md` |
 | D-2 | Old filename contained "thread" instead of "threat" | `audit/` | ✅ Rename applied the spelling correction simultaneously with D-1 |
-| D-3 | `audit/open-points/` directory name contained a typo and a space (misnamed) | `audit/` | ✅ Moved to `audit/open-points/`; all cross-references updated |
+| D-3 | `audit/follow-up/` directory name contained a typo and a space (misnamed) | `audit/` | ✅ Moved to `audit/follow-up/`; all cross-references updated |
 | D-4 | `audit/drift-analysis.md` and `audit/review-history.md` were empty 0-byte stubs | `audit/` | ✅ Minimal stub header added to both |
 
 **Notes:**
@@ -93,14 +93,14 @@ None. This chunk has no dependency on any other chunk or on any other plan.
 - Authoring any substantive content in `audit/security-threat-model.md`.
 - Authoring `audit/drift-analysis.md` or `audit/review-history.md` beyond a minimal stub header.
 - Any changes to `/design/`, `/planning/`, or `/docs/` files.
-- Moving or restructuring the contents of `audit/open-points/` (only the directory rename is performed).
+- Moving or restructuring the contents of `audit/follow-up/` (only the directory rename is performed).
 - Fixing the `docs/app-registration-design.md` misclassification defect (listed in Section 7 of the audit but not named in the Summary Recommendations for housekeeping; deferred).
 
 ### Expected Output
 
 After Chunk D, the repository will have:
 - `audit/security-threat-model.md` (renamed; content unchanged — empty or minimal stub)
-- `audit/open-points/` (renamed from old misnamed directory; all internal files unchanged ✅)
+- `audit/follow-up/` (renamed from old misnamed directory; all internal files unchanged ✅)
 - `audit/drift-analysis.md` (either minimal stub or deleted)
 - `audit/review-history.md` (either minimal stub or deleted)
 - All cross-references to old names updated
@@ -108,7 +108,7 @@ After Chunk D, the repository will have:
 ### Acceptance Criteria
 
 - `git ls-files audit/` contains `audit/security-threat-model.md` and no file matching the old misnamed filename.
-- `git ls-files audit/` contains `audit/open-points/` and no path segment matching the old directory name.
+- `git ls-files audit/` contains `audit/follow-up/` and no path segment matching the old directory name.
 - `grep` for the old misnamed directory name returns no results in markdown files.
 - `grep` for the old security file name returns no results in markdown files.
 - `audit/drift-analysis.md` and `audit/review-history.md` each either have content (≥1 line) or are absent from `git ls-files`.
