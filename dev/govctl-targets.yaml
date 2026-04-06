@@ -105,7 +105,10 @@ targets:
   metrics.build.dashboard:
     description: "Build metrics dashboard statics + fingerprint"
     command: "./dev/bin/build-metrics-dashboard"
-    requires: [dev.stack-ready.dashboard]
+    # build-metrics-dashboard already runs `devctl ensure-stack-ready dashboard`
+    # internally; keeping this target dependency empty avoids duplicate drift
+    # checks while preserving the same readiness guardrail.
+    requires: []
     preflight:
       - container-running:dev-photo-ingress
     lock: true
