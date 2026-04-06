@@ -17,6 +17,8 @@
 # Resolve paths relative to this file's location at source time.
 _GOVCTL_PF_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 GOVCTL_PREFLIGHTS_PROJECT_ROOT="$(cd "$_GOVCTL_PF_SCRIPT_DIR/../.." && pwd)"
+_GOVCTL_MANIFEST_HASH_PY="$_GOVCTL_PF_SCRIPT_DIR/manifest_hash.py"
+_GOVCTL_PACKAGE_META_PY="$_GOVCTL_PF_SCRIPT_DIR/package_meta.py"
 
 # Overridable dev container name; matches devctl's CONTAINER variable.
 GOVCTL_DEV_CONTAINER="${GOVCTL_DEV_CONTAINER:-dev-photo-ingress}"
@@ -130,8 +132,10 @@ _preflight_stack_drift_free() {
     fi
 
     local host_hash container_hash
-    host_hash="$(cat "$stack_dir/package.json" "$stack_dir/package-lock.json" \
-        | sha256sum | awk '{print $1}')"
+    host_hash="$(python3 "$_GOVCTL_MANIFEST_HASH_PY" compute "$stack_dir" 2>/dev/null)" || {
+        echo "stack-drift-free: failed to compute host manifest hash for $stack"
+        return 1
+    }
     container_hash="$(lxc exec "$GOVCTL_DEV_CONTAINER" -- \
         bash -c "cat '$container_hash_file' 2>/dev/null | tr -d '[:space:]' || true" \
         2>/dev/null)" || {
@@ -139,9 +143,14 @@ _preflight_stack_drift_free() {
         return 1
     }
 
-    if [[ "$host_hash" == "$container_hash" ]]; then
+    local tmp_hash_file
+    tmp_hash_file="$(mktemp)"
+    printf '%s\n' "$container_hash" > "$tmp_hash_file"
+    if python3 "$_GOVCTL_MANIFEST_HASH_PY" compare "$stack_dir" "$tmp_hash_file" >/dev/null 2>&1; then
+        rm -f "$tmp_hash_file"
         return 0
     fi
+    rm -f "$tmp_hash_file"
     echo "stack-drift-free: $stack manifest drift (host=${host_hash} container=${container_hash:-MISSING})"
     return 1
 }
@@ -153,15 +162,11 @@ _preflight_stack_drift_free() {
 
 _preflight_node_version_match() {
     local pinned_version
-    if [[ -f "$GOVCTL_PREFLIGHTS_PROJECT_ROOT/.nvmrc" ]]; then
-        pinned_version="$(tr -d '[:space:]' < "$GOVCTL_PREFLIGHTS_PROJECT_ROOT/.nvmrc")"
-    elif [[ -f "$GOVCTL_PREFLIGHTS_PROJECT_ROOT/.node-version" ]]; then
-        pinned_version="$(tr -d '[:space:]' < "$GOVCTL_PREFLIGHTS_PROJECT_ROOT/.node-version")"
-    else
+    pinned_version="$(python3 "$_GOVCTL_PACKAGE_META_PY" node-version "$GOVCTL_PREFLIGHTS_PROJECT_ROOT" 2>/dev/null || true)"
+    if [[ -z "$pinned_version" ]]; then
         echo "node-version-match: no .nvmrc or .node-version found in project root"
         return 1
     fi
-    pinned_version="${pinned_version#v}"
 
     local container_version
     container_version="$(lxc exec "$GOVCTL_DEV_CONTAINER" -- \
