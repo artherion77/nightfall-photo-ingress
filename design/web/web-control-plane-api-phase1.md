@@ -1,7 +1,7 @@
 # Phase 1 REST API Specification
 
 **Status:** Implemented (Chunks 1, 4, and 5)  
-**Date:** 2026-04-03  
+**Date:** 2026-04-06  
 **Owner:** Systems Engineering
 
 ---
@@ -673,7 +673,16 @@ lifespan management and test isolation.
 
 ## 10. Testing
 
-All Phase 1 endpoints are covered by the test suite: `tests/test_api_chunk1.py`.
+The shipped API surface is covered by the integration suites under `tests/integration/api/`.
+
+Relevant files include:
+- `test_auth.py`
+- `test_health.py`
+- `test_staging.py`
+- `test_audit_log.py`
+- `test_config.py`
+- `test_api_triage.py`
+- `test_blocklist.py`
 
 Test coverage includes:
 - Auth validation (missing/invalid token → 401)
@@ -682,6 +691,8 @@ Test coverage includes:
 - Action filtering (audit log `action` parameter)
 - Redaction (api_token shown as `[redacted]` in config endpoint)
 - No-auth endpoints (docs endpoints accessible without auth)
+- Triage mutation idempotency and state transitions
+- Blocklist CRUD and ingest-enforcement behavior
 
 ---
 

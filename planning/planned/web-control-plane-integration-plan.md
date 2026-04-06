@@ -1,24 +1,28 @@
 # Integration Plan — Web Control Plane
 
-Status: Active planning baseline; Chunk 0 and Chunk 1 implemented, later phases remain planned
-Date: 2026-04-03
+Status: Local control plane baseline implemented through Phase 4; hardening and LAN-exposure phases remain planned
+Date: 2026-04-06
 Owner: Systems Engineering
 
-## Implementation status (as of 2026-04-03)
+## Implementation status (as of 2026-04-06)
 
 | Phase | Name | Status |
 |-------|------|--------|
 | 0 | Foundation | Implemented |
 | 1 | Read-only API | Implemented |
-| 2 | Read-only UI | Not started |
-| 3 | Triage write path | Not started |
-| 4 | Blocklist management | Not started |
-| 5 | Sidecar and metadata | Not started |
-| 6 | Hardening | Not started |
+| 2 | Read-only UI | Implemented |
+| 3 | Triage write path | Implemented |
+| 4 | Blocklist management | Implemented |
+| 5 | Sidecar and metadata | Deferred / not started |
+| 6 | Hardening | Partial foundations only |
 | 7 | Reverse proxy | Not started |
 
-This plan specifies the full web control plane build-out. Foundation and the read-only
-API are implemented; later phases remain planned. All CLI and ingest pipeline functionality
+This plan originally described the entire web control plane build-out from zero. The
+current repository has already delivered the local-control-plane baseline through
+Phase 4: FastAPI API routes, static SPA serving, read-only pages, triage writes, and
+blocklist CRUD are in place. Remaining work is now about closing the hardening gap,
+preparing LAN exposure under the Phase 2 architecture, and deferring worker/metadata
+capabilities until that foundation is stable. All CLI and ingest pipeline functionality
 remain independent of the control plane.
 
 ---
@@ -50,6 +54,44 @@ within any phase does not affect the upstream CLI or timer-driven ingest pipelin
 
 Phases 0–3 constitute the minimum viable control plane. Phases 4–7 are progressive
 enhancements.
+
+### 2.1 Drift review summary
+
+- **Implemented in code:** Phases 0 through 4 are already shipped.
+- **Not yet implemented:** Phase 5 sidecar/metadata, Phase 7 reverse proxy/LAN exposure.
+- **Partially implemented:** Phase 6 has some foundations only: bearer-token auth,
+  config redaction, same-origin SPA/API serving, and additive schema support for web
+  tables. Rate limiting, auth-failure audit events, CORS allowlist policy, and
+  security-header enforcement are not yet complete.
+- **Superseding design note:** LAN exposure is no longer just an optional finishing
+  step. `design/web/web-control-plane-architecture-phase2.md` makes reverse proxy,
+  TLS, proxy-level headers, and proxy-level rate limiting mandatory before any
+  operator access outside localhost.
+
+### 2.2 Recommended execution sequence from the current state
+
+Recommended order to reach the intended design end state:
+
+1. **Phase 6A — finish hardening on the current localhost topology.**
+   - Close the baseline security gaps that are independent of proxy choice: auth-failure
+     audit, explicit CORS policy, input-validation audit, and documented header policy.
+   - Do not spend effort building a throwaway in-process rate limiter first; the Phase 2
+     architecture already makes proxy-level limiting the durable target.
+2. **Phase 7A / Phase 2 mandatory LAN-exposure platform work.**
+   - Introduce Caddy, TLS, versioned static build releases, structured access logging,
+     and proxy-level security headers.
+   - Keep Uvicorn bound to `127.0.0.1`.
+3. **Phase 7B / remaining Phase 2 mandatory UX/runtime work.**
+   - Complete API/client retry and backoff behavior, filter sidebar, audit infinite
+     scroll, and threshold-management work that the Phase 2 architecture marks as
+     required before broader operator use.
+4. **Stability gate.**
+   - Run the LAN-exposed control plane in stable use and verify rollback, logs,
+     and operator workflows before introducing background-worker complexity.
+5. **Only then reopen Phase 5 as a later-phase worker/metadata program.**
+   - Sidecar/thumbnail/metadata work should follow the stronger sequencing in
+     `design/web/web-control-plane-architecture-phase3.md`, not jump ahead of the
+     hardening and LAN-exposure gate.
 
 ---
 
@@ -162,6 +204,8 @@ access.
 
 ## 5. Phase 2: Read-Only UI
 
+Implementation status: Implemented, then extended by later phases
+
 ### 5.1 Goals
 
 Wire the SvelteKit SPA to the Phase 1 read-only API. Produce a deployable static
@@ -251,8 +295,9 @@ Route: /settings
 - Dashboard loads with live KPI data and recent audit events.
 - Audit page loads with paginated event list.
 - Settings page shows effective config (tokens redacted server-side).
-- Staging page shows photo wheel with items from the pending queue (no triage yet).
-- Blocklist page is read-only in the Phase 2 read-only UI step.
+- Staging page shows photo wheel with items from the pending queue.
+- Blocklist page remains functional as a read-only view at this phase, though later
+  phases now extend it with write controls in the current implementation.
 - AppHeader health badge updates live.
 - AppFooter last-poll timestamp is accurate.
 - Dark-mode design tokens are applied consistently across all pages.
@@ -260,6 +305,8 @@ Route: /settings
 ---
 
 ## 6. Phase 3: Triage Write Path
+
+Implementation status: Implemented
 
 ### 6.1 Goals
 
@@ -290,7 +337,7 @@ audit write, a compensating audit event is written.
 ### 6.4 UI Integration
 
 1. Complete `PhotoWheel` component with keyboard navigation and mouse-wheel support.
-2. Add `TriageControls` (button overlays + drop zones) with drag-and-drop.
+2. Add `TriageControls` with inline action buttons and CTA buttons.
 3. On Accept or Reject action:
    a. Generate idempotency key (UUID v4).
    b. Apply optimistic update (remove item from wheel).
@@ -298,6 +345,11 @@ audit write, a compensating audit event is written.
    d. On success: wheel advances, health/KPI stores invalidated.
    e. On error: item restored, toast notification shown.
 4. Defer: no file system change; item is re-queued for later operator review.
+
+Current implementation note:
+- Drag-and-drop zones were deferred. The shipped interaction model is keyboard/button
+  driven, with defer available through the staging page interaction model rather than
+  a dedicated drag/drop surface.
 
 ### 6.5 Acceptance
 
@@ -310,6 +362,8 @@ audit write, a compensating audit event is written.
 ---
 
 ## 7. Phase 4: Blocklist Management
+
+Implementation status: Implemented
 
 ### 7.1 Goals
 
@@ -347,6 +401,14 @@ All require `X-Idempotency-Key`. Delete requires confirmation from UI.
 This phase introduces the optional background worker for sidecar fetching. It is not
 required for minimum viable operator functionality.
 
+Current sequencing note:
+- This phase is intentionally **not** the next recommended implementation step.
+- The more recent Phase 2 and Phase 3 architecture documents move worker/sidecar work
+  behind the hardening and LAN-exposure gate.
+- Any future implementation of this phase should be aligned with
+  `design/web/web-control-plane-architecture-phase3.md`, which supersedes the earlier
+  single-process sketch below.
+
 Scope:
 - `POST /api/v1/metadata/{item_id}/sidecar-fetch` — Enqueues a sidecar fetch job.
 - `sidecar_jobs` table tracks queue state.
@@ -354,7 +416,8 @@ Scope:
   up queued jobs and executes the XMP/sidecar fetch.
 - UI: detail view shows sidecar status; manual trigger button.
 
-Precondition: Phase 3 accepted and stable.
+Precondition: Phase 6 completed, Phase 2 mandatory LAN-exposure work signed off, and
+post-LAN stabilization complete.
 
 ---
 
@@ -362,11 +425,17 @@ Precondition: Phase 3 accepted and stable.
 
 Applies after write-path validation is complete.
 
+Current status note:
+- Foundations present today: bearer-token auth, config redaction, same-origin serving,
+  and structured/redacted logging support in the broader application.
+- Not yet complete for the control plane: auth-failure audit entries, explicit CORS
+  allowlist enforcement, security headers, and a deployed rate-limiting layer.
+
 ### 9.1 Items
 
 | Item | Description |
 |------|-------------|
-| Rate limiting | Per-route per-IP sliding window. `POST` routes: 30 req/min. `GET` routes: 120 req/min. |
+| Rate limiting | Durable deployment target is proxy-level limiting in Phase 2; avoid adding a temporary in-process limiter unless required for an immediate localhost-only risk. |
 | Structured audit for auth failures | Every 401 and 403 is written to the audit log with IP and requested path. |
 | Credential redaction | Tokens, URLs with embedded credentials, and service passwords are redacted in all structured logs. |
 | CORS allowlist | Only the configured UI origin is in the CORS allowlist. Default: `http://localhost:8000`. |
@@ -381,11 +450,14 @@ Applies after write-path validation is complete.
 
 ---
 
-## 10. Phase 7: Reverse Proxy (Optional)
+## 10. Phase 7: Reverse Proxy / LAN Exposure Gate
+
+For localhost-only usage, this phase remains optional. For any LAN exposure, it is
+mandatory and is governed by `design/web/web-control-plane-architecture-phase2.md`.
 
 For LAN exposure with TLS:
 
-1. Add Nginx or Caddy as a systemd service in the LXC container.
+1. Add Caddy (preferred) or Nginx as a systemd service in the LXC container.
 2. Configure TLS termination (self-signed cert or Let's Encrypt via local CA).
 3. Proxy `/` → Uvicorn on `127.0.0.1:8000`.
 4. Move static file serving to Nginx/Caddy for cache-header control.
@@ -445,13 +517,15 @@ complete in milliseconds.
 
 ### 13.1 API Tests
 
-Extend the existing `tests/` directory with:
+Current implemented API integration suite lives under `tests/integration/api/`:
 
-- `tests/test_api_health.py` — health endpoint returns expected schema.
-- `tests/test_api_staging.py` — staging pagination, filtering, item detail.
-- `tests/test_api_triage.py` — accept/reject/defer, idempotency key replay.
-- `tests/test_api_blocklist.py` — CRUD operations, enabled toggle.
-- `tests/test_api_auth.py` — missing/invalid token → 401.
+- `test_health.py`
+- `test_staging.py`
+- `test_audit_log.py`
+- `test_config.py`
+- `test_auth.py`
+- `test_api_triage.py`
+- `test_blocklist.py`
 
 Tests use `httpx.AsyncClient` with `ASGITransport` pointing at the FastAPI application
 factory (same pattern as FastAPI's testing documentation). No live Uvicorn server
@@ -459,18 +533,28 @@ required.
 
 ### 13.2 UI Tests (Phase 2+)
 
-Playwright integration tests for the SvelteKit UI (located in `tests/integration/ui/`):
+Current implemented UI-facing integration suite lives under `tests/integration/ui/`:
 
-- Dashboard loads with mocked API via Playwright route intercept.
-- Photo Wheel keyboard navigation advances the wheel correctly.
-- Accept action fires the correct API endpoint with idempotency key.
-- Error banner appears when API returns 500.
+- `test_dashboard.py`
+- `test_audit.py`
+- `test_settings.py`
+- `test_staging_display.py`
+- `test_triage.py`
+- `test_triage_error_recovery.py`
+- `test_blocklist_crud.py`
+- `test_error_states.py`
+
+These are pytest integration tests against the ASGI app and a stubbed static SPA shell.
+They validate route/data contracts and mutation flows, but they are **not** a real
+browser DOM/Playwright harness yet.
+
+Future browser automation remains useful, but it is a separate follow-up rather than a
+current implementation fact.
 
 ### 13.3 Parity Test
 
-A test that exercises both the CLI triage command and the API triage endpoint on the
-same item (in separate runs) and asserts that the resulting registry state is identical.
-This enforces the CLI/API behaviour parity invariant.
+This remains a recommended future regression test. No dedicated CLI/API parity test is
+currently checked in.
 
 ---
 

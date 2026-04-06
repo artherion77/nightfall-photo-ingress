@@ -97,7 +97,7 @@ if Caddy is misconfigured, Uvicorn is not directly reachable from the LAN.
 
 ### 3.4 Security Headers at Proxy Level
 
-In Phase 2, security headers move from FastAPI middleware to the Caddy configuration.
+In Phase 2, security headers are enforced at the Caddy configuration layer.
 Caddy adds these on all responses:
 
 | Header | Value |
@@ -108,21 +108,28 @@ Caddy adds these on all responses:
 | `Referrer-Policy` | `strict-origin-when-cross-origin` |
 | `Content-Security-Policy` | `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'` |
 
-FastAPI middleware that previously set these headers is removed in Phase 2 to avoid
-duplication.
+Current implementation note:
+- The current FastAPI application does not yet ship a dedicated security-header
+  middleware layer for the control plane.
+- Phase 2 therefore introduces the durable header policy at the proxy, rather than
+  migrating an already-live app-level header stack.
 
 ### 3.5 Rate Limiting at Proxy Level
 
-In Phase 2, Caddy's rate limiting module (`caddy-ratelimit` or equivalent) replaces the
-in-process FastAPI dependency. This provides:
+In Phase 2, Caddy's rate limiting module (`caddy-ratelimit` or equivalent) becomes the
+first durable request-throttling layer for the control plane. This provides:
 
 - Rate limiting before requests reach the Python process (lower CPU cost for abusive
   traffic).
 - Shared limits for static and API endpoints from a single configuration point.
 - Log visibility for rate-limited requests in the access log.
 
-Phase 1 in-process rate limiting is removed when the proxy rate limiting is verified.
-Decommissioning the Phase 1 dependency is a mandatory Phase 2 step listed in §3.6.
+Current implementation note:
+- The current control-plane app does not ship a verified in-process rate-limiting
+  dependency today.
+- Phase 2 should not assume a removal migration here; it should introduce proxy-level
+  limiting directly and avoid overlapping policies unless an explicit short-lived
+  localhost safeguard is intentionally added.
 
 ### 3.6 Phase 2 Mandatory Reverse Proxy Checklist
 
@@ -136,7 +143,8 @@ Before LAN exposure is enabled:
 6. Access logs in structured JSON format, written to a log file or journald.
 7. Rate limiting active for `/api/` path.
 8. Uvicorn remains on `127.0.0.1` only.
-9. Phase 1 in-process rate limiting dependency removed.
+9. No overlapping legacy app-level rate limiter remains active unless explicitly retained
+  as a temporary localhost-only safeguard.
 10. CORS allowlist updated to match the LAN hostname (e.g., `https://photo-ingress.lan`).
 
 ---
@@ -438,11 +446,13 @@ of the auth dependency.
 
 ### 11.1 Phase 1 vs Phase 2
 
-Phase 1 implements in-process rate limiting as a FastAPI dependency (token bucket per
-route, per source IP, in-memory). This is simple but has limitations:
-- State is lost on Uvicorn restart.
-- Rate limit state is not shared if multiple Uvicorn workers are used.
-- Requests consume Python thread/event loop time before being rejected.
+The original Phase 1 intent included an in-process FastAPI rate limiter, but the
+current control-plane baseline does not rely on a shipped app-level rate-limiting
+dependency. That leaves the following open concern set for LAN exposure:
+- Requests currently reach Python before any dedicated control-plane throttling policy
+  is applied.
+- There is no shared request-throttling state across future multi-process topologies.
+- Rate-limit observability is absent until a front-door limiter is added.
 
 ### 11.2 Phase 2 Approach
 
@@ -461,8 +471,9 @@ Caddy's rate limiting module intercepts requests before they reach Python. Benef
 | `GET /api/` | 120 req/min | Per IP |
 | All paths (global) | 300 req/min | Per IP |
 
-These replace the Phase 1 in-process limits. After Caddy rate limiting is verified,
-the Phase 1 FastAPI rate limiting dependency is removed from all routers.
+These become the primary control-plane rate limits. No document should assume there is
+an already-live FastAPI limiter to remove unless that implementation is added in a
+separate, explicitly documented localhost-only hardening step.
 
 ---
 
