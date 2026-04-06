@@ -66,9 +66,30 @@ Typical flow:
 ./dev/bin/devctl status
 ```
 
+## govctl Commands (Build Governor)
+
+govctl is the build governor CLI. It reads a declarative target manifest, resolves dependencies via topological sort, runs preflight checks, and executes build/test targets in correct order.
+
+- Manifest: dev/govctl-targets.yaml
+- CLI: dev/bin/govctl
+
+Commands:
+
+```bash
+./dev/bin/govctl list                          # list all targets and groups
+./dev/bin/govctl check [TARGET...]             # run preflight checks
+./dev/bin/govctl graph [TARGET...]             # show dependency graph (DOT)
+./dev/bin/govctl run TARGET [TARGET...]        # execute targets in dependency order
+./dev/bin/govctl run --dry-run TARGET          # show execution plan without running
+./dev/bin/govctl run --json TARGET             # machine-readable JSONL output (for MCP)
+```
+
+JSON mode (`--json`) writes JSONL events to stdout and stores artifacts under `artifacts/govctl/`.
+
 ## MCP Tasks (devctl-first)
 
 Canonical MCP tasks now use devctl orchestration for environment prepare/reset.
+MCP-mapped test tasks (`backend.test.unit`, `web.test.unit`) route through govctl `--json` for structured output.
 
 - devcontainer.prepare
 - devcontainer.reset
@@ -136,6 +157,18 @@ Run web unit tests:
 curl -sS -X POST http://<server>/mcp/exec \
   -H 'Content-Type: application/json' \
   -d '{"task":"web.test.unit"}'
+```
+
+Run backend unit tests through govctl JSON mode (agent-friendly stream):
+
+```bash
+./dev/bin/govctl backend.test.unit --json
+```
+
+Run web unit tests through govctl JSON mode:
+
+```bash
+./dev/bin/govctl web.test.unit --json
 ```
 
 Inspect status/log/context:

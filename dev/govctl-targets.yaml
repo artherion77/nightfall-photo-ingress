@@ -1,0 +1,206 @@
+version: 1
+defaults:
+  lock: false
+  timeout_seconds: 300
+
+targets:
+  dev.ensure-running:
+    description: "Ensure dev container exists and is running"
+    command: |
+      lxc info dev-photo-ingress >/dev/null 2>&1 || ./dev/bin/devctl setup
+      lxc start dev-photo-ingress 2>/dev/null || true
+    preflight: []
+    lock: false
+
+  dev.stack-ready.webui:
+    description: "Sync webui sources and fix drift if needed"
+    command: "./dev/bin/devctl ensure-stack-ready webui"
+    requires: [dev.ensure-running]
+    preflight:
+      - container-running:dev-photo-ingress
+      - cache-mounts-active
+    lock: true
+
+  dev.stack-ready.dashboard:
+    description: "Sync dashboard sources and fix drift if needed"
+    command: "./dev/bin/devctl ensure-stack-ready dashboard"
+    requires: [dev.ensure-running]
+    preflight:
+      - container-running:dev-photo-ingress
+      - cache-mounts-active
+    lock: true
+
+  backend.build.wheel:
+    description: "Build Python wheel into dist/"
+    command: "python -m build --wheel --outdir dist/"
+    requires: []
+    preflight: []
+    lock: false
+
+  backend.test.unit:
+    description: "Run backend unit tests"
+    command: "pytest tests/unit -q"
+    requires: []
+    preflight: []
+    lock: false
+    timeout_seconds: 120
+
+  backend.test.integration:
+    description: "Run backend integration tests"
+    command: "pytest tests/integration -q"
+    requires: []
+    preflight: []
+    lock: false
+    timeout_seconds: 180
+
+  web.typecheck:
+    description: "SvelteKit typecheck (webui)"
+    command: "./dev/bin/devctl test-web-typecheck"
+    requires: [dev.stack-ready.webui]
+    preflight:
+      - container-running:dev-photo-ingress
+      - node-version-match
+    lock: true
+
+  web.typecheck.dashboard:
+    description: "SvelteKit typecheck (metrics dashboard)"
+    command: "./dev/bin/devctl test-metrics-dashboard-typecheck"
+    requires: [dev.stack-ready.dashboard]
+    preflight:
+      - container-running:dev-photo-ingress
+      - node-version-match
+    lock: true
+
+  web.test.unit:
+    description: "Vitest unit tests for webui"
+    command: "./dev/bin/devctl test-web-unit"
+    requires: [dev.stack-ready.webui]
+    preflight:
+      - container-running:dev-photo-ingress
+      - stack-drift-free:webui
+    lock: true
+    timeout_seconds: 120
+
+  web.test.e2e:
+    description: "Playwright end-to-end tests"
+    command: "./dev/bin/devctl test-web-e2e"
+    requires: [dev.stack-ready.webui]
+    preflight:
+      - container-running:dev-photo-ingress
+      - stack-drift-free:webui
+    lock: true
+    timeout_seconds: 300
+
+  web.build:
+    description: "Production SvelteKit build (webui)"
+    command: |
+      lxc exec dev-photo-ingress -- bash -c \
+        'cd /opt/nightfall-webui && npm run build'
+    requires: [dev.stack-ready.webui]
+    preflight:
+      - container-running:dev-photo-ingress
+      - stack-drift-free:webui
+    lock: true
+
+  metrics.build.dashboard:
+    description: "Build metrics dashboard statics + fingerprint"
+    command: "./dev/bin/build-metrics-dashboard"
+    requires: [dev.stack-ready.dashboard]
+    preflight:
+      - container-running:dev-photo-ingress
+    lock: true
+
+  metrics.collect.backend:
+    description: "Collect backend metrics (Module 2)"
+    command: "./metricsctl collect-backend"
+    requires: []
+    preflight: []
+    lock: true
+
+  metrics.collect.frontend:
+    description: "Collect frontend metrics (Module 3)"
+    command: "./metricsctl collect-frontend"
+    requires: []
+    preflight: []
+    lock: true
+
+  metrics.aggregate:
+    description: "Aggregate collected metrics (Module 4)"
+    command: "./metricsctl aggregate"
+    requires: [metrics.collect.backend, metrics.collect.frontend]
+    preflight: []
+    lock: true
+
+  metrics.generate.dashboard:
+    description: "Generate dashboard from aggregated data (Module 5)"
+    command: "./metricsctl generate-dashboard"
+    requires: [metrics.aggregate, metrics.build.dashboard]
+    preflight: []
+    lock: true
+
+  metrics.publish:
+    description: "Publish metrics surface (Module 7)"
+    command: "./metricsctl publish"
+    requires: [metrics.generate.dashboard]
+    preflight: []
+    lock: true
+
+  staging.install:
+    description: "Build wheel and install into staging container"
+    command: "./dev/bin/stagingctl install"
+    requires: [backend.build.wheel]
+    preflight:
+      - container-running:staging-photo-ingress
+      - bridge-network:br-staging
+    lock: false
+
+  staging.smoke:
+    description: "Run headless smoke assertions in staging"
+    command: "./dev/bin/stagingctl smoke"
+    requires: [staging.install]
+    preflight:
+      - container-running:staging-photo-ingress
+    lock: false
+
+  staging.smoke-live:
+    description: "Authenticated live poll + secret scan"
+    command: "./dev/bin/stagingctl smoke-live"
+    requires: [staging.install]
+    preflight:
+      - container-running:staging-photo-ingress
+    lock: false
+
+  dev.check:
+    description: "Read-only drift report"
+    command: "./dev/bin/devctl check"
+    requires: []
+    preflight:
+      - container-running:dev-photo-ingress
+    lock: false
+
+groups:
+  test.backend:
+    targets: [backend.test.unit, backend.test.integration]
+
+  test.web:
+    targets: [web.typecheck, web.typecheck.dashboard, web.test.unit]
+
+  test.all:
+    targets: [test.backend, test.web]
+
+  build.all:
+    targets: [backend.build.wheel, web.build, metrics.build.dashboard]
+
+  staging.full:
+    targets: [staging.install, staging.smoke]
+
+  metrics.full:
+    targets:
+      - metrics.collect.backend
+      - metrics.collect.frontend
+      - metrics.aggregate
+      - metrics.generate.dashboard
+      - metrics.publish
+
+  all:
+    targets: [test.all, build.all, staging.full, metrics.full]

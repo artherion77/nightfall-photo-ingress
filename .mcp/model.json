@@ -41,6 +41,9 @@
         "completed",
         "failed"
       ]
+    },
+    "configFiles": {
+      "govctlManifest": "./dev/govctl-targets.yaml"
     }
   },
   "domains": {
@@ -127,6 +130,17 @@
       "playwright_cache": "~/.cache/ms-playwright -> /root/.cache/ms-playwright"
     }
   },
+  "govctl": {
+    "path": "./dev/bin/govctl",
+    "manifest": "./dev/govctl-targets.yaml",
+    "commands": [
+      "list",
+      "check",
+      "graph",
+      "run"
+    ],
+    "jsonMode": "--json"
+  },
   "stagectl": {
     "path": "./dev/bin/stagingctl",
     "commands": [
@@ -182,6 +196,9 @@
       "./dev/bin/devctl status"
     ],
     "backend.test.unit": [
+      "./dev/bin/govctl backend.test.unit --json"
+    ],
+    "backend.test.unit.direct": [
       "./dev/bin/devctl setup",
       "./dev/bin/devctl assert-cached-ready",
       "./dev/bin/devctl reset",
@@ -194,6 +211,9 @@
       "./.venv/bin/python -m pytest tests/integration"
     ],
     "web.test.unit": [
+      "./dev/bin/govctl web.test.unit --json"
+    ],
+    "web.test.unit.direct": [
       "./dev/bin/devctl setup",
       "./dev/bin/devctl assert-cached-ready",
       "./dev/bin/devctl reset",

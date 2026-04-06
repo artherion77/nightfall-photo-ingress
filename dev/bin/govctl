@@ -1,0 +1,447 @@
+#!/usr/bin/env bash
+# govctl — Build governor CLI for nightfall-photo-ingress.
+#
+# Usage:
+#   govctl <target|group> [<target|group> ...] [--dry-run] [--continue-on-error]
+#          [--json] [--log-dir <path>]
+#   govctl list   [--format human|json]
+#   govctl check  [<target|group> ...] [--format human|json]
+#   govctl graph  [<target|group> ...] [--format human|dot]
+#   govctl help
+#
+# Environment:
+#   GOVCTL_MANIFEST   Override path to govctl-targets.yaml
+#   REPO_LOCK_TIMEOUT_SEC  Override global lock timeout (default: 300)
+
+set -uo pipefail
+
+# ── Paths ─────────────────────────────────────────────────────────────────────
+
+GOVCTL_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$GOVCTL_SCRIPT_DIR/../.." && pwd)"
+
+_MANIFEST_YAML="${GOVCTL_MANIFEST:-$PROJECT_ROOT/dev/govctl-targets.yaml}"
+_MANIFEST_PY="$PROJECT_ROOT/dev/lib/govctl_manifest.py"
+_RESOLVE_PY="$PROJECT_ROOT/dev/lib/govctl_resolve.py"
+_PREFLIGHTS_LIB="$PROJECT_ROOT/dev/lib/govctl-preflights.sh"
+_EXECUTOR_LIB="$PROJECT_ROOT/dev/lib/govctl-executor.sh"
+
+# ── Bootstrap check ───────────────────────────────────────────────────────────
+
+_govctl_check_deps() {
+    local missing=()
+    local dep
+    for dep in python3 lxc flock timeout; do
+        command -v "$dep" &>/dev/null || missing+=("$dep")
+    done
+    if [[ ${#missing[@]} -gt 0 ]]; then
+        printf '[govctl] ERROR: missing required tools: %s\n' "${missing[*]}" >&2
+        printf '[govctl] Install them and retry.\n' >&2
+        exit 1
+    fi
+
+    for f in "$_MANIFEST_YAML" "$_MANIFEST_PY" "$_RESOLVE_PY" \
+              "$_PREFLIGHTS_LIB" "$_EXECUTOR_LIB"; do
+        if [[ ! -f "$f" ]]; then
+            printf '[govctl] ERROR: required file not found: %s\n' "$f" >&2
+            exit 1
+        fi
+    done
+}
+
+_govctl_check_deps
+
+# ── Source libraries ──────────────────────────────────────────────────────────
+
+GOVCTL_PREFLIGHTS_PROJECT_ROOT="$PROJECT_ROOT"
+# shellcheck source=../lib/govctl-preflights.sh
+source "$_PREFLIGHTS_LIB"
+
+GOVCTL_EXEC_PROJECT_ROOT="$PROJECT_ROOT"
+# shellcheck source=../lib/govctl-executor.sh
+source "$_EXECUTOR_LIB"
+
+
+# ── Shared helpers ────────────────────────────────────────────────────────────
+
+_govctl_load_manifest_json() {
+    local manifest_json_file="$1"
+    if ! python3 "$_MANIFEST_PY" "$_MANIFEST_YAML" > "$manifest_json_file"; then
+        printf '[govctl] ERROR: failed to load manifest: %s\n' "$_MANIFEST_YAML" >&2
+        exit 1
+    fi
+}
+
+_govctl_resolve_targets() {
+    local manifest_json_file="$1"
+    local resolved_file="$2"
+    shift 2
+    local requested=("$@")
+
+    if ! python3 "$_RESOLVE_PY" \
+            --manifest-json "$manifest_json_file" \
+            "${requested[@]}" \
+            > "$resolved_file"; then
+        cat "$resolved_file" >&2
+        printf '[govctl] ERROR: could not resolve targets: %s\n' "${requested[*]}" >&2
+        exit 1
+    fi
+}
+
+_govctl_tmpfile() {
+    mktemp /tmp/govctl-XXXXXX
+}
+
+_govctl_print_separator() {
+    local width=72
+    printf '%*s\n' "$width" '' | tr ' ' '─'
+}
+
+
+# ── cmd_list ──────────────────────────────────────────────────────────────────
+
+cmd_list() {
+    local format="human"
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --format) format="$2"; shift 2 ;;
+            --format=*) format="${1#--format=}"; shift ;;
+            *) printf '[govctl] list: unknown option: %s\n' "$1" >&2; exit 1 ;;
+        esac
+    done
+
+    local manifest_json
+    manifest_json="$(_govctl_tmpfile)"
+    _govctl_load_manifest_json "$manifest_json"
+
+    if [[ "$format" == "json" ]]; then
+        python3 - "$manifest_json" << 'PY'
+import json, sys
+m = json.loads(open(sys.argv[1]).read())
+out = {
+    "targets": [
+        {"name": k, "description": v.get("description", "")}
+        for k, v in m["targets"].items()
+    ],
+    "groups": [
+        {"name": k, "targets": v}
+        for k, v in m.get("groups_expanded", {}).items()
+    ]
+}
+print(json.dumps(out, indent=2))
+PY
+    else
+        python3 - "$manifest_json" << 'PY'
+import json, sys
+m = json.loads(open(sys.argv[1]).read())
+
+print("Targets:")
+for name, target in m["targets"].items():
+    desc = target.get("description", "")
+    lock = "  [lock]" if target.get("lock") else ""
+    print(f"  {name:<40} {desc}{lock}")
+
+print()
+print("Groups:")
+for name, members in m.get("groups_expanded", {}).items():
+    print(f"  {name:<40} ({', '.join(members)})")
+PY
+    fi
+
+    rm -f "$manifest_json"
+}
+
+
+# ── cmd_check ─────────────────────────────────────────────────────────────────
+
+cmd_check() {
+    local format="human"
+    local -a requested=()
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --format) format="$2"; shift 2 ;;
+            --format=*) format="${1#--format=}"; shift ;;
+            -*) printf '[govctl] check: unknown option: %s\n' "$1" >&2; exit 1 ;;
+            *) requested+=("$1"); shift ;;
+        esac
+    done
+
+    local manifest_json resolved_file
+    manifest_json="$(_govctl_tmpfile)"
+    resolved_file="$(_govctl_tmpfile)"
+    _govctl_load_manifest_json "$manifest_json"
+
+    # Default to all targets if nothing specified.
+    if [[ ${#requested[@]} -eq 0 ]]; then
+        python3 - "$manifest_json" > "$resolved_file" << 'PY'
+import json, sys
+m = json.loads(open(sys.argv[1]).read())
+for name in m["targets"]:
+    print(name)
+PY
+    else
+        _govctl_resolve_targets "$manifest_json" "$resolved_file" "${requested[@]}"
+    fi
+
+    # Run preflights for each resolved target and collect results.
+    local -a results=()
+    local overall_exit=0
+
+    while IFS= read -r target; do
+        [[ -z "$target" ]] && continue
+
+        # Read preflight list for this target.
+        local preflight_list
+        preflight_list="$(python3 - "$manifest_json" "$target" << 'PY'
+import json, sys
+m = json.loads(open(sys.argv[1]).read())
+t = m["targets"].get(sys.argv[2], {})
+for pf in t.get("preflight", []):
+    print(pf)
+PY
+)"
+
+        if [[ -z "$preflight_list" ]]; then
+            results+=("PASS|$target|(no preflights)")
+            continue
+        fi
+
+        while IFS= read -r check; do
+            [[ -z "$check" ]] && continue
+            local pf_reason pf_exit
+            pf_exit=0
+            pf_reason="$(govctl_run_preflight "$check")" || pf_exit=$?
+            if [[ "$pf_exit" -eq 0 ]]; then
+                results+=("PASS|$target|$check")
+            else
+                results+=("FAIL|$target|$check|${pf_reason}")
+                overall_exit=1
+            fi
+        done <<< "$preflight_list"
+    done < "$resolved_file"
+
+    # Emit output.
+    if [[ "$format" == "json" ]]; then
+        python3 - << 'PY' "${results[@]}"
+import json, sys
+rows = []
+for arg in sys.argv[1:]:
+    parts = arg.split("|", 3)
+    status, target, check = parts[0], parts[1], parts[2]
+    reason = parts[3] if len(parts) > 3 else ""
+    rows.append({"status": status, "target": target, "check": check,
+                 "reason": reason})
+print(json.dumps(rows, indent=2))
+PY
+    else
+        local row
+        for row in "${results[@]}"; do
+            IFS='|' read -r status target check reason <<< "$row"
+            if [[ "$status" == "PASS" ]]; then
+                printf '\033[0;32m  PASS\033[0m  %-40s  %s\n' "$target" "$check"
+            else
+                printf '\033[0;31m  FAIL\033[0m  %-40s  %s\n' "$target" "$check"
+                [[ -n "${reason:-}" ]] && printf '         reason: %s\n' "$reason"
+            fi
+        done
+    fi
+
+    rm -f "$manifest_json" "$resolved_file"
+    return "$overall_exit"
+}
+
+
+# ── cmd_graph ─────────────────────────────────────────────────────────────────
+
+cmd_graph() {
+    local format="human"
+    local -a requested=()
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --format) format="$2"; shift 2 ;;
+            --format=*) format="${1#--format=}"; shift ;;
+            -*) printf '[govctl] graph: unknown option: %s\n' "$1" >&2; exit 1 ;;
+            *) requested+=("$1"); shift ;;
+        esac
+    done
+
+    local manifest_json resolved_file
+    manifest_json="$(_govctl_tmpfile)"
+    resolved_file="$(_govctl_tmpfile)"
+    _govctl_load_manifest_json "$manifest_json"
+
+    # Default to all targets if nothing specified.
+    if [[ ${#requested[@]} -eq 0 ]]; then
+        python3 - "$manifest_json" > "$resolved_file" << 'PY'
+import json, sys
+m = json.loads(open(sys.argv[1]).read())
+for name in m["targets"]:
+    print(name)
+PY
+    else
+        _govctl_resolve_targets "$manifest_json" "$resolved_file" "${requested[@]}"
+    fi
+
+    if [[ "$format" == "dot" ]]; then
+        python3 - "$manifest_json" "$resolved_file" << 'PY'
+import json, sys
+from pathlib import Path
+
+m       = json.loads(open(sys.argv[1]).read())
+targets = m["targets"]
+resolved = [l for l in Path(sys.argv[2]).read_text().splitlines() if l.strip()]
+resolved_set = set(resolved)
+
+print("digraph govctl {")
+print('  rankdir=LR;')
+print('  node [shape=box fontname="monospace" fontsize=10];')
+for t in resolved:
+    deps = targets[t].get("requires_expanded", [])
+    if not deps:
+        print(f'  "{t}";')
+    for dep in deps:
+        if dep in resolved_set:
+            print(f'  "{dep}" -> "{t}";')
+print("}")
+PY
+    else
+        python3 - "$manifest_json" "$resolved_file" << 'PY'
+import json, sys
+from pathlib import Path
+
+m       = json.loads(open(sys.argv[1]).read())
+targets = m["targets"]
+resolved = [l for l in Path(sys.argv[2]).read_text().splitlines() if l.strip()]
+
+for t in resolved:
+    deps = targets[t].get("requires_expanded", [])
+    if deps:
+        print(f"  {t}  ←  {', '.join(deps)}")
+    else:
+        print(f"  {t}")
+PY
+    fi
+
+    rm -f "$manifest_json" "$resolved_file"
+}
+
+
+# ── cmd_run ───────────────────────────────────────────────────────────────────
+
+cmd_run() {
+    local dry_run=0
+    local continue_on_error=0
+    local json_mode=0
+    local log_dir="$PROJECT_ROOT/artifacts/govctl"
+    local -a requested=()
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --dry-run)           dry_run=1;            shift ;;
+            --continue-on-error) continue_on_error=1;  shift ;;
+            --json)              json_mode=1;           shift ;;
+            --log-dir)           log_dir="$2";         shift 2 ;;
+            --log-dir=*)         log_dir="${1#--log-dir=}"; shift ;;
+            -*) printf '[govctl] unknown option: %s\n' "$1" >&2; exit 1 ;;
+            *) requested+=("$1"); shift ;;
+        esac
+    done
+
+    if [[ ${#requested[@]} -eq 0 ]]; then
+        printf '[govctl] ERROR: no targets specified. Try: govctl list\n' >&2
+        exit 1
+    fi
+
+    local manifest_json resolved_file
+    manifest_json="$(_govctl_tmpfile)"
+    resolved_file="$(_govctl_tmpfile)"
+
+    _govctl_load_manifest_json "$manifest_json"
+    _govctl_resolve_targets "$manifest_json" "$resolved_file" "${requested[@]}"
+
+    if [[ "$json_mode" == "1" && "$dry_run" == "0" ]]; then
+        # --json: suppress tee passthrough by redirecting terminal output to /dev/null.
+        # events.jsonl is written by the executor; forward it to stdout after the run.
+        local temp_log_dir
+        temp_log_dir="$(mktemp -d /tmp/govctl-json-XXXXXX)"
+        govctl_execute \
+            "$manifest_json" "$resolved_file" \
+            "${requested[*]}" "$temp_log_dir" \
+            "$continue_on_error" "$dry_run" \
+            > /dev/null 2>&1
+        local rc=$?
+        # Emit the events.jsonl to stdout.
+        local run_events
+        run_events="$(ls -1t "$temp_log_dir"/run-*/events.jsonl 2>/dev/null | head -n 1)"
+        [[ -n "$run_events" ]] && cat "$run_events"
+        # Copy artifacts to real log_dir.
+        if [[ -n "$run_events" ]]; then
+            mkdir -p "$log_dir"
+            local run_dir
+            run_dir="$(dirname "$run_events")"
+            cp -r "$run_dir" "$log_dir/"
+        fi
+        rm -rf "$temp_log_dir"
+        rm -f "$manifest_json" "$resolved_file"
+        return "$rc"
+    fi
+
+    govctl_execute \
+        "$manifest_json" "$resolved_file" \
+        "${requested[*]}" "$log_dir" \
+        "$continue_on_error" "$dry_run"
+    local rc=$?
+
+    rm -f "$manifest_json" "$resolved_file"
+    return "$rc"
+}
+
+
+# ── cmd_help ──────────────────────────────────────────────────────────────────
+
+cmd_help() {
+    cat << 'HELP'
+govctl — build governor for nightfall-photo-ingress
+
+Usage:
+  govctl <target|group> [<target|group> ...] [options]   Run targets
+  govctl list   [--format human|json]                    List all targets/groups
+  govctl check  [<target|group> ...]  [--format human|json]  Check preflights
+  govctl graph  [<target|group> ...]  [--format human|dot]   Show dependency graph
+  govctl help                                            Show this help
+
+Run Options:
+  --dry-run              Print execution plan without running
+  --continue-on-error    Don't abort on first target failure
+  --json                 Suppress human log; emit JSONL to stdout
+  --log-dir <path>       Artifact directory (default: artifacts/govctl/)
+
+Examples:
+  govctl backend.test.unit
+  govctl test.all --dry-run
+  govctl test.all --continue-on-error
+  govctl list --format json
+  govctl check test.all --format json
+  govctl graph test.all --format dot | dot -Tpng -o graph.png
+
+HELP
+}
+
+
+# ── Entry point ───────────────────────────────────────────────────────────────
+
+if [[ $# -eq 0 ]]; then
+    cmd_help
+    exit 0
+fi
+
+case "$1" in
+    list)   shift; cmd_list  "$@" ;;
+    check)  shift; cmd_check "$@" ;;
+    graph)  shift; cmd_graph "$@" ;;
+    help|--help|-h) cmd_help ;;
+    *)      cmd_run "$@" ;;
+esac

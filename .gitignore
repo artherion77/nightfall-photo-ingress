@@ -32,6 +32,7 @@ metrics/state/poller.lock
 reports/latest.md
 artifacts/metrics/latest/
 artifacts/metrics/history/*
+artifacts/govctl/
 !artifacts/metrics/history/module1-bootstrap/
 !artifacts/metrics/history/module1-bootstrap/manifest.json
 !artifacts/metrics/history/module1-bootstrap/metrics.json
