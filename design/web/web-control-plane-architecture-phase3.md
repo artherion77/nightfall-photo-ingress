@@ -3,7 +3,7 @@
 Status: Proposed
 Date: 2026-04-03
 Owner: Systems Engineering
-Depends on: planning/planned/web-control-plane-phase1-scope.md,
+Depends on: design/web/roadmaps/web-control-plane-phase1-scope.md,
             design/web/web-control-plane-architecture-phase2.md,
             planning/proposed/web-control-plane-phase2-implementation-roadmap.md
 

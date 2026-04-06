@@ -3,9 +3,9 @@
 Status: Proposed
 Date: 2026-04-03
 Owner: Systems Engineering
-Depends on: planning/planned/web-control-plane-phase1-scope.md,
-            planning/planned/web-control-plane-integration-plan.md,
-            planning/planned/web-control-plane-techstack-decision.md
+Depends on: design/web/roadmaps/web-control-plane-phase1-scope.md,
+            design/web/roadmaps/web-control-plane-integration-plan.md,
+            design/web/roadmaps/web-control-plane-techstack-decision.md
 
 ---
 
@@ -30,7 +30,7 @@ Phase 2 has two tiers:
 |------|------|-----------|
 | Reverse proxy (Nginx or Caddy) | Mandatory | TLS, compression, access logs, rate limiting |
 | TLS termination | Mandatory | Operator credentials must not transit LAN in cleartext |
-| Proxy-level rate limiting | Mandatory | Replaces in-process Phase 1 rate limiting |
+| Proxy-level rate limiting | Mandatory | Required before any LAN exposure |
 | API versioning policy | Mandatory | Required before any breaking API change |
 | Build artifact versioning and rollback | Mandatory | Enables safe re-deployment |
 | Retry/backoff for read-only API client | Mandatory | Reduces transient error noise |

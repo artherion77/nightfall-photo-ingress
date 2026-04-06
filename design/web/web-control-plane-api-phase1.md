@@ -700,7 +700,7 @@ Test coverage includes:
 
 - **Frontend integration:** [webui-architecture-phase1.md](webui-architecture-phase1.md) §7 (API Client Layer)
 - **Database schema:** [design/specs/registry.md](../specs/registry.md)
-- **Implementation roadmap:** [planning/planned/web-control-plane-phase1-implementation-roadmap.md](../../planning/planned/web-control-plane-phase1-implementation-roadmap.md) (Chunk 1 specification)
+- **Implementation roadmap:** [roadmaps/web-control-plane-phase1-implementation-roadmap.md](roadmaps/web-control-plane-phase1-implementation-roadmap.md) (Chunk 1 specification)
 
 ---
 

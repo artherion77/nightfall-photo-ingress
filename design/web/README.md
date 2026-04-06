@@ -16,6 +16,30 @@ layer of the system.
 | [web-control-plane-architecture-phase2.md](web-control-plane-architecture-phase2.md) | Phase 2 | Reverse-proxy integration, SSR migration path, API versioning policy, session management, and feature additions |
 | [web-control-plane-architecture-phase3.md](web-control-plane-architecture-phase3.md) | Phase 3 | Advanced features: multi-account support, photo-wheel infinite scroll upgrade, KPI config API |
 
+## Delivery Roadmaps
+
+The execution and decision-tracking documents are now colocated under
+`design/web/roadmaps/`.
+
+| File | Purpose |
+|---|---|
+| [roadmaps/web-control-plane-phase1-implementation-roadmap.md](roadmaps/web-control-plane-phase1-implementation-roadmap.md) | Phase 1 chunk sequence, status, and acceptance gates |
+| [roadmaps/web-control-plane-integration-plan.md](roadmaps/web-control-plane-integration-plan.md) | End-to-end phased integration plan |
+| [roadmaps/web-control-plane-phase1-scope.md](roadmaps/web-control-plane-phase1-scope.md) | Phase 1 scope decisions and critique dispositions |
+| [roadmaps/web-control-plane-techstack-decision.md](roadmaps/web-control-plane-techstack-decision.md) | Stack rationale and dependency decisions |
+| [roadmaps/web-control-plane-project-structure.md](roadmaps/web-control-plane-project-structure.md) | Intended and rationale-backed project structure |
+
+## Document Taxonomy
+
+The web-control-plane documentation is intentionally split into three classes:
+
+1. **Architecture and design specs (this folder):**
+	- Source-of-truth design behavior and target architecture.
+2. **Delivery roadmaps and implementation sequencing (`design/web/roadmaps/`):**
+	- Chunk sequencing, execution checkpoints, and implementation status tracking.
+3. **Superseded records (`design/superseeded/`):**
+	- Historical context retained for auditability.
+
 ## Scope
 
 This category covers **web control plane and UI design only**. It is separate from the

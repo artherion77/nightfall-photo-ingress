@@ -38,7 +38,7 @@
 ## Related Documents
 
 - [Web Control Plane Architecture Phase 1](web/webui-architecture-phase1.md)
-- [Web Control Plane Integration Plan](../planning/planned/web-control-plane-integration-plan.md)
+- [Web Control Plane Integration Plan](web/roadmaps/web-control-plane-integration-plan.md)
 
 ---
 
