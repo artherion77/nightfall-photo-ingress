@@ -1,9 +1,16 @@
 # Frontend Cognitive Complexity: System Integration
 
-Status: Design
-Date: 2026-04-05
+Status: Implemented
+Date: 2026-04-06
 Owner: Systems Engineering
 Purpose: Define collector integration with metrics pipeline, dashboard, and devctl runtime
+
+Implementation status:
+
+- Collector implementation is live in `metrics/runner/frontend_collector.py`
+- Dashboard payload integration is live in `metrics/runner/dashboard_generator.py`
+- Latest artifacts show `source: "sonar_cognitive"` and dashboard provenance fields populated
+- Current runtime caveat: `.svelte` files still parse through JS grammar fallback, so Svelte-heavy runs can remain `partial`
 
 ## 1. Collector Integration Architecture
 
@@ -44,7 +51,7 @@ Frontend cognitive complexity collector is invoked as part of `collect-frontend`
 metricsctl collect-frontend --run-id <id> 2>&1 | tee logs/frontend-<id>.log
 ```
 
-**Expected entry point:** `metrics/runner/module3_frontend.py` (new module)
+**Implemented entry point:** `metrics/runner/frontend_collector.py`
 
 **Invocation pattern:**
 
@@ -57,23 +64,11 @@ python -m metrics.runner collect_frontend \
 
 ### 2.2 Configuration
 
-Frontend cognitive complexity collector reads from `metrics/state/extensions.json`:
+Current implementation does not gate frontend cognitive complexity through `metrics/state/extensions.json`.
 
-```json
-{
-  "collectors": {
-    "frontend": {
-      "enabled": true,
-      "cognitive_complexity": {
-        "enabled": true,
-        "check_enabled": true
-      }
-    }
-  }
-}
-```
-
-When `enabled: false`, collector returns `not_available` without running.
+- The collector runs whenever `collect-frontend` is invoked and eligible frontend files are present
+- `not_available` is currently used for "no eligible files found"
+- Config-driven enable/disable behavior remains a future hardening option, not a verified implementation detail
 
 ### 2.3 Exit semantics
 
@@ -98,10 +93,10 @@ Core payload structure:
           "version": "1.0",
           "parser_info": {
             "library": "tree-sitter",
-            "library_version": "0.20.8",
-            "grammar_js": "0.21.0",
-            "grammar_ts": "0.20.2",
-            "grammar_svelte": "0.13.10"
+            "library_version": "0.25.2",
+            "grammar_js": "0.25.0",
+            "grammar_ts": "0.23.2",
+            "grammar_svelte": "0.25.0"
           },
           "mean": 7.4,
           "file_count": 42,
@@ -287,36 +282,28 @@ artifacts/
 
 ### 7.1 Unit tests
 
-New test module: `tests/unit/test_metrics_module3_frontend.py`
+Implemented regression coverage is centered on:
+
+- `tests/unit/test_metrics_module3_frontend.py`
+- `tests/unit/test_cognitive_complexity.py`
 
 **Coverage:**
-- Roundtrip parsing and scoring of fixture files (JS, TS, Svelte).
-- Determinism: same fixture, run twice, assert identical output.
-- Parse errors: malformed files produce `partial` status with failures.
-- Empty/filtered files: produce correct aggregates.
-- Snapshot test: lock scores for representative samples.
+- Function-level scoring rules using inline JavaScript snippets
+- Project/file aggregation behavior
+- Parse errors and graceful degradation
+- Parser metadata presence
+- Per-file output contract used by dashboard breakdowns
+- Frontend collection artifact writing
 
-**Integration tests:**
-- Invocation via `metricsctl collect-frontend` inside container.
-- Payload schema validation against `modules.json` structure.
-- Dashboard generator consumes payload without error.
+**Integration expectations:**
+- Dashboard generator consumes collector output without error
+- Live dashboard payloads expose provenance through `complexityCard.frontend.*`
 
-### 7.2 Fixture coverage
+### 7.2 Test coverage notes
 
-```
-tests/unit/fixtures/frontend_cognitive/
-  ├── simple_functions.js
-  ├── nested_conditions.ts
-  ├── svelte_reactivity.svelte
-  ├── parse_error.svelte
-  └── deep_nesting.ts
-```
-
-### 7.3 Snapshot test maintenance
-
-- Snapshots locked in git under `tests/unit/snapshots/frontend_cognitive.snap`.
-- Algorithm changes require snapshot review and explicit approval.
-- Parser version upgrades may change snapshots (flagged in CI).
+- No fixture-tree plus snapshot harness is currently checked in for this collector
+- Deterministic expectations are covered by rule-based unit tests rather than snapshot files
+- Dedicated Svelte success fixtures remain a gap while `.svelte` parsing is still incomplete
 
 ## 8. Regression Assurance
 
@@ -329,8 +316,8 @@ tests/unit/fixtures/frontend_cognitive/
 ### 8.2 New module tests
 
 Chunk 3B implementation adds `test_metrics_module3_frontend.py` which passes if:
-- Scores match algorithm pseudocode for all fixtures.
-- Determinism invariant holds (identical inputs → identical outputs).
+- Scores match the implemented rule set for representative inline samples.
+- Parser metadata and per-file outputs are present.
 - Parser version is included in payload.
 - Failure handling is graceful.
 
@@ -342,7 +329,7 @@ Frontend cognitive complexity collector requires:
 
 - Python 3.9+
 - tree-sitter library (pinned version in `requirements.txt`)
-- Bundled grammar packages for JS/TS/Svelte
+- Bundled grammar packages for JS/TS; `.svelte` currently uses JS grammar fallback
 
 Container startup includes:
 ```bash
@@ -369,10 +356,10 @@ Collector reads from container's `/home/runner/workspace/webui`.
 
 ### 10.1 Phased availability
 
-- **Phase 1 (now):** Design complete; Chunk 3B implementation starts.
-- **Phase 2:** Collector implemented and tested; included in `collect-frontend` sequence.
-- **Phase 3:** Enabled by default in `metrics/state/extensions.json` for all new runs.
-- **Phase 4 (optional):** Historical backfill of scores for prior runs using frozen parser.
+- **Phase 1:** Design completed.
+- **Phase 2:** Collector implemented and included in `collect-frontend`.
+- **Phase 3 (current):** Dashboard payload and UI provenance wiring are live.
+- **Phase 4 (next hardening):** Improve `.svelte` parsing coverage and any optional config gating.
 
 ### 10.2 Gradual dashboard adoption
 
@@ -387,9 +374,9 @@ Collector reads from container's `/home/runner/workspace/webui`.
 Frontend cognitive complexity collector implementation is correct when:
 
 1. **Schema:** Payload matches contract; `source: "sonar_cognitive"`; parser_info included.
-2. **Determinism:** Same fixture inputs produce identical scores across runs.
-3. **Snapshot tests:** Algorithm changes produce test failures; require explicit approval.
-4. **Svelte support:** At least one `.svelte` fixture parses and scores correctly.
+2. **Determinism:** Fixed inputs produce stable scores across rule-based tests.
+3. **Tests:** Algorithm changes produce unit-test failures in the current suite.
+4. **Svelte support:** This remains only partially satisfied in live runs; `.svelte` parse coverage is an active hardening gap.
 5. **Failure handling:** Partial failures produce `status: partial`; full failures produce `error`.
 6. **Dashboard:** Frontend complexity appears with provenance label; N/A states include reason.
 7. **Regressions:** Existing module2/module5/module8 tests pass; no breaking changes to pipeline.

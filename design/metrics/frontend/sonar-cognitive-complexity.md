@@ -1,9 +1,15 @@
 # Sonar Cognitive Complexity: Algorithm and Methodology
 
-Status: Design
-Date: 2026-04-05
+Status: Implemented
+Date: 2026-04-06
 Owner: Systems Engineering
 Purpose: Define deterministic, AST-based cognitive complexity scoring for frontend code
+
+Implementation status:
+
+- Implemented in `metrics/runner/frontend_collector.py`
+- Active in live metrics artifacts with `source: "sonar_cognitive"`
+- Current runtime caveat: `.svelte` files are still parsed with JS grammar fallback, so Svelte-heavy runs can report `status: "partial"` with parse failures
 
 ## 1. Methodology Reference
 
@@ -36,7 +42,7 @@ Core principles:
 
 ### 2.1 In scope
 
-**Languages:** JavaScript, TypeScript, Svelte.
+**Languages:** JavaScript, TypeScript, Svelte script logic.
 
 **Collection root:** `webui/` directory.
 
@@ -148,9 +154,10 @@ Scores are computed per function-like scope:
 
 ### 3.4 Svelte-specific handling
 
-- Parse `.svelte` files into AST segments covering script content.
-- Complexity is computed from executable script logic only.
-- Template markup alone contributes 0 complexity unless mapped to generated control-flow in the AST.
+- Target model: parse `.svelte` files into script-bearing AST segments and score executable script logic only.
+- Current implementation: `.svelte` files are handed to the JavaScript grammar as a fallback, not a dedicated Svelte parser.
+- Consequence: many `.svelte` files in the current frontend parse as errors and drive the collector to `partial` status.
+- Template markup alone is still intended to contribute 0 complexity unless mapped to executable control-flow in a future parser strategy.
 
 ### 3.5 Pseudocode
 
@@ -277,6 +284,10 @@ function traverse(node, nesting_level):
 - Reduces dependency churn compared to Node subprocess model.
 - Consolidates scoring logic in one language/runtime with backend collectors.
 
+**Current implementation note:**
+- Implemented with `tree-sitter`, `tree-sitter-javascript`, and `tree-sitter-typescript`.
+- `grammar_svelte` currently mirrors the JS grammar version in payload metadata because no dedicated Svelte grammar is wired into the collector yet.
+
 ## 5. Parser Version Reporting
 
 ### 5.1 Version contract
@@ -292,10 +303,10 @@ Every collection run must include explicit parser version metadata:
           "source": "sonar_cognitive",
           "parser_info": {
             "library": "tree-sitter",
-            "library_version": "0.20.8",
-            "grammar_js": "0.21.0",
-            "grammar_ts": "0.20.2",
-            "grammar_svelte": "0.13.10"
+            "library_version": "0.25.2",
+            "grammar_js": "0.25.0",
+            "grammar_ts": "0.23.2",
+            "grammar_svelte": "0.25.0"
           }
         }
       }
@@ -313,37 +324,28 @@ When parser versions change:
 - Breaking changes in a grammar version should trigger a baseline reset (clear historical comparisons).
 - Minor patches (e.g., 0.20.7 → 0.20.8) are treated as compatible; run-to-run consistency is expected.
 
-## 6. Test Fixture Strategy
+## 6. Test Strategy
 
 ### 6.1 Regression locking
 
-Test suite includes fixtures locked to known outputs via snapshot testing:
+Current regression coverage is rule-based rather than snapshot-based:
 
-- Representative JS/TS/Svelte code samples covering all scoring rules.
-- Each fixture has a locked baseline score that fails if algorithm changes.
-- Fixtures cover edge cases: empty functions, deeply nested control, boolean chains, recursion, Svelte templates.
+- `tests/unit/test_cognitive_complexity.py` exercises function-level scoring with inline JS snippets
+- `tests/unit/test_metrics_module3_frontend.py` covers file/project aggregation, parse-error handling, parser metadata, per-file output, and integration artifact writes
+- Coverage includes flat functions, nested conditionals, loops, switch statements, catch clauses, boolean chains, multiple functions per file, and malformed input
 
-### 6.2 Fixture organization
+### 6.2 Test organization
 
 ```
-tests/unit/fixtures/cognitive_complexity/
-  ├── flat_function.js
-  ├── nested_conditionals.ts
-  ├── loop_with_catches.js
-  ├── boolean_chains.ts
-  ├── svelte_script_logic.svelte
-  ├── deeply_nested.js
-  └── recursion_example.ts
-
-tests/unit/snapshots/
-  └── cognitive_complexity_scores.snap
+tests/unit/test_cognitive_complexity.py
+tests/unit/test_metrics_module3_frontend.py
 ```
 
 ### 6.3 Determinism validation
 
-- Build-time: Verify all fixture inputs hash reproducibly.
-- Test-time: Run fixtures through scorer twice; assert identical output.
-- CI: Lock snapshot hashes to prevent score drift without review.
+- Determinism remains a design requirement.
+- The current suite validates fixed scoring expectations for known inputs, but no separate snapshot or fixture-hash harness is checked in yet.
+- Adding dedicated deterministic fixture/snapshot coverage remains a future hardening option, not a current implementation fact.
 
 ## 7. Performance Expectations
 
@@ -361,9 +363,9 @@ tests/unit/snapshots/
 
 ### 7.3 Monitoring
 
-- Collector emits wall-clock duration in metadata.
-- Dashboard includes parser/collection time for transparency.
-- If collection exceeds 30 seconds, emit warning to logs (possible timeout risk).
+- Collector payload includes `collection_time_ms`, but the current implementation still writes a placeholder `0` value.
+- Dashboard currently exposes parser version metadata for transparency; collection time is not yet surfaced.
+- Runtime warning thresholds remain a design target rather than a verified implemented behavior.
 
 ## 8. Determinism Contract Summary
 
