@@ -14,38 +14,13 @@ import subprocess
 import sys
 from pathlib import Path
 
-_VENV_REEXEC_GUARD = "NIGHTFALL_METRICSCTL_VENV_REEXEC"
-
-
-def _maybe_reexec_venv() -> None:
-    """Re-exec under repo .venv Python when available for dependency consistency."""
-    script_path = Path(__file__).resolve()
-    repo_root = script_path.parent
-    if os.name == "nt":
-        venv_python = repo_root / ".venv" / "Scripts" / "python.exe"
-    else:
-        venv_python = repo_root / ".venv" / "bin" / "python"
-
-    if not venv_python.exists():
-        return
-
-    current = Path(sys.executable).resolve()
-    target = venv_python.resolve()
-    if current == target:
-        return
-    if os.environ.get(_VENV_REEXEC_GUARD) == "1":
-        return
-
-    env = os.environ.copy()
-    env[_VENV_REEXEC_GUARD] = "1"
-    os.execve(str(target), [str(target), str(script_path), *sys.argv[1:]], env)
-
-
-_maybe_reexec_venv()
-
 DEV_LIB = Path(__file__).resolve().parent / "dev" / "lib"
 if str(DEV_LIB) not in sys.path:
     sys.path.insert(0, str(DEV_LIB))
+
+from venv_bootstrap import ensure_venv
+
+ensure_venv(Path(__file__))
 
 from repo_lock import RepoLock
 
