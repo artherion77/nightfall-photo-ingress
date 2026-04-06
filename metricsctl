@@ -8,15 +8,12 @@ all command behavior centralized for operators and automation.
 """
 
 import argparse
-import fcntl
 import json
 import os
 import subprocess
 import sys
-from contextlib import contextmanager
 from pathlib import Path
 
-REPO_LOCK_FILE = "/tmp/nightfall-repo.lock"
 _VENV_REEXEC_GUARD = "NIGHTFALL_METRICSCTL_VENV_REEXEC"
 
 
@@ -46,6 +43,12 @@ def _maybe_reexec_venv() -> None:
 
 _maybe_reexec_venv()
 
+DEV_LIB = Path(__file__).resolve().parent / "dev" / "lib"
+if str(DEV_LIB) not in sys.path:
+    sys.path.insert(0, str(DEV_LIB))
+
+from repo_lock import RepoLock
+
 from metrics.runner.aggregator import run_aggregation
 from metrics.runner.backend_collector import run_backend_collection
 from metrics.runner.dashboard_generator import run_dashboard_generation
@@ -68,21 +71,6 @@ from metrics.runner.poller_runner import (
     uninstall_poller,
 )
 from metrics.runner.schema_contract import manifest_schema, metrics_schema, validate_manifest_payload, validate_metrics_payload
-
-
-@contextmanager
-def _repo_lock() -> object:
-    """Hold the global repo lock used by devctl/metrics integrations.
-
-    This prevents concurrent stateful operations from separate entrypoints.
-    """
-    Path(REPO_LOCK_FILE).parent.mkdir(parents=True, exist_ok=True)
-    with open(REPO_LOCK_FILE, "w", encoding="utf-8") as handle:
-        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
-        try:
-            yield handle
-        finally:
-            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
 def _devctl_dashboard_drift_preflight(repo_root: Path) -> None:
@@ -181,7 +169,7 @@ def cmd_aggregate(args: argparse.Namespace) -> int:
 def cmd_generate_dashboard(args: argparse.Namespace) -> int:
     """Generate dashboard/report artifacts after dependency drift preflight."""
     root = _repo_root()
-    with _repo_lock():
+    with RepoLock():
         _devctl_dashboard_drift_preflight(root)
         run_dashboard_generation(
             repo_root=root,
