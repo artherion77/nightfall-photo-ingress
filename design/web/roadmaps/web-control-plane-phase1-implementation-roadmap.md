@@ -35,16 +35,14 @@ Phase 2 mandatory items.
 | SvelteKit SPA — all 5 pages rendered with live data | Dashboard, Staging, Audit, Blocklist, Settings |
 | Triage write path (accept / reject / defer) | With idempotency keys and audit-first writes |
 | Blocklist CRUD | Add / edit / toggle / delete via UI |
-| Security hardening (remaining) | CORS, auth-failure audit, header policy, input validation review |
+| Security hardening (completed) | CORS, auth-failure audit, header policy, input validation review |
 | RapiDoc API docs at `/api/docs` | Served offline from static asset |
 
 ### 1.1 Current reality snapshot (2026-04-06)
 
-- Chunks 0 through 5 are implemented in code and covered by integration suites.
-- Chunk 6 is not fully complete yet.
-- The current hardening gap is primarily policy and enforcement completion (auth-failure
-  auditing, explicit CORS posture, response-header posture, and documented input-validation
-  review) rather than missing API/UI feature slices.
+- Chunks 0 through 6 are implemented in code and covered by integration suites.
+- Security hardening is complete with auth-failure auditing, explicit CORS posture,
+  explicit response-header posture, and input-validation boundary review evidence.
 - For LAN exposure, this roadmap defers to the Phase 2 architecture gate in
   `design/web/web-control-plane-architecture-phase2.md`.
 
@@ -903,6 +901,22 @@ The following are deferred to Phase 2 or later. Do not implement them during Pha
 | CDN or asset caching | Optional | — |
 | Phase 5: Sidecar and metadata endpoint | Optional | Integration plan §8 |
 
+### 10.1 Verification outcome (2026-04-06)
+
+Result: intent fulfilled; no new drift detected for out-of-scope boundaries.
+
+Evidence captured from repository inspection:
+
+- API router surface remains Phase 1-only (`health`, `staging`, `items/{item_id}`,
+  `audit-log`, `config/effective`, `triage`, `blocklist`) with no Phase 2-only
+  endpoints such as `PATCH /api/v1/config/thresholds` or any `/api/v2/*` routes.
+- No API/UI implementation signals for Phase 2 network posture controls
+  (reverse-proxy/TLS/LAN exposure, proxy-level rate limiting, OIDC/OAuth migration,
+  API-client retry/backoff policy rollout) were found in active Phase 1 API/UI code
+  paths (`api/`, `webui/src/`, `tests/integration/`).
+- Existing Phase 2 references remain documentation-only in architecture/roadmap docs,
+  preserving the intended deferred boundary.
+
 ---
 
 ## 11. Phase 1 Deliverables Summary
@@ -945,6 +959,24 @@ At the end of Chunk 6, the following artefacts must exist and be passing tests:
 - This roadmap document (updated with chunk completion status as work progresses)
 - Targeted OWASP review findings documented in `audit/follow-up/` if any gaps remained unresolved
 
+### 11.1 Verification outcome (2026-04-06)
+
+Result: intent fulfilled with minor corrections only.
+
+Evidence captured from repository inspection:
+
+- Deliverable trees exist as documented: `api/routers/`, `api/schemas/`,
+  `webui/src/routes/` (all five pages + root routes), and
+  `webui/static/rapiddoc/rapidoc-min.js`.
+- Configuration and runtime assets exist as documented:
+  `src/nightfall_photo_ingress/config.py`, `conf/photo-ingress.conf.example`, and
+  `systemd/nightfall-photo-ingress-api.service`.
+- Integration test inventory in this section matches current filenames under
+  `tests/integration/api/` and `tests/integration/ui/`.
+- Minor correction applied in this roadmap during verification:
+  section 1.1 stale wording was updated so completion status is internally consistent
+  with the Chunk 6 completion record.
+
 ---
 
 ## 12. Drift log (2026-04-06)
@@ -964,3 +996,8 @@ The following drift corrections were applied in this update:
 - Completed Chunk 6 Step 6 full regression stability pass against
   `tests/integration/api` and `tests/integration/ui` with all tests green
   (`60 passed`).
+- Reviewed Section 10 out-of-scope boundaries against current API/UI implementation
+  surface; no new drift detected.
+- Reviewed Section 11 deliverables summary against current repository tree; summary
+  remains valid.
+- Updated section 1.1 wording to remove stale pre-completion Chunk 6 snapshot text.
