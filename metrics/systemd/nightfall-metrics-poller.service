@@ -6,7 +6,7 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 WorkingDirectory=/home/chris/dev/nightfall-photo-ingress
-ExecStart=/home/chris/dev/nightfall-photo-ingress/metricsctl run-now
+ExecStart=/home/chris/dev/nightfall-photo-ingress/dev/bin/metricsctl run-now
 
 [Install]
 WantedBy=multi-user.target

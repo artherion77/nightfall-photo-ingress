@@ -234,22 +234,22 @@
       "echo '[mcp.smoke.fail] intentional failure' && false"
     ],
     "metrics.status": [
-      "./metricsctl status"
+      "./dev/bin/metricsctl status"
     ],
     "metrics.run-now": [
-      "./metricsctl run-now"
+      "./dev/bin/metricsctl run-now"
     ],
     "metrics.publish": [
-      "./metricsctl publish"
+      "./dev/bin/metricsctl publish"
     ],
     "metrics.build-dashboard": [
       "./dev/bin/build-metrics-dashboard"
     ],
     "metrics.install": [
-      "./metricsctl install"
+      "./dev/bin/metricsctl install"
     ],
     "metrics.stop": [
-      "./metricsctl stop"
+      "./dev/bin/metricsctl stop"
     ],
     "web.e2e": [
       "./dev/bin/stagingctl smoke"

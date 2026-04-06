@@ -112,35 +112,35 @@ targets:
 
   metrics.collect.backend:
     description: "Collect backend metrics (Module 2)"
-    command: "./metricsctl collect-backend"
+    command: "./dev/bin/metricsctl collect-backend"
     requires: []
     preflight: []
     lock: true
 
   metrics.collect.frontend:
     description: "Collect frontend metrics (Module 3)"
-    command: "./metricsctl collect-frontend"
+    command: "./dev/bin/metricsctl collect-frontend"
     requires: []
     preflight: []
     lock: true
 
   metrics.aggregate:
     description: "Aggregate collected metrics (Module 4)"
-    command: "./metricsctl aggregate"
+    command: "./dev/bin/metricsctl aggregate"
     requires: [metrics.collect.backend, metrics.collect.frontend]
     preflight: []
     lock: true
 
   metrics.generate.dashboard:
     description: "Generate dashboard from aggregated data (Module 5)"
-    command: "./metricsctl generate-dashboard"
+    command: "./dev/bin/metricsctl generate-dashboard"
     requires: [metrics.aggregate, metrics.build.dashboard]
     preflight: []
     lock: true
 
   metrics.publish:
     description: "Publish metrics surface (Module 7)"
-    command: "./metricsctl publish"
+    command: "./dev/bin/metricsctl publish"
     requires: [metrics.generate.dashboard]
     preflight: []
     lock: true

@@ -262,13 +262,13 @@ Authoritative trigger mode:
 - systemd timer plus oneshot service
 
 Runtime control surface:
-- `metricsctl start`
-- `metricsctl stop`
-- `metricsctl status`
-- `metricsctl run-now`
-- `metricsctl install --frequency-minutes <n>`
-- `metricsctl uninstall`
-- `metricsctl publish`
+- `./dev/bin/metricsctl start`
+- `./dev/bin/metricsctl stop`
+- `./dev/bin/metricsctl status`
+- `./dev/bin/metricsctl run-now`
+- `./dev/bin/metricsctl install --frequency-minutes <n>`
+- `./dev/bin/metricsctl uninstall`
+- `./dev/bin/metricsctl publish`
 
 MCP integration surface:
 - MCP may expose read-first operations such as:
@@ -357,7 +357,7 @@ Recommended structure:
 Timer behavior:
 
 - default cadence: every 60 minutes
-- cadence is configurable through `metricsctl install --frequency-minutes <n>` and `metricsctl reconfigure --frequency-minutes <n>`
+- cadence is configurable through `./dev/bin/metricsctl install --frequency-minutes <n>` and `./dev/bin/metricsctl reconfigure --frequency-minutes <n>`
 - persistent timer enabled so missed runs after reboot are resumed
 - service invokes the host-side runner script with lock enforcement
 
@@ -551,9 +551,9 @@ Implementation is organized as deterministic steps that can later be executed as
 
 - oneshot service definition
 - timer definition
-- `metricsctl install` writes or updates unit files
-- `metricsctl uninstall` removes unit files and disables timer/service
-- `metricsctl reconfigure` updates timer frequency without changing source artifacts
+- `./dev/bin/metricsctl install` writes or updates unit files
+- `./dev/bin/metricsctl uninstall` removes unit files and disables timer/service
+- `./dev/bin/metricsctl reconfigure` updates timer frequency without changing source artifacts
 
 ### Step 11: Add operational guardrails
 
@@ -606,7 +606,7 @@ Implementation is organized as deterministic steps that can later be executed as
 4. Step 4 complete
 	 - Derived acceptance criteria:
 		 - MCP delegates metrics operations through mapped `metricsctl` tasks.
-		 - MCP status path for metrics includes manifest/summary/dashboard-relative paths via `metricsctl status` output.
+		 - MCP status path for metrics includes manifest/summary/dashboard-relative paths via `./dev/bin/metricsctl status` output.
 	 - Evidence:
 		 - `.mcp/model.json` mappings for `metrics.status`, `metrics.run-now`, `metrics.publish`, `metrics.install`, `metrics.stop`
 	 - Regression tests:

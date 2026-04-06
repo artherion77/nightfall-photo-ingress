@@ -121,7 +121,7 @@ Make backend cyclomatic and maintainability consistently available in dev contai
 
 ### Testable acceptance criteria
 
-- `metricsctl collect-backend --run-id <id>` emits:
+- `./dev/bin/metricsctl collect-backend --run-id <id>` emits:
   - `modules.backend.metrics.complexity.status == "available"`
   - non-null `cyclomatic.mean` and `maintainability_index.mean`
   - `collectors.backend.tool_versions.radon != "not_available"`
@@ -331,13 +331,13 @@ Reduce `not_available` warnings for optional collectors to improve signal qualit
 
 ### Work items
 
-- Add collector readiness preflight in `metricsctl extensions-status` output.
+- Add collector readiness preflight in `./dev/bin/metricsctl extensions-status` output.
 - Add explicit remediation hints for each optional collector missing dependency.
 - Gate optional collector errors to avoid whole-run degradation.
 
 ### Testable acceptance criteria
 
-- `metricsctl extensions-status` reports each optional collector as one of:
+- `./dev/bin/metricsctl extensions-status` reports each optional collector as one of:
   - ready
   - missing_dependency
   - disabled_by_config

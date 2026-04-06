@@ -584,4 +584,4 @@ After all chunks are complete, the operator must perform:
 9. `devctl reset` (should restore from `current`)
 10. `devctl reset --base` (should restore from `base`)
 11. Revert the `package.json` edit; commit the regenerated lockfile.
-12. Full `metricsctl run-now` to verify automated flows are unaffected.
+12. Full `./dev/bin/metricsctl run-now` to verify automated flows are unaffected.

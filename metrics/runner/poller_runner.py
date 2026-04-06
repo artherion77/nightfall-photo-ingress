@@ -260,7 +260,7 @@ def _service_unit_content(repo_root: Path) -> str:
             "[Service]",
             "Type=oneshot",
             f"WorkingDirectory={repo_root}",
-            f"ExecStart={repo_root}/metricsctl run-now",
+            f"ExecStart={repo_root}/dev/bin/metricsctl run-now",
             "",
             "[Install]",
             "WantedBy=multi-user.target",

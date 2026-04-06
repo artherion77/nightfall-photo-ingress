@@ -87,7 +87,7 @@ Module 5 dashboard payload baseline contract (`metrics/output/dashboard/latest/_
 
 Module 6 adds poller and orchestration responsibilities:
 
-- lock-protected single-run execution loop via `metricsctl run-now`
+- lock-protected single-run execution loop via `./dev/bin/metricsctl run-now`
 - unchanged commit fast-exit using `metrics/state/last_processed_commit`
 - explicit post-collection validation for critical complexity collectors
   - backend complexity `status=not_available` is treated as run failure

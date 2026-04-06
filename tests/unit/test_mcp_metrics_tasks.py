@@ -37,18 +37,19 @@ def test_model_exposes_metrics_mcp_task_mappings() -> None:
     model = json.loads((workspace_root / ".mcp" / "model.json").read_text(encoding="utf-8"))
 
     mappings = model["mappings"]
-    assert mappings["metrics.status"] == ["./metricsctl status"]
-    assert mappings["metrics.run-now"] == ["./metricsctl run-now"]
-    assert mappings["metrics.publish"] == ["./metricsctl publish"]
-    assert mappings["metrics.install"] == ["./metricsctl install"]
-    assert mappings["metrics.stop"] == ["./metricsctl stop"]
+    assert mappings["metrics.status"] == ["./dev/bin/metricsctl status"]
+    assert mappings["metrics.run-now"] == ["./dev/bin/metricsctl run-now"]
+    assert mappings["metrics.publish"] == ["./dev/bin/metricsctl publish"]
+    assert mappings["metrics.install"] == ["./dev/bin/metricsctl install"]
+    assert mappings["metrics.stop"] == ["./dev/bin/metricsctl stop"]
 
 
 def test_metrics_mcp_tasks_delegate_to_metricsctl_in_isolated_workspace(tmp_path: Path) -> None:
     workspace_root = tmp_path
     (workspace_root / ".mcp").mkdir(parents=True, exist_ok=True)
 
-    metricsctl = workspace_root / "metricsctl"
+    metricsctl = workspace_root / "dev" / "bin" / "metricsctl"
+    metricsctl.parent.mkdir(parents=True, exist_ok=True)
     metricsctl.write_text(
         "#!/usr/bin/env bash\n"
         "set -euo pipefail\n"
@@ -67,11 +68,11 @@ def test_metrics_mcp_tasks_delegate_to_metricsctl_in_isolated_workspace(tmp_path
 
     model = {
         "mappings": {
-            "metrics.status": ["./metricsctl status"],
-            "metrics.run-now": ["./metricsctl run-now"],
-            "metrics.publish": ["./metricsctl publish"],
-            "metrics.install": ["./metricsctl install"],
-            "metrics.stop": ["./metricsctl stop"],
+            "metrics.status": ["./dev/bin/metricsctl status"],
+            "metrics.run-now": ["./dev/bin/metricsctl run-now"],
+            "metrics.publish": ["./dev/bin/metricsctl publish"],
+            "metrics.install": ["./dev/bin/metricsctl install"],
+            "metrics.stop": ["./dev/bin/metricsctl stop"],
         }
     }
     (workspace_root / ".mcp" / "model.json").write_text(json.dumps(model), encoding="utf-8")

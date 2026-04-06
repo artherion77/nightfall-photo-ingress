@@ -455,7 +455,7 @@ Add `update` and `check` to `devctl.commands` array.
 
 ### 10.3 Poller Runtime
 
-**No changes required.** The poller (`metricsctl run-now`) calls
+**No changes required.** The poller (`./dev/bin/metricsctl run-now`) calls
 `run_backend_collection` (host-side pytest), `run_frontend_collection`
 (host-side static analysis), then `run_dashboard_generation` which calls
 `devctl ensure-stack-ready dashboard`. The update flow is operator-initiated
@@ -478,8 +478,8 @@ Tests that reference devctl paths or snapshot names will require updates:
 | Flow | Uses Container? | Uses devctl? | Entry Point | Affected by Redesign? |
 |------|----------------|-------------|-------------|----------------------|
 | webui dev server | Yes | `run-webui` → `ensure-stack-ready webui` | `devctl run-webui` | No — ensure-stack-ready unchanged |
-| Dashboard generation | Yes (preflight) | `ensure-stack-ready dashboard` | `metricsctl generate-dashboard` | No — ensure-stack-ready unchanged |
-| Frontend collection | No | No | `metricsctl collect-frontend` | No |
+| Dashboard generation | Yes (preflight) | `ensure-stack-ready dashboard` | `./dev/bin/metricsctl generate-dashboard` | No — ensure-stack-ready unchanged |
+| Frontend collection | No | No | `./dev/bin/metricsctl collect-frontend` | No |
 | Backend pytest | No (host venv) | `setup` + `reset` in MCP mappings | `.venv/bin/python -m pytest` | Minor — reset targets `current` by default |
 | Backend coverage | No | No | `metrics/runner/backend_collector.py` | No |
 | Web unit tests | Yes | `test-web-unit` → `ensure-stack-ready webui` | `devctl test-web-unit` | No |
@@ -487,7 +487,7 @@ Tests that reference devctl paths or snapshot names will require updates:
 | Dashboard typecheck | Yes | `test-metrics-dashboard-typecheck` → `ensure-stack-ready dashboard` | `devctl test-metrics-dashboard-typecheck` | No |
 | Web E2E | Yes | `test-web-e2e` → `ensure-stack-ready webui` | `devctl test-web-e2e` | No |
 | Schema validation | No | No | `metrics/runner/schema_contract.py` | No |
-| Poller runtime | No (except dashboard preflight) | `ensure-stack-ready dashboard` (via metricsctl) | `metricsctl run-now` | No |
+| Poller runtime | No (except dashboard preflight) | `ensure-stack-ready dashboard` (via metricsctl) | `./dev/bin/metricsctl run-now` | No |
 | MCP task execution | Varies | Via task mappings | `mcp_server.py` | Minor — new mappings added |
 | Container lifecycle | Yes | `setup`, `reset`, `destroy` | Direct devctl invocation | Yes — snapshot names + reset semantics |
 | **Node update** | **Yes** | **`update --scope node`** | **New** | **New capability** |

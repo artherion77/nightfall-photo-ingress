@@ -71,7 +71,7 @@ Targets have implicit dependencies that are only encoded in operator knowledge:
 - `build-metrics-dashboard` calls `devctl ensure-stack-ready dashboard`
   internally, but there is no external signal that this has happened or whether
   it needs to happen.
-- `metricsctl generate-dashboard` acquires the global repo lock and calls
+- `./dev/bin/metricsctl generate-dashboard` acquires the global repo lock and calls
   `devctl` internally for drift preflight, but the caller cannot inspect this
   chain.
 - `devctl test-web-e2e` requires `devctl ensure-stack-ready webui` to have run
@@ -381,35 +381,35 @@ targets:
 
   metrics.collect.backend:
     description: "Collect backend metrics (Module 2)"
-    command: "./metricsctl collect-backend"
+    command: "./dev/bin/metricsctl collect-backend"
     requires: []
     preflight: []
     lock: true
 
   metrics.collect.frontend:
     description: "Collect frontend metrics (Module 3)"
-    command: "./metricsctl collect-frontend"
+    command: "./dev/bin/metricsctl collect-frontend"
     requires: []
     preflight: []
     lock: true
 
   metrics.aggregate:
     description: "Aggregate collected metrics (Module 4)"
-    command: "./metricsctl aggregate"
+    command: "./dev/bin/metricsctl aggregate"
     requires: [metrics.collect.backend, metrics.collect.frontend]
     preflight: []
     lock: true
 
   metrics.generate.dashboard:
     description: "Generate dashboard from aggregated data (Module 5)"
-    command: "./metricsctl generate-dashboard"
+    command: "./dev/bin/metricsctl generate-dashboard"
     requires: [metrics.aggregate, metrics.build.dashboard]
     preflight: []
     lock: true
 
   metrics.publish:
     description: "Publish metrics surface (Module 7)"
-    command: "./metricsctl publish"
+    command: "./dev/bin/metricsctl publish"
     requires: [metrics.generate.dashboard]
     preflight: []
     lock: true
@@ -800,7 +800,7 @@ available)?
 Should `govctl` prune old run artifacts from `artifacts/govctl/`?
 
 - **Proposed:** Not initially. The operator can use `find` or adapt the
-  existing `metricsctl retention-prune` pattern later. Adding retention
+  existing `./dev/bin/metricsctl retention-prune` pattern later. Adding retention
   complexity is premature until artifact volume is a real concern.
 
 ---
@@ -825,11 +825,11 @@ script, or command it delegates to.
 | `web.test.e2e` | `devctl test-web-e2e` | `dev/bin/devctl` | Yes | Playwright |
 | `web.build` | `npm run build` via `lxc exec` | webui/package.json | Yes | SvelteKit → adapter-static |
 | `metrics.build.dashboard` | `build-metrics-dashboard` | `dev/bin/build-metrics-dashboard` | Yes | SvelteKit → tar → fingerprint |
-| `metrics.collect.backend` | `metricsctl collect-backend` | metricsctl | Yes | Module 2 |
-| `metrics.collect.frontend` | `metricsctl collect-frontend` | metricsctl | Yes | Module 3 |
-| `metrics.aggregate` | `metricsctl aggregate` | metricsctl | Yes | Module 4 |
-| `metrics.generate.dashboard` | `metricsctl generate-dashboard` | metricsctl | Yes | Module 5 (internal devctl preflight) |
-| `metrics.publish` | `metricsctl publish` | metricsctl | Yes | Module 7 |
+| `metrics.collect.backend` | `./dev/bin/metricsctl collect-backend` | metricsctl | Yes | Module 2 |
+| `metrics.collect.frontend` | `./dev/bin/metricsctl collect-frontend` | metricsctl | Yes | Module 3 |
+| `metrics.aggregate` | `./dev/bin/metricsctl aggregate` | metricsctl | Yes | Module 4 |
+| `metrics.generate.dashboard` | `./dev/bin/metricsctl generate-dashboard` | metricsctl | Yes | Module 5 (internal devctl preflight) |
+| `metrics.publish` | `./dev/bin/metricsctl publish` | metricsctl | Yes | Module 7 |
 | `staging.install` | `stagingctl install` | `dev/bin/stagingctl` | No | Builds wheel + deploys to staging container |
 | `staging.smoke` | `stagingctl smoke` | `dev/bin/stagingctl` | No | JSONL evidence collection |
 | `staging.smoke-live` | `stagingctl smoke-live` | `dev/bin/stagingctl` | No | Authenticated poll + secret scan |

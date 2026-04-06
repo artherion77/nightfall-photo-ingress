@@ -48,7 +48,7 @@ Frontend cognitive complexity collector is invoked as part of `collect-frontend`
 
 ```bash
 # Inside devctl container
-metricsctl collect-frontend --run-id <id> 2>&1 | tee logs/frontend-<id>.log
+./dev/bin/metricsctl collect-frontend --run-id <id> 2>&1 | tee logs/frontend-<id>.log
 ```
 
 **Implemented entry point:** `metrics/runner/frontend_collector.py`

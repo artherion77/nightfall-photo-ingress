@@ -333,7 +333,7 @@ Replace `poller_runner` private fingerprinting functions with calls to `source_f
 |--------|-----------|
 | `_maybe_reexec_venv()` → `venv_bootstrap.py` | metricsctl launches correctly from both system Python and venv Python |
 | `_repo_lock()` → `repo_lock.py` | `cmd_generate_dashboard` still acquires lock; devctl subprocess doesn't deadlock |
-| Fingerprint consolidation | `metricsctl dashboard-build-stamp` produces identical output before/after |
+| Fingerprint consolidation | `./dev/bin/metricsctl dashboard-build-stamp` produces identical output before/after |
 
 ### System-Level
 
