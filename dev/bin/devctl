@@ -80,47 +80,10 @@ release_repo_lock() {
 # Returns the version without a leading "v".
 get_node_version() {
     local raw=""
-    if [[ -f "$PROJECT_ROOT/.nvmrc" ]]; then
-        raw="$(tr -d '[:space:]' < "$PROJECT_ROOT/.nvmrc")"
-    elif [[ -f "$PROJECT_ROOT/.node-version" ]]; then
-        raw="$(tr -d '[:space:]' < "$PROJECT_ROOT/.node-version")"
-    fi
-
-    raw="${raw#v}"
+    raw="$(python3 "$PROJECT_ROOT/dev/lib/package_meta.py" node-version "$PROJECT_ROOT" 2>/dev/null || true)"
     if [[ -n "$raw" ]]; then
         printf "%s" "$raw"
     fi
-}
-
-# Convert a semver range/value into just its major version number.
-# Example: "^5.3.1" -> "5".
-extract_major_from_semver() {
-    local value="$1"
-    value="${value#^}"
-    value="${value#~}"
-    value="${value#>=}"
-    value="${value#>}"
-    value="${value#<=}"
-    value="${value#<}"
-    value="${value%%.*}"
-    value="${value%%-*}"
-    printf "%s" "$value"
-}
-
-# Read a dependency version from the devDependencies section of package.json.
-_json_dependency_version() {
-    local package_file="$1"
-    local dep_name="$2"
-    python3 - <<'PY' "$package_file" "$dep_name"
-import json
-import sys
-from pathlib import Path
-
-pkg = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-dep = sys.argv[2]
-dev_deps = pkg.get("devDependencies", {})
-print(dev_deps.get(dep, ""))
-PY
 }
 
 # Ensure web stacks stay aligned on SvelteKit and Vite major versions.
@@ -132,32 +95,9 @@ assert_web_stack_major_consistency() {
     [[ -f "$web_pkg" ]] || { echo "Missing $web_pkg" >&2; return 1; }
     [[ -f "$dashboard_pkg" ]] || { echo "Missing $dashboard_pkg" >&2; return 1; }
 
-    local web_kit web_vite dash_kit dash_vite
-    web_kit="$(_json_dependency_version "$web_pkg" "@sveltejs/kit")"
-    web_vite="$(_json_dependency_version "$web_pkg" "vite")"
-    dash_kit="$(_json_dependency_version "$dashboard_pkg" "@sveltejs/kit")"
-    dash_vite="$(_json_dependency_version "$dashboard_pkg" "vite")"
-
-    local web_kit_major web_vite_major dash_kit_major dash_vite_major
-    web_kit_major="$(extract_major_from_semver "$web_kit")"
-    web_vite_major="$(extract_major_from_semver "$web_vite")"
-    dash_kit_major="$(extract_major_from_semver "$dash_kit")"
-    dash_vite_major="$(extract_major_from_semver "$dash_vite")"
-
-    [[ -n "$web_kit_major" && -n "$web_vite_major" && -n "$dash_kit_major" && -n "$dash_vite_major" ]] || {
-        echo "Unable to derive SvelteKit/Vite majors from package manifests" >&2
-        return 1
-    }
-
-    [[ "$web_kit_major" == "$dash_kit_major" ]] || {
-        echo "SvelteKit major mismatch: webui=$web_kit_major dashboard=$dash_kit_major" >&2
-        return 1
-    }
-
-    [[ "$web_vite_major" == "$dash_vite_major" ]] || {
-        echo "Vite major mismatch: webui=$web_vite_major dashboard=$dash_vite_major" >&2
-        return 1
-    }
+    python3 "$PROJECT_ROOT/dev/lib/package_meta.py" \
+        check-consistency "$web_pkg" "$dashboard_pkg" \
+        --packages "@sveltejs/kit" "vite"
 }
 
 
