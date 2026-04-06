@@ -1,0 +1,8 @@
+{
+  "name": "dashboard-fixture",
+  "devDependencies": {
+    "@sveltejs/kit": ">=2.1.0",
+    "vite": "5.1.0",
+    "typescript": "5.7.0"
+  }
+}

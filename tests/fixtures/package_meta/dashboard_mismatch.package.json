@@ -1,0 +1,7 @@
+{
+  "name": "dashboard-mismatch-fixture",
+  "devDependencies": {
+    "@sveltejs/kit": "^3.0.0",
+    "vite": "4.9.1"
+  }
+}
