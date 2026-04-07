@@ -1,6 +1,6 @@
 # Web Control Plane — Phase 1.5 Implementation Roadmap
 
-Status: In Progress — Chunks P1.5-0 and P1.5-1 complete; P1.5-2 not started
+Status: In Progress — Chunks P1.5-0 through P1.5-2 complete; P1.5-3 not started
 Date: 2026-04-07
 Owner: Systems Engineering
 Depends on: Phase 1 complete (all Chunks 0-6 implemented and validated)
@@ -223,7 +223,7 @@ signed off in architecture documentation.
 
 ## 5. Chunk P1.5-2 — Thumbnail Backend Implementation
 
-Status: Not Started
+Status: Implemented (2026-04-07)
 
 ### Purpose
 
@@ -280,19 +280,19 @@ tests/integration/api/test_thumbnails.py
 
 ### Acceptance Criteria
 
-- [ ] `GET /api/v1/thumbnails/{sha256}` returns 200 with `image/webp` for a pending
+- [x] `GET /api/v1/thumbnails/{sha256}` returns 200 with `image/webp` for a pending
       JPEG, PNG, or WebP source.
-- [ ] Repeated requests are served from disk cache without re-generation.
-- [ ] 404 for non-existent SHA-256, non-pending status, or non-decodable source.
-- [ ] Zero-byte marker prevents repeated decode attempts for non-image files.
-- [ ] Thumbnails are written atomically (temp file + rename).
-- [ ] EXIF orientation is applied; all metadata is stripped.
-- [ ] `Cache-Control: private, max-age=86400, immutable` and `ETag` headers are set.
-- [ ] Authentication required (same `verify_api_token` as other endpoints).
-- [ ] Accept/reject transitions trigger best-effort cache-entry removal.
-- [ ] `metricsctl thumbnail-gc` removes orphaned cache entries.
-- [ ] All new `test_thumbnails.py` tests pass.
-- [ ] All existing Phase 1 integration tests pass (zero regressions).
+- [x] Repeated requests are served from disk cache without re-generation.
+- [x] 404 for non-existent SHA-256, non-pending status, or non-decodable source.
+- [x] Zero-byte marker prevents repeated decode attempts for non-image files.
+- [x] Thumbnails are written atomically (temp file + rename).
+- [x] EXIF orientation is applied; all metadata is stripped.
+- [x] `Cache-Control: private, max-age=86400, immutable` and `ETag` headers are set.
+- [x] Authentication required (same `verify_api_token` as other endpoints).
+- [x] Accept/reject transitions trigger best-effort cache-entry removal.
+- [x] `metricsctl thumbnail-gc` removes orphaned cache entries.
+- [x] All new `test_thumbnails.py` tests pass.
+- [x] All existing Phase 1 integration tests pass (zero regressions).
 
 ### Stop-Gate
 
@@ -301,7 +301,8 @@ and `GET /api/v1/thumbnails/{sha256}` returns correct responses for test fixture
 
 ---
 
-### ⛔ STOP — P1.5-2 complete. Return control to user for review before continuing.
+### Chunk P1.5-2 complete (2026-04-07) — thumbnail endpoint, cache subsystem,
+triage purge hooks, and thumbnail-gc command implemented and validated.
 
 ---
 
@@ -738,3 +739,14 @@ architecture-phase1.5.md` §9.
   contract, loading-state transitions, backend guarantees, and no-schema-change
   constraint.
 - Marked chunk P1.5-1 as implemented and acceptance criteria complete.
+
+### 13.4 Chunk P1.5-2 sign-off (2026-04-07)
+
+- Added `GET /api/v1/thumbnails/{sha256}` route and backend thumbnail service with
+  lazy generation, disk caching, zero-byte markers, and cache headers.
+- Added `thumbnail_cache_path` to `CoreConfig` with default derivation and dependency
+  wiring through API app state.
+- Added best-effort triage post-commit thumbnail purge hook for accept/reject actions.
+- Added `metricsctl thumbnail-gc` command for periodic orphan cache sweep.
+- Added integration coverage in `tests/integration/api/test_thumbnails.py`.
+- Validation: `govctl backend.test.integration --json` passed using repo virtualenv.

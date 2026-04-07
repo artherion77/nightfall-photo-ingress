@@ -9,9 +9,10 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Path, status
 from fastapi.responses import JSONResponse
 
 from api.auth import verify_api_token
-from api.dependencies import get_registry_connection
+from api.dependencies import get_registry_connection, get_thumbnail_cache_path
 from api.schemas import TriageRequest, TriageResponse
 from api.services import TriageService
+from pathlib import Path as FilePath
 
 router = APIRouter(prefix="/api/v1", tags=["triage"])
 
@@ -23,8 +24,9 @@ def _run_triage_action(
     payload: TriageRequest,
     idempotency_key: str,
     conn: sqlite3.Connection,
+    thumbnail_cache_path: FilePath,
 ) -> JSONResponse:
-    service = TriageService(conn)
+    service = TriageService(conn, thumbnail_cache_path=thumbnail_cache_path)
     try:
         status_code, response = service.execute(
             action=action,
@@ -49,6 +51,7 @@ async def triage_accept(
     _: str = Depends(verify_api_token),
     idempotency_key: str = Header(..., alias="X-Idempotency-Key", min_length=8, max_length=128),
     conn: sqlite3.Connection = Depends(get_registry_connection),
+    thumbnail_cache_path: FilePath = Depends(get_thumbnail_cache_path),
 ) -> JSONResponse:
     return _run_triage_action(
         action="accept",
@@ -56,6 +59,7 @@ async def triage_accept(
         payload=payload,
         idempotency_key=idempotency_key,
         conn=conn,
+        thumbnail_cache_path=thumbnail_cache_path,
     )
 
 
@@ -66,6 +70,7 @@ async def triage_reject(
     _: str = Depends(verify_api_token),
     idempotency_key: str = Header(..., alias="X-Idempotency-Key", min_length=8, max_length=128),
     conn: sqlite3.Connection = Depends(get_registry_connection),
+    thumbnail_cache_path: FilePath = Depends(get_thumbnail_cache_path),
 ) -> JSONResponse:
     return _run_triage_action(
         action="reject",
@@ -73,6 +78,7 @@ async def triage_reject(
         payload=payload,
         idempotency_key=idempotency_key,
         conn=conn,
+        thumbnail_cache_path=thumbnail_cache_path,
     )
 
 
@@ -83,6 +89,7 @@ async def triage_defer(
     _: str = Depends(verify_api_token),
     idempotency_key: str = Header(..., alias="X-Idempotency-Key", min_length=8, max_length=128),
     conn: sqlite3.Connection = Depends(get_registry_connection),
+    thumbnail_cache_path: FilePath = Depends(get_thumbnail_cache_path),
 ) -> JSONResponse:
     return _run_triage_action(
         action="defer",
@@ -90,4 +97,5 @@ async def triage_defer(
         payload=payload,
         idempotency_key=idempotency_key,
         conn=conn,
+        thumbnail_cache_path=thumbnail_cache_path,
     )

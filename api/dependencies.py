@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 import sqlite3
 
 from fastapi import Request
@@ -25,3 +26,10 @@ def get_registry_connection(request: Request) -> sqlite3.Connection:
     if conn is None:
         raise RuntimeError("Registry connection not initialized")
     return conn
+
+
+def get_thumbnail_cache_path(request: Request) -> Path:
+    """Return thumbnail cache root from app config."""
+
+    app_config = get_app_config(request)
+    return app_config.core.thumbnail_cache_path

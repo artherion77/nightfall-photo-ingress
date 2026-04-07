@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 import json
+from pathlib import Path
 import sqlite3
 
 from api.audit_hook import write_triage_compensating_event, write_triage_requested_event
 from api.schemas import TriageResponse
+from api.services.thumbnail_service import ThumbnailService
 
 
 class TriageService:
@@ -19,8 +21,13 @@ class TriageService:
         "defer": "pending",
     }
 
-    def __init__(self, registry_conn: sqlite3.Connection):
+    def __init__(
+        self,
+        registry_conn: sqlite3.Connection,
+        thumbnail_cache_path: Path | None = None,
+    ):
         self.conn = registry_conn
+        self.thumbnail_cache_path = thumbnail_cache_path
 
     def execute(
         self,
@@ -94,6 +101,10 @@ class TriageService:
             )
 
             self.conn.commit()
+
+            if action in {"accept", "reject"} and self.thumbnail_cache_path is not None:
+                self._purge_thumbnail_best_effort(item_id)
+
             return 200, response
         except Exception:
             self.conn.rollback()
@@ -106,6 +117,14 @@ class TriageService:
             )
             self.conn.commit()
             raise
+
+    def _purge_thumbnail_best_effort(self, item_id: str) -> None:
+        try:
+            service = ThumbnailService(self.conn, self.thumbnail_cache_path)
+            service.purge_cache_entry(item_id)
+        except Exception:
+            # Best-effort derivative-cache cleanup must never fail triage.
+            return
 
     def _replay_if_present(
         self,

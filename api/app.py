@@ -13,7 +13,7 @@ from nightfall_photo_ingress.config import AppConfig, load_config
 from nightfall_photo_ingress.domain.registry import Registry
 
 from api.rapiddoc import router as rapiddoc_router
-from api.routers import audit_log, blocklist, config, health, staging, triage
+from api.routers import audit_log, blocklist, config, health, staging, thumbnails, triage
 
 
 class SPAStaticFiles(StaticFiles):
@@ -134,6 +134,7 @@ def create_app(
     app.include_router(config.router)
     app.include_router(blocklist.router)
     app.include_router(triage.router)
+    app.include_router(thumbnails.router)
     app.include_router(rapiddoc_router)
 
     web_build = Path(__file__).resolve().parent.parent / "webui" / "build"

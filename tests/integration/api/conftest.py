@@ -159,6 +159,7 @@ def app_config(registry_path: Path, api_token: str) -> AppConfig:
             sync_hash_import_enabled=True,
             sync_hash_import_path=Path("/tmp/sync"),
             sync_hash_import_glob=".hashes.sha1",
+            thumbnail_cache_path=registry_path.parent / "thumbnail-cache",
         ),
         logging=LoggingConfig(log_level="INFO", console_format="json"),
         web=WebConfig(api_token=api_token, bind_host="127.0.0.1", bind_port=8000),

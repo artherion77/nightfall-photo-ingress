@@ -10,6 +10,7 @@ all command behavior centralized for operators and automation.
 import argparse
 import json
 import os
+import sqlite3
 import subprocess
 import sys
 from pathlib import Path
@@ -46,6 +47,9 @@ from metrics.runner.poller_runner import (
     uninstall_poller,
 )
 from metrics.runner.schema_contract import manifest_schema, metrics_schema, validate_manifest_payload, validate_metrics_payload
+from nightfall_photo_ingress.config import load_config
+
+from api.services.thumbnail_service import ThumbnailService
 
 
 def _devctl_dashboard_drift_preflight(repo_root: Path) -> None:
@@ -272,6 +276,21 @@ def cmd_dashboard_build_stamp(_: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_thumbnail_gc(args: argparse.Namespace) -> int:
+    """Garbage-collect thumbnail cache entries no longer in pending status."""
+    app_config = load_config(args.config)
+    conn = sqlite3.connect(app_config.core.registry_path, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    try:
+        service = ThumbnailService(conn, app_config.core.thumbnail_cache_path)
+        payload = service.garbage_collect()
+    finally:
+        conn.close()
+
+    print(json.dumps(payload, indent=2))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Construct CLI command surface and wire handlers."""
     parser = argparse.ArgumentParser(description="Nightfall metrics administrative entrypoint")
@@ -351,6 +370,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="Show dashboard build stamp and rebuild requirement",
     )
     build_stamp_parser.set_defaults(func=cmd_dashboard_build_stamp)
+
+    thumbnail_gc_parser = sub.add_parser(
+        "thumbnail-gc",
+        help="Remove thumbnail cache entries for non-pending items",
+    )
+    thumbnail_gc_parser.add_argument(
+        "--config",
+        default="/etc/nightfall/photo-ingress.conf",
+        help="Path to photo-ingress configuration file",
+    )
+    thumbnail_gc_parser.set_defaults(func=cmd_thumbnail_gc)
 
     return parser
 

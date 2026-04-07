@@ -54,6 +54,7 @@ class CoreConfig:
     sync_hash_import_enabled: bool
     sync_hash_import_path: Path
     sync_hash_import_glob: str
+    thumbnail_cache_path: Path = Path("/tmp/cache/thumbnails")
     integrity_mode: str = "strict"
     drift_warning_threshold_ratio: float = 0.05
     drift_critical_threshold_ratio: float = 0.20
@@ -201,10 +202,12 @@ def _parse_core(parser: configparser.ConfigParser, errors: list[str]) -> CoreCon
 
     core = parser[section]
 
+    staging_path = _get_path(core, "staging_path", errors, required=True)
     pending_path = _get_path(core, "pending_path", errors, required=True)
     accepted_path = _get_path(core, "accepted_path", errors, required=True)
     rejected_path = _get_path(core, "rejected_path", errors, required=True)
     trash_path = _get_path(core, "trash_path", errors, required=True)
+    default_thumbnail_cache_path = str(staging_path.parent / "cache" / "thumbnails")
 
     return CoreConfig(
         config_version=_get_int(core, "config_version", errors, required=True),
@@ -215,7 +218,7 @@ def _parse_core(parser: configparser.ConfigParser, errors: list[str]) -> CoreCon
             errors,
             default=True,
         ),
-        staging_path=_get_path(core, "staging_path", errors, required=True),
+        staging_path=staging_path,
         pending_path=pending_path,
         accepted_path=accepted_path,
         accepted_storage_template=_get_str(
@@ -267,6 +270,12 @@ def _parse_core(parser: configparser.ConfigParser, errors: list[str]) -> CoreCon
         sync_hash_import_enabled=_get_bool(core, "sync_hash_import_enabled", errors, default=True),
         sync_hash_import_path=_get_path(core, "sync_hash_import_path", errors, required=True),
         sync_hash_import_glob=_get_str(core, "sync_hash_import_glob", errors, default=".hashes.sha1"),
+        thumbnail_cache_path=_get_path(
+            core,
+            "thumbnail_cache_path",
+            errors,
+            default=default_thumbnail_cache_path,
+        ),
         integrity_mode=_get_str(core, "integrity_mode", errors, default="strict"),
         drift_warning_threshold_ratio=_get_float(
             core,
@@ -378,6 +387,7 @@ def _default_core() -> CoreConfig:
         sync_hash_import_enabled=True,
         sync_hash_import_path=Path("/nightfall/media/pictures"),
         sync_hash_import_glob=".hashes.sha1",
+        thumbnail_cache_path=Path("/tmp/cache/thumbnails"),
         integrity_mode="strict",
         drift_warning_threshold_ratio=0.05,
         drift_critical_threshold_ratio=0.20,
