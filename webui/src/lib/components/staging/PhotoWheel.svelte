@@ -18,6 +18,14 @@
     stepMomentumFrame,
     type ActiveIndexState,
   } from './photowheel-momentum';
+  import {
+    getPreloadIndexes,
+    getRenderWindow,
+    getWindowSlotCounts,
+    PRELOAD_RADIUS,
+    RENDER_RADIUS,
+    shouldRunIdlePreload,
+  } from './photowheel-windowing';
 
   interface Item {
     sha256: string;
@@ -48,6 +56,7 @@
   let lastMomentumFrameTs = 0;
   let momentumActiveIndex: number | null = null;
   let transitionTimer: ReturnType<typeof setTimeout> | null = null;
+  let preloadedImages: HTMLImageElement[] = [];
 
   const TRANSITION_SETTLE_MS = 220;
 
@@ -273,6 +282,42 @@
 
   onDestroy(() => {
     cancelMotion();
+    for (const img of preloadedImages) {
+      img.src = '';
+    }
+    preloadedImages = [];
+  });
+
+  $effect(() => {
+    if (!shouldRunIdlePreload(interactionState)) {
+      return;
+    }
+    if (typeof Image === 'undefined') {
+      return;
+    }
+    if (items.length === 0) {
+      return;
+    }
+
+    for (const img of preloadedImages) {
+      img.src = '';
+    }
+    preloadedImages = [];
+
+    const indexes = getPreloadIndexes(activeIndex, items.length, PRELOAD_RADIUS);
+    preloadedImages = indexes.map((index) => {
+      const img = new Image();
+      img.decoding = 'async';
+      img.src = `/api/v1/thumbnails/${items[index]?.sha256 ?? ''}`;
+      return img;
+    });
+
+    return () => {
+      for (const img of preloadedImages) {
+        img.src = '';
+      }
+      preloadedImages = [];
+    };
   });
 
   function slotStyle(index: number): string {
@@ -326,8 +371,19 @@
   {#if items.length === 0}
     <EmptyState message="No pending items in staging queue." />
   {:else}
+    {@const window = getRenderWindow(activeIndex, items.length, RENDER_RADIUS)}
+    {@const slotCounts = getWindowSlotCounts(window, items.length)}
     <div class="track">
-      {#each items as item, index}
+      {#if slotCounts.left > 0}
+        <div
+          class="spacer"
+          aria-hidden="true"
+          style={`--slot-count: ${slotCounts.left}`}
+        ></div>
+      {/if}
+
+      {#each items.slice(window.start, window.end + 1) as item, localIndex (item.sha256)}
+        {@const index = window.start + localIndex}
         <div
           class="slot"
           class:is-active={index === activeIndex}
@@ -345,6 +401,14 @@
           <PhotoCard item={item} active={index === activeIndex} />
         </div>
       {/each}
+
+      {#if slotCounts.right > 0}
+        <div
+          class="spacer"
+          aria-hidden="true"
+          style={`--slot-count: ${slotCounts.right}`}
+        ></div>
+      {/if}
     </div>
   {/if}
 </section>
@@ -374,6 +438,10 @@
       transform var(--duration-slow) var(--easing-default),
       opacity var(--duration-slow) var(--easing-default),
       filter var(--duration-slow) var(--easing-default);
+  }
+
+  .spacer {
+    flex: 0 0 calc(var(--slot-count) * (220px + var(--space-4)));
   }
 
   .slot.is-active {

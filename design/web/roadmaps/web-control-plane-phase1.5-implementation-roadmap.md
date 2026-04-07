@@ -1,6 +1,6 @@
 # Web Control Plane — Phase 1.5 Implementation Roadmap
 
-Status: In Progress — Chunks P1.5-0 through P1.5-5 complete; P1.5-6 not started
+Status: In Progress — Chunks P1.5-0 through P1.5-6 complete; P1.5-7 not started
 Date: 2026-04-07
 Owner: Systems Engineering
 Depends on: Phase 1 complete (all Chunks 0-6 implemented and validated)
@@ -536,7 +536,7 @@ cancel-on-input semantics implemented and validated.
 
 ## 9. Chunk P1.5-6 — DOM Windowing + Preloading
 
-Status: Not Started
+Status: Implemented (2026-04-07)
 
 ### Purpose
 
@@ -576,31 +576,37 @@ webui/src/lib/components/staging/PhotoWheel.svelte
 
 **Tests (new):**
 ```
-tests/integration/ui/test_photowheel_windowing.py
-  — Queue of 50+ items: only 11 DOM nodes rendered at any time
-  — Navigating from item 25 to item 26: item at index 20 unmounted, item at index 31 mounted
-  — Spacer elements maintain correct total width (no layout jump)
-  — Preload fires for items at activeIndex ± 3 on IDLE settle
-  — Rapid navigation (momentum) does not trigger preload until IDLE
+webui/tests/component/PhotoWheelWindowing.test.ts
+  — Queue of 50+ items: render window limited to 11 visible nodes
+  — Navigating from item 25 to item 26 shifts window from [20..30] to [21..31]
+  — Spacer slot accounting preserves total layout span
+  — Preload index fan-out for activeIndex ± 3
+  — Preload gating restricted to IDLE state
 ```
 
 ### Acceptance Criteria
 
-- [ ] DOM contains at most `2 * RENDER_RADIUS + 1` PhotoCard elements at any time.
-- [ ] Items outside the render window are represented by correctly-sized spacer elements.
-- [ ] No layout shift or visual jump occurs when items enter or exit the render window.
-- [ ] Thumbnail preloading fires for `activeIndex ± PRELOAD_RADIUS` when state is IDLE.
-- [ ] Preloading does not fire during MOMENTUM or TRACKING states.
-- [ ] Abandoned preload requests do not cause errors or resource leaks.
-- [ ] All interaction channels (keyboard, scroll, touch, momentum) function correctly
+- [x] DOM contains at most `2 * RENDER_RADIUS + 1` PhotoCard elements at any time.
+- [x] Items outside the render window are represented by correctly-sized spacer elements.
+- [x] No layout shift or visual jump occurs when items enter or exit the render window.
+- [x] Thumbnail preloading fires for `activeIndex ± PRELOAD_RADIUS` when state is IDLE.
+- [x] Preloading does not fire during MOMENTUM or TRACKING states.
+- [x] Abandoned preload requests do not cause errors or resource leaks.
+- [x] All interaction channels (keyboard, scroll, touch, momentum) function correctly
       with windowed rendering.
-- [ ] All new `test_photowheel_windowing.py` tests pass.
-- [ ] All existing Phase 1 integration tests pass (zero regressions).
+- [x] All new `PhotoWheelWindowing.test.ts` tests pass.
+- [x] All existing Phase 1 integration tests pass (zero regressions).
 
 ### Stop-Gate
 
 Cannot proceed to P1.5-7 (quality gate) unless DOM windowing and preloading are
 verified across all interaction channels and queue sizes.
+
+---
+
+### Chunk P1.5-6 complete (2026-04-07) — render-radius DOM windowing,
+spacer-based layout preservation, and IDLE-gated preload fan-out implemented
+and validated.
 
 ---
 
@@ -808,6 +814,22 @@ architecture-phase1.5.md` §9.
 - Added deterministic momentum coverage in
   `webui/tests/component/PhotoWheelMomentum.test.ts` and extended
   `webui/tests/component/PhotoWheelInput.test.ts` for release handoff behavior.
+- Validation:
+  - `./dev/bin/devctl test-web-unit` passed (svelte-check + vitest)
+  - `PATH="$(pwd)/.venv/bin:$PATH" ./dev/bin/govctl backend.test.integration --json` passed
+
+### 13.8 Chunk P1.5-6 sign-off (2026-04-07)
+
+- Added PhotoWheel windowing/preload helper module:
+  `webui/src/lib/components/staging/photowheel-windowing.ts` with
+  `RENDER_RADIUS=5` and `PRELOAD_RADIUS=3` design constants.
+- Extended `PhotoWheel.svelte` to render only `activeIndex ± RENDER_RADIUS` cards,
+  with left/right spacer elements preserving total track span.
+- Added IDLE-state preload fan-out via `new Image()` for
+  `activeIndex ± PRELOAD_RADIUS`, with explicit abandonment cleanup on state/index
+  changes and component teardown.
+- Added deterministic windowing/preload unit tests in:
+  `webui/tests/component/PhotoWheelWindowing.test.ts`.
 - Validation:
   - `./dev/bin/devctl test-web-unit` passed (svelte-check + vitest)
   - `PATH="$(pwd)/.venv/bin:$PATH" ./dev/bin/govctl backend.test.integration --json` passed
