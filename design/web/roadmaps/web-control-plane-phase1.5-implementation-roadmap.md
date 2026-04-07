@@ -1,6 +1,6 @@
 # Web Control Plane — Phase 1.5 Implementation Roadmap
 
-Status: In Progress — Chunks P1.5-0 through P1.5-2 complete; P1.5-3 not started
+Status: In Progress — Chunks P1.5-0 through P1.5-3 complete; P1.5-4 not started
 Date: 2026-04-07
 Owner: Systems Engineering
 Depends on: Phase 1 complete (all Chunks 0-6 implemented and validated)
@@ -308,7 +308,7 @@ triage purge hooks, and thumbnail-gc command implemented and validated.
 
 ## 6. Chunk P1.5-3 — PhotoWheel Scroll + Touch Handlers
 
-Status: Not Started
+Status: Implemented (2026-04-07)
 
 ### Purpose
 
@@ -360,14 +360,14 @@ Phase 1 test strategy for client-side interaction logic.
 
 ### Acceptance Criteria
 
-- [ ] Mouse scroll wheel navigates the PhotoWheel (one step per detent).
-- [ ] Trackpad two-finger swipe navigates with accumulated delta threshold (60px).
-- [ ] Touch swipe navigates with 40px commit threshold.
-- [ ] Touch swipe below 10px dead zone does not trigger navigation.
-- [ ] Scroll-lock prevents page scroll while PhotoWheel is focused.
-- [ ] Scroll-lock disengages at queue boundaries (first/last item).
-- [ ] All existing keyboard shortcuts continue to function.
-- [ ] All existing Phase 1 integration tests pass (zero regressions).
+- [x] Mouse scroll wheel navigates the PhotoWheel (one step per detent).
+- [x] Trackpad two-finger swipe navigates with accumulated delta threshold (60px).
+- [x] Touch swipe navigates with 40px commit threshold.
+- [x] Touch swipe below 10px dead zone does not trigger navigation.
+- [x] Scroll-lock prevents page scroll while PhotoWheel is focused.
+- [x] Scroll-lock disengages at queue boundaries (first/last item).
+- [x] All existing keyboard shortcuts continue to function.
+- [x] All existing Phase 1 integration tests pass (zero regressions).
 
 ### Stop-Gate
 
@@ -376,7 +376,8 @@ handlers are wired and confirmed to produce correct `activeIndex` changes.
 
 ---
 
-### ⛔ STOP — P1.5-3 complete. Return control to user for review before continuing.
+### Chunk P1.5-3 complete (2026-04-07) — wheel and touch handlers implemented,
+boundary-aware scroll lock added, and input-helper unit tests validated.
 
 ---
 
@@ -750,3 +751,18 @@ architecture-phase1.5.md` §9.
 - Added `metricsctl thumbnail-gc` command for periodic orphan cache sweep.
 - Added integration coverage in `tests/integration/api/test_thumbnails.py`.
 - Validation: `govctl backend.test.integration --json` passed using repo virtualenv.
+
+### 13.5 Chunk P1.5-3 sign-off (2026-04-07)
+
+- Extended `PhotoWheel.svelte` with wheel and touch handlers for discrete detent,
+  continuous delta accumulation, and swipe-commit thresholds.
+- Added boundary-aware scroll-lock behavior and preserved existing keyboard triage
+  shortcuts (Arrow/A/R/D).
+- Introduced deterministic input helper module
+  `webui/src/lib/components/staging/photowheel-input.ts` for wheel/touch logic.
+- Added unit tests in `webui/tests/component/PhotoWheelInput.test.ts` covering:
+  detent and continuous wheel behavior, scroll-lock boundaries, dead-zone handling,
+  swipe threshold commit, and velocity-based fling commit.
+- Validation:
+  - `./dev/bin/devctl test-web-unit` passed (svelte-check + vitest)
+  - `PATH="$(pwd)/.venv/bin:$PATH" ./dev/bin/govctl backend.test.integration --json` passed

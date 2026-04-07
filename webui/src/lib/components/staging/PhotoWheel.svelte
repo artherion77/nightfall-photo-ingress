@@ -1,6 +1,15 @@
 <script lang="ts">
   import EmptyState from '$lib/components/common/EmptyState.svelte';
   import PhotoCard from './PhotoCard.svelte';
+  import {
+    clampIndex,
+    computeWheelStep,
+    resolveTouchStep,
+    shouldPreventWheelScroll,
+    startTouch,
+    updateTouch,
+    type TouchState,
+  } from './photowheel-input';
 
   interface Item {
     sha256: string;
@@ -19,6 +28,10 @@
   }
 
   let { items, activeIndex = 0, onSelect, onAccept, onReject, onDefer }: Props = $props();
+
+  let wheelAccumulator = 0;
+  let hasPointerFocus = false;
+  let touchState: TouchState | null = null;
 
   function handleKeydown(event: KeyboardEvent): void {
     if (event.key === 'ArrowLeft') {
@@ -51,6 +64,64 @@
     }
   }
 
+  function selectDelta(delta: number): void {
+    const next = clampIndex(activeIndex + delta, items.length);
+    if (next !== activeIndex) {
+      onSelect?.(next);
+    }
+  }
+
+  function handleWheel(event: WheelEvent): void {
+    if (items.length === 0) {
+      return;
+    }
+
+    const preventScroll = hasPointerFocus && shouldPreventWheelScroll(activeIndex, items.length, event.deltaY);
+    if (preventScroll) {
+      event.preventDefault();
+    }
+
+    const result = computeWheelStep(event.deltaY, event.deltaMode, wheelAccumulator);
+    wheelAccumulator = result.accumulator;
+
+    if (result.step !== 0) {
+      selectDelta(result.step);
+    }
+  }
+
+  function handleTouchStart(event: TouchEvent): void {
+    const touch = event.touches[0];
+    if (!touch) return;
+    hasPointerFocus = true;
+    touchState = startTouch(touch.clientX, touch.clientY, event.timeStamp);
+  }
+
+  function handleTouchMove(event: TouchEvent): void {
+    if (!touchState) return;
+    const touch = event.touches[0];
+    if (!touch) return;
+
+    touchState = updateTouch(touchState, touch.clientX, touch.clientY, event.timeStamp);
+    if (touchState.trackingSwipe) {
+      event.preventDefault();
+    }
+  }
+
+  function handleTouchEnd(): void {
+    if (!touchState) {
+      hasPointerFocus = false;
+      return;
+    }
+
+    const step = resolveTouchStep(touchState);
+    if (step !== 0) {
+      selectDelta(step);
+    }
+
+    touchState = null;
+    hasPointerFocus = false;
+  }
+
   function slotStyle(index: number): string {
     const dist = Math.abs(index - activeIndex);
     if (dist === 0) {
@@ -80,7 +151,24 @@
 
 <svelte:window on:keydown={handleKeydown} />
 
-<section class="wheel" data-testid="photo-wheel">
+<section
+  class="wheel"
+  data-testid="photo-wheel"
+  role="group"
+  aria-label="Photo wheel"
+  onwheel={handleWheel}
+  onmouseenter={() => {
+    hasPointerFocus = true;
+  }}
+  onmouseleave={() => {
+    hasPointerFocus = false;
+    wheelAccumulator = 0;
+  }}
+  ontouchstart={handleTouchStart}
+  ontouchmove={handleTouchMove}
+  ontouchend={handleTouchEnd}
+  ontouchcancel={handleTouchEnd}
+>
   {#if items.length === 0}
     <EmptyState message="No pending items in staging queue." />
   {:else}
