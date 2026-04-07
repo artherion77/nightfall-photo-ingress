@@ -1,6 +1,6 @@
 # Web Control Plane — Phase 1.5 Implementation Roadmap
 
-Status: In Progress — Chunks P1.5-0 through P1.5-4 complete; P1.5-5 not started
+Status: In Progress — Chunks P1.5-0 through P1.5-5 complete; P1.5-6 not started
 Date: 2026-04-07
 Owner: Systems Engineering
 Depends on: Phase 1 complete (all Chunks 0-6 implemented and validated)
@@ -456,7 +456,7 @@ loading/error fallbacks, and deterministic image-state tests validated.
 
 ## 8. Chunk P1.5-5 — Momentum Engine + ActiveIndex State Machine
 
-Status: Not Started
+Status: Implemented (2026-04-07)
 
 ### Purpose
 
@@ -491,13 +491,16 @@ webui/src/lib/components/staging/PhotoWheel.svelte
 
 **Tests (new):**
 ```
-tests/integration/ui/test_photowheel_momentum.py
-  — High-velocity touch fling triggers momentum; multiple items are traversed
-  — Momentum terminates when velocity decays below threshold
-  — Momentum terminates at queue boundary (first or last item)
-  — New input during momentum cancels motion immediately
-  — State machine returns to IDLE after momentum terminates
-  — Keyboard input during MOMENTUM cancels and enters STEP
+webui/tests/component/PhotoWheelMomentum.test.ts
+  — Fling-threshold momentum trigger detection
+  — rAF-frame friction decay behavior (0.92/frame)
+  — Step traversal when accumulated displacement crosses threshold
+  — Momentum termination below minimum velocity threshold
+  — Momentum termination at queue boundary
+  — Cancel-on-input state guard for TRANSITIONING/MOMENTUM
+
+webui/tests/component/PhotoWheelInput.test.ts (extended)
+  — Touch-release momentum handoff velocity metadata
 ```
 
 Note: momentum testing requires a browser-level driver for rAF simulation.  Same
@@ -505,19 +508,25 @@ Playwright fallback strategy as P1.5-3.
 
 ### Acceptance Criteria
 
-- [ ] High-velocity touch fling produces momentum traversal of multiple items.
-- [ ] Momentum decays per rAF loop with friction coefficient 0.92/frame.
-- [ ] Momentum terminates at velocity < 0.05px/ms.
-- [ ] Momentum terminates at queue boundaries (first/last item).
-- [ ] Any new input during TRANSITIONING or MOMENTUM cancels motion immediately.
-- [ ] ActiveIndex state machine transitions are correct for all input channels.
-- [ ] CSS transitions during momentum steps use canonical tokens.
-- [ ] All existing Phase 1 integration tests pass (zero regressions).
+- [x] High-velocity touch fling produces momentum traversal of multiple items.
+- [x] Momentum decays per rAF loop with friction coefficient 0.92/frame.
+- [x] Momentum terminates at velocity < 0.05px/ms.
+- [x] Momentum terminates at queue boundaries (first/last item).
+- [x] Any new input during TRANSITIONING or MOMENTUM cancels motion immediately.
+- [x] ActiveIndex state machine transitions are correct for all input channels.
+- [x] CSS transitions during momentum steps use canonical tokens.
+- [x] All existing Phase 1 integration tests pass (zero regressions).
 
 ### Stop-Gate
 
 Cannot proceed to P1.5-6 (DOM windowing + preloading) unless momentum engine is
 functional and cancel-on-input semantics are verified.
+
+---
+
+### Chunk P1.5-5 complete (2026-04-07) — momentum frame-decay engine,
+ActiveIndex state lifecycle (IDLE/STEP/TRACKING/TRANSITIONING/MOMENTUM), and
+cancel-on-input semantics implemented and validated.
 
 ---
 
@@ -782,6 +791,23 @@ architecture-phase1.5.md` §9.
 - Added deterministic unit tests for PhotoCard image contracts in:
   `webui/tests/component/PhotoCardImage.test.ts` and
   `webui/tests/component/PhotoCardImageLogic.test.ts`.
+- Validation:
+  - `./dev/bin/devctl test-web-unit` passed (svelte-check + vitest)
+  - `PATH="$(pwd)/.venv/bin:$PATH" ./dev/bin/govctl backend.test.integration --json` passed
+
+### 13.7 Chunk P1.5-5 sign-off (2026-04-07)
+
+- Added PhotoWheel momentum engine helper module:
+  `webui/src/lib/components/staging/photowheel-momentum.ts`.
+- Extended `PhotoWheel.svelte` with formal interaction lifecycle states
+  (IDLE, STEP, TRACKING, TRANSITIONING, MOMENTUM), rAF momentum decay,
+  queue-boundary termination, and cancel-on-input semantics.
+- Extended touch release handling in
+  `webui/src/lib/components/staging/photowheel-input.ts` to expose momentum
+  handoff velocity for fling continuation.
+- Added deterministic momentum coverage in
+  `webui/tests/component/PhotoWheelMomentum.test.ts` and extended
+  `webui/tests/component/PhotoWheelInput.test.ts` for release handoff behavior.
 - Validation:
   - `./dev/bin/devctl test-web-unit` passed (svelte-check + vitest)
   - `PATH="$(pwd)/.venv/bin:$PATH" ./dev/bin/govctl backend.test.integration --json` passed

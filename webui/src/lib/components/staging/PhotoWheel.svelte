@@ -1,15 +1,23 @@
 <script lang="ts">
+  import { onDestroy } from 'svelte';
   import EmptyState from '$lib/components/common/EmptyState.svelte';
   import PhotoCard from './PhotoCard.svelte';
   import {
     clampIndex,
     computeWheelStep,
-    resolveTouchStep,
+    resolveTouchRelease,
     shouldPreventWheelScroll,
     startTouch,
     updateTouch,
+    TOUCH_FLING_PX_PER_MS,
     type TouchState,
   } from './photowheel-input';
+  import {
+    shouldCancelMotionOnInput,
+    shouldStartMomentum,
+    stepMomentumFrame,
+    type ActiveIndexState,
+  } from './photowheel-momentum';
 
   interface Item {
     sha256: string;
@@ -30,19 +38,122 @@
   let { items, activeIndex = 0, onSelect, onAccept, onReject, onDefer }: Props = $props();
 
   let wheelAccumulator = 0;
+  let lastWheelTs = 0;
   let hasPointerFocus = false;
   let touchState: TouchState | null = null;
+  let interactionState = $state<ActiveIndexState>('IDLE');
+  let momentumVelocityPxPerMs = 0;
+  let momentumAccumulatorPx = 0;
+  let momentumFrameId: number | null = null;
+  let lastMomentumFrameTs = 0;
+  let momentumActiveIndex: number | null = null;
+  let transitionTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const TRANSITION_SETTLE_MS = 220;
+
+  function clearTransitionTimer(): void {
+    if (!transitionTimer) return;
+    clearTimeout(transitionTimer);
+    transitionTimer = null;
+  }
+
+  function scheduleTransitionToIdle(): void {
+    clearTransitionTimer();
+    interactionState = 'TRANSITIONING';
+    transitionTimer = setTimeout(() => {
+      if (interactionState === 'TRANSITIONING') {
+        interactionState = 'IDLE';
+      }
+    }, TRANSITION_SETTLE_MS);
+  }
+
+  function cancelMotion(): void {
+    if (momentumFrameId !== null) {
+      cancelAnimationFrame(momentumFrameId);
+      momentumFrameId = null;
+    }
+    momentumVelocityPxPerMs = 0;
+    momentumAccumulatorPx = 0;
+    lastMomentumFrameTs = 0;
+    momentumActiveIndex = null;
+    clearTransitionTimer();
+    interactionState = 'IDLE';
+  }
+
+  function cancelMotionOnNewInput(): void {
+    if (shouldCancelMotionOnInput(interactionState)) {
+      cancelMotion();
+    }
+  }
+
+  function runMomentumFrame(ts: number): void {
+    if (interactionState !== 'MOMENTUM') {
+      momentumFrameId = null;
+      return;
+    }
+
+    if (lastMomentumFrameTs === 0) {
+      lastMomentumFrameTs = ts;
+      momentumFrameId = requestAnimationFrame(runMomentumFrame);
+      return;
+    }
+
+    const dtMs = Math.max(1, ts - lastMomentumFrameTs);
+    lastMomentumFrameTs = ts;
+
+    const frame = stepMomentumFrame({
+      activeIndex: momentumActiveIndex ?? activeIndex,
+      itemCount: items.length,
+      velocityPxPerMs: momentumVelocityPxPerMs,
+      accumulatorPx: momentumAccumulatorPx,
+      dtMs,
+    });
+
+    momentumVelocityPxPerMs = frame.velocityPxPerMs;
+    momentumAccumulatorPx = frame.accumulatorPx;
+    momentumActiveIndex = frame.activeIndex;
+
+    if (frame.activeIndex !== activeIndex) {
+      onSelect?.(frame.activeIndex);
+    }
+
+    if (frame.state === 'IDLE') {
+      cancelMotion();
+      return;
+    }
+
+    momentumFrameId = requestAnimationFrame(runMomentumFrame);
+  }
+
+  function startMomentum(initialVelocityPxPerMs: number): void {
+    if (items.length === 0) return;
+    if (!shouldStartMomentum(initialVelocityPxPerMs, TOUCH_FLING_PX_PER_MS)) return;
+
+    clearTransitionTimer();
+    interactionState = 'MOMENTUM';
+    momentumVelocityPxPerMs = initialVelocityPxPerMs;
+    momentumAccumulatorPx = 0;
+    momentumActiveIndex = activeIndex;
+    lastMomentumFrameTs = 0;
+
+    if (momentumFrameId !== null) {
+      cancelAnimationFrame(momentumFrameId);
+    }
+    momentumFrameId = requestAnimationFrame(runMomentumFrame);
+  }
 
   function handleKeydown(event: KeyboardEvent): void {
+    cancelMotionOnNewInput();
+
     if (event.key === 'ArrowLeft') {
       event.preventDefault();
-      onSelect?.(Math.max(activeIndex - 1, 0));
+      selectDelta(-1, 'STEP');
       return;
     }
 
     if (event.key === 'ArrowRight') {
       event.preventDefault();
-      onSelect?.(Math.min(activeIndex + 1, Math.max(items.length - 1, 0)));
+      selectDelta(1, 'STEP');
       return;
     }
 
@@ -64,14 +175,19 @@
     }
   }
 
-  function selectDelta(delta: number): void {
+  function selectDelta(delta: number, sourceState: 'STEP' | 'TRACKING' = 'STEP'): void {
     const next = clampIndex(activeIndex + delta, items.length);
     if (next !== activeIndex) {
+      interactionState = sourceState;
+      momentumActiveIndex = null;
       onSelect?.(next);
+      scheduleTransitionToIdle();
     }
   }
 
   function handleWheel(event: WheelEvent): void {
+    cancelMotionOnNewInput();
+
     if (items.length === 0) {
       return;
     }
@@ -81,22 +197,37 @@
       event.preventDefault();
     }
 
+    const dtMs = lastWheelTs === 0 ? 16 : Math.max(1, event.timeStamp - lastWheelTs);
+    const velocityPxPerMs = event.deltaY / dtMs;
+    lastWheelTs = event.timeStamp;
+
     const result = computeWheelStep(event.deltaY, event.deltaMode, wheelAccumulator);
     wheelAccumulator = result.accumulator;
 
     if (result.step !== 0) {
-      selectDelta(result.step);
+      selectDelta(result.step, 'TRACKING');
+      if (event.deltaMode === 0) {
+        startMomentum(velocityPxPerMs);
+      }
+    } else {
+      interactionState = 'TRACKING';
     }
   }
 
   function handleTouchStart(event: TouchEvent): void {
+    cancelMotionOnNewInput();
+
     const touch = event.touches[0];
     if (!touch) return;
     hasPointerFocus = true;
+    interactionState = 'TRACKING';
+    momentumActiveIndex = null;
     touchState = startTouch(touch.clientX, touch.clientY, event.timeStamp);
   }
 
   function handleTouchMove(event: TouchEvent): void {
+    cancelMotionOnNewInput();
+
     if (!touchState) return;
     const touch = event.touches[0];
     if (!touch) return;
@@ -113,14 +244,36 @@
       return;
     }
 
-    const step = resolveTouchStep(touchState);
+    const release = resolveTouchRelease(touchState);
+    const step = release.step;
     if (step !== 0) {
-      selectDelta(step);
+      selectDelta(step, 'TRACKING');
+    }
+
+    if (step !== 0 && shouldStartMomentum(release.momentumVelocityPxPerMs, TOUCH_FLING_PX_PER_MS)) {
+      startMomentum(release.momentumVelocityPxPerMs);
+    } else if (step === 0) {
+      interactionState = 'IDLE';
     }
 
     touchState = null;
     hasPointerFocus = false;
   }
+
+  function handleSlotClick(index: number): void {
+    cancelMotionOnNewInput();
+    const next = clampIndex(index, items.length);
+    if (next !== activeIndex) {
+      interactionState = 'STEP';
+      momentumActiveIndex = null;
+      onSelect?.(next);
+      scheduleTransitionToIdle();
+    }
+  }
+
+  onDestroy(() => {
+    cancelMotion();
+  });
 
   function slotStyle(index: number): string {
     const dist = Math.abs(index - activeIndex);
@@ -154,6 +307,7 @@
 <section
   class="wheel"
   data-testid="photo-wheel"
+  data-interaction-state={interactionState}
   role="group"
   aria-label="Photo wheel"
   onwheel={handleWheel}
@@ -180,11 +334,11 @@
           style={slotStyle(index)}
           role="button"
           tabindex="0"
-          onclick={() => onSelect?.(index)}
+          onclick={() => handleSlotClick(index)}
           onkeydown={(event) => {
             if (event.key === 'Enter' || event.key === ' ') {
               event.preventDefault();
-              onSelect?.(index);
+              handleSlotClick(index);
             }
           }}
         >

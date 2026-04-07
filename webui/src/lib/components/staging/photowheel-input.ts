@@ -18,6 +18,11 @@ export interface TouchState {
   trackingSwipe: boolean;
 }
 
+export interface TouchRelease {
+  step: number;
+  momentumVelocityPxPerMs: number;
+}
+
 export function clampIndex(index: number, itemCount: number): number {
   if (itemCount <= 0) return 0;
   return Math.max(0, Math.min(index, itemCount - 1));
@@ -109,12 +114,35 @@ export function resolveTouchStep(
   commitPx: number = TOUCH_COMMIT_PX,
   flingPxPerMs: number = TOUCH_FLING_PX_PER_MS
 ): number {
+  return resolveTouchRelease(state, commitPx, flingPxPerMs).step;
+}
+
+export function resolveTouchRelease(
+  state: TouchState,
+  commitPx: number = TOUCH_COMMIT_PX,
+  flingPxPerMs: number = TOUCH_FLING_PX_PER_MS
+): TouchRelease {
   const dxTotal = state.currentX - state.startX;
-  if (!state.trackingSwipe) return 0;
+  if (!state.trackingSwipe) {
+    return {
+      step: 0,
+      momentumVelocityPxPerMs: 0,
+    };
+  }
+
+  // Convert X-axis gesture velocity into wheel step direction.
+  const momentumVelocityPxPerMs = -state.velocityX;
 
   if (Math.abs(dxTotal) >= commitPx || Math.abs(state.velocityX) >= flingPxPerMs) {
     // Swipe left advances to next item, swipe right goes to previous item.
-    return dxTotal < 0 ? 1 : -1;
+    return {
+      step: dxTotal < 0 ? 1 : -1,
+      momentumVelocityPxPerMs,
+    };
   }
-  return 0;
+
+  return {
+    step: 0,
+    momentumVelocityPxPerMs,
+  };
 }

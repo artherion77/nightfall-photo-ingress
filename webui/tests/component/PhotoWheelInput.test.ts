@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   clampIndex,
   computeWheelStep,
+  resolveTouchRelease,
   resolveTouchStep,
   shouldPreventWheelScroll,
   startTouch,
@@ -57,6 +58,15 @@ describe('photowheel input helpers', () => {
 
     // Dead-zone crossing with very high instantaneous velocity triggers fling.
     expect(resolveTouchStep(move, 40, 0.3)).toBe(1);
+  });
+
+  it('returns release velocity for momentum handoff', () => {
+    const start = startTouch(100, 200, 1000);
+    const move = updateTouch(start, 60, 200, 1020, 10);
+
+    const release = resolveTouchRelease(move, 40, 0.3);
+    expect(release.step).toBe(1);
+    expect(release.momentumVelocityPxPerMs).toBeGreaterThan(0);
   });
 
   it('does not commit below dead zone and without fling', () => {
