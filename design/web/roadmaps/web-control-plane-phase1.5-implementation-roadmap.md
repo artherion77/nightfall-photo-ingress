@@ -1,6 +1,6 @@
 # Web Control Plane — Phase 1.5 Implementation Roadmap
 
-Status: In Progress — Chunks P1.5-0 through P1.5-3 complete; P1.5-4 not started
+Status: In Progress — Chunks P1.5-0 through P1.5-4 complete; P1.5-5 not started
 Date: 2026-04-07
 Owner: Systems Engineering
 Depends on: Phase 1 complete (all Chunks 0-6 implemented and validated)
@@ -383,7 +383,7 @@ boundary-aware scroll lock added, and input-helper unit tests validated.
 
 ## 7. Chunk P1.5-4 — PhotoCard Image Rendering
 
-Status: Not Started
+Status: Implemented (2026-04-07)
 
 ### Purpose
 
@@ -420,25 +420,26 @@ webui/src/lib/components/staging/PhotoCard.svelte
 
 **Tests (new):**
 ```
-tests/integration/ui/test_photocard_image.py
-  — PhotoCard img src points to /api/v1/thumbnails/{sha256}
-  — Successful thumbnail load renders visible image
-  — 404 response triggers file-type icon fallback
-  — Card dimensions remain stable across all three states (no layout shift)
-  — loading="lazy" and decoding="async" attributes present
+webui/tests/component/PhotoCardImage.test.ts
+  — Thumbnail src format and required img attributes
+  — Deterministic loading/image/error visibility contract
+  — File-type fallback label mapping
+
+webui/tests/component/PhotoCardImageLogic.test.ts
+  — Thumbnail URL mapping, fallback classification, and explicit state helpers
 ```
 
 ### Acceptance Criteria
 
-- [ ] PhotoCard renders a real `<img>` element with `src` pointing to the thumbnail API.
-- [ ] Skeleton (pulsing rectangle) is visible while the image is loading.
-- [ ] Loaded state shows the full thumbnail with `object-fit: cover`.
-- [ ] Non-image files (404) show an appropriate file-type icon fallback.
-- [ ] Generation failure (500 after retries) shows a broken-image icon.
-- [ ] Card dimensions are stable across skeleton, loaded, and error states (zero layout shift).
-- [ ] `loading="lazy"` and `decoding="async"` attributes are present on the `<img>`.
-- [ ] All new `test_photocard_image.py` tests pass.
-- [ ] All existing Phase 1 integration tests pass (zero regressions).
+- [x] PhotoCard renders a real `<img>` element with `src` pointing to the thumbnail API.
+- [x] Skeleton (pulsing rectangle) is visible while the image is loading.
+- [x] Loaded state shows the full thumbnail with `object-fit: cover`.
+- [x] Non-image files (404) show an appropriate file-type icon fallback.
+- [x] Generation failure (500 after retries) shows a broken-image icon.
+- [x] Card dimensions are stable across skeleton, loaded, and error states (zero layout shift).
+- [x] `loading="lazy"` and `decoding="async"` attributes are present on the `<img>`.
+- [x] All new PhotoCard image unit tests pass.
+- [x] All existing Phase 1 integration tests pass (zero regressions).
 
 ### Stop-Gate
 
@@ -448,7 +449,8 @@ shift-free.
 
 ---
 
-### ⛔ STOP — P1.5-4 complete. Return control to user for review before continuing.
+### Chunk P1.5-4 complete (2026-04-07) — PhotoCard thumbnail image rendering,
+loading/error fallbacks, and deterministic image-state tests validated.
 
 ---
 
@@ -763,6 +765,23 @@ architecture-phase1.5.md` §9.
 - Added unit tests in `webui/tests/component/PhotoWheelInput.test.ts` covering:
   detent and continuous wheel behavior, scroll-lock boundaries, dead-zone handling,
   swipe threshold commit, and velocity-based fling commit.
+- Validation:
+  - `./dev/bin/devctl test-web-unit` passed (svelte-check + vitest)
+  - `PATH="$(pwd)/.venv/bin:$PATH" ./dev/bin/govctl backend.test.integration --json` passed
+
+### 13.6 Chunk P1.5-4 sign-off (2026-04-07)
+
+- Replaced PhotoCard placeholder thumb with real `<img>` bound to
+  `/api/v1/thumbnails/{sha256}` and required attributes (`loading="lazy"`,
+  `decoding="async"`).
+- Implemented explicit image states: loading skeleton, loaded thumbnail,
+  and error fallback surface.
+- Implemented deterministic fallback classification for image/video/document files.
+- Added PhotoCard image-state helper module:
+  `webui/src/lib/components/staging/photocard-image.ts`.
+- Added deterministic unit tests for PhotoCard image contracts in:
+  `webui/tests/component/PhotoCardImage.test.ts` and
+  `webui/tests/component/PhotoCardImageLogic.test.ts`.
 - Validation:
   - `./dev/bin/devctl test-web-unit` passed (svelte-check + vitest)
   - `PATH="$(pwd)/.venv/bin:$PATH" ./dev/bin/govctl backend.test.integration --json` passed
