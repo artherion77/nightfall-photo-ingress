@@ -40,6 +40,7 @@
   --surface-base: var(--color-bg-900);
   --surface-card: var(--color-bg-800);
   --surface-raised: var(--color-bg-700);
+  --surface-raise: var(--surface-raised);
   --surface-hover: var(--color-bg-600);
   --surface-overlay: var(--color-bg-overlay);
 
@@ -48,6 +49,7 @@
   --text-secondary: var(--color-content-200);
   --text-muted: var(--color-content-300);
   --text-disabled: var(--color-content-400);
+  --text-tertiary: var(--text-muted);
 
   /* Interactive / Action Tokens */
   --action-accept: var(--color-accent-teal);

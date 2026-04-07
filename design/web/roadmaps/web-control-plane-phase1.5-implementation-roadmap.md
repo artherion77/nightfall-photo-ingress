@@ -1,10 +1,10 @@
 # Web Control Plane — Phase 1.5 Implementation Roadmap
 
-Status: In Progress — Chunks P1.5-0 through P1.5-6 complete; P1.5-7 not started
+Status: Complete — Phase 1.5 quality gate passed; Chunks P1.5-0 through P1.5-7 implemented
 Date: 2026-04-07
 Owner: Systems Engineering
 Depends on: Phase 1 complete (all Chunks 0-6 implemented and validated)
-Blocks: Phase 2 Chunk P2-2 and beyond
+Blocks: Released — Phase 2 Chunks P2-2 through P2-7 unblocked by P1.5-7 sign-off
 
 Authoritative Phase 1.5 design:
 - `design/web/web-control-plane-architecture-phase1.5.md`
@@ -12,7 +12,7 @@ Authoritative Phase 1.5 design:
 Phase 1 completion record:
 - `design/web/roadmaps/web-control-plane-phase1-implementation-roadmap.md`
 
-Phase 2 roadmap (dependency update required after Phase 1.5 sign-off):
+Phase 2 roadmap (Phase 1.5 dependency gate updated by P1.5-7):
 - `design/web/roadmaps/web-control-plane-phase2-implementation-roadmap.md`
 
 ---
@@ -616,7 +616,7 @@ and validated.
 
 ## 10. Chunk P1.5-7 — Regression + Quality Gate
 
-Status: Not Started
+Status: Implemented (2026-04-07)
 
 ### Purpose
 
@@ -650,24 +650,29 @@ that all Phase 1 behavior is preserved without modification.
 
 ### Acceptance Criteria
 
-- [ ] All Phase 1 integration tests pass without modification.
-- [ ] All Phase 1.5 integration tests pass.
-- [ ] Triage mutations (accept/reject/defer with idempotency keys) are unaffected.
-- [ ] Audit trail entries are unaffected.
-- [ ] Health endpoint and polling are unaffected.
-- [ ] No existing API endpoint responses have changed shape or status codes.
-- [ ] Only one new API endpoint exists: `GET /api/v1/thumbnails/{sha256}`.
-- [ ] All PhotoWheel interaction channels produce correct activeIndex changes.
-- [ ] PhotoCard renders correctly in skeleton, loaded, and error states.
-- [ ] DOM windowing limits rendered nodes to `2 * RENDER_RADIUS + 1`.
-- [ ] Thumbnail preloading fires on IDLE settle within PRELOAD_RADIUS.
-- [ ] Canonical token file is the sole token source for all components.
-- [ ] Phase 2 roadmap dependency annotation is updated.
+- [x] All Phase 1 integration tests pass without modification.
+- [x] All Phase 1.5 integration tests pass.
+- [x] Triage mutations (accept/reject/defer with idempotency keys) are unaffected.
+- [x] Audit trail entries are unaffected.
+- [x] Health endpoint and polling are unaffected.
+- [x] No existing API endpoint responses have changed shape or status codes.
+- [x] Only one new API endpoint exists: `GET /api/v1/thumbnails/{sha256}`.
+- [x] All PhotoWheel interaction channels produce correct activeIndex changes.
+- [x] PhotoCard renders correctly in skeleton, loaded, and error states.
+- [x] DOM windowing limits rendered nodes to `2 * RENDER_RADIUS + 1`.
+- [x] Thumbnail preloading fires on IDLE settle within PRELOAD_RADIUS.
+- [x] Canonical token file is the sole token source for all components.
+- [x] Phase 2 roadmap dependency annotation is updated.
 
 ### Stop-Gate
 
 Phase 1.5 is declared complete only when all acceptance criteria above are met.
 Phase 2 Chunks P2-2 through P2-7 cannot proceed until this gate is passed.
+
+---
+
+### Chunk P1.5-7 complete (2026-04-07) — full regression pass, API/token audits,
+and Phase 2 dependency-gate updates completed; Phase 1.5 declared complete.
 
 ---
 
@@ -833,3 +838,25 @@ architecture-phase1.5.md` §9.
 - Validation:
   - `./dev/bin/devctl test-web-unit` passed (svelte-check + vitest)
   - `PATH="$(pwd)/.venv/bin:$PATH" ./dev/bin/govctl backend.test.integration --json` passed
+
+### 13.9 Chunk P1.5-7 sign-off (2026-04-07)
+
+- Full deterministic validation evidence collected:
+  - `PATH="$(pwd)/.venv/bin:$PATH" ./dev/bin/govctl backend.test.unit --json` passed
+  - `PATH="$(pwd)/.venv/bin:$PATH" ./dev/bin/govctl backend.test.integration --json` passed
+  - `./dev/bin/devctl test-web-unit` passed (includes `svelte-check` + vitest)
+- API surface audit completed from router inventory in `api/app.py` and
+  `api/routers/*`:
+  only one new `/api/v1/*` endpoint exists relative to Phase 1,
+  `GET /api/v1/thumbnails/{sha256}`.
+- Token migration audit completed:
+  `webui/src/routes/+layout.svelte` now imports canonical tokens from
+  `webui/src/lib/tokens/tokens.css`; legacy `webui/src/styles/tokens.css`
+  reduced to compatibility shim only.
+- Phase 2 dependency annotations updated so P2-2 through P2-7 explicitly depend on
+  Phase 1.5 completion, while P2-1 remains complete and exempt.
+- Roadmap index updated to include both Phase 1.5 and Phase 2 roadmap artifacts.
+- Note on governed aggregate test target:
+  `./dev/bin/govctl test.all --json` timed out in `dev.stack-ready.webui`
+  after backend unit/integration targets had already passed. Chunk sign-off relies on
+  the direct deterministic gates above rather than the orchestration timeout path.

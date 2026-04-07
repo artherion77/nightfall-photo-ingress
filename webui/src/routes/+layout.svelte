@@ -1,6 +1,6 @@
 <script>
   import '../styles/reset.css';
-  import '../styles/tokens.css';
+  import '$lib/tokens/tokens.css';
   import AppHeader from '$lib/components/layout/AppHeader.svelte';
   import AppFooter from '$lib/components/layout/AppFooter.svelte';
   import { health } from '$lib/stores/health.svelte';

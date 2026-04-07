@@ -3,13 +3,17 @@
 Status: In Progress — Chunk P2-1 (API Client Retry/Backoff) complete; P2-2 not started
 Date: 2026-04-06
 Owner: Systems Engineering
-Depends on: Phase 1 complete (all Chunks 0-6 implemented and validated)
+Depends on: Phase 1 complete (all Chunks 0-6 implemented and validated);
+Phase 1.5 complete for P2-2 through P2-7 (P2-1 already implemented)
 
 Authoritative Phase 2 design:
 - `design/web/web-control-plane-architecture-phase2.md`
 
 Phase 1 completion record:
 - `design/web/roadmaps/web-control-plane-phase1-implementation-roadmap.md`
+
+Phase 1.5 completion gate:
+- `design/web/roadmaps/web-control-plane-phase1.5-implementation-roadmap.md`
 
 ---
 
@@ -46,27 +50,32 @@ Optional items are listed in §10 for reference.
 ```
 Phase 1 (all chunks complete)
     │
-    ├──► P2-1: API Client Retry/Backoff   (independent; no backend changes)
+    ├──► P2-1: API Client Retry/Backoff   (independent; already complete)
     │
-    ├──► P2-2: Filter Sidebar             (depends on Phase 1 staging endpoint)
-    │
-    ├──► P2-3: Audit Timeline ∞ Scroll    (depends on Phase 1 audit endpoint)
-    │
-    ├──► P2-4: KPI Threshold Config       (depends on Phase 1 config endpoint)
-    │
-    ├──► P2-5: API Versioning Policy      (documentation; no code gate)
-    │
-    ├──► P2-6: Build Artifact Versioning  (deployment tooling; no code gate)
-    │
-    └──► P2-7: Caddy LAN Gate             (depends on P2-5 and P2-6 being complete;
-                                           all mandatory code chunks should be done first)
+    └──► Phase 1.5 (quality gate complete)
+            │
+            ├──► P2-2: Filter Sidebar             (depends on Phase 1 staging endpoint
+            │                                        and Phase 1.5 PhotoWheel/thumbnail gate)
+            │
+            ├──► P2-3: Audit Timeline ∞ Scroll    (depends on Phase 1 audit endpoint
+            │                                        and Phase 1.5 completion gate)
+            │
+            ├──► P2-4: KPI Threshold Config       (depends on Phase 1 config endpoint
+            │                                        and Phase 1.5 completion gate)
+            │
+            ├──► P2-5: API Versioning Policy      (documentation; blocked on Phase 1.5 gate)
+            │
+            ├──► P2-6: Build Artifact Versioning  (deployment tooling; blocked on Phase 1.5 gate)
+            │
+            └──► P2-7: Caddy LAN Gate             (depends on P2-5 and P2-6 being complete;
+                                                     all mandatory code chunks should be done first)
 ```
 
-**Execution order:** P2-1 through P2-6 are independent of each other and can be
-implemented in any order. P2-7 (LAN gate) should not be activated until all other
-mandatory chunks are complete and stable.
+**Execution order:** P2-1 is already complete. P2-2 through P2-6 remain independent
+after the Phase 1.5 gate, and may be implemented in any order. P2-7 (LAN gate)
+should not be activated until all other mandatory chunks are complete and stable.
 
-**Recommended sequence:** P2-1 → P2-2 → P2-3 → P2-4 → P2-5 → P2-6 → P2-7.
+**Recommended sequence:** P2-1 → Phase 1.5 gate → P2-2 → P2-3 → P2-4 → P2-5 → P2-6 → P2-7.
 
 ---
 

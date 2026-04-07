@@ -12,6 +12,8 @@ Design-rationale documents are located one level up in `design/web/`.
 | Document | Role | Current use |
 |---|---|---|
 | [web-control-plane-phase1-implementation-roadmap.md](web-control-plane-phase1-implementation-roadmap.md) | Phase 1 chunk delivery tracker | Primary chunk-status and execution-order tracker |
+| [web-control-plane-phase1.5-implementation-roadmap.md](web-control-plane-phase1.5-implementation-roadmap.md) | Phase 1.5 chunk delivery tracker | Thumbnail, interaction model, DOM windowing chunks |
+| [web-control-plane-phase2-implementation-roadmap.md](web-control-plane-phase2-implementation-roadmap.md) | Phase 2 chunk delivery tracker | LAN exposure prerequisites and mandatory features |
 | [web-control-plane-integration-plan.md](web-control-plane-integration-plan.md) | End-to-end integration sequencing | Baseline implementation plus post-Phase-4 replan |
 | [web-control-plane-phase1-scope.md](web-control-plane-phase1-scope.md) | Scope decision log | Records accepted/deferred scope decisions |
 | [../web-control-plane-techstack-decision.md](../web-control-plane-techstack-decision.md) | Stack and dependency decisions | Rationale for FastAPI/Uvicorn/SvelteKit/RapiDoc choices |
