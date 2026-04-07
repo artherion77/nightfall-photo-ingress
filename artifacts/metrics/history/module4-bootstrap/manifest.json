@@ -4,16 +4,16 @@
   "source": {
     "repository_path": "/home/chris/dev/nightfall-photo-ingress",
     "branch": "main",
-    "commit_sha": "831aeb4cf21e7ce3e72948f4005a49187078de74"
+    "commit_sha": "4fd126dc124dcf2388f206f61ea2ee3fc1b97a0c"
   },
   "trigger": {
     "mode": "bootstrap",
-    "polled_at": "2026-04-04T12:28:57.919618+00:00"
+    "polled_at": "2026-04-07T18:19:11.276711+00:00"
   },
   "execution": {
-    "started_at": "2026-04-04T12:28:57.919618+00:00",
-    "finished_at": "2026-04-04T12:28:57.924242+00:00",
-    "duration_seconds": 0.0046,
+    "started_at": "2026-04-07T18:19:11.276711+00:00",
+    "finished_at": "2026-04-07T18:19:11.283158+00:00",
+    "duration_seconds": 0.0065,
     "hostname": "nightfall",
     "executor_identity": "chris",
     "exit_state": "success"
@@ -28,7 +28,7 @@
       "name": "module4_aggregate",
       "status": "success",
       "exit_code": 0,
-      "duration_seconds": 0.0046
+      "duration_seconds": 0.0065
     }
   ],
   "artifacts": {
@@ -44,8 +44,6 @@
     "published_at": null
   },
   "warnings": [
-    "modules.backend.metrics.complexity not available",
-    "modules.backend.metrics.coverage not available",
     "modules.frontend.metrics.test_coverage not available"
   ],
   "failures": []
