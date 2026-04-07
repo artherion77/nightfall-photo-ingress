@@ -1,6 +1,6 @@
 # Web Control Plane — Phase 1.5 Implementation Roadmap
 
-Status: In Progress — Chunk P1.5-0 complete; P1.5-1 not started
+Status: In Progress — Chunks P1.5-0 and P1.5-1 complete; P1.5-2 not started
 Date: 2026-04-07
 Owner: Systems Engineering
 Depends on: Phase 1 complete (all Chunks 0-6 implemented and validated)
@@ -146,7 +146,7 @@ migration expectation, and motion-token source-of-truth documented.
 
 ## 4. Chunk P1.5-1 — Thumbnail Backend Integration Contract
 
-Status: Not Started
+Status: Implemented (2026-04-07)
 
 ### Purpose
 
@@ -201,12 +201,12 @@ parallel with no ambiguity.
 
 ### Acceptance Criteria
 
-- [ ] Integration contract document exists and covers all items listed above.
-- [ ] API route, status codes, headers, and content type are specified without ambiguity.
-- [ ] Frontend loading-state transition table is specified.
-- [ ] Backend latency budget and atomic-write guarantee are stated.
-- [ ] Preload concurrency and abandoned-connection tolerance are stated.
-- [ ] No code changes are included in this chunk.
+- [x] Integration contract document exists and covers all items listed above.
+- [x] API route, status codes, headers, and content type are specified without ambiguity.
+- [x] Frontend loading-state transition table is specified.
+- [x] Backend latency budget and atomic-write guarantee are stated.
+- [x] Preload concurrency and abandoned-connection tolerance are stated.
+- [x] No code changes are included in this chunk.
 
 ### Stop-Gate
 
@@ -216,7 +216,8 @@ this contract.
 
 ---
 
-### ⛔ STOP — P1.5-1 complete. Return control to user for review before continuing.
+### Chunk P1.5-1 complete (2026-04-07) — integration contract designated and
+signed off in architecture documentation.
 
 ---
 
@@ -728,3 +729,12 @@ architecture-phase1.5.md` §9.
 - Added explicit PhotoWheel motion-token source-of-truth statement and Phase 1.5
   token dependency list.
 - Marked chunk P1.5-0 as implemented and acceptance criteria complete.
+
+### 13.3 Chunk P1.5-1 sign-off (2026-04-07)
+
+- Designated `design/web/web-control-plane-architecture-phase1.5.md` section 5 as the
+  authoritative thumbnail integration contract for chunks P1.5-2, P1.5-4, and P1.5-6.
+- Confirmed the contract includes required API surface, error semantics, preload
+  contract, loading-state transitions, backend guarantees, and no-schema-change
+  constraint.
+- Marked chunk P1.5-1 as implemented and acceptance criteria complete.

@@ -326,6 +326,26 @@ navigates:
 
 ## 5. Thumbnail Backend Design
 
+### 5.0 Integration contract designation (P1.5-1)
+
+Sections 5.1 through 5.7 and the related frontend loading-state definition in section
+6.4 are the authoritative Phase 1.5 thumbnail integration contract consumed by:
+
+- Backend implementation chunk P1.5-2
+- Frontend image rendering chunk P1.5-4
+- Frontend preloading chunk P1.5-6
+
+This contract is signed off for P1.5-1 with the following fixed constraints:
+
+- API route and response contract: `GET /api/v1/thumbnails/{sha256}` with 200/404/500
+  semantics and explicit content/cache headers as defined below.
+- Frontend loading behavior: skeleton -> loaded -> error states as defined in section 6.4.
+- Preload behavior: `new Image()`-based prefetch with tolerated concurrent requests and
+  abandoned client connections.
+- Backend guarantees: latency targets, atomic writes, zero-byte marker behavior, and
+  cache purge expectations.
+- Registry boundary: no registry schema changes for thumbnail state.
+
 ### 5.1 Design principles
 
 1. **Independent subsystem.** Thumbnail generation and serving is a self-contained
