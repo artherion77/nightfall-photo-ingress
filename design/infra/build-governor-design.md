@@ -21,7 +21,8 @@
 10. [Operational UX](#10-operational-ux)
 11. [Integration Notes](#11-integration-notes)
 12. [Open Questions and Decision Points](#12-open-questions-and-decision-points)
-13. [Appendix: Mapping to Existing Repo Artifacts](#13-appendix-mapping-to-existing-repo-artifacts)
+13. [Executor Refactoring: FD-Safe Process Tree](#13-executor-refactoring-fd-safe-process-tree)
+14. [Appendix: Mapping to Existing Repo Artifacts](#14-appendix-mapping-to-existing-repo-artifacts)
 
 ---
 
@@ -805,7 +806,91 @@ Should `govctl` prune old run artifacts from `artifacts/govctl/`?
 
 ---
 
-## 13. Appendix: Mapping to Existing Repo Artifacts
+## 13. Executor Refactoring: FD-Safe Process Tree
+
+**Status:** implemented  
+**Date:** 2025-07-26  
+**Addresses:** GitHub issue #12 — govctl test.all intermittently times out in
+`dev.stack-ready.webui` after cold container start.
+
+### 13.1 Problem
+
+The original executor ran target commands using:
+
+```bash
+(
+    cd "$GOVCTL_EXEC_PROJECT_ROOT"
+    timeout "$timeout_sec" bash -c "$command"
+) 2>&1 | tee "$target_log" || exit_code="${PIPESTATUS[0]:-1}"
+```
+
+`timeout(1)` (GNU coreutils) by default creates a **new process group** via
+`setpgid()` so it can later kill the entire group if the time limit expires.
+When `lxc` is installed via snap, the `snap-confine` security wrapper
+performs process-group and session checks during setup. When `snap-confine`
+runs inside a non-leader process group created by `timeout`, it intermittently
+hangs or exits with status 1, causing the outer `timeout` to fire (exit 124).
+
+The failure is non-deterministic because `snap-confine`'s behaviour depends on
+kernel scheduling of the `setpgid()` race between `timeout` and the child exec
+chain.
+
+### 13.2 Root Cause Analysis Summary
+
+Hypotheses that were systematically ruled out:
+
+| Hypothesis | Test | Result |
+|---|---|---|
+| Container readiness race | Artifact logs show "ready" before hang | Ruled out |
+| flock reentry deadlock | Tested explicit FD reentry | Ruled out |
+| Cold boot time exceeding timeout | 5/5 manual cold starts succeed | Ruled out |
+| `tee` pipeline buffering | Tested without tee: same hang | Ruled out |
+| `set -e` / `pipefail` propagation | Verified not set in executor | Ruled out |
+| Inherited FD (flock FD) | Closed ALL FDs > 2 in child: still hangs | Ruled out |
+| `timeout` process group (`setpgid`) | `timeout --foreground`: passes | **Confirmed** |
+
+Key evidence:
+
+- Closing all inherited FDs in the child (including the flock FD) does NOT
+  prevent the hang. The issue is not FD-related.
+- `timeout --foreground` (which skips `setpgid()`) resolves the issue
+  immediately — even with all FDs inherited, even through the full devctl stack.
+- `lxc exec --force-noninteractive` also works, confirming the interaction is
+  between snap-confine's process group detection and timeout's `setpgid()`.
+
+### 13.3 Design Change
+
+A single-line change to the executor's command invocation:
+
+```diff
+- timeout "$timeout_sec" bash -c "$command"
++ timeout --foreground "$timeout_sec" bash -c "$command"
+```
+
+The `--foreground` flag tells `timeout` to **not** create a new process group.
+The child command inherits the caller's process group, which is what
+`snap-confine` expects.
+
+**Trade-off:** Without a dedicated process group, `timeout` cannot
+`kill(-pgid)` the entire group on expiry. Instead it sends SIGTERM to the
+direct child only. For govctl's use case this is acceptable because:
+
+1. `bash -c` receives SIGTERM, which propagates to its foreground job.
+2. devctl/lxc exec handle SIGTERM correctly (tested).
+3. govctl already has per-target timeout events and the run aborts on failure.
+
+### 13.4 Compatibility
+
+- Lock semantics: unchanged (flock held by parent, `DEVCTL_GLOBAL_LOCK_HELD=1`
+  prevents reentry).
+- Tee pipeline: unchanged (kept for real-time log passthrough).
+- JSONL event output: unchanged.
+- Process tree depth: unchanged (same nesting, just no `setpgid`).
+- No changes to `govctl-targets.yaml`, preflight system, or graph resolution.
+
+---
+
+## 14. Appendix: Mapping to Existing Repo Artifacts
 
 This table maps every proposed `govctl` target back to the existing tool,
 script, or command it delegates to.
@@ -834,7 +919,7 @@ script, or command it delegates to.
 | `staging.smoke` | `stagingctl smoke` | `dev/bin/stagingctl` | No | JSONL evidence collection |
 | `staging.smoke-live` | `stagingctl smoke-live` | `dev/bin/stagingctl` | No | Authenticated poll + secret scan |
 
-### 13.1 Existing Shared Infrastructure Reused
+### 14.1 Existing Shared Infrastructure Reused
 
 | Artifact | Path | Usage in govctl |
 |----------|------|-----------------|
@@ -847,7 +932,7 @@ script, or command it delegates to.
 | Evidence directory | `artifacts/govctl/` | New — follows the `artifacts/` convention from `artifacts/metrics/` |
 | Build output | `dist/` | Reused by `backend.build.wheel` → `staging.install` chain |
 
-### 13.2 New Artifacts Introduced
+### 14.2 New Artifacts Introduced
 
 | Artifact | Path | Description |
 |----------|------|-------------|

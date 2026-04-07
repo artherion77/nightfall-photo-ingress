@@ -288,9 +288,13 @@ govctl_execute() {
         target_start_epoch="$(date +%s)"
         exit_code=0
 
+        # Use --foreground so timeout does NOT create a new process group.
+        # Without --foreground, snap-confine (snap-installed LXD) hangs
+        # when called from a child in a non-leader process group.
+        # See design doc §13 and GitHub issue #12.
         (
             cd "$GOVCTL_EXEC_PROJECT_ROOT"
-            timeout "$timeout_sec" bash -c "$command"
+            timeout --foreground "$timeout_sec" bash -c "$command"
         ) 2>&1 | tee "$target_log" || exit_code="${PIPESTATUS[0]:-1}"
 
         # Detect timeout (exit code 124 from GNU timeout).
