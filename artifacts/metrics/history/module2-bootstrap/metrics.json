@@ -2,13 +2,13 @@
   "schema_version": 1,
   "run_id": "module2-bootstrap",
   "source": {
-    "commit_sha": "e28aab693b90404700e94a507650258f7bb3df7b",
+    "commit_sha": "4fd126dc124dcf2388f206f61ea2ee3fc1b97a0c",
     "branch": "main"
   },
-  "collection_status": "partial",
+  "collection_status": "success",
   "modules": {
     "backend": {
-      "status": "partial",
+      "status": "success",
       "metrics": {
         "loc": {
           "status": "success",
@@ -17,29 +17,29 @@
             "api",
             "tests"
           ],
-          "files": 156,
-          "total_lines": 25396,
-          "total_code_lines": 20946,
+          "files": 176,
+          "total_lines": 29503,
+          "total_code_lines": 24200,
           "per_file": {
             "api/__init__.py": {
               "lines": 1,
               "code_lines": 1
             },
             "api/app.py": {
-              "lines": 109,
-              "code_lines": 84
+              "lines": 151,
+              "code_lines": 120
             },
             "api/audit_hook.py": {
-              "lines": 47,
-              "code_lines": 39
+              "lines": 52,
+              "code_lines": 41
             },
             "api/auth.py": {
-              "lines": 58,
-              "code_lines": 44
+              "lines": 114,
+              "code_lines": 91
             },
             "api/dependencies.py": {
-              "lines": 27,
-              "code_lines": 17
+              "lines": 35,
+              "code_lines": 22
             },
             "api/rapiddoc.py": {
               "lines": 60,
@@ -54,8 +54,8 @@
               "code_lines": 23
             },
             "api/routers/blocklist.py": {
-              "lines": 79,
-              "code_lines": 67
+              "lines": 81,
+              "code_lines": 68
             },
             "api/routers/config.py": {
               "lines": 20,
@@ -69,9 +69,13 @@
               "lines": 37,
               "code_lines": 30
             },
+            "api/routers/thumbnails.py": {
+              "lines": 48,
+              "code_lines": 38
+            },
             "api/routers/triage.py": {
-              "lines": 92,
-              "code_lines": 78
+              "lines": 101,
+              "code_lines": 87
             },
             "api/schemas/__init__.py": {
               "lines": 31,
@@ -82,8 +86,8 @@
               "code_lines": 18
             },
             "api/schemas/blocklist.py": {
-              "lines": 48,
-              "code_lines": 31
+              "lines": 50,
+              "code_lines": 32
             },
             "api/schemas/config.py": {
               "lines": 25,
@@ -102,8 +106,8 @@
               "code_lines": 11
             },
             "api/services/__init__.py": {
-              "lines": 17,
-              "code_lines": 15
+              "lines": 19,
+              "code_lines": 17
             },
             "api/services/audit_service.py": {
               "lines": 83,
@@ -125,9 +129,13 @@
               "lines": 86,
               "code_lines": 67
             },
+            "api/services/thumbnail_service.py": {
+              "lines": 167,
+              "code_lines": 127
+            },
             "api/services/triage_service.py": {
-              "lines": 157,
-              "code_lines": 138
+              "lines": 186,
+              "code_lines": 162
             },
             "src/nightfall_photo_ingress/__init__.py": {
               "lines": 5,
@@ -174,8 +182,8 @@
               "code_lines": 668
             },
             "src/nightfall_photo_ingress/config.py": {
-              "lines": 816,
-              "code_lines": 678
+              "lines": 838,
+              "code_lines": 699
             },
             "src/nightfall_photo_ingress/domain/__init__.py": {
               "lines": 10,
@@ -246,40 +254,52 @@
               "code_lines": 7
             },
             "tests/integration/api/conftest.py": {
-              "lines": 182,
-              "code_lines": 161
+              "lines": 183,
+              "code_lines": 162
             },
             "tests/integration/api/support.py": {
               "lines": 7,
               "code_lines": 4
             },
             "tests/integration/api/test_api_triage.py": {
-              "lines": 123,
-              "code_lines": 100
+              "lines": 205,
+              "code_lines": 172
             },
             "tests/integration/api/test_audit_log.py": {
-              "lines": 28,
-              "code_lines": 21
+              "lines": 34,
+              "code_lines": 25
             },
             "tests/integration/api/test_auth.py": {
-              "lines": 73,
-              "code_lines": 56
+              "lines": 108,
+              "code_lines": 86
             },
             "tests/integration/api/test_blocklist.py": {
-              "lines": 136,
-              "code_lines": 111
+              "lines": 165,
+              "code_lines": 134
             },
             "tests/integration/api/test_config.py": {
               "lines": 23,
               "code_lines": 16
             },
+            "tests/integration/api/test_cors.py": {
+              "lines": 51,
+              "code_lines": 39
+            },
             "tests/integration/api/test_health.py": {
               "lines": 21,
               "code_lines": 16
             },
+            "tests/integration/api/test_security_headers.py": {
+              "lines": 44,
+              "code_lines": 32
+            },
             "tests/integration/api/test_staging.py": {
-              "lines": 56,
-              "code_lines": 44
+              "lines": 62,
+              "code_lines": 48
+            },
+            "tests/integration/api/test_thumbnails.py": {
+              "lines": 195,
+              "code_lines": 151
             },
             "tests/integration/browser_chain_harness/__init__.py": {
               "lines": 0,
@@ -469,6 +489,10 @@
               "lines": 13,
               "code_lines": 8
             },
+            "tests/unit/test_cognitive_complexity.py": {
+              "lines": 188,
+              "code_lines": 159
+            },
             "tests/unit/test_config_check_integration.py": {
               "lines": 82,
               "code_lines": 63
@@ -482,12 +506,20 @@
               "code_lines": 159
             },
             "tests/unit/test_devcontainer_snapshot_invariants.py": {
-              "lines": 54,
-              "code_lines": 39
+              "lines": 73,
+              "code_lines": 51
             },
             "tests/unit/test_devctl_contracts.py": {
               "lines": 104,
               "code_lines": 81
+            },
+            "tests/unit/test_govctl_manifest.py": {
+              "lines": 175,
+              "code_lines": 144
+            },
+            "tests/unit/test_govctl_resolve.py": {
+              "lines": 134,
+              "code_lines": 107
             },
             "tests/unit/test_imports.py": {
               "lines": 17,
@@ -545,21 +577,53 @@
               "lines": 86,
               "code_lines": 67
             },
+            "tests/unit/test_manifest_hash.py": {
+              "lines": 190,
+              "code_lines": 126
+            },
+            "tests/unit/test_mcp_metrics_tasks.py": {
+              "lines": 103,
+              "code_lines": 86
+            },
             "tests/unit/test_mcp_server.py": {
               "lines": 67,
               "code_lines": 57
             },
             "tests/unit/test_mcp_web_tasks.py": {
-              "lines": 97,
-              "code_lines": 78
+              "lines": 103,
+              "code_lines": 84
             },
             "tests/unit/test_metrics_module1_schema.py": {
-              "lines": 47,
-              "code_lines": 34
+              "lines": 60,
+              "code_lines": 41
             },
             "tests/unit/test_metrics_module2_backend.py": {
-              "lines": 69,
-              "code_lines": 54
+              "lines": 170,
+              "code_lines": 131
+            },
+            "tests/unit/test_metrics_module3_frontend.py": {
+              "lines": 365,
+              "code_lines": 286
+            },
+            "tests/unit/test_metrics_module4_aggregator.py": {
+              "lines": 131,
+              "code_lines": 119
+            },
+            "tests/unit/test_metrics_module5_dashboard.py": {
+              "lines": 437,
+              "code_lines": 380
+            },
+            "tests/unit/test_metrics_module6_poller.py": {
+              "lines": 258,
+              "code_lines": 189
+            },
+            "tests/unit/test_metrics_module7_publication.py": {
+              "lines": 212,
+              "code_lines": 173
+            },
+            "tests/unit/test_metrics_module8_operations.py": {
+              "lines": 253,
+              "code_lines": 205
             },
             "tests/unit/test_module8_packaging.py": {
               "lines": 28,
@@ -589,6 +653,10 @@
               "lines": 379,
               "code_lines": 301
             },
+            "tests/unit/test_package_meta.py": {
+              "lines": 172,
+              "code_lines": 140
+            },
             "tests/unit/test_registry_operations.py": {
               "lines": 228,
               "code_lines": 181
@@ -600,6 +668,14 @@
             "tests/unit/test_reject_cli.py": {
               "lines": 336,
               "code_lines": 285
+            },
+            "tests/unit/test_repo_lock.py": {
+              "lines": 243,
+              "code_lines": 185
+            },
+            "tests/unit/test_source_fingerprint.py": {
+              "lines": 119,
+              "code_lines": 87
             },
             "tests/unit/test_staging_recovery.py": {
               "lines": 143,
@@ -644,12 +720,732 @@
             "tests/unit/test_v2_config_hardening.py": {
               "lines": 112,
               "code_lines": 89
+            },
+            "tests/unit/test_venv_bootstrap.py": {
+              "lines": 147,
+              "code_lines": 97
             }
           }
         },
         "complexity": {
-          "status": "not_available",
-          "reason": "radon unavailable: No module named 'radon'"
+          "status": "success",
+          "radon_version": "6.0.1",
+          "cyclomatic": {
+            "mean": 3.2016,
+            "max": 48.0,
+            "count": 1508
+          },
+          "maintainability_index": {
+            "mean": 55.4652,
+            "min": 0.0,
+            "count": 176
+          },
+          "per_file": {
+            "api/__init__.py": {
+              "cyclomatic_avg": 0.0,
+              "maintainability_index": 100.0
+            },
+            "api/app.py": {
+              "cyclomatic_avg": 4.6667,
+              "maintainability_index": 40.3556
+            },
+            "api/audit_hook.py": {
+              "cyclomatic_avg": 1.0,
+              "maintainability_index": 100.0
+            },
+            "api/auth.py": {
+              "cyclomatic_avg": 2.5,
+              "maintainability_index": 67.6937
+            },
+            "api/dependencies.py": {
+              "cyclomatic_avg": 1.6667,
+              "maintainability_index": 62.3026
+            },
+            "api/rapiddoc.py": {
+              "cyclomatic_avg": 1.0,
+              "maintainability_index": 63.1455
+            },
+            "api/routers/__init__.py": {
+              "cyclomatic_avg": 0.0,
+              "maintainability_index": 100.0
+            },
+            "api/routers/audit_log.py": {
+              "cyclomatic_avg": 1.0,
+              "maintainability_index": 100.0
+            },
+            "api/routers/blocklist.py": {
+              "cyclomatic_avg": 2.25,
+              "maintainability_index": 100.0
+            },
+            "api/routers/config.py": {
+              "cyclomatic_avg": 1.0,
+              "maintainability_index": 100.0
+            },
+            "api/routers/health.py": {
+              "cyclomatic_avg": 1.0,
+              "maintainability_index": 100.0
+            },
+            "api/routers/staging.py": {
+              "cyclomatic_avg": 1.5,
+              "maintainability_index": 68.7803
+            },
+            "api/routers/thumbnails.py": {
+              "cyclomatic_avg": 3.0,
+              "maintainability_index": 100.0
+            },
+            "api/routers/triage.py": {
+              "cyclomatic_avg": 1.75,
+              "maintainability_index": 100.0
+            },
+            "api/schemas/__init__.py": {
+              "cyclomatic_avg": 0.0,
+              "maintainability_index": 100.0
+            },
+            "api/schemas/audit.py": {
+              "cyclomatic_avg": 1.0,
+              "maintainability_index": 57.622
+            },
+            "api/schemas/blocklist.py": {
+              "cyclomatic_avg": 1.0,
+              "maintainability_index": 51.4531
+            },
+            "api/schemas/config.py": {
+              "cyclomatic_avg": 1.0,
+              "maintainability_index": 100.0
+            },
+            "api/schemas/health.py": {
+              "cyclomatic_avg": 1.0,
+              "maintainability_index": 65.4195
+            },
+            "api/schemas/staging.py": {
+              "cyclomatic_avg": 1.0,
+              "maintainability_index": 59.8826
+            },
+            "api/schemas/triage.py": {
+              "cyclomatic_avg": 1.0,
+              "maintainability_index": 69.4689
+            },
+            "api/services/__init__.py": {
+              "cyclomatic_avg": 0.0,
+              "maintainability_index": 100.0
+            },
+            "api/services/audit_service.py": {
+              "cyclomatic_avg": 7.0,
+              "maintainability_index": 55.547
+            },
+            "api/services/blocklist_service.py": {
+              "cyclomatic_avg": 4.0,
+              "maintainability_index": 36.9208
+            },
+            "api/services/config_service.py": {
+              "cyclomatic_avg": 1.5,
+              "maintainability_index": 100.0
+            },
+            "api/services/health_service.py": {
+              "cyclomatic_avg": 4.5,
+              "maintainability_index": 100.0
+            },
+            "api/services/staging_service.py": {
+              "cyclomatic_avg": 4.5,
+              "maintainability_index": 49.9599
+            },
+            "api/services/thumbnail_service.py": {
+              "cyclomatic_avg": 3.25,
+              "maintainability_index": 41.2376
+            },
+            "api/services/triage_service.py": {
+              "cyclomatic_avg": 3.1667,
+              "maintainability_index": 47.7104
+            },
+            "src/nightfall_photo_ingress/__init__.py": {
+              "cyclomatic_avg": 0.0,
+              "maintainability_index": 100.0
+            },
+            "src/nightfall_photo_ingress/__main__.py": {
+              "cyclomatic_avg": 0.0,
+              "maintainability_index": 81.8563
+            },
+            "src/nightfall_photo_ingress/adapters/__init__.py": {
+              "cyclomatic_avg": 0.0,
+              "maintainability_index": 100.0
+            },
+            "src/nightfall_photo_ingress/adapters/onedrive/__init__.py": {
+              "cyclomatic_avg": 0.0,
+              "maintainability_index": 100.0
+            },
+            "src/nightfall_photo_ingress/adapters/onedrive/auth.py": {
+              "cyclomatic_avg": 3.5,
+              "maintainability_index": 34.1989
+            },
+            "src/nightfall_photo_ingress/adapters/onedrive/cache_lock.py": {
+              "cyclomatic_avg": 1.5,
+              "maintainability_index": 83.9786
+            },
+            "src/nightfall_photo_ingress/adapters/onedrive/client.py": {
+              "cyclomatic_avg": 4.2763,
+              "maintainability_index": 0.0
+            },
+            "src/nightfall_photo_ingress/adapters/onedrive/errors.py": {
+              "cyclomatic_avg": 2.2941,
+              "maintainability_index": 71.3442
+            },
+            "src/nightfall_photo_ingress/adapters/onedrive/retry.py": {
+              "cyclomatic_avg": 2.5,
+              "maintainability_index": 63.9853
+            },
+            "src/nightfall_photo_ingress/adapters/onedrive/safe_logging.py": {
+              "cyclomatic_avg": 7.0,
+              "maintainability_index": 82.9839
+            },
+            "src/nightfall_photo_ingress/cli.py": {
+              "cyclomatic_avg": 4.4118,
+              "maintainability_index": 24.0656
+            },
+            "src/nightfall_photo_ingress/config.py": {
+              "cyclomatic_avg": 4.5926,
+              "maintainability_index": 16.9202
+            },
+            "src/nightfall_photo_ingress/domain/__init__.py": {
+              "cyclomatic_avg": 0.0,
+              "maintainability_index": 100.0
+            },
+            "src/nightfall_photo_ingress/domain/ingest.py": {
+              "cyclomatic_avg": 6.7895,
+              "maintainability_index": 15.0628
+            },
+            "src/nightfall_photo_ingress/domain/journal.py": {
+              "cyclomatic_avg": 2.75,
+              "maintainability_index": 53.0117
+            },
+            "src/nightfall_photo_ingress/domain/registry.py": {
+              "cyclomatic_avg": 1.6923,
+              "maintainability_index": 25.2574
+            },
+            "src/nightfall_photo_ingress/domain/storage.py": {
+              "cyclomatic_avg": 2.9375,
+              "maintainability_index": 46.4439
+            },
+            "src/nightfall_photo_ingress/live_photo.py": {
+              "cyclomatic_avg": 2.375,
+              "maintainability_index": 40.6859
+            },
+            "src/nightfall_photo_ingress/logging_bootstrap.py": {
+              "cyclomatic_avg": 5.65,
+              "maintainability_index": 27.4813
+            },
+            "src/nightfall_photo_ingress/migrations/0003_add_blocked_rules.py": {
+              "cyclomatic_avg": 1.0,
+              "maintainability_index": 100.0
+            },
+            "src/nightfall_photo_ingress/migrations/0004_add_ui_action_idempotency.py": {
+              "cyclomatic_avg": 1.0,
+              "maintainability_index": 100.0
+            },
+            "src/nightfall_photo_ingress/migrations/__init__.py": {
+              "cyclomatic_avg": 0.0,
+              "maintainability_index": 100.0
+            },
+            "src/nightfall_photo_ingress/reject.py": {
+              "cyclomatic_avg": 4.0667,
+              "maintainability_index": 25.5542
+            },
+            "src/nightfall_photo_ingress/runtime/__init__.py": {
+              "cyclomatic_avg": 0.0,
+              "maintainability_index": 100.0
+            },
+            "src/nightfall_photo_ingress/runtime/process_lock.py": {
+              "cyclomatic_avg": 1.0,
+              "maintainability_index": 100.0
+            },
+            "src/nightfall_photo_ingress/status.py": {
+              "cyclomatic_avg": 2.0,
+              "maintainability_index": 64.0119
+            },
+            "src/nightfall_photo_ingress/sync_import.py": {
+              "cyclomatic_avg": 3.5833,
+              "maintainability_index": 37.7086
+            },
+            "tests/__init__.py": {
+              "cyclomatic_avg": 0.0,
+              "maintainability_index": 100.0
+            },
+            "tests/conftest.py": {
+              "cyclomatic_avg": 0.0,
+              "maintainability_index": 100.0
+            },
+            "tests/integration/api/conftest.py": {
+              "cyclomatic_avg": 1.0,
+              "maintainability_index": 55.1807
+            },
+            "tests/integration/api/support.py": {
+              "cyclomatic_avg": 1.0,
+              "maintainability_index": 100.0
+            },
+            "tests/integration/api/test_api_triage.py": {
+              "cyclomatic_avg": 5.125,
+              "maintainability_index": 33.5464
+            },
+            "tests/integration/api/test_audit_log.py": {
+              "cyclomatic_avg": 3.3333,
+              "maintainability_index": 56.7854
+            },
+            "tests/integration/api/test_auth.py": {
+              "cyclomatic_avg": 4.7143,
+              "maintainability_index": 57.0371
+            },
+            "tests/integration/api/test_blocklist.py": {
+              "cyclomatic_avg": 3.5556,
+              "maintainability_index": 36.404
+            },
+            "tests/integration/api/test_config.py": {
+              "cyclomatic_avg": 3.0,
+              "maintainability_index": 61.8536
+            },
+            "tests/integration/api/test_cors.py": {
+              "cyclomatic_avg": 3.3333,
+              "maintainability_index": 55.6797
+            },
+            "tests/integration/api/test_health.py": {
+              "cyclomatic_avg": 3.0,
+              "maintainability_index": 69.4459
+            },
+            "tests/integration/api/test_security_headers.py": {
+              "cyclomatic_avg": 5.0,
+              "maintainability_index": 51.8185
+            },
+            "tests/integration/api/test_staging.py": {
+              "cyclomatic_avg": 4.0,
+              "maintainability_index": 46.7581
+            },
+            "tests/integration/api/test_thumbnails.py": {
+              "cyclomatic_avg": 3.3636,
+              "maintainability_index": 32.1721
+            },
+            "tests/integration/browser_chain_harness/__init__.py": {
+              "cyclomatic_avg": 0.0,
+              "maintainability_index": 100.0
+            },
+            "tests/integration/browser_chain_harness/chain_harness.py": {
+              "cyclomatic_avg": 1.1429,
+              "maintainability_index": 62.8832
+            },
+            "tests/integration/browser_chain_harness/test_browser_chain_harness.py": {
+              "cyclomatic_avg": 7.0,
+              "maintainability_index": 66.6094
+            },
+            "tests/integration/browser_chain_harness/test_chain_plan_adl_alignment.py": {
+              "cyclomatic_avg": 5.0,
+              "maintainability_index": 48.9551
+            },
+            "tests/integration/conftest.py": {
+              "cyclomatic_avg": 1.7273,
+              "maintainability_index": 16.4263
+            },
+            "tests/integration/test_live_photo_integration.py": {
+              "cyclomatic_avg": 6.5,
+              "maintainability_index": 52.6307
+            },
+            "tests/integration/test_m3_m4_crash_recovery.py": {
+              "cyclomatic_avg": 4.6,
+              "maintainability_index": 37.0746
+            },
+            "tests/integration/test_m3_m4_duplicates_and_replay.py": {
+              "cyclomatic_avg": 4.5,
+              "maintainability_index": 56.844
+            },
+            "tests/integration/test_m3_m4_fixture_capabilities.py": {
+              "cyclomatic_avg": 3.7143,
+              "maintainability_index": 42.8595
+            },
+            "tests/integration/test_m3_m4_happy_path.py": {
+              "cyclomatic_avg": 7.4,
+              "maintainability_index": 35.7731
+            },
+            "tests/integration/test_m3_m4_idempotency.py": {
+              "cyclomatic_avg": 7.0,
+              "maintainability_index": 50.2454
+            },
+            "tests/integration/test_m3_m4_operator_semantics.py": {
+              "cyclomatic_avg": 11.0,
+              "maintainability_index": 47.1473
+            },
+            "tests/integration/test_m3_m4_schema_drift.py": {
+              "cyclomatic_avg": 3.6,
+              "maintainability_index": 47.7084
+            },
+            "tests/integration/test_m3_m4_storage_commit.py": {
+              "cyclomatic_avg": 3.4,
+              "maintainability_index": 34.263
+            },
+            "tests/integration/test_m3_m4_strategy_and_operator_semantics.py": {
+              "cyclomatic_avg": 6.4,
+              "maintainability_index": 37.8023
+            },
+            "tests/integration/test_pending_lifecycle_integration.py": {
+              "cyclomatic_avg": 22.0,
+              "maintainability_index": 46.7143
+            },
+            "tests/integration/test_registry_ingest_filter_integration.py": {
+              "cyclomatic_avg": 6.0,
+              "maintainability_index": 45.769
+            },
+            "tests/integration/test_reject_flow_integration.py": {
+              "cyclomatic_avg": 6.5,
+              "maintainability_index": 52.2196
+            },
+            "tests/integration/test_sync_import_integration.py": {
+              "cyclomatic_avg": 6.0,
+              "maintainability_index": 59.2205
+            },
+            "tests/integration/ui/conftest.py": {
+              "cyclomatic_avg": 1.0,
+              "maintainability_index": 68.1524
+            },
+            "tests/integration/ui/test_audit.py": {
+              "cyclomatic_avg": 5.5,
+              "maintainability_index": 55.4915
+            },
+            "tests/integration/ui/test_blocklist_crud.py": {
+              "cyclomatic_avg": 3.6,
+              "maintainability_index": 53.8704
+            },
+            "tests/integration/ui/test_dashboard.py": {
+              "cyclomatic_avg": 7.0,
+              "maintainability_index": 51.4438
+            },
+            "tests/integration/ui/test_error_states.py": {
+              "cyclomatic_avg": 2.3333,
+              "maintainability_index": 89.3914
+            },
+            "tests/integration/ui/test_settings.py": {
+              "cyclomatic_avg": 4.0,
+              "maintainability_index": 67.6256
+            },
+            "tests/integration/ui/test_staging_display.py": {
+              "cyclomatic_avg": 3.5,
+              "maintainability_index": 63.5153
+            },
+            "tests/integration/ui/test_triage.py": {
+              "cyclomatic_avg": 3.8,
+              "maintainability_index": 45.055
+            },
+            "tests/integration/ui/test_triage_error_recovery.py": {
+              "cyclomatic_avg": 2.5,
+              "maintainability_index": 58.9712
+            },
+            "tests/staging/__init__.py": {
+              "cyclomatic_avg": 0.0,
+              "maintainability_index": 100.0
+            },
+            "tests/staging/conftest.py": {
+              "cyclomatic_avg": 1.625,
+              "maintainability_index": 72.6689
+            },
+            "tests/staging/test_evidence_contracts.py": {
+              "cyclomatic_avg": 3.4231,
+              "maintainability_index": 35.1432
+            },
+            "tests/staging/test_secret_scan.py": {
+              "cyclomatic_avg": 2.75,
+              "maintainability_index": 47.4162
+            },
+            "tests/staging/test_smoke_contracts.py": {
+              "cyclomatic_avg": 1.7619,
+              "maintainability_index": 51.2512
+            },
+            "tests/staging/test_stagingctl_policy_contracts.py": {
+              "cyclomatic_avg": 2.7451,
+              "maintainability_index": 31.6166
+            },
+            "tests/staging-flow/test_flowctl_contracts.py": {
+              "cyclomatic_avg": 2.8605,
+              "maintainability_index": 36.3395
+            },
+            "tests/unit/conftest.py": {
+              "cyclomatic_avg": 0.0,
+              "maintainability_index": 100.0
+            },
+            "tests/unit/test_chunk1_error_taxonomy.py": {
+              "cyclomatic_avg": 3.0938,
+              "maintainability_index": 45.4037
+            },
+            "tests/unit/test_chunk2_retry_policy.py": {
+              "cyclomatic_avg": 2.0727,
+              "maintainability_index": 34.2756
+            },
+            "tests/unit/test_chunk3_streaming_download.py": {
+              "cyclomatic_avg": 2.2,
+              "maintainability_index": 40.1277
+            },
+            "tests/unit/test_chunk4_download_reresolve.py": {
+              "cyclomatic_avg": 3.4167,
+              "maintainability_index": 33.6
+            },
+            "tests/unit/test_chunk5_delta_guardrails.py": {
+              "cyclomatic_avg": 3.2308,
+              "maintainability_index": 32.3189
+            },
+            "tests/unit/test_chunk6_delta_reducer.py": {
+              "cyclomatic_avg": 3.4545,
+              "maintainability_index": 35.082
+            },
+            "tests/unit/test_chunk7_auth_resilience.py": {
+              "cyclomatic_avg": 1.75,
+              "maintainability_index": 30.9658
+            },
+            "tests/unit/test_chunk8_path_metadata_validation.py": {
+              "cyclomatic_avg": 3.0909,
+              "maintainability_index": 37.9339
+            },
+            "tests/unit/test_chunk9_observability.py": {
+              "cyclomatic_avg": 2.8,
+              "maintainability_index": 40.1251
+            },
+            "tests/unit/test_cli_bootstrap.py": {
+              "cyclomatic_avg": 3.0,
+              "maintainability_index": 49.5805
+            },
+            "tests/unit/test_cli_version.py": {
+              "cyclomatic_avg": 3.0,
+              "maintainability_index": 71.5599
+            },
+            "tests/unit/test_cognitive_complexity.py": {
+              "cyclomatic_avg": 2.0,
+              "maintainability_index": 58.4278
+            },
+            "tests/unit/test_config_check_integration.py": {
+              "cyclomatic_avg": 2.0,
+              "maintainability_index": 56.2474
+            },
+            "tests/unit/test_config_parsing.py": {
+              "cyclomatic_avg": 2.4,
+              "maintainability_index": 52.0279
+            },
+            "tests/unit/test_config_validation.py": {
+              "cyclomatic_avg": 2.0,
+              "maintainability_index": 39.3395
+            },
+            "tests/unit/test_devcontainer_snapshot_invariants.py": {
+              "cyclomatic_avg": 4.1667,
+              "maintainability_index": 41.0964
+            },
+            "tests/unit/test_devctl_contracts.py": {
+              "cyclomatic_avg": 2.8333,
+              "maintainability_index": 42.5811
+            },
+            "tests/unit/test_govctl_manifest.py": {
+              "cyclomatic_avg": 3.0,
+              "maintainability_index": 42.2876
+            },
+            "tests/unit/test_govctl_resolve.py": {
+              "cyclomatic_avg": 2.4286,
+              "maintainability_index": 46.6558
+            },
+            "tests/unit/test_imports.py": {
+              "cyclomatic_avg": 1.5,
+              "maintainability_index": 100.0
+            },
+            "tests/unit/test_ingest_decisions.py": {
+              "cyclomatic_avg": 3.6364,
+              "maintainability_index": 30.1664
+            },
+            "tests/unit/test_live_photo_pairing.py": {
+              "cyclomatic_avg": 4.2,
+              "maintainability_index": 45.8391
+            },
+            "tests/unit/test_live_photo_registry.py": {
+              "cyclomatic_avg": 4.3333,
+              "maintainability_index": 48.0296
+            },
+            "tests/unit/test_logging_bootstrap.py": {
+              "cyclomatic_avg": 3.75,
+              "maintainability_index": 36.0015
+            },
+            "tests/unit/test_m4_h1_atomic_finalize.py": {
+              "cyclomatic_avg": 5.0,
+              "maintainability_index": 52.5124
+            },
+            "tests/unit/test_m4_h2_journal_replay.py": {
+              "cyclomatic_avg": 4.0,
+              "maintainability_index": 38.3996
+            },
+            "tests/unit/test_m4_h3_staging_reconciliation.py": {
+              "cyclomatic_avg": 3.6,
+              "maintainability_index": 42.1215
+            },
+            "tests/unit/test_m4_h4_contract_validation.py": {
+              "cyclomatic_avg": 1.1667,
+              "maintainability_index": 48.1454
+            },
+            "tests/unit/test_m4_h5_storage_hardening.py": {
+              "cyclomatic_avg": 1.0,
+              "maintainability_index": 52.3479
+            },
+            "tests/unit/test_m4_h6_integrity_policies.py": {
+              "cyclomatic_avg": 2.8333,
+              "maintainability_index": 41.9277
+            },
+            "tests/unit/test_m4_h7_audit_ordering.py": {
+              "cyclomatic_avg": 2.6667,
+              "maintainability_index": 57.7289
+            },
+            "tests/unit/test_m4_h8_performance_scaling.py": {
+              "cyclomatic_avg": 2.2,
+              "maintainability_index": 51.3601
+            },
+            "tests/unit/test_m4_h9_security_policies.py": {
+              "cyclomatic_avg": 2.0,
+              "maintainability_index": 46.3859
+            },
+            "tests/unit/test_manifest_hash.py": {
+              "cyclomatic_avg": 2.4722,
+              "maintainability_index": 39.3449
+            },
+            "tests/unit/test_mcp_metrics_tasks.py": {
+              "cyclomatic_avg": 3.5,
+              "maintainability_index": 41.546
+            },
+            "tests/unit/test_mcp_server.py": {
+              "cyclomatic_avg": 4.0,
+              "maintainability_index": 45.1608
+            },
+            "tests/unit/test_mcp_web_tasks.py": {
+              "cyclomatic_avg": 3.5,
+              "maintainability_index": 46.3477
+            },
+            "tests/unit/test_metrics_module1_schema.py": {
+              "cyclomatic_avg": 6.25,
+              "maintainability_index": 53.9384
+            },
+            "tests/unit/test_metrics_module2_backend.py": {
+              "cyclomatic_avg": 8.5,
+              "maintainability_index": 42.4584
+            },
+            "tests/unit/test_metrics_module3_frontend.py": {
+              "cyclomatic_avg": 5.087,
+              "maintainability_index": 27.3911
+            },
+            "tests/unit/test_metrics_module4_aggregator.py": {
+              "cyclomatic_avg": 3.3333,
+              "maintainability_index": 46.7954
+            },
+            "tests/unit/test_metrics_module5_dashboard.py": {
+              "cyclomatic_avg": 10.1429,
+              "maintainability_index": 27.4542
+            },
+            "tests/unit/test_metrics_module6_poller.py": {
+              "cyclomatic_avg": 3.3333,
+              "maintainability_index": 31.2011
+            },
+            "tests/unit/test_metrics_module7_publication.py": {
+              "cyclomatic_avg": 4.2857,
+              "maintainability_index": 30.2902
+            },
+            "tests/unit/test_metrics_module8_operations.py": {
+              "cyclomatic_avg": 3.7273,
+              "maintainability_index": 41.026
+            },
+            "tests/unit/test_module8_packaging.py": {
+              "cyclomatic_avg": 3.6667,
+              "maintainability_index": 56.0587
+            },
+            "tests/unit/test_onboarding_metadata_config.py": {
+              "cyclomatic_avg": 3.0,
+              "maintainability_index": 47.2871
+            },
+            "tests/unit/test_onedrive_auth.py": {
+              "cyclomatic_avg": 1.7333,
+              "maintainability_index": 37.6147
+            },
+            "tests/unit/test_onedrive_delta.py": {
+              "cyclomatic_avg": 2.4211,
+              "maintainability_index": 28.9015
+            },
+            "tests/unit/test_onedrive_onboarding_discovery.py": {
+              "cyclomatic_avg": 3.1333,
+              "maintainability_index": 32.8605
+            },
+            "tests/unit/test_onedrive_robustness_regression.py": {
+              "cyclomatic_avg": 3.0,
+              "maintainability_index": 45.0663
+            },
+            "tests/unit/test_onedrive_root_configuration.py": {
+              "cyclomatic_avg": 3.4286,
+              "maintainability_index": 48.4355
+            },
+            "tests/unit/test_package_meta.py": {
+              "cyclomatic_avg": 2.4231,
+              "maintainability_index": 36.2556
+            },
+            "tests/unit/test_registry_operations.py": {
+              "cyclomatic_avg": 3.1111,
+              "maintainability_index": 34.1609
+            },
+            "tests/unit/test_registry_schema.py": {
+              "cyclomatic_avg": 4.0,
+              "maintainability_index": 42.65
+            },
+            "tests/unit/test_reject_cli.py": {
+              "cyclomatic_avg": 5.8182,
+              "maintainability_index": 20.6666
+            },
+            "tests/unit/test_repo_lock.py": {
+              "cyclomatic_avg": 2.2083,
+              "maintainability_index": 31.7678
+            },
+            "tests/unit/test_source_fingerprint.py": {
+              "cyclomatic_avg": 2.4615,
+              "maintainability_index": 44.5813
+            },
+            "tests/unit/test_staging_recovery.py": {
+              "cyclomatic_avg": 2.6,
+              "maintainability_index": 42.6994
+            },
+            "tests/unit/test_status_export.py": {
+              "cyclomatic_avg": 9.0,
+              "maintainability_index": 46.9164
+            },
+            "tests/unit/test_sync_import.py": {
+              "cyclomatic_avg": 4.1429,
+              "maintainability_index": 33.1522
+            },
+            "tests/unit/test_v2_chunk10_contract_stabilization.py": {
+              "cyclomatic_avg": 2.4375,
+              "maintainability_index": 39.1629
+            },
+            "tests/unit/test_v2_chunk1_trace_logging.py": {
+              "cyclomatic_avg": 5.25,
+              "maintainability_index": 28.7281
+            },
+            "tests/unit/test_v2_chunk2_safe_logging.py": {
+              "cyclomatic_avg": 6.3333,
+              "maintainability_index": 49.2923
+            },
+            "tests/unit/test_v2_chunk7_delta_breakers.py": {
+              "cyclomatic_avg": 3.4,
+              "maintainability_index": 44.5056
+            },
+            "tests/unit/test_v2_chunk8_token_integrity.py": {
+              "cyclomatic_avg": 1.25,
+              "maintainability_index": 48.6095
+            },
+            "tests/unit/test_v2_chunk9_throughput_backpressure.py": {
+              "cyclomatic_avg": 1.9375,
+              "maintainability_index": 37.0576
+            },
+            "tests/unit/test_v2_chunks_3_4_5_6.py": {
+              "cyclomatic_avg": 2.8889,
+              "maintainability_index": 37.0109
+            },
+            "tests/unit/test_v2_config_hardening.py": {
+              "cyclomatic_avg": 1.1111,
+              "maintainability_index": 53.2192
+            },
+            "tests/unit/test_venv_bootstrap.py": {
+              "cyclomatic_avg": 2.3,
+              "maintainability_index": 43.8352
+            }
+          }
         },
         "dependency_graph": {
           "status": "success",
@@ -666,6 +1462,7 @@
             "api/routers/config.py",
             "api/routers/health.py",
             "api/routers/staging.py",
+            "api/routers/thumbnails.py",
             "api/routers/triage.py",
             "api/schemas/__init__.py",
             "api/schemas/audit.py",
@@ -680,6 +1477,7 @@
             "api/services/config_service.py",
             "api/services/health_service.py",
             "api/services/staging_service.py",
+            "api/services/thumbnail_service.py",
             "api/services/triage_service.py",
             "src/nightfall_photo_ingress/__init__.py",
             "src/nightfall_photo_ingress/__main__.py",
@@ -717,8 +1515,11 @@
             "tests/integration/api/test_auth.py",
             "tests/integration/api/test_blocklist.py",
             "tests/integration/api/test_config.py",
+            "tests/integration/api/test_cors.py",
             "tests/integration/api/test_health.py",
+            "tests/integration/api/test_security_headers.py",
             "tests/integration/api/test_staging.py",
+            "tests/integration/api/test_thumbnails.py",
             "tests/integration/browser_chain_harness/__init__.py",
             "tests/integration/browser_chain_harness/chain_harness.py",
             "tests/integration/browser_chain_harness/test_browser_chain_harness.py",
@@ -766,11 +1567,14 @@
             "tests/unit/test_chunk9_observability.py",
             "tests/unit/test_cli_bootstrap.py",
             "tests/unit/test_cli_version.py",
+            "tests/unit/test_cognitive_complexity.py",
             "tests/unit/test_config_check_integration.py",
             "tests/unit/test_config_parsing.py",
             "tests/unit/test_config_validation.py",
             "tests/unit/test_devcontainer_snapshot_invariants.py",
             "tests/unit/test_devctl_contracts.py",
+            "tests/unit/test_govctl_manifest.py",
+            "tests/unit/test_govctl_resolve.py",
             "tests/unit/test_imports.py",
             "tests/unit/test_ingest_decisions.py",
             "tests/unit/test_live_photo_pairing.py",
@@ -785,10 +1589,18 @@
             "tests/unit/test_m4_h7_audit_ordering.py",
             "tests/unit/test_m4_h8_performance_scaling.py",
             "tests/unit/test_m4_h9_security_policies.py",
+            "tests/unit/test_manifest_hash.py",
+            "tests/unit/test_mcp_metrics_tasks.py",
             "tests/unit/test_mcp_server.py",
             "tests/unit/test_mcp_web_tasks.py",
             "tests/unit/test_metrics_module1_schema.py",
             "tests/unit/test_metrics_module2_backend.py",
+            "tests/unit/test_metrics_module3_frontend.py",
+            "tests/unit/test_metrics_module4_aggregator.py",
+            "tests/unit/test_metrics_module5_dashboard.py",
+            "tests/unit/test_metrics_module6_poller.py",
+            "tests/unit/test_metrics_module7_publication.py",
+            "tests/unit/test_metrics_module8_operations.py",
             "tests/unit/test_module8_packaging.py",
             "tests/unit/test_onboarding_metadata_config.py",
             "tests/unit/test_onedrive_auth.py",
@@ -796,9 +1608,12 @@
             "tests/unit/test_onedrive_onboarding_discovery.py",
             "tests/unit/test_onedrive_robustness_regression.py",
             "tests/unit/test_onedrive_root_configuration.py",
+            "tests/unit/test_package_meta.py",
             "tests/unit/test_registry_operations.py",
             "tests/unit/test_registry_schema.py",
             "tests/unit/test_reject_cli.py",
+            "tests/unit/test_repo_lock.py",
+            "tests/unit/test_source_fingerprint.py",
             "tests/unit/test_staging_recovery.py",
             "tests/unit/test_status_export.py",
             "tests/unit/test_sync_import.py",
@@ -809,7 +1624,8 @@
             "tests/unit/test_v2_chunk8_token_integrity.py",
             "tests/unit/test_v2_chunk9_throughput_backpressure.py",
             "tests/unit/test_v2_chunks_3_4_5_6.py",
-            "tests/unit/test_v2_config_hardening.py"
+            "tests/unit/test_v2_config_hardening.py",
+            "tests/unit/test_venv_bootstrap.py"
           ],
           "edges": [
             {
@@ -862,10 +1678,6 @@
             },
             {
               "from": "api/audit_hook.py",
-              "to": "contextlib"
-            },
-            {
-              "from": "api/audit_hook.py",
               "to": "datetime"
             },
             {
@@ -877,12 +1689,12 @@
               "to": "sqlite3"
             },
             {
-              "from": "api/audit_hook.py",
-              "to": "typing"
+              "from": "api/auth.py",
+              "to": "api.dependencies"
             },
             {
               "from": "api/auth.py",
-              "to": "api.dependencies"
+              "to": "datetime"
             },
             {
               "from": "api/auth.py",
@@ -898,7 +1710,15 @@
             },
             {
               "from": "api/auth.py",
+              "to": "json"
+            },
+            {
+              "from": "api/auth.py",
               "to": "nightfall_photo_ingress.config"
+            },
+            {
+              "from": "api/auth.py",
+              "to": "sqlite3"
             },
             {
               "from": "api/dependencies.py",
@@ -911,6 +1731,10 @@
             {
               "from": "api/dependencies.py",
               "to": "nightfall_photo_ingress.config"
+            },
+            {
+              "from": "api/dependencies.py",
+              "to": "pathlib"
             },
             {
               "from": "api/dependencies.py",
@@ -985,6 +1809,10 @@
               "to": "sqlite3"
             },
             {
+              "from": "api/routers/blocklist.py",
+              "to": "typing"
+            },
+            {
               "from": "api/routers/config.py",
               "to": "api.auth"
             },
@@ -1051,6 +1879,42 @@
             {
               "from": "api/routers/staging.py",
               "to": "sqlite3"
+            },
+            {
+              "from": "api/routers/thumbnails.py",
+              "to": "__future__"
+            },
+            {
+              "from": "api/routers/thumbnails.py",
+              "to": "api.auth"
+            },
+            {
+              "from": "api/routers/thumbnails.py",
+              "to": "api.dependencies"
+            },
+            {
+              "from": "api/routers/thumbnails.py",
+              "to": "api.services.thumbnail_service"
+            },
+            {
+              "from": "api/routers/thumbnails.py",
+              "to": "fastapi"
+            },
+            {
+              "from": "api/routers/thumbnails.py",
+              "to": "fastapi.responses"
+            },
+            {
+              "from": "api/routers/thumbnails.py",
+              "to": "pathlib"
+            },
+            {
+              "from": "api/routers/thumbnails.py",
+              "to": "sqlite3"
+            },
+            {
+              "from": "api/routers/thumbnails.py",
+              "to": "typing"
             },
             {
               "from": "api/routers/triage.py",
@@ -1082,7 +1946,15 @@
             },
             {
               "from": "api/routers/triage.py",
+              "to": "pathlib"
+            },
+            {
+              "from": "api/routers/triage.py",
               "to": "sqlite3"
+            },
+            {
+              "from": "api/routers/triage.py",
+              "to": "typing"
             },
             {
               "from": "api/schemas/__init__.py",
@@ -1123,6 +1995,10 @@
             {
               "from": "api/schemas/blocklist.py",
               "to": "pydantic"
+            },
+            {
+              "from": "api/schemas/blocklist.py",
+              "to": "typing"
             },
             {
               "from": "api/schemas/config.py",
@@ -1175,6 +2051,10 @@
             {
               "from": "api/services/__init__.py",
               "to": "api.services.staging_service"
+            },
+            {
+              "from": "api/services/__init__.py",
+              "to": "api.services.thumbnail_service"
             },
             {
               "from": "api/services/__init__.py",
@@ -1257,6 +2137,30 @@
               "to": "sqlite3"
             },
             {
+              "from": "api/services/thumbnail_service.py",
+              "to": "PIL"
+            },
+            {
+              "from": "api/services/thumbnail_service.py",
+              "to": "__future__"
+            },
+            {
+              "from": "api/services/thumbnail_service.py",
+              "to": "os"
+            },
+            {
+              "from": "api/services/thumbnail_service.py",
+              "to": "pathlib"
+            },
+            {
+              "from": "api/services/thumbnail_service.py",
+              "to": "sqlite3"
+            },
+            {
+              "from": "api/services/thumbnail_service.py",
+              "to": "tempfile"
+            },
+            {
               "from": "api/services/triage_service.py",
               "to": "__future__"
             },
@@ -1270,11 +2174,19 @@
             },
             {
               "from": "api/services/triage_service.py",
+              "to": "api.services.thumbnail_service"
+            },
+            {
+              "from": "api/services/triage_service.py",
               "to": "datetime"
             },
             {
               "from": "api/services/triage_service.py",
               "to": "json"
+            },
+            {
+              "from": "api/services/triage_service.py",
+              "to": "pathlib"
             },
             {
               "from": "api/services/triage_service.py",
@@ -1962,6 +2874,10 @@
             },
             {
               "from": "tests/integration/api/test_api_triage.py",
+              "to": "api.services.triage_service"
+            },
+            {
+              "from": "tests/integration/api/test_api_triage.py",
               "to": "pytest"
             },
             {
@@ -1986,7 +2902,15 @@
             },
             {
               "from": "tests/integration/api/test_auth.py",
+              "to": "json"
+            },
+            {
+              "from": "tests/integration/api/test_auth.py",
               "to": "pytest"
+            },
+            {
+              "from": "tests/integration/api/test_auth.py",
+              "to": "sqlite3"
             },
             {
               "from": "tests/integration/api/test_auth.py",
@@ -2029,6 +2953,18 @@
               "to": "tests.integration.api.support"
             },
             {
+              "from": "tests/integration/api/test_cors.py",
+              "to": "__future__"
+            },
+            {
+              "from": "tests/integration/api/test_cors.py",
+              "to": "pytest"
+            },
+            {
+              "from": "tests/integration/api/test_cors.py",
+              "to": "tests.integration.api.support"
+            },
+            {
               "from": "tests/integration/api/test_health.py",
               "to": "__future__"
             },
@@ -2041,6 +2977,18 @@
               "to": "tests.integration.api.support"
             },
             {
+              "from": "tests/integration/api/test_security_headers.py",
+              "to": "__future__"
+            },
+            {
+              "from": "tests/integration/api/test_security_headers.py",
+              "to": "pytest"
+            },
+            {
+              "from": "tests/integration/api/test_security_headers.py",
+              "to": "tests.integration.api.support"
+            },
+            {
               "from": "tests/integration/api/test_staging.py",
               "to": "__future__"
             },
@@ -2050,6 +2998,30 @@
             },
             {
               "from": "tests/integration/api/test_staging.py",
+              "to": "tests.integration.api.support"
+            },
+            {
+              "from": "tests/integration/api/test_thumbnails.py",
+              "to": "PIL"
+            },
+            {
+              "from": "tests/integration/api/test_thumbnails.py",
+              "to": "__future__"
+            },
+            {
+              "from": "tests/integration/api/test_thumbnails.py",
+              "to": "api.services.thumbnail_service"
+            },
+            {
+              "from": "tests/integration/api/test_thumbnails.py",
+              "to": "pathlib"
+            },
+            {
+              "from": "tests/integration/api/test_thumbnails.py",
+              "to": "pytest"
+            },
+            {
+              "from": "tests/integration/api/test_thumbnails.py",
               "to": "tests.integration.api.support"
             },
             {
@@ -2837,6 +3809,14 @@
               "to": "nightfall_photo_ingress"
             },
             {
+              "from": "tests/unit/test_cognitive_complexity.py",
+              "to": "metrics.runner.frontend_collector"
+            },
+            {
+              "from": "tests/unit/test_cognitive_complexity.py",
+              "to": "pytest"
+            },
+            {
               "from": "tests/unit/test_config_check_integration.py",
               "to": "__future__"
             },
@@ -2911,6 +3891,46 @@
             {
               "from": "tests/unit/test_devctl_contracts.py",
               "to": "subprocess"
+            },
+            {
+              "from": "tests/unit/test_govctl_manifest.py",
+              "to": "__future__"
+            },
+            {
+              "from": "tests/unit/test_govctl_manifest.py",
+              "to": "json"
+            },
+            {
+              "from": "tests/unit/test_govctl_manifest.py",
+              "to": "pathlib"
+            },
+            {
+              "from": "tests/unit/test_govctl_manifest.py",
+              "to": "subprocess"
+            },
+            {
+              "from": "tests/unit/test_govctl_manifest.py",
+              "to": "sys"
+            },
+            {
+              "from": "tests/unit/test_govctl_resolve.py",
+              "to": "__future__"
+            },
+            {
+              "from": "tests/unit/test_govctl_resolve.py",
+              "to": "json"
+            },
+            {
+              "from": "tests/unit/test_govctl_resolve.py",
+              "to": "pathlib"
+            },
+            {
+              "from": "tests/unit/test_govctl_resolve.py",
+              "to": "subprocess"
+            },
+            {
+              "from": "tests/unit/test_govctl_resolve.py",
+              "to": "sys"
             },
             {
               "from": "tests/unit/test_imports.py",
@@ -3177,6 +4197,66 @@
               "to": "pytest"
             },
             {
+              "from": "tests/unit/test_manifest_hash.py",
+              "to": "__future__"
+            },
+            {
+              "from": "tests/unit/test_manifest_hash.py",
+              "to": "manifest_hash"
+            },
+            {
+              "from": "tests/unit/test_manifest_hash.py",
+              "to": "pathlib"
+            },
+            {
+              "from": "tests/unit/test_manifest_hash.py",
+              "to": "pytest"
+            },
+            {
+              "from": "tests/unit/test_manifest_hash.py",
+              "to": "subprocess"
+            },
+            {
+              "from": "tests/unit/test_manifest_hash.py",
+              "to": "sys"
+            },
+            {
+              "from": "tests/unit/test_mcp_metrics_tasks.py",
+              "to": "__future__"
+            },
+            {
+              "from": "tests/unit/test_mcp_metrics_tasks.py",
+              "to": "http.server"
+            },
+            {
+              "from": "tests/unit/test_mcp_metrics_tasks.py",
+              "to": "json"
+            },
+            {
+              "from": "tests/unit/test_mcp_metrics_tasks.py",
+              "to": "mcp_server"
+            },
+            {
+              "from": "tests/unit/test_mcp_metrics_tasks.py",
+              "to": "os"
+            },
+            {
+              "from": "tests/unit/test_mcp_metrics_tasks.py",
+              "to": "pathlib"
+            },
+            {
+              "from": "tests/unit/test_mcp_metrics_tasks.py",
+              "to": "threading"
+            },
+            {
+              "from": "tests/unit/test_mcp_metrics_tasks.py",
+              "to": "time"
+            },
+            {
+              "from": "tests/unit/test_mcp_metrics_tasks.py",
+              "to": "urllib"
+            },
+            {
               "from": "tests/unit/test_mcp_server.py",
               "to": "__future__"
             },
@@ -3266,7 +4346,15 @@
             },
             {
               "from": "tests/unit/test_metrics_module2_backend.py",
+              "to": "builtins"
+            },
+            {
+              "from": "tests/unit/test_metrics_module2_backend.py",
               "to": "json"
+            },
+            {
+              "from": "tests/unit/test_metrics_module2_backend.py",
+              "to": "metrics.runner"
             },
             {
               "from": "tests/unit/test_metrics_module2_backend.py",
@@ -3275,6 +4363,118 @@
             {
               "from": "tests/unit/test_metrics_module2_backend.py",
               "to": "pathlib"
+            },
+            {
+              "from": "tests/unit/test_metrics_module3_frontend.py",
+              "to": "json"
+            },
+            {
+              "from": "tests/unit/test_metrics_module3_frontend.py",
+              "to": "metrics.runner.frontend_collector"
+            },
+            {
+              "from": "tests/unit/test_metrics_module3_frontend.py",
+              "to": "pathlib"
+            },
+            {
+              "from": "tests/unit/test_metrics_module3_frontend.py",
+              "to": "pytest"
+            },
+            {
+              "from": "tests/unit/test_metrics_module4_aggregator.py",
+              "to": "__future__"
+            },
+            {
+              "from": "tests/unit/test_metrics_module4_aggregator.py",
+              "to": "json"
+            },
+            {
+              "from": "tests/unit/test_metrics_module4_aggregator.py",
+              "to": "metrics.runner.aggregator"
+            },
+            {
+              "from": "tests/unit/test_metrics_module4_aggregator.py",
+              "to": "pathlib"
+            },
+            {
+              "from": "tests/unit/test_metrics_module5_dashboard.py",
+              "to": "__future__"
+            },
+            {
+              "from": "tests/unit/test_metrics_module5_dashboard.py",
+              "to": "json"
+            },
+            {
+              "from": "tests/unit/test_metrics_module5_dashboard.py",
+              "to": "metrics.runner"
+            },
+            {
+              "from": "tests/unit/test_metrics_module5_dashboard.py",
+              "to": "pathlib"
+            },
+            {
+              "from": "tests/unit/test_metrics_module6_poller.py",
+              "to": "__future__"
+            },
+            {
+              "from": "tests/unit/test_metrics_module6_poller.py",
+              "to": "fcntl"
+            },
+            {
+              "from": "tests/unit/test_metrics_module6_poller.py",
+              "to": "json"
+            },
+            {
+              "from": "tests/unit/test_metrics_module6_poller.py",
+              "to": "metrics.runner"
+            },
+            {
+              "from": "tests/unit/test_metrics_module6_poller.py",
+              "to": "pathlib"
+            },
+            {
+              "from": "tests/unit/test_metrics_module6_poller.py",
+              "to": "pytest"
+            },
+            {
+              "from": "tests/unit/test_metrics_module7_publication.py",
+              "to": "__future__"
+            },
+            {
+              "from": "tests/unit/test_metrics_module7_publication.py",
+              "to": "json"
+            },
+            {
+              "from": "tests/unit/test_metrics_module7_publication.py",
+              "to": "metrics.runner"
+            },
+            {
+              "from": "tests/unit/test_metrics_module7_publication.py",
+              "to": "pathlib"
+            },
+            {
+              "from": "tests/unit/test_metrics_module8_operations.py",
+              "to": "__future__"
+            },
+            {
+              "from": "tests/unit/test_metrics_module8_operations.py",
+              "to": "json"
+            },
+            {
+              "from": "tests/unit/test_metrics_module8_operations.py",
+              "to": "metrics.runner.aggregator"
+            },
+            {
+              "from": "tests/unit/test_metrics_module8_operations.py",
+              "to": "metrics.runner.module8_ops"
+            },
+            {
+              "from": "tests/unit/test_metrics_module8_operations.py",
+              "to": "pathlib"
+            },
+            {
+              "from": "tests/unit/test_metrics_module8_operations.py",
+              "to": "pytest"
             },
             {
               "from": "tests/unit/test_module8_packaging.py",
@@ -3445,6 +4645,30 @@
               "to": "pytest"
             },
             {
+              "from": "tests/unit/test_package_meta.py",
+              "to": "__future__"
+            },
+            {
+              "from": "tests/unit/test_package_meta.py",
+              "to": "package_meta"
+            },
+            {
+              "from": "tests/unit/test_package_meta.py",
+              "to": "pathlib"
+            },
+            {
+              "from": "tests/unit/test_package_meta.py",
+              "to": "pytest"
+            },
+            {
+              "from": "tests/unit/test_package_meta.py",
+              "to": "subprocess"
+            },
+            {
+              "from": "tests/unit/test_package_meta.py",
+              "to": "sys"
+            },
+            {
               "from": "tests/unit/test_registry_operations.py",
               "to": "__future__"
             },
@@ -3511,6 +4735,78 @@
             {
               "from": "tests/unit/test_reject_cli.py",
               "to": "sqlite3"
+            },
+            {
+              "from": "tests/unit/test_repo_lock.py",
+              "to": "__future__"
+            },
+            {
+              "from": "tests/unit/test_repo_lock.py",
+              "to": "fcntl"
+            },
+            {
+              "from": "tests/unit/test_repo_lock.py",
+              "to": "os"
+            },
+            {
+              "from": "tests/unit/test_repo_lock.py",
+              "to": "pathlib"
+            },
+            {
+              "from": "tests/unit/test_repo_lock.py",
+              "to": "pytest"
+            },
+            {
+              "from": "tests/unit/test_repo_lock.py",
+              "to": "repo_lock"
+            },
+            {
+              "from": "tests/unit/test_repo_lock.py",
+              "to": "subprocess"
+            },
+            {
+              "from": "tests/unit/test_repo_lock.py",
+              "to": "sys"
+            },
+            {
+              "from": "tests/unit/test_repo_lock.py",
+              "to": "threading"
+            },
+            {
+              "from": "tests/unit/test_repo_lock.py",
+              "to": "time"
+            },
+            {
+              "from": "tests/unit/test_source_fingerprint.py",
+              "to": "__future__"
+            },
+            {
+              "from": "tests/unit/test_source_fingerprint.py",
+              "to": "datetime"
+            },
+            {
+              "from": "tests/unit/test_source_fingerprint.py",
+              "to": "json"
+            },
+            {
+              "from": "tests/unit/test_source_fingerprint.py",
+              "to": "pathlib"
+            },
+            {
+              "from": "tests/unit/test_source_fingerprint.py",
+              "to": "pytest"
+            },
+            {
+              "from": "tests/unit/test_source_fingerprint.py",
+              "to": "source_fingerprint"
+            },
+            {
+              "from": "tests/unit/test_source_fingerprint.py",
+              "to": "subprocess"
+            },
+            {
+              "from": "tests/unit/test_source_fingerprint.py",
+              "to": "sys"
             },
             {
               "from": "tests/unit/test_staging_recovery.py",
@@ -3827,21 +5123,3616 @@
             {
               "from": "tests/unit/test_v2_config_hardening.py",
               "to": "pytest"
+            },
+            {
+              "from": "tests/unit/test_venv_bootstrap.py",
+              "to": "__future__"
+            },
+            {
+              "from": "tests/unit/test_venv_bootstrap.py",
+              "to": "os"
+            },
+            {
+              "from": "tests/unit/test_venv_bootstrap.py",
+              "to": "pathlib"
+            },
+            {
+              "from": "tests/unit/test_venv_bootstrap.py",
+              "to": "pytest"
+            },
+            {
+              "from": "tests/unit/test_venv_bootstrap.py",
+              "to": "sys"
+            },
+            {
+              "from": "tests/unit/test_venv_bootstrap.py",
+              "to": "venv_bootstrap"
+            }
+          ],
+          "node_details": [
+            {
+              "path": "api/__init__.py",
+              "fan_in": 0,
+              "fan_out": 0,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "api/app.py",
+              "fan_in": 1,
+              "fan_out": 11,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "api/audit_hook.py",
+              "fan_in": 1,
+              "fan_out": 4,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "api/auth.py",
+              "fan_in": 7,
+              "fan_out": 8,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "api/dependencies.py",
+              "fan_in": 7,
+              "fan_out": 5,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "api/rapiddoc.py",
+              "fan_in": 1,
+              "fan_out": 3,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "api/routers/__init__.py",
+              "fan_in": 1,
+              "fan_out": 0,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "api/routers/audit_log.py",
+              "fan_in": 0,
+              "fan_out": 6,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "api/routers/blocklist.py",
+              "fan_in": 0,
+              "fan_out": 9,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "api/routers/config.py",
+              "fan_in": 0,
+              "fan_out": 6,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "api/routers/health.py",
+              "fan_in": 0,
+              "fan_out": 5,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "api/routers/staging.py",
+              "fan_in": 0,
+              "fan_out": 6,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "api/routers/thumbnails.py",
+              "fan_in": 0,
+              "fan_out": 9,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "api/routers/triage.py",
+              "fan_in": 0,
+              "fan_out": 10,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "api/schemas/__init__.py",
+              "fan_in": 12,
+              "fan_out": 6,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "api/schemas/audit.py",
+              "fan_in": 1,
+              "fan_out": 2,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "api/schemas/blocklist.py",
+              "fan_in": 1,
+              "fan_out": 3,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "api/schemas/config.py",
+              "fan_in": 1,
+              "fan_out": 2,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "api/schemas/health.py",
+              "fan_in": 1,
+              "fan_out": 2,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "api/schemas/staging.py",
+              "fan_in": 1,
+              "fan_out": 2,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "api/schemas/triage.py",
+              "fan_in": 1,
+              "fan_out": 2,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "api/services/__init__.py",
+              "fan_in": 6,
+              "fan_out": 7,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "api/services/audit_service.py",
+              "fan_in": 1,
+              "fan_out": 4,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "api/services/blocklist_service.py",
+              "fan_in": 1,
+              "fan_out": 5,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "api/services/config_service.py",
+              "fan_in": 1,
+              "fan_out": 3,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "api/services/health_service.py",
+              "fan_in": 1,
+              "fan_out": 4,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "api/services/staging_service.py",
+              "fan_in": 1,
+              "fan_out": 3,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "api/services/thumbnail_service.py",
+              "fan_in": 4,
+              "fan_out": 6,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "api/services/triage_service.py",
+              "fan_in": 3,
+              "fan_out": 8,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "src/nightfall_photo_ingress/__init__.py",
+              "fan_in": 0,
+              "fan_out": 0,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "src/nightfall_photo_ingress/__main__.py",
+              "fan_in": 0,
+              "fan_out": 1,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "src/nightfall_photo_ingress/adapters/__init__.py",
+              "fan_in": 0,
+              "fan_out": 0,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "src/nightfall_photo_ingress/adapters/onedrive/__init__.py",
+              "fan_in": 0,
+              "fan_out": 0,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "src/nightfall_photo_ingress/adapters/onedrive/auth.py",
+              "fan_in": 0,
+              "fan_out": 12,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "src/nightfall_photo_ingress/adapters/onedrive/cache_lock.py",
+              "fan_in": 0,
+              "fan_out": 5,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "src/nightfall_photo_ingress/adapters/onedrive/client.py",
+              "fan_in": 0,
+              "fan_out": 21,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "src/nightfall_photo_ingress/adapters/onedrive/errors.py",
+              "fan_in": 0,
+              "fan_out": 3,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "src/nightfall_photo_ingress/adapters/onedrive/retry.py",
+              "fan_in": 0,
+              "fan_out": 6,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "src/nightfall_photo_ingress/adapters/onedrive/safe_logging.py",
+              "fan_in": 0,
+              "fan_out": 5,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "src/nightfall_photo_ingress/cli.py",
+              "fan_in": 0,
+              "fan_out": 19,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "src/nightfall_photo_ingress/config.py",
+              "fan_in": 0,
+              "fan_out": 6,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "src/nightfall_photo_ingress/domain/__init__.py",
+              "fan_in": 0,
+              "fan_out": 2,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "src/nightfall_photo_ingress/domain/ingest.py",
+              "fan_in": 0,
+              "fan_out": 14,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "src/nightfall_photo_ingress/domain/journal.py",
+              "fan_in": 0,
+              "fan_out": 6,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "src/nightfall_photo_ingress/domain/registry.py",
+              "fan_in": 0,
+              "fan_out": 5,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "src/nightfall_photo_ingress/domain/storage.py",
+              "fan_in": 0,
+              "fan_out": 8,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "src/nightfall_photo_ingress/live_photo.py",
+              "fan_in": 0,
+              "fan_out": 4,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "src/nightfall_photo_ingress/logging_bootstrap.py",
+              "fan_in": 0,
+              "fan_out": 9,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "src/nightfall_photo_ingress/migrations/0003_add_blocked_rules.py",
+              "fan_in": 0,
+              "fan_out": 2,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "src/nightfall_photo_ingress/migrations/0004_add_ui_action_idempotency.py",
+              "fan_in": 0,
+              "fan_out": 2,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "src/nightfall_photo_ingress/migrations/__init__.py",
+              "fan_in": 0,
+              "fan_out": 0,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "src/nightfall_photo_ingress/reject.py",
+              "fan_in": 0,
+              "fan_out": 7,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "src/nightfall_photo_ingress/runtime/__init__.py",
+              "fan_in": 0,
+              "fan_out": 0,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "src/nightfall_photo_ingress/runtime/process_lock.py",
+              "fan_in": 0,
+              "fan_out": 5,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "src/nightfall_photo_ingress/status.py",
+              "fan_in": 0,
+              "fan_out": 5,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "src/nightfall_photo_ingress/sync_import.py",
+              "fan_in": 0,
+              "fan_out": 9,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/__init__.py",
+              "fan_in": 0,
+              "fan_out": 0,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/conftest.py",
+              "fan_in": 0,
+              "fan_out": 2,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/integration/api/conftest.py",
+              "fan_in": 0,
+              "fan_out": 10,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/integration/api/support.py",
+              "fan_in": 17,
+              "fan_out": 1,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/integration/api/test_api_triage.py",
+              "fan_in": 0,
+              "fan_out": 4,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/integration/api/test_audit_log.py",
+              "fan_in": 0,
+              "fan_out": 3,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/integration/api/test_auth.py",
+              "fan_in": 0,
+              "fan_out": 5,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/integration/api/test_blocklist.py",
+              "fan_in": 0,
+              "fan_out": 6,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/integration/api/test_config.py",
+              "fan_in": 0,
+              "fan_out": 3,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/integration/api/test_cors.py",
+              "fan_in": 0,
+              "fan_out": 3,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/integration/api/test_health.py",
+              "fan_in": 0,
+              "fan_out": 3,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/integration/api/test_security_headers.py",
+              "fan_in": 0,
+              "fan_out": 3,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/integration/api/test_staging.py",
+              "fan_in": 0,
+              "fan_out": 3,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/integration/api/test_thumbnails.py",
+              "fan_in": 0,
+              "fan_out": 6,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/integration/browser_chain_harness/__init__.py",
+              "fan_in": 0,
+              "fan_out": 0,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/integration/browser_chain_harness/chain_harness.py",
+              "fan_in": 1,
+              "fan_out": 4,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/integration/browser_chain_harness/test_browser_chain_harness.py",
+              "fan_in": 0,
+              "fan_out": 3,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/integration/browser_chain_harness/test_chain_plan_adl_alignment.py",
+              "fan_in": 0,
+              "fan_out": 3,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/integration/conftest.py",
+              "fan_in": 0,
+              "fan_out": 16,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/integration/test_live_photo_integration.py",
+              "fan_in": 0,
+              "fan_out": 1,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/integration/test_m3_m4_crash_recovery.py",
+              "fan_in": 0,
+              "fan_out": 3,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/integration/test_m3_m4_duplicates_and_replay.py",
+              "fan_in": 0,
+              "fan_out": 1,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/integration/test_m3_m4_fixture_capabilities.py",
+              "fan_in": 0,
+              "fan_out": 6,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/integration/test_m3_m4_happy_path.py",
+              "fan_in": 0,
+              "fan_out": 2,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/integration/test_m3_m4_idempotency.py",
+              "fan_in": 0,
+              "fan_out": 1,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/integration/test_m3_m4_operator_semantics.py",
+              "fan_in": 0,
+              "fan_out": 1,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/integration/test_m3_m4_schema_drift.py",
+              "fan_in": 0,
+              "fan_out": 3,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/integration/test_m3_m4_storage_commit.py",
+              "fan_in": 0,
+              "fan_out": 6,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/integration/test_m3_m4_strategy_and_operator_semantics.py",
+              "fan_in": 0,
+              "fan_out": 3,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/integration/test_pending_lifecycle_integration.py",
+              "fan_in": 0,
+              "fan_out": 3,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/integration/test_registry_ingest_filter_integration.py",
+              "fan_in": 0,
+              "fan_out": 3,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/integration/test_reject_flow_integration.py",
+              "fan_in": 0,
+              "fan_out": 2,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/integration/test_sync_import_integration.py",
+              "fan_in": 0,
+              "fan_out": 4,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/integration/ui/conftest.py",
+              "fan_in": 0,
+              "fan_out": 3,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/integration/ui/test_audit.py",
+              "fan_in": 0,
+              "fan_out": 3,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/integration/ui/test_blocklist_crud.py",
+              "fan_in": 0,
+              "fan_out": 3,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/integration/ui/test_dashboard.py",
+              "fan_in": 0,
+              "fan_out": 3,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/integration/ui/test_error_states.py",
+              "fan_in": 0,
+              "fan_out": 2,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/integration/ui/test_settings.py",
+              "fan_in": 0,
+              "fan_out": 3,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/integration/ui/test_staging_display.py",
+              "fan_in": 0,
+              "fan_out": 3,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/integration/ui/test_triage.py",
+              "fan_in": 0,
+              "fan_out": 3,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/integration/ui/test_triage_error_recovery.py",
+              "fan_in": 0,
+              "fan_out": 4,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/staging-flow/test_flowctl_contracts.py",
+              "fan_in": 0,
+              "fan_out": 4,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/staging/__init__.py",
+              "fan_in": 0,
+              "fan_out": 0,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/staging/conftest.py",
+              "fan_in": 1,
+              "fan_out": 9,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/staging/test_evidence_contracts.py",
+              "fan_in": 0,
+              "fan_out": 6,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/staging/test_secret_scan.py",
+              "fan_in": 0,
+              "fan_out": 6,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/staging/test_smoke_contracts.py",
+              "fan_in": 0,
+              "fan_out": 5,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/staging/test_stagingctl_policy_contracts.py",
+              "fan_in": 0,
+              "fan_out": 3,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/conftest.py",
+              "fan_in": 0,
+              "fan_out": 3,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_chunk1_error_taxonomy.py",
+              "fan_in": 0,
+              "fan_out": 4,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_chunk2_retry_policy.py",
+              "fan_in": 0,
+              "fan_out": 9,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_chunk3_streaming_download.py",
+              "fan_in": 0,
+              "fan_out": 8,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_chunk4_download_reresolve.py",
+              "fan_in": 0,
+              "fan_out": 6,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_chunk5_delta_guardrails.py",
+              "fan_in": 0,
+              "fan_out": 8,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_chunk6_delta_reducer.py",
+              "fan_in": 0,
+              "fan_out": 6,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_chunk7_auth_resilience.py",
+              "fan_in": 0,
+              "fan_out": 9,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_chunk8_path_metadata_validation.py",
+              "fan_in": 0,
+              "fan_out": 7,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_chunk9_observability.py",
+              "fan_in": 0,
+              "fan_out": 6,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_cli_bootstrap.py",
+              "fan_in": 0,
+              "fan_out": 3,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_cli_version.py",
+              "fan_in": 0,
+              "fan_out": 2,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_cognitive_complexity.py",
+              "fan_in": 0,
+              "fan_out": 2,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_config_check_integration.py",
+              "fan_in": 0,
+              "fan_out": 4,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_config_parsing.py",
+              "fan_in": 0,
+              "fan_out": 3,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_config_validation.py",
+              "fan_in": 0,
+              "fan_out": 4,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_devcontainer_snapshot_invariants.py",
+              "fan_in": 0,
+              "fan_out": 3,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_devctl_contracts.py",
+              "fan_in": 0,
+              "fan_out": 5,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_govctl_manifest.py",
+              "fan_in": 0,
+              "fan_out": 5,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_govctl_resolve.py",
+              "fan_in": 0,
+              "fan_out": 5,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_imports.py",
+              "fan_in": 0,
+              "fan_out": 3,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_ingest_decisions.py",
+              "fan_in": 0,
+              "fan_out": 6,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_live_photo_pairing.py",
+              "fan_in": 0,
+              "fan_out": 4,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_live_photo_registry.py",
+              "fan_in": 0,
+              "fan_out": 3,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_logging_bootstrap.py",
+              "fan_in": 0,
+              "fan_out": 5,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_m4_h1_atomic_finalize.py",
+              "fan_in": 0,
+              "fan_out": 4,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_m4_h2_journal_replay.py",
+              "fan_in": 0,
+              "fan_out": 6,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_m4_h3_staging_reconciliation.py",
+              "fan_in": 0,
+              "fan_out": 6,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_m4_h4_contract_validation.py",
+              "fan_in": 0,
+              "fan_out": 5,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_m4_h5_storage_hardening.py",
+              "fan_in": 0,
+              "fan_out": 4,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_m4_h6_integrity_policies.py",
+              "fan_in": 0,
+              "fan_out": 4,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_m4_h7_audit_ordering.py",
+              "fan_in": 0,
+              "fan_out": 5,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_m4_h8_performance_scaling.py",
+              "fan_in": 0,
+              "fan_out": 5,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_m4_h9_security_policies.py",
+              "fan_in": 0,
+              "fan_out": 6,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_manifest_hash.py",
+              "fan_in": 0,
+              "fan_out": 6,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_mcp_metrics_tasks.py",
+              "fan_in": 0,
+              "fan_out": 9,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_mcp_server.py",
+              "fan_in": 0,
+              "fan_out": 8,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_mcp_web_tasks.py",
+              "fan_in": 0,
+              "fan_out": 9,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_metrics_module1_schema.py",
+              "fan_in": 0,
+              "fan_out": 4,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_metrics_module2_backend.py",
+              "fan_in": 0,
+              "fan_out": 6,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_metrics_module3_frontend.py",
+              "fan_in": 0,
+              "fan_out": 4,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_metrics_module4_aggregator.py",
+              "fan_in": 0,
+              "fan_out": 4,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_metrics_module5_dashboard.py",
+              "fan_in": 0,
+              "fan_out": 4,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_metrics_module6_poller.py",
+              "fan_in": 0,
+              "fan_out": 6,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_metrics_module7_publication.py",
+              "fan_in": 0,
+              "fan_out": 4,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_metrics_module8_operations.py",
+              "fan_in": 0,
+              "fan_out": 6,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_module8_packaging.py",
+              "fan_in": 0,
+              "fan_out": 2,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_onboarding_metadata_config.py",
+              "fan_in": 0,
+              "fan_out": 5,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_onedrive_auth.py",
+              "fan_in": 0,
+              "fan_out": 8,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_onedrive_delta.py",
+              "fan_in": 0,
+              "fan_out": 9,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_onedrive_onboarding_discovery.py",
+              "fan_in": 0,
+              "fan_out": 6,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_onedrive_robustness_regression.py",
+              "fan_in": 0,
+              "fan_out": 7,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_onedrive_root_configuration.py",
+              "fan_in": 0,
+              "fan_out": 5,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_package_meta.py",
+              "fan_in": 0,
+              "fan_out": 6,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_registry_operations.py",
+              "fan_in": 0,
+              "fan_out": 5,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_registry_schema.py",
+              "fan_in": 0,
+              "fan_out": 4,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_reject_cli.py",
+              "fan_in": 0,
+              "fan_out": 8,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_repo_lock.py",
+              "fan_in": 0,
+              "fan_out": 10,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_source_fingerprint.py",
+              "fan_in": 0,
+              "fan_out": 8,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_staging_recovery.py",
+              "fan_in": 0,
+              "fan_out": 7,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_status_export.py",
+              "fan_in": 0,
+              "fan_out": 5,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_sync_import.py",
+              "fan_in": 0,
+              "fan_out": 7,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_v2_chunk10_contract_stabilization.py",
+              "fan_in": 0,
+              "fan_out": 6,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_v2_chunk1_trace_logging.py",
+              "fan_in": 0,
+              "fan_out": 9,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_v2_chunk2_safe_logging.py",
+              "fan_in": 0,
+              "fan_out": 5,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_v2_chunk7_delta_breakers.py",
+              "fan_in": 0,
+              "fan_out": 8,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_v2_chunk8_token_integrity.py",
+              "fan_in": 0,
+              "fan_out": 10,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_v2_chunk9_throughput_backpressure.py",
+              "fan_in": 0,
+              "fan_out": 9,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_v2_chunks_3_4_5_6.py",
+              "fan_in": 0,
+              "fan_out": 9,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_v2_config_hardening.py",
+              "fan_in": 0,
+              "fan_out": 4,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "tests/unit/test_venv_bootstrap.py",
+              "fan_in": 0,
+              "fan_out": 6,
+              "kind": "local",
+              "in_cycle": false
             }
           ]
         },
         "coverage": {
-          "status": "not_available",
-          "reason": "pytest-cov unavailable",
-          "exit_code": 4,
-          "duration_seconds": 0.3806,
-          "pytest_log": "metrics/output/backend/module2-bootstrap/pytest-coverage.log"
+          "status": "success",
+          "exit_code": 0,
+          "duration_seconds": 17.4535,
+          "coverage_percent": 77.91183294663573,
+          "covered_lines": 3358,
+          "num_statements": 4310,
+          "missing_lines": 952,
+          "coverage_json": "metrics/output/backend/module2-bootstrap/coverage.json",
+          "pytest_log": "metrics/output/backend/module2-bootstrap/pytest-coverage.log",
+          "python_executable": "/home/chris/dev/nightfall-photo-ingress/.venv/bin/python"
         }
       }
     },
     "frontend": {
-      "status": "not_available",
-      "metrics": {}
+      "status": "partial",
+      "metrics": {
+        "loc": {
+          "status": "success",
+          "roots": [
+            "webui/src",
+            "webui/tests"
+          ],
+          "files": 55,
+          "total_lines": 2740,
+          "total_code_lines": 2380,
+          "js_ts_files": 24,
+          "svelte_files": 31,
+          "per_file": {
+            "webui/src/lib/api/audit.ts": {
+              "type": "js_ts",
+              "lines": 30,
+              "code_lines": 27
+            },
+            "webui/src/lib/api/blocklist.ts": {
+              "type": "js_ts",
+              "lines": 41,
+              "code_lines": 36
+            },
+            "webui/src/lib/api/client.ts": {
+              "type": "js_ts",
+              "lines": 45,
+              "code_lines": 39
+            },
+            "webui/src/lib/api/config.ts": {
+              "type": "js_ts",
+              "lines": 10,
+              "code_lines": 8
+            },
+            "webui/src/lib/api/health.ts": {
+              "type": "js_ts",
+              "lines": 19,
+              "code_lines": 16
+            },
+            "webui/src/lib/api/staging.ts": {
+              "type": "js_ts",
+              "lines": 29,
+              "code_lines": 25
+            },
+            "webui/src/lib/api/triage.ts": {
+              "type": "js_ts",
+              "lines": 38,
+              "code_lines": 31
+            },
+            "webui/src/lib/components/audit/AuditEvent.svelte": {
+              "type": "svelte",
+              "lines": 38,
+              "code_lines": 32
+            },
+            "webui/src/lib/components/audit/AuditTimeline.svelte": {
+              "type": "svelte",
+              "lines": 43,
+              "code_lines": 38
+            },
+            "webui/src/lib/components/blocklist/BlockRuleForm.svelte": {
+              "type": "svelte",
+              "lines": 122,
+              "code_lines": 105
+            },
+            "webui/src/lib/components/blocklist/BlockRuleList.svelte": {
+              "type": "svelte",
+              "lines": 96,
+              "code_lines": 85
+            },
+            "webui/src/lib/components/common/ActionButton.svelte": {
+              "type": "svelte",
+              "lines": 89,
+              "code_lines": 74
+            },
+            "webui/src/lib/components/common/ConfirmDialog.svelte": {
+              "type": "svelte",
+              "lines": 99,
+              "code_lines": 87
+            },
+            "webui/src/lib/components/common/EmptyState.svelte": {
+              "type": "svelte",
+              "lines": 61,
+              "code_lines": 54
+            },
+            "webui/src/lib/components/common/ErrorBanner.svelte": {
+              "type": "svelte",
+              "lines": 64,
+              "code_lines": 56
+            },
+            "webui/src/lib/components/common/KpiCard.svelte": {
+              "type": "svelte",
+              "lines": 81,
+              "code_lines": 71
+            },
+            "webui/src/lib/components/common/LoadMoreButton.svelte": {
+              "type": "svelte",
+              "lines": 72,
+              "code_lines": 64
+            },
+            "webui/src/lib/components/common/LoadingSkeleton.svelte": {
+              "type": "svelte",
+              "lines": 36,
+              "code_lines": 32
+            },
+            "webui/src/lib/components/common/StatusBadge.svelte": {
+              "type": "svelte",
+              "lines": 44,
+              "code_lines": 37
+            },
+            "webui/src/lib/components/dashboard/AuditPreview.svelte": {
+              "type": "svelte",
+              "lines": 62,
+              "code_lines": 54
+            },
+            "webui/src/lib/components/dashboard/HealthBar.svelte": {
+              "type": "svelte",
+              "lines": 42,
+              "code_lines": 36
+            },
+            "webui/src/lib/components/dashboard/KpiGrid.svelte": {
+              "type": "svelte",
+              "lines": 32,
+              "code_lines": 28
+            },
+            "webui/src/lib/components/dashboard/PollRuntimeChart.svelte": {
+              "type": "svelte",
+              "lines": 41,
+              "code_lines": 36
+            },
+            "webui/src/lib/components/layout/AppFooter.svelte": {
+              "type": "svelte",
+              "lines": 72,
+              "code_lines": 62
+            },
+            "webui/src/lib/components/layout/AppHeader.svelte": {
+              "type": "svelte",
+              "lines": 98,
+              "code_lines": 87
+            },
+            "webui/src/lib/components/layout/PageTitle.svelte": {
+              "type": "svelte",
+              "lines": 36,
+              "code_lines": 31
+            },
+            "webui/src/lib/components/settings/ConfigTable.svelte": {
+              "type": "svelte",
+              "lines": 52,
+              "code_lines": 45
+            },
+            "webui/src/lib/components/staging/ItemMetaPanel.svelte": {
+              "type": "svelte",
+              "lines": 49,
+              "code_lines": 44
+            },
+            "webui/src/lib/components/staging/PhotoCard.svelte": {
+              "type": "svelte",
+              "lines": 66,
+              "code_lines": 58
+            },
+            "webui/src/lib/components/staging/PhotoWheel.svelte": {
+              "type": "svelte",
+              "lines": 105,
+              "code_lines": 96
+            },
+            "webui/src/lib/components/staging/TriageControls.svelte": {
+              "type": "svelte",
+              "lines": 60,
+              "code_lines": 50
+            },
+            "webui/src/lib/stores/auditLog.svelte.js": {
+              "type": "js_ts",
+              "lines": 56,
+              "code_lines": 49
+            },
+            "webui/src/lib/stores/blocklist.svelte.js": {
+              "type": "js_ts",
+              "lines": 131,
+              "code_lines": 117
+            },
+            "webui/src/lib/stores/config.svelte.js": {
+              "type": "js_ts",
+              "lines": 28,
+              "code_lines": 23
+            },
+            "webui/src/lib/stores/health.svelte.js": {
+              "type": "js_ts",
+              "lines": 80,
+              "code_lines": 67
+            },
+            "webui/src/lib/stores/kpis.svelte.js": {
+              "type": "js_ts",
+              "lines": 37,
+              "code_lines": 32
+            },
+            "webui/src/lib/stores/stagingQueue.svelte.js": {
+              "type": "js_ts",
+              "lines": 126,
+              "code_lines": 112
+            },
+            "webui/src/lib/stores/toast.svelte.js": {
+              "type": "js_ts",
+              "lines": 35,
+              "code_lines": 26
+            },
+            "webui/src/routes/+error.svelte": {
+              "type": "svelte",
+              "lines": 6,
+              "code_lines": 5
+            },
+            "webui/src/routes/+layout.js": {
+              "type": "js_ts",
+              "lines": 1,
+              "code_lines": 1
+            },
+            "webui/src/routes/+layout.svelte": {
+              "type": "svelte",
+              "lines": 38,
+              "code_lines": 33
+            },
+            "webui/src/routes/+page.js": {
+              "type": "js_ts",
+              "lines": 15,
+              "code_lines": 13
+            },
+            "webui/src/routes/+page.svelte": {
+              "type": "svelte",
+              "lines": 44,
+              "code_lines": 39
+            },
+            "webui/src/routes/audit/+page.js": {
+              "type": "js_ts",
+              "lines": 6,
+              "code_lines": 5
+            },
+            "webui/src/routes/audit/+page.svelte": {
+              "type": "svelte",
+              "lines": 83,
+              "code_lines": 73
+            },
+            "webui/src/routes/blocklist/+page.js": {
+              "type": "js_ts",
+              "lines": 6,
+              "code_lines": 5
+            },
+            "webui/src/routes/blocklist/+page.svelte": {
+              "type": "svelte",
+              "lines": 112,
+              "code_lines": 97
+            },
+            "webui/src/routes/settings/+page.js": {
+              "type": "js_ts",
+              "lines": 6,
+              "code_lines": 5
+            },
+            "webui/src/routes/settings/+page.svelte": {
+              "type": "svelte",
+              "lines": 22,
+              "code_lines": 18
+            },
+            "webui/src/routes/staging/+page.js": {
+              "type": "js_ts",
+              "lines": 6,
+              "code_lines": 5
+            },
+            "webui/src/routes/staging/+page.svelte": {
+              "type": "svelte",
+              "lines": 91,
+              "code_lines": 77
+            },
+            "webui/tests/component/ErrorBanner.test.ts": {
+              "type": "js_ts",
+              "lines": 9,
+              "code_lines": 8
+            },
+            "webui/tests/component/KpiCard.test.ts": {
+              "type": "js_ts",
+              "lines": 18,
+              "code_lines": 15
+            },
+            "webui/tests/component/StatusBadge.test.ts": {
+              "type": "js_ts",
+              "lines": 11,
+              "code_lines": 10
+            },
+            "webui/tests/setup.ts": {
+              "type": "js_ts",
+              "lines": 1,
+              "code_lines": 1
+            }
+          }
+        },
+        "cognitive_complexity": {
+          "source": "sonar_cognitive",
+          "status": "partial",
+          "version": "1.0",
+          "parser_info": {
+            "library": "tree-sitter",
+            "library_version": "0.25.2",
+            "grammar_js": "0.25.0",
+            "grammar_ts": "0.23.2",
+            "grammar_svelte": "0.25.0"
+          },
+          "mean": 0.6821266233766233,
+          "max": 4.5,
+          "file_count": 55,
+          "failed_file_count": 31,
+          "files": [
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/api/audit.ts",
+              "language": "typescript",
+              "function_count": 1,
+              "functions": [
+                {
+                  "name": "getAuditLog",
+                  "start_line": 20,
+                  "end_line": 30,
+                  "cognitive_complexity": 2
+                }
+              ],
+              "file_total": 2,
+              "file_mean": 2.0
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/api/blocklist.ts",
+              "language": "typescript",
+              "function_count": 4,
+              "functions": [
+                {
+                  "name": "getBlocklist",
+                  "start_line": 3,
+                  "end_line": 5,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "createRule",
+                  "start_line": 14,
+                  "end_line": 22,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "updateRule",
+                  "start_line": 24,
+                  "end_line": 32,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "deleteRule",
+                  "start_line": 34,
+                  "end_line": 41,
+                  "cognitive_complexity": 0
+                }
+              ],
+              "file_total": 0,
+              "file_mean": 0.0
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/api/client.ts",
+              "language": "typescript",
+              "function_count": 2,
+              "functions": [
+                {
+                  "name": "constructor",
+                  "start_line": 7,
+                  "end_line": 12,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "apiFetch",
+                  "start_line": 17,
+                  "end_line": 45,
+                  "cognitive_complexity": 9
+                }
+              ],
+              "file_total": 9,
+              "file_mean": 4.5
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/api/config.ts",
+              "language": "typescript",
+              "function_count": 1,
+              "functions": [
+                {
+                  "name": "getEffectiveConfig",
+                  "start_line": 8,
+                  "end_line": 10,
+                  "cognitive_complexity": 0
+                }
+              ],
+              "file_total": 0,
+              "file_mean": 0.0
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/api/health.ts",
+              "language": "typescript",
+              "function_count": 1,
+              "functions": [
+                {
+                  "name": "getHealth",
+                  "start_line": 17,
+                  "end_line": 19,
+                  "cognitive_complexity": 0
+                }
+              ],
+              "file_total": 0,
+              "file_mean": 0.0
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/api/staging.ts",
+              "language": "typescript",
+              "function_count": 2,
+              "functions": [
+                {
+                  "name": "getStagingPage",
+                  "start_line": 18,
+                  "end_line": 25,
+                  "cognitive_complexity": 1
+                },
+                {
+                  "name": "getItem",
+                  "start_line": 27,
+                  "end_line": 29,
+                  "cognitive_complexity": 0
+                }
+              ],
+              "file_total": 1,
+              "file_mean": 0.5
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/api/triage.ts",
+              "language": "typescript",
+              "function_count": 5,
+              "functions": [
+                {
+                  "name": "buildIdempotencyKey",
+                  "start_line": 11,
+                  "end_line": 16,
+                  "cognitive_complexity": 2
+                },
+                {
+                  "name": "postTriage",
+                  "start_line": 18,
+                  "end_line": 26,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "postAccept",
+                  "start_line": 28,
+                  "end_line": 30,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "postReject",
+                  "start_line": 32,
+                  "end_line": 34,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "postDefer",
+                  "start_line": 36,
+                  "end_line": 38,
+                  "cognitive_complexity": 0
+                }
+              ],
+              "file_total": 2,
+              "file_mean": 0.4
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/components/audit/AuditEvent.svelte",
+              "language": "svelte",
+              "function_count": 0,
+              "functions": [],
+              "file_total": 0,
+              "file_mean": null
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/components/audit/AuditTimeline.svelte",
+              "language": "svelte",
+              "function_count": 0,
+              "functions": [],
+              "file_total": 0,
+              "file_mean": null
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/components/blocklist/BlockRuleForm.svelte",
+              "language": "svelte",
+              "function_count": 0,
+              "functions": [],
+              "file_total": 0,
+              "file_mean": null
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/components/blocklist/BlockRuleList.svelte",
+              "language": "svelte",
+              "function_count": 0,
+              "functions": [],
+              "file_total": 0,
+              "file_mean": null
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/components/common/ActionButton.svelte",
+              "language": "svelte",
+              "function_count": 0,
+              "functions": [],
+              "file_total": 0,
+              "file_mean": null
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/components/common/ConfirmDialog.svelte",
+              "language": "svelte",
+              "function_count": 0,
+              "functions": [],
+              "file_total": 0,
+              "file_mean": null
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/components/common/EmptyState.svelte",
+              "language": "svelte",
+              "function_count": 0,
+              "functions": [],
+              "file_total": 0,
+              "file_mean": null
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/components/common/ErrorBanner.svelte",
+              "language": "svelte",
+              "function_count": 0,
+              "functions": [],
+              "file_total": 0,
+              "file_mean": null
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/components/common/KpiCard.svelte",
+              "language": "svelte",
+              "function_count": 0,
+              "functions": [],
+              "file_total": 0,
+              "file_mean": null
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/components/common/LoadMoreButton.svelte",
+              "language": "svelte",
+              "function_count": 0,
+              "functions": [],
+              "file_total": 0,
+              "file_mean": null
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/components/common/LoadingSkeleton.svelte",
+              "language": "svelte",
+              "function_count": 0,
+              "functions": [],
+              "file_total": 0,
+              "file_mean": null
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/components/common/StatusBadge.svelte",
+              "language": "svelte",
+              "function_count": 0,
+              "functions": [],
+              "file_total": 0,
+              "file_mean": null
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/components/dashboard/AuditPreview.svelte",
+              "language": "svelte",
+              "function_count": 0,
+              "functions": [],
+              "file_total": 0,
+              "file_mean": null
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/components/dashboard/HealthBar.svelte",
+              "language": "svelte",
+              "function_count": 0,
+              "functions": [],
+              "file_total": 0,
+              "file_mean": null
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/components/dashboard/KpiGrid.svelte",
+              "language": "svelte",
+              "function_count": 0,
+              "functions": [],
+              "file_total": 0,
+              "file_mean": null
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/components/dashboard/PollRuntimeChart.svelte",
+              "language": "svelte",
+              "function_count": 0,
+              "functions": [],
+              "file_total": 0,
+              "file_mean": null
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/components/layout/AppFooter.svelte",
+              "language": "svelte",
+              "function_count": 0,
+              "functions": [],
+              "file_total": 0,
+              "file_mean": null
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/components/layout/AppHeader.svelte",
+              "language": "svelte",
+              "function_count": 0,
+              "functions": [],
+              "file_total": 0,
+              "file_mean": null
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/components/layout/PageTitle.svelte",
+              "language": "svelte",
+              "function_count": 0,
+              "functions": [],
+              "file_total": 0,
+              "file_mean": null
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/components/settings/ConfigTable.svelte",
+              "language": "svelte",
+              "function_count": 0,
+              "functions": [],
+              "file_total": 0,
+              "file_mean": null
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/components/staging/ItemMetaPanel.svelte",
+              "language": "svelte",
+              "function_count": 0,
+              "functions": [],
+              "file_total": 0,
+              "file_mean": null
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/components/staging/PhotoCard.svelte",
+              "language": "svelte",
+              "function_count": 0,
+              "functions": [],
+              "file_total": 0,
+              "file_mean": null
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/components/staging/PhotoWheel.svelte",
+              "language": "svelte",
+              "function_count": 0,
+              "functions": [],
+              "file_total": 0,
+              "file_mean": null
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/components/staging/TriageControls.svelte",
+              "language": "svelte",
+              "function_count": 0,
+              "functions": [],
+              "file_total": 0,
+              "file_mean": null
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/stores/auditLog.svelte.js",
+              "language": "javascript",
+              "function_count": 8,
+              "functions": [
+                {
+                  "name": "loadMore",
+                  "start_line": 16,
+                  "end_line": 37,
+                  "cognitive_complexity": 3
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 18,
+                  "end_line": 20,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 23,
+                  "end_line": 23,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 26,
+                  "end_line": 33,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 35,
+                  "end_line": 35,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "setFilter",
+                  "start_line": 39,
+                  "end_line": 54,
+                  "cognitive_complexity": 3
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 43,
+                  "end_line": 50,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 52,
+                  "end_line": 52,
+                  "cognitive_complexity": 0
+                }
+              ],
+              "file_total": 6,
+              "file_mean": 0.75
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/stores/blocklist.svelte.js",
+              "language": "javascript",
+              "function_count": 25,
+              "functions": [
+                {
+                  "name": "makeIdempotencyKey",
+                  "start_line": 14,
+                  "end_line": 19,
+                  "cognitive_complexity": 2
+                },
+                {
+                  "name": "loadRules",
+                  "start_line": 21,
+                  "end_line": 29,
+                  "cognitive_complexity": 3
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 22,
+                  "end_line": 22,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 25,
+                  "end_line": 25,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 27,
+                  "end_line": 27,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "hydrate",
+                  "start_line": 31,
+                  "end_line": 33,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 32,
+                  "end_line": 32,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "createRuleAction",
+                  "start_line": 35,
+                  "end_line": 69,
+                  "cognitive_complexity": 7
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 48,
+                  "end_line": 51,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 55,
+                  "end_line": 59,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 57,
+                  "end_line": 57,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "snapshot",
+                  "start_line": 62,
+                  "end_line": 62,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 65,
+                  "end_line": 65,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "updateRuleAction",
+                  "start_line": 71,
+                  "end_line": 98,
+                  "cognitive_complexity": 8
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 73,
+                  "end_line": 80,
+                  "cognitive_complexity": 1
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 77,
+                  "end_line": 77,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 84,
+                  "end_line": 88,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 86,
+                  "end_line": 86,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "snapshot",
+                  "start_line": 91,
+                  "end_line": 91,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 94,
+                  "end_line": 94,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "deleteRuleAction",
+                  "start_line": 100,
+                  "end_line": 122,
+                  "cognitive_complexity": 6
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 102,
+                  "end_line": 109,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 106,
+                  "end_line": 106,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "snapshot",
+                  "start_line": 115,
+                  "end_line": 115,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 118,
+                  "end_line": 118,
+                  "cognitive_complexity": 0
+                }
+              ],
+              "file_total": 27,
+              "file_mean": 1.08
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/stores/config.svelte.js",
+              "language": "javascript",
+              "function_count": 3,
+              "functions": [
+                {
+                  "name": "load",
+                  "start_line": 13,
+                  "end_line": 26,
+                  "cognitive_complexity": 3
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 14,
+                  "end_line": 14,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 24,
+                  "end_line": 24,
+                  "cognitive_complexity": 0
+                }
+              ],
+              "file_total": 3,
+              "file_mean": 1.0
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/stores/health.svelte.js",
+              "language": "javascript",
+              "function_count": 7,
+              "functions": [
+                {
+                  "name": "fetchHealth",
+                  "start_line": 17,
+                  "end_line": 47,
+                  "cognitive_complexity": 3
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 27,
+                  "end_line": 34,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 36,
+                  "end_line": 39,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 42,
+                  "end_line": 45,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "connect",
+                  "start_line": 49,
+                  "end_line": 57,
+                  "cognitive_complexity": 1
+                },
+                {
+                  "name": "disconnect",
+                  "start_line": 59,
+                  "end_line": 64,
+                  "cognitive_complexity": 1
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 74,
+                  "end_line": 80,
+                  "cognitive_complexity": 0
+                }
+              ],
+              "file_total": 5,
+              "file_mean": 0.7142857142857143
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/stores/kpis.svelte.js",
+              "language": "javascript",
+              "function_count": 4,
+              "functions": [
+                {
+                  "name": "load",
+                  "start_line": 18,
+                  "end_line": 35,
+                  "cognitive_complexity": 3
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 19,
+                  "end_line": 19,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 22,
+                  "end_line": 31,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 33,
+                  "end_line": 33,
+                  "cognitive_complexity": 0
+                }
+              ],
+              "file_total": 3,
+              "file_mean": 0.75
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/stores/stagingQueue.svelte.js",
+              "language": "javascript",
+              "function_count": 16,
+              "functions": [
+                {
+                  "name": "loadPage",
+                  "start_line": 18,
+                  "end_line": 34,
+                  "cognitive_complexity": 5
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 19,
+                  "end_line": 19,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 22,
+                  "end_line": 30,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 32,
+                  "end_line": 32,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "clearQueue",
+                  "start_line": 36,
+                  "end_line": 38,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "hydrate",
+                  "start_line": 40,
+                  "end_line": 48,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 41,
+                  "end_line": 47,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "setActiveIndex",
+                  "start_line": 50,
+                  "end_line": 58,
+                  "cognitive_complexity": 1
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 51,
+                  "end_line": 57,
+                  "cognitive_complexity": 1
+                },
+                {
+                  "name": "shiftActive",
+                  "start_line": 60,
+                  "end_line": 69,
+                  "cognitive_complexity": 1
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 61,
+                  "end_line": 68,
+                  "cognitive_complexity": 1
+                },
+                {
+                  "name": "triageItem",
+                  "start_line": 71,
+                  "end_line": 116,
+                  "cognitive_complexity": 11
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 74,
+                  "end_line": 91,
+                  "cognitive_complexity": 1
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 76,
+                  "end_line": 76,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 81,
+                  "end_line": 81,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 112,
+                  "end_line": 112,
+                  "cognitive_complexity": 0
+                }
+              ],
+              "file_total": 21,
+              "file_mean": 1.3125
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/stores/toast.svelte.js",
+              "language": "javascript",
+              "function_count": 7,
+              "functions": [
+                {
+                  "name": "push",
+                  "start_line": 5,
+                  "end_line": 20,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 9,
+                  "end_line": 12,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 15,
+                  "end_line": 17,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "dismiss",
+                  "start_line": 22,
+                  "end_line": 24,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 23,
+                  "end_line": 23,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 23,
+                  "end_line": 23,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "clear",
+                  "start_line": 26,
+                  "end_line": 28,
+                  "cognitive_complexity": 0
+                }
+              ],
+              "file_total": 0,
+              "file_mean": 0.0
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/routes/+error.svelte",
+              "language": "svelte",
+              "function_count": 0,
+              "functions": [],
+              "file_total": 0,
+              "file_mean": null
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/routes/+layout.js",
+              "language": "javascript",
+              "function_count": 0,
+              "functions": [],
+              "file_total": 0,
+              "file_mean": null
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/routes/+layout.svelte",
+              "language": "svelte",
+              "function_count": 0,
+              "functions": [],
+              "file_total": 0,
+              "file_mean": null
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/routes/+page.js",
+              "language": "javascript",
+              "function_count": 1,
+              "functions": [
+                {
+                  "name": "load",
+                  "start_line": 6,
+                  "end_line": 15,
+                  "cognitive_complexity": 0
+                }
+              ],
+              "file_total": 0,
+              "file_mean": 0.0
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/routes/+page.svelte",
+              "language": "svelte",
+              "function_count": 0,
+              "functions": [],
+              "file_total": 0,
+              "file_mean": null
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/routes/audit/+page.js",
+              "language": "javascript",
+              "function_count": 1,
+              "functions": [
+                {
+                  "name": "load",
+                  "start_line": 3,
+                  "end_line": 6,
+                  "cognitive_complexity": 0
+                }
+              ],
+              "file_total": 0,
+              "file_mean": 0.0
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/routes/audit/+page.svelte",
+              "language": "svelte",
+              "function_count": 0,
+              "functions": [],
+              "file_total": 0,
+              "file_mean": null
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/routes/blocklist/+page.js",
+              "language": "javascript",
+              "function_count": 1,
+              "functions": [
+                {
+                  "name": "load",
+                  "start_line": 3,
+                  "end_line": 6,
+                  "cognitive_complexity": 0
+                }
+              ],
+              "file_total": 0,
+              "file_mean": 0.0
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/routes/blocklist/+page.svelte",
+              "language": "svelte",
+              "function_count": 0,
+              "functions": [],
+              "file_total": 0,
+              "file_mean": null
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/routes/settings/+page.js",
+              "language": "javascript",
+              "function_count": 1,
+              "functions": [
+                {
+                  "name": "load",
+                  "start_line": 3,
+                  "end_line": 6,
+                  "cognitive_complexity": 0
+                }
+              ],
+              "file_total": 0,
+              "file_mean": 0.0
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/routes/settings/+page.svelte",
+              "language": "svelte",
+              "function_count": 0,
+              "functions": [],
+              "file_total": 0,
+              "file_mean": null
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/routes/staging/+page.js",
+              "language": "javascript",
+              "function_count": 1,
+              "functions": [
+                {
+                  "name": "load",
+                  "start_line": 3,
+                  "end_line": 6,
+                  "cognitive_complexity": 0
+                }
+              ],
+              "file_total": 0,
+              "file_mean": 0.0
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/routes/staging/+page.svelte",
+              "language": "svelte",
+              "function_count": 0,
+              "functions": [],
+              "file_total": 0,
+              "file_mean": null
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/tests/component/ErrorBanner.test.ts",
+              "language": "typescript",
+              "function_count": 2,
+              "functions": [
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 3,
+                  "end_line": 9,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 4,
+                  "end_line": 8,
+                  "cognitive_complexity": 0
+                }
+              ],
+              "file_total": 0,
+              "file_mean": 0.0
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/tests/component/KpiCard.test.ts",
+              "language": "typescript",
+              "function_count": 3,
+              "functions": [
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 3,
+                  "end_line": 18,
+                  "cognitive_complexity": 2
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 4,
+                  "end_line": 17,
+                  "cognitive_complexity": 2
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 8,
+                  "end_line": 12,
+                  "cognitive_complexity": 2
+                }
+              ],
+              "file_total": 6,
+              "file_mean": 2.0
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/tests/component/StatusBadge.test.ts",
+              "language": "typescript",
+              "function_count": 2,
+              "functions": [
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 3,
+                  "end_line": 11,
+                  "cognitive_complexity": 0
+                },
+                {
+                  "name": "<arrow_function>",
+                  "start_line": 4,
+                  "end_line": 10,
+                  "cognitive_complexity": 0
+                }
+              ],
+              "file_total": 0,
+              "file_mean": 0.0
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/tests/setup.ts",
+              "language": "typescript",
+              "function_count": 0,
+              "functions": [],
+              "file_total": 0,
+              "file_mean": null
+            }
+          ],
+          "failures": [
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/components/audit/AuditEvent.svelte",
+              "reason": "parse_error",
+              "detail": "Failed to parse file",
+              "remediation": "Fix syntax error or exclude file from analysis"
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/components/audit/AuditTimeline.svelte",
+              "reason": "parse_error",
+              "detail": "Failed to parse file",
+              "remediation": "Fix syntax error or exclude file from analysis"
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/components/blocklist/BlockRuleForm.svelte",
+              "reason": "parse_error",
+              "detail": "Failed to parse file",
+              "remediation": "Fix syntax error or exclude file from analysis"
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/components/blocklist/BlockRuleList.svelte",
+              "reason": "parse_error",
+              "detail": "Failed to parse file",
+              "remediation": "Fix syntax error or exclude file from analysis"
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/components/common/ActionButton.svelte",
+              "reason": "parse_error",
+              "detail": "Failed to parse file",
+              "remediation": "Fix syntax error or exclude file from analysis"
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/components/common/ConfirmDialog.svelte",
+              "reason": "parse_error",
+              "detail": "Failed to parse file",
+              "remediation": "Fix syntax error or exclude file from analysis"
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/components/common/EmptyState.svelte",
+              "reason": "parse_error",
+              "detail": "Failed to parse file",
+              "remediation": "Fix syntax error or exclude file from analysis"
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/components/common/ErrorBanner.svelte",
+              "reason": "parse_error",
+              "detail": "Failed to parse file",
+              "remediation": "Fix syntax error or exclude file from analysis"
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/components/common/KpiCard.svelte",
+              "reason": "parse_error",
+              "detail": "Failed to parse file",
+              "remediation": "Fix syntax error or exclude file from analysis"
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/components/common/LoadMoreButton.svelte",
+              "reason": "parse_error",
+              "detail": "Failed to parse file",
+              "remediation": "Fix syntax error or exclude file from analysis"
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/components/common/LoadingSkeleton.svelte",
+              "reason": "parse_error",
+              "detail": "Failed to parse file",
+              "remediation": "Fix syntax error or exclude file from analysis"
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/components/common/StatusBadge.svelte",
+              "reason": "parse_error",
+              "detail": "Failed to parse file",
+              "remediation": "Fix syntax error or exclude file from analysis"
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/components/dashboard/AuditPreview.svelte",
+              "reason": "parse_error",
+              "detail": "Failed to parse file",
+              "remediation": "Fix syntax error or exclude file from analysis"
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/components/dashboard/HealthBar.svelte",
+              "reason": "parse_error",
+              "detail": "Failed to parse file",
+              "remediation": "Fix syntax error or exclude file from analysis"
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/components/dashboard/KpiGrid.svelte",
+              "reason": "parse_error",
+              "detail": "Failed to parse file",
+              "remediation": "Fix syntax error or exclude file from analysis"
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/components/dashboard/PollRuntimeChart.svelte",
+              "reason": "parse_error",
+              "detail": "Failed to parse file",
+              "remediation": "Fix syntax error or exclude file from analysis"
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/components/layout/AppFooter.svelte",
+              "reason": "parse_error",
+              "detail": "Failed to parse file",
+              "remediation": "Fix syntax error or exclude file from analysis"
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/components/layout/AppHeader.svelte",
+              "reason": "parse_error",
+              "detail": "Failed to parse file",
+              "remediation": "Fix syntax error or exclude file from analysis"
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/components/layout/PageTitle.svelte",
+              "reason": "parse_error",
+              "detail": "Failed to parse file",
+              "remediation": "Fix syntax error or exclude file from analysis"
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/components/settings/ConfigTable.svelte",
+              "reason": "parse_error",
+              "detail": "Failed to parse file",
+              "remediation": "Fix syntax error or exclude file from analysis"
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/components/staging/ItemMetaPanel.svelte",
+              "reason": "parse_error",
+              "detail": "Failed to parse file",
+              "remediation": "Fix syntax error or exclude file from analysis"
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/components/staging/PhotoCard.svelte",
+              "reason": "parse_error",
+              "detail": "Failed to parse file",
+              "remediation": "Fix syntax error or exclude file from analysis"
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/components/staging/PhotoWheel.svelte",
+              "reason": "parse_error",
+              "detail": "Failed to parse file",
+              "remediation": "Fix syntax error or exclude file from analysis"
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/lib/components/staging/TriageControls.svelte",
+              "reason": "parse_error",
+              "detail": "Failed to parse file",
+              "remediation": "Fix syntax error or exclude file from analysis"
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/routes/+error.svelte",
+              "reason": "parse_error",
+              "detail": "Failed to parse file",
+              "remediation": "Fix syntax error or exclude file from analysis"
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/routes/+layout.svelte",
+              "reason": "parse_error",
+              "detail": "Failed to parse file",
+              "remediation": "Fix syntax error or exclude file from analysis"
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/routes/+page.svelte",
+              "reason": "parse_error",
+              "detail": "Failed to parse file",
+              "remediation": "Fix syntax error or exclude file from analysis"
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/routes/audit/+page.svelte",
+              "reason": "parse_error",
+              "detail": "Failed to parse file",
+              "remediation": "Fix syntax error or exclude file from analysis"
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/routes/blocklist/+page.svelte",
+              "reason": "parse_error",
+              "detail": "Failed to parse file",
+              "remediation": "Fix syntax error or exclude file from analysis"
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/routes/settings/+page.svelte",
+              "reason": "parse_error",
+              "detail": "Failed to parse file",
+              "remediation": "Fix syntax error or exclude file from analysis"
+            },
+            {
+              "path": "/home/chris/dev/nightfall-photo-ingress/webui/src/routes/staging/+page.svelte",
+              "reason": "parse_error",
+              "detail": "Failed to parse file",
+              "remediation": "Fix syntax error or exclude file from analysis"
+            }
+          ],
+          "per_file": {
+            "webui/src/lib/api/audit.ts": 2.0,
+            "webui/src/lib/api/blocklist.ts": 0.0,
+            "webui/src/lib/api/client.ts": 4.5,
+            "webui/src/lib/api/config.ts": 0.0,
+            "webui/src/lib/api/health.ts": 0.0,
+            "webui/src/lib/api/staging.ts": 0.5,
+            "webui/src/lib/api/triage.ts": 0.4,
+            "webui/src/lib/stores/auditLog.svelte.js": 0.75,
+            "webui/src/lib/stores/blocklist.svelte.js": 1.08,
+            "webui/src/lib/stores/config.svelte.js": 1.0,
+            "webui/src/lib/stores/health.svelte.js": 0.71,
+            "webui/src/lib/stores/kpis.svelte.js": 0.75,
+            "webui/src/lib/stores/stagingQueue.svelte.js": 1.31,
+            "webui/src/lib/stores/toast.svelte.js": 0.0,
+            "webui/src/routes/+page.js": 0.0,
+            "webui/src/routes/audit/+page.js": 0.0,
+            "webui/src/routes/blocklist/+page.js": 0.0,
+            "webui/src/routes/settings/+page.js": 0.0,
+            "webui/src/routes/staging/+page.js": 0.0,
+            "webui/tests/component/ErrorBanner.test.ts": 0.0,
+            "webui/tests/component/KpiCard.test.ts": 2.0,
+            "webui/tests/component/StatusBadge.test.ts": 0.0
+          },
+          "collection_time_ms": 0
+        },
+        "dependency_graph": {
+          "status": "success",
+          "nodes": [
+            "webui/src/lib/api/audit.ts",
+            "webui/src/lib/api/blocklist.ts",
+            "webui/src/lib/api/client.ts",
+            "webui/src/lib/api/config.ts",
+            "webui/src/lib/api/health.ts",
+            "webui/src/lib/api/staging.ts",
+            "webui/src/lib/api/triage.ts",
+            "webui/src/lib/components/audit/AuditEvent.svelte",
+            "webui/src/lib/components/audit/AuditTimeline.svelte",
+            "webui/src/lib/components/blocklist/BlockRuleForm.svelte",
+            "webui/src/lib/components/blocklist/BlockRuleList.svelte",
+            "webui/src/lib/components/common/ActionButton.svelte",
+            "webui/src/lib/components/common/ConfirmDialog.svelte",
+            "webui/src/lib/components/common/EmptyState.svelte",
+            "webui/src/lib/components/common/ErrorBanner.svelte",
+            "webui/src/lib/components/common/KpiCard.svelte",
+            "webui/src/lib/components/common/LoadMoreButton.svelte",
+            "webui/src/lib/components/common/LoadingSkeleton.svelte",
+            "webui/src/lib/components/common/StatusBadge.svelte",
+            "webui/src/lib/components/dashboard/AuditPreview.svelte",
+            "webui/src/lib/components/dashboard/HealthBar.svelte",
+            "webui/src/lib/components/dashboard/KpiGrid.svelte",
+            "webui/src/lib/components/dashboard/PollRuntimeChart.svelte",
+            "webui/src/lib/components/layout/AppFooter.svelte",
+            "webui/src/lib/components/layout/AppHeader.svelte",
+            "webui/src/lib/components/layout/PageTitle.svelte",
+            "webui/src/lib/components/settings/ConfigTable.svelte",
+            "webui/src/lib/components/staging/ItemMetaPanel.svelte",
+            "webui/src/lib/components/staging/PhotoCard.svelte",
+            "webui/src/lib/components/staging/PhotoWheel.svelte",
+            "webui/src/lib/components/staging/TriageControls.svelte",
+            "webui/src/lib/stores/auditLog.svelte.js",
+            "webui/src/lib/stores/blocklist.svelte.js",
+            "webui/src/lib/stores/config.svelte.js",
+            "webui/src/lib/stores/health.svelte.js",
+            "webui/src/lib/stores/kpis.svelte.js",
+            "webui/src/lib/stores/stagingQueue.svelte.js",
+            "webui/src/lib/stores/toast.svelte.js",
+            "webui/src/routes/+error.svelte",
+            "webui/src/routes/+layout.js",
+            "webui/src/routes/+layout.svelte",
+            "webui/src/routes/+page.js",
+            "webui/src/routes/+page.svelte",
+            "webui/src/routes/audit/+page.js",
+            "webui/src/routes/audit/+page.svelte",
+            "webui/src/routes/blocklist/+page.js",
+            "webui/src/routes/blocklist/+page.svelte",
+            "webui/src/routes/settings/+page.js",
+            "webui/src/routes/settings/+page.svelte",
+            "webui/src/routes/staging/+page.js",
+            "webui/src/routes/staging/+page.svelte",
+            "webui/tests/component/ErrorBanner.test.ts",
+            "webui/tests/component/KpiCard.test.ts",
+            "webui/tests/component/StatusBadge.test.ts",
+            "webui/tests/setup.ts"
+          ],
+          "edges": [
+            {
+              "from": "webui/src/lib/api/audit.ts",
+              "to": "./client"
+            },
+            {
+              "from": "webui/src/lib/api/blocklist.ts",
+              "to": "./client"
+            },
+            {
+              "from": "webui/src/lib/api/client.ts",
+              "to": "$env/static/public"
+            },
+            {
+              "from": "webui/src/lib/api/config.ts",
+              "to": "./client"
+            },
+            {
+              "from": "webui/src/lib/api/health.ts",
+              "to": "./client"
+            },
+            {
+              "from": "webui/src/lib/api/staging.ts",
+              "to": "./client"
+            },
+            {
+              "from": "webui/src/lib/api/triage.ts",
+              "to": "./client"
+            },
+            {
+              "from": "webui/src/lib/components/audit/AuditEvent.svelte",
+              "to": "$lib/api/audit"
+            },
+            {
+              "from": "webui/src/lib/components/audit/AuditTimeline.svelte",
+              "to": "$lib/api/audit"
+            },
+            {
+              "from": "webui/src/lib/components/audit/AuditTimeline.svelte",
+              "to": "$lib/components/common/EmptyState.svelte"
+            },
+            {
+              "from": "webui/src/lib/components/audit/AuditTimeline.svelte",
+              "to": "$lib/components/common/LoadMoreButton.svelte"
+            },
+            {
+              "from": "webui/src/lib/components/audit/AuditTimeline.svelte",
+              "to": "./AuditEvent.svelte"
+            },
+            {
+              "from": "webui/src/lib/components/blocklist/BlockRuleList.svelte",
+              "to": "$lib/components/common/EmptyState.svelte"
+            },
+            {
+              "from": "webui/src/lib/components/common/StatusBadge.svelte",
+              "to": "svelte"
+            },
+            {
+              "from": "webui/src/lib/components/dashboard/AuditPreview.svelte",
+              "to": "$lib/api/audit"
+            },
+            {
+              "from": "webui/src/lib/components/dashboard/HealthBar.svelte",
+              "to": "$lib/components/common/StatusBadge.svelte"
+            },
+            {
+              "from": "webui/src/lib/components/dashboard/KpiGrid.svelte",
+              "to": "$lib/components/common/KpiCard.svelte"
+            },
+            {
+              "from": "webui/src/lib/components/layout/AppFooter.svelte",
+              "to": "$lib/stores/health.svelte"
+            },
+            {
+              "from": "webui/src/lib/components/layout/AppFooter.svelte",
+              "to": "../common/StatusBadge.svelte"
+            },
+            {
+              "from": "webui/src/lib/components/layout/AppHeader.svelte",
+              "to": "$app/stores"
+            },
+            {
+              "from": "webui/src/lib/components/layout/AppHeader.svelte",
+              "to": "$lib/stores/health.svelte"
+            },
+            {
+              "from": "webui/src/lib/components/layout/AppHeader.svelte",
+              "to": "../common/StatusBadge.svelte"
+            },
+            {
+              "from": "webui/src/lib/components/staging/PhotoWheel.svelte",
+              "to": "$lib/components/common/EmptyState.svelte"
+            },
+            {
+              "from": "webui/src/lib/components/staging/PhotoWheel.svelte",
+              "to": "./PhotoCard.svelte"
+            },
+            {
+              "from": "webui/src/lib/components/staging/TriageControls.svelte",
+              "to": "$lib/components/common/ActionButton.svelte"
+            },
+            {
+              "from": "webui/src/lib/stores/auditLog.svelte.js",
+              "to": "$lib/api/audit"
+            },
+            {
+              "from": "webui/src/lib/stores/auditLog.svelte.js",
+              "to": "svelte/store"
+            },
+            {
+              "from": "webui/src/lib/stores/blocklist.svelte.js",
+              "to": "$lib/api/blocklist"
+            },
+            {
+              "from": "webui/src/lib/stores/blocklist.svelte.js",
+              "to": "$lib/stores/toast.svelte"
+            },
+            {
+              "from": "webui/src/lib/stores/blocklist.svelte.js",
+              "to": "svelte/store"
+            },
+            {
+              "from": "webui/src/lib/stores/config.svelte.js",
+              "to": "$lib/api/config"
+            },
+            {
+              "from": "webui/src/lib/stores/config.svelte.js",
+              "to": "svelte/store"
+            },
+            {
+              "from": "webui/src/lib/stores/health.svelte.js",
+              "to": "$env/static/public"
+            },
+            {
+              "from": "webui/src/lib/stores/health.svelte.js",
+              "to": "svelte/store"
+            },
+            {
+              "from": "webui/src/lib/stores/kpis.svelte.js",
+              "to": "$lib/api/health"
+            },
+            {
+              "from": "webui/src/lib/stores/kpis.svelte.js",
+              "to": "$lib/api/staging"
+            },
+            {
+              "from": "webui/src/lib/stores/kpis.svelte.js",
+              "to": "svelte/store"
+            },
+            {
+              "from": "webui/src/lib/stores/stagingQueue.svelte.js",
+              "to": "$lib/api/staging"
+            },
+            {
+              "from": "webui/src/lib/stores/stagingQueue.svelte.js",
+              "to": "$lib/api/triage"
+            },
+            {
+              "from": "webui/src/lib/stores/stagingQueue.svelte.js",
+              "to": "$lib/stores/toast.svelte"
+            },
+            {
+              "from": "webui/src/lib/stores/stagingQueue.svelte.js",
+              "to": "svelte/store"
+            },
+            {
+              "from": "webui/src/lib/stores/toast.svelte.js",
+              "to": "svelte/store"
+            },
+            {
+              "from": "webui/src/routes/+error.svelte",
+              "to": "$app/stores"
+            },
+            {
+              "from": "webui/src/routes/+layout.svelte",
+              "to": "$lib/components/layout/AppFooter.svelte"
+            },
+            {
+              "from": "webui/src/routes/+layout.svelte",
+              "to": "$lib/components/layout/AppHeader.svelte"
+            },
+            {
+              "from": "webui/src/routes/+layout.svelte",
+              "to": "$lib/stores/health.svelte"
+            },
+            {
+              "from": "webui/src/routes/+page.js",
+              "to": "$lib/api/audit"
+            },
+            {
+              "from": "webui/src/routes/+page.js",
+              "to": "$lib/api/config"
+            },
+            {
+              "from": "webui/src/routes/+page.js",
+              "to": "$lib/api/health"
+            },
+            {
+              "from": "webui/src/routes/+page.js",
+              "to": "$lib/api/staging"
+            },
+            {
+              "from": "webui/src/routes/+page.svelte",
+              "to": "$lib/api/audit"
+            },
+            {
+              "from": "webui/src/routes/+page.svelte",
+              "to": "$lib/api/config"
+            },
+            {
+              "from": "webui/src/routes/+page.svelte",
+              "to": "$lib/api/health"
+            },
+            {
+              "from": "webui/src/routes/+page.svelte",
+              "to": "$lib/api/staging"
+            },
+            {
+              "from": "webui/src/routes/+page.svelte",
+              "to": "$lib/components/dashboard/AuditPreview.svelte"
+            },
+            {
+              "from": "webui/src/routes/+page.svelte",
+              "to": "$lib/components/dashboard/HealthBar.svelte"
+            },
+            {
+              "from": "webui/src/routes/+page.svelte",
+              "to": "$lib/components/dashboard/KpiGrid.svelte"
+            },
+            {
+              "from": "webui/src/routes/+page.svelte",
+              "to": "$lib/components/dashboard/PollRuntimeChart.svelte"
+            },
+            {
+              "from": "webui/src/routes/audit/+page.js",
+              "to": "$lib/api/audit"
+            },
+            {
+              "from": "webui/src/routes/audit/+page.svelte",
+              "to": "$lib/api/audit"
+            },
+            {
+              "from": "webui/src/routes/audit/+page.svelte",
+              "to": "$lib/components/audit/AuditTimeline.svelte"
+            },
+            {
+              "from": "webui/src/routes/blocklist/+page.js",
+              "to": "$lib/api/blocklist"
+            },
+            {
+              "from": "webui/src/routes/blocklist/+page.svelte",
+              "to": "$lib/components/blocklist/BlockRuleForm.svelte"
+            },
+            {
+              "from": "webui/src/routes/blocklist/+page.svelte",
+              "to": "$lib/components/blocklist/BlockRuleList.svelte"
+            },
+            {
+              "from": "webui/src/routes/blocklist/+page.svelte",
+              "to": "$lib/components/common/ConfirmDialog.svelte"
+            },
+            {
+              "from": "webui/src/routes/blocklist/+page.svelte",
+              "to": "$lib/stores/blocklist.svelte"
+            },
+            {
+              "from": "webui/src/routes/settings/+page.js",
+              "to": "$lib/api/config"
+            },
+            {
+              "from": "webui/src/routes/settings/+page.svelte",
+              "to": "$lib/api/config"
+            },
+            {
+              "from": "webui/src/routes/settings/+page.svelte",
+              "to": "$lib/components/settings/ConfigTable.svelte"
+            },
+            {
+              "from": "webui/src/routes/staging/+page.js",
+              "to": "$lib/api/staging"
+            },
+            {
+              "from": "webui/src/routes/staging/+page.svelte",
+              "to": "$lib/components/staging/ItemMetaPanel.svelte"
+            },
+            {
+              "from": "webui/src/routes/staging/+page.svelte",
+              "to": "$lib/components/staging/PhotoWheel.svelte"
+            },
+            {
+              "from": "webui/src/routes/staging/+page.svelte",
+              "to": "$lib/components/staging/TriageControls.svelte"
+            },
+            {
+              "from": "webui/src/routes/staging/+page.svelte",
+              "to": "$lib/stores/stagingQueue.svelte"
+            },
+            {
+              "from": "webui/tests/component/ErrorBanner.test.ts",
+              "to": "vitest"
+            },
+            {
+              "from": "webui/tests/component/KpiCard.test.ts",
+              "to": "vitest"
+            },
+            {
+              "from": "webui/tests/component/StatusBadge.test.ts",
+              "to": "vitest"
+            }
+          ],
+          "node_details": [
+            {
+              "path": "webui/src/lib/api/audit.ts",
+              "fan_in": 0,
+              "fan_out": 1,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/lib/api/blocklist.ts",
+              "fan_in": 0,
+              "fan_out": 1,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/lib/api/client.ts",
+              "fan_in": 6,
+              "fan_out": 1,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/lib/api/config.ts",
+              "fan_in": 0,
+              "fan_out": 1,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/lib/api/health.ts",
+              "fan_in": 0,
+              "fan_out": 1,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/lib/api/staging.ts",
+              "fan_in": 0,
+              "fan_out": 1,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/lib/api/triage.ts",
+              "fan_in": 0,
+              "fan_out": 1,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/lib/components/audit/AuditEvent.svelte",
+              "fan_in": 1,
+              "fan_out": 1,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/lib/components/audit/AuditTimeline.svelte",
+              "fan_in": 0,
+              "fan_out": 4,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/lib/components/blocklist/BlockRuleForm.svelte",
+              "fan_in": 0,
+              "fan_out": 0,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/lib/components/blocklist/BlockRuleList.svelte",
+              "fan_in": 0,
+              "fan_out": 1,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/lib/components/common/ActionButton.svelte",
+              "fan_in": 0,
+              "fan_out": 0,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/lib/components/common/ConfirmDialog.svelte",
+              "fan_in": 0,
+              "fan_out": 0,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/lib/components/common/EmptyState.svelte",
+              "fan_in": 0,
+              "fan_out": 0,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/lib/components/common/ErrorBanner.svelte",
+              "fan_in": 0,
+              "fan_out": 0,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/lib/components/common/KpiCard.svelte",
+              "fan_in": 0,
+              "fan_out": 0,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/lib/components/common/LoadMoreButton.svelte",
+              "fan_in": 0,
+              "fan_out": 0,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/lib/components/common/LoadingSkeleton.svelte",
+              "fan_in": 0,
+              "fan_out": 0,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/lib/components/common/StatusBadge.svelte",
+              "fan_in": 2,
+              "fan_out": 1,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/lib/components/dashboard/AuditPreview.svelte",
+              "fan_in": 0,
+              "fan_out": 1,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/lib/components/dashboard/HealthBar.svelte",
+              "fan_in": 0,
+              "fan_out": 1,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/lib/components/dashboard/KpiGrid.svelte",
+              "fan_in": 0,
+              "fan_out": 1,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/lib/components/dashboard/PollRuntimeChart.svelte",
+              "fan_in": 0,
+              "fan_out": 0,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/lib/components/layout/AppFooter.svelte",
+              "fan_in": 0,
+              "fan_out": 2,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/lib/components/layout/AppHeader.svelte",
+              "fan_in": 0,
+              "fan_out": 3,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/lib/components/layout/PageTitle.svelte",
+              "fan_in": 0,
+              "fan_out": 0,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/lib/components/settings/ConfigTable.svelte",
+              "fan_in": 0,
+              "fan_out": 0,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/lib/components/staging/ItemMetaPanel.svelte",
+              "fan_in": 0,
+              "fan_out": 0,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/lib/components/staging/PhotoCard.svelte",
+              "fan_in": 1,
+              "fan_out": 0,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/lib/components/staging/PhotoWheel.svelte",
+              "fan_in": 0,
+              "fan_out": 2,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/lib/components/staging/TriageControls.svelte",
+              "fan_in": 0,
+              "fan_out": 1,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/lib/stores/auditLog.svelte.js",
+              "fan_in": 0,
+              "fan_out": 2,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/lib/stores/blocklist.svelte.js",
+              "fan_in": 0,
+              "fan_out": 3,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/lib/stores/config.svelte.js",
+              "fan_in": 0,
+              "fan_out": 2,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/lib/stores/health.svelte.js",
+              "fan_in": 0,
+              "fan_out": 2,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/lib/stores/kpis.svelte.js",
+              "fan_in": 0,
+              "fan_out": 3,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/lib/stores/stagingQueue.svelte.js",
+              "fan_in": 0,
+              "fan_out": 4,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/lib/stores/toast.svelte.js",
+              "fan_in": 0,
+              "fan_out": 1,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/routes/+error.svelte",
+              "fan_in": 0,
+              "fan_out": 1,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/routes/+layout.js",
+              "fan_in": 0,
+              "fan_out": 0,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/routes/+layout.svelte",
+              "fan_in": 0,
+              "fan_out": 3,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/routes/+page.js",
+              "fan_in": 0,
+              "fan_out": 4,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/routes/+page.svelte",
+              "fan_in": 0,
+              "fan_out": 8,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/routes/audit/+page.js",
+              "fan_in": 0,
+              "fan_out": 1,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/routes/audit/+page.svelte",
+              "fan_in": 0,
+              "fan_out": 2,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/routes/blocklist/+page.js",
+              "fan_in": 0,
+              "fan_out": 1,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/routes/blocklist/+page.svelte",
+              "fan_in": 0,
+              "fan_out": 4,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/routes/settings/+page.js",
+              "fan_in": 0,
+              "fan_out": 1,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/routes/settings/+page.svelte",
+              "fan_in": 0,
+              "fan_out": 2,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/routes/staging/+page.js",
+              "fan_in": 0,
+              "fan_out": 1,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/src/routes/staging/+page.svelte",
+              "fan_in": 0,
+              "fan_out": 4,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/tests/component/ErrorBanner.test.ts",
+              "fan_in": 0,
+              "fan_out": 1,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/tests/component/KpiCard.test.ts",
+              "fan_in": 0,
+              "fan_out": 1,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/tests/component/StatusBadge.test.ts",
+              "fan_in": 0,
+              "fan_out": 1,
+              "kind": "local",
+              "in_cycle": false
+            },
+            {
+              "path": "webui/tests/setup.ts",
+              "fan_in": 0,
+              "fan_out": 0,
+              "kind": "local",
+              "in_cycle": false
+            }
+          ]
+        },
+        "test_coverage": {
+          "status": "not_available",
+          "reason": "deferred_until_vitest_playwright_maturity"
+        }
+      }
     }
   },
   "delta": {}

@@ -23,6 +23,11 @@
 12. [Open Questions and Decision Points](#12-open-questions-and-decision-points)
 13. [Executor Refactoring: FD-Safe Process Tree](#13-executor-refactoring-fd-safe-process-tree)
 14. [Appendix: Mapping to Existing Repo Artifacts](#14-appendix-mapping-to-existing-repo-artifacts)
+15. [Token Authority Model](#15-token-authority-model)
+16. [Artifact Immutability and Promotion](#16-artifact-immutability-and-promotion)
+17. [Build Governor Enforcement Responsibilities](#17-build-governor-enforcement-responsibilities)
+18. [Preflight Execution Context Contract](#18-preflight-execution-context-contract)
+19. [Token Placeholder Semantics](#19-token-placeholder-semantics)
 
 ---
 
@@ -940,3 +945,360 @@ script, or command it delegates to.
 | Target manifest | `dev/govctl-targets.yaml` | Declarative target/group/preflight definitions |
 | Run logs | `artifacts/govctl/run-<ts>/` | Per-run directory with JSONL events + per-target logs |
 | .gitignore entry | `artifacts/govctl/` | Ephemeral run data excluded from VCS |
+
+---
+
+## 15. Token Authority Model
+
+**Status:** proposed  
+**Date:** 2025-07-27  
+**Motivation:** Root-cause analysis of staging auth failures (see
+`audit/staging-token-mismatch-root-cause.md`) identified that the API token
+has no single canonical source, no build-time injection contract, and no
+runtime validation contract. This section formalizes the token lifecycle as a
+build governor concern.
+
+### 15.1 Invariants
+
+| ID | Invariant |
+|----|-----------|
+| T1 | There is exactly one canonical token definition per deployment environment: the `[web] api_token` value in the environment's authoritative INI configuration artifact. No alternate authoritative token source is permitted. |
+| T2 | The frontend (SvelteKit) consumes the token exclusively via `PUBLIC_API_TOKEN` in `webui/.env`. This frontend value is a derived build-time materialization of T1 and must be byte-identical to the canonical token at build time. The value is then baked into static JS; it is never fetched or injected at runtime. |
+| T3 | The backend (FastAPI) consumes the canonical token exclusively via `[web] api_token` in the INI config file loaded at process start. It is never read from environment variables, command-line flags, or secondary files. |
+| T4 | The staging config template (`staging/container/photo-ingress.conf`) must contain a `[web]` section with `api_token` defined. A template missing this section is a build-time defect, not a runtime misconfiguration. |
+| T5 | Token values must not appear in build logs, JSONL events, preflight check output, or `govctl` summary artifacts. |
+| T6 | Token comparison must use constant-time comparison (`hmac.compare_digest` or equivalent). Direct string equality is prohibited. |
+
+For audit purposes, token-bearing artifacts are classified as follows:
+
+- Canonical definition: environment INI `[web] api_token` (authoritative).
+- Derived materializations: `webui/.env` `PUBLIC_API_TOKEN` and built SPA `_app/env.js` token payload.
+- Runtime consumptions: FastAPI process load from INI and SPA request header use of baked token.
+
+### 15.2 Token Sources Per Environment
+
+| Environment | Frontend Token Source | Backend Token Source |
+|-------------|----------------------|----------------------|
+| Development | `webui/.env` → SvelteKit build → `_app/env.js` | `conf/photo-ingress.dev.conf` `[web] api_token` |
+| Staging | `webui/.env` → SvelteKit build → `_app/env.js` (baked in dev container, synced to staging) | `staging/container/photo-ingress.conf` `[web] api_token` |
+| Production | `webui/.env` → SvelteKit build → `_app/env.js` (baked in dev container, promoted from staging) | `/etc/nightfall/photo-ingress.conf` `[web] api_token` |
+
+### 15.3 Divergence Prohibition
+
+The build governor treats frontend-backend token divergence as a defect class
+equivalent to a broken build. The following divergence scenarios are defined:
+
+| Scenario | Nature | Detection Point |
+|----------|--------|-----------------|
+| `webui/.env` contains a different token than the config template `[web] api_token` | Source divergence | Pre-build preflight |
+| Config template is missing the `[web]` section entirely | Template defect | Pre-build preflight |
+| Build artifact (`_app/env.js`) contains a token not present in any config file | Artifact drift | Post-build verification |
+| Running API container has a `[web] api_token` that differs from the build artifact token | Deployment drift | Staging smoke |
+
+### 15.4 Non-Goals
+
+- Token rotation protocol. Rotation requires operational procedures beyond
+  build orchestration.
+- Secret management integration (Vault, SOPS, etc.). The token is a low-risk
+  internal staging/dev credential. External secret managers are out of scope.
+- Multi-token or role-based access. The current design uses a single bearer
+  token per environment.
+
+---
+
+## 16. Artifact Immutability and Promotion
+
+**Status:** proposed  
+**Date:** 2025-07-27  
+**Motivation:** The staging auth failure was partly caused by a mismatch between
+the SPA build artifact and the runtime configuration. This section defines the
+immutability contract for build artifacts and the promotion model that prevents
+rebuild-induced drift.
+
+### 16.1 Invariants
+
+| ID | Invariant |
+|----|-----------|
+| A1 | A SvelteKit SPA build is an immutable artifact. Once produced by `web.build`, its contents must not be modified, patched, or re-baked before or during deployment. |
+| A2 | The token baked into the SPA at build time is final. There is no post-build token injection, substitution, or templating step. |
+| A3 | Staging deployment consumes the same build artifact as production. There is no separate staging build. |
+| A4 | A Python wheel produced by `backend.build.wheel` is an immutable artifact. `staging.install` consumes it without modification. |
+| A5 | Artifact identity is established by content hash (SHA-256) at build time. Any artifact whose content hash does not match the recorded build hash is rejected. |
+
+### 16.2 Promotion Model
+
+```
+  Build Phase                 Staging Phase              Production Phase
+  ───────────                 ─────────────              ────────────────
+  web.build                   staging.install            (future: promote)
+  ┌─────────────┐             ┌─────────────────┐        ┌───────────────┐
+  │ SvelteKit   │             │ Deploy artifact  │        │ Deploy same   │
+  │ build in    │──artifact──▶│ to staging LXC   │──same──▶│ artifact to   │
+  │ dev container│  (no re-   │ container        │ artifact│ production    │
+  │             │   build)    │                  │         │               │
+  └─────────────┘             └─────────────────┘        └───────────────┘
+
+  backend.build.wheel         staging.install            (future: promote)
+  ┌─────────────┐             ┌─────────────────┐        ┌───────────────┐
+  │ python -m   │             │ pip install .whl │        │ pip install   │
+  │ build       │──artifact──▶│ in staging LXC   │──same──▶│ same .whl in  │
+  │ --wheel     │  (no re-   │ container        │ artifact│ production    │
+  │             │   build)    │                  │         │               │
+  └─────────────┘             └─────────────────┘        └───────────────┘
+```
+
+### 16.3 Guarantees
+
+| ID | Guarantee |
+|----|-----------|
+| P1 | Promotion never triggers a rebuild. The artifact deployed to production is byte-identical to the artifact validated in staging. |
+| P2 | If the staging smoke suite passes against an artifact, that exact artifact is eligible for promotion. A rebuild invalidates eligibility. |
+| P3 | The config template deployed alongside the artifact is versioned in the same commit. Config and artifact provenance are linked. |
+| P4 | Artifact fingerprinting (SHA-256 of the build output directory or wheel file) is recorded in the govctl JSONL event stream at build time and verified at deployment time. |
+
+### 16.4 Failure Modes
+
+| Failure | Cause | Consequence |
+|---------|-------|-------------|
+| Artifact hash mismatch at deploy | Build output was modified after `web.build` or `backend.build.wheel` completed | `staging.install` refuses deployment |
+| Token embedded in artifact differs from staging config | `webui/.env` was changed after last `web.build`, or config template was edited without rebuild | Staging smoke fails with 401 on all endpoints |
+| No artifact present at deploy time | `staging.install` invoked without prior `web.build` or `backend.build.wheel` | Dependency graph prevents execution (`requires` edge) |
+
+### 16.5 Non-Goals
+
+- Image-based promotion (Docker/OCI). The current deployment model uses LXC
+  containers with file-level artifact deployment.
+- Rollback automation. Rollback is a manual operational procedure (restore
+  from LXC snapshot).
+- Multi-artifact atomic promotion. Each artifact type (SPA, wheel) is promoted
+  independently.
+
+---
+
+## 17. Build Governor Enforcement Responsibilities
+
+**Status:** proposed  
+**Date:** 2025-07-27  
+**Motivation:** Sections 15 and 16 define invariants and guarantees. This
+section defines what the build governor validates, what it refuses, and where
+enforcement occurs in the target execution lifecycle.
+
+### 17.1 Enforcement Points
+
+The build governor enforces correctness at three points in target execution:
+
+| Point | Phase | What Runs |
+|-------|-------|-----------|
+| Pre-build | Before `web.build` or `backend.build.wheel` | Token consistency preflight, template completeness preflight |
+| Post-build | After `web.build` or `backend.build.wheel` completes | Artifact fingerprint recording |
+| Pre-deploy | Before `staging.install` | Artifact hash verification, token/config consistency check |
+
+### 17.2 New Preflight Checks
+
+These checks extend the preflight framework defined in §6.
+
+| Check Name | Enforces | Validation Logic |
+|------------|----------|------------------|
+| `token-source-consistent` | T1, T2, T3 | Reads `PUBLIC_API_TOKEN` from `webui/.env` and `api_token` from the staging config template `[web]` section. Fails if values differ. |
+| `config-template-complete:<file>` | T4 | Parses the named INI file and verifies the `[web]` section exists with a non-empty `api_token` key. |
+| `artifact-hash-recorded:<target>` | A5 | Verifies that the JSONL event log for the current run contains a `build_fingerprint` event for the named target. Required before any target that consumes the build output. |
+| `artifact-hash-verified:<artifact-path>` | A5, P1 | Computes SHA-256 of the artifact at the given path and compares against the recorded fingerprint. Fails on mismatch. |
+
+### 17.3 Refusal Semantics
+
+The build governor refuses to proceed (emits `preflight_failed`, skips target)
+under these conditions:
+
+| Condition | Preflight That Catches It | Error Category |
+|-----------|---------------------------|----------------|
+| Frontend and backend token values diverge | `token-source-consistent` | Source divergence |
+| Staging config template missing `[web]` section | `config-template-complete:staging/container/photo-ingress.conf` | Template defect |
+| Staging config template has empty `api_token` | `config-template-complete:staging/container/photo-ingress.conf` | Template defect |
+| `staging.install` invoked but no fingerprint recorded for `web.build` | `artifact-hash-recorded:web.build` | Missing provenance |
+| `staging.install` invoked but artifact hash does not match recorded fingerprint | `artifact-hash-verified:webui/build/` | Artifact tamper |
+
+### 17.4 JSONL Event Extensions
+
+New event types for the JSONL stream (extends §8):
+
+```jsonc
+// Emitted after web.build or backend.build.wheel completes successfully
+{"event":"build_fingerprint","target":"web.build","sha256":"abc123...","artifact_path":"webui/build/","timestamp":"..."}
+
+// Emitted when artifact hash verification passes at deploy time
+{"event":"artifact_verified","target":"staging.install","artifact":"web.build","expected_sha256":"abc123...","actual_sha256":"abc123...","timestamp":"..."}
+
+// Emitted when artifact hash verification fails
+{"event":"artifact_rejected","target":"staging.install","artifact":"web.build","expected_sha256":"abc123...","actual_sha256":"def456...","timestamp":"..."}
+```
+
+### 17.5 Target Manifest Additions
+
+The following preflight declarations would be added to the targets defined in §7:
+
+```yaml
+  web.build:
+    preflight:
+      - container-running:dev-photo-ingress
+      - stack-drift-free:webui
+      - token-source-consistent                              # new
+      - config-template-complete:staging/container/photo-ingress.conf  # new
+
+  staging.install:
+    preflight:
+      - container-running:staging-photo-ingress
+      - bridge-network:br-staging
+      - artifact-hash-recorded:web.build                     # new
+      - artifact-hash-recorded:backend.build.wheel           # new
+      - artifact-hash-verified:webui/build/                  # new
+      - artifact-hash-verified:dist/*.whl                    # new
+      - token-source-consistent                              # new
+```
+
+### 17.6 What The Build Governor Does Not Enforce
+
+| Concern | Reason |
+|---------|--------|
+| Runtime token validation correctness | Responsibility of `api/auth.py`; verified by staging smoke tests, not build preflights |
+| Token rotation | Operational procedure, not a build concern |
+| Secret storage security | Out of scope (see §15.4) |
+| Network-level auth (TLS, mTLS) | Infrastructure concern, not build orchestration |
+| Correctness of test assertions | Tests validate behavior; the governor validates preconditions |
+| Container image integrity | The LXC container is managed by devctl/stagingctl, not by govctl directly |
+
+---
+
+## 18. Preflight Execution Context Contract
+
+**Status:** proposed  
+**Date:** 2026-04-08  
+**Motivation:** Chunk 4 of the staging-token-hardening roadmap failed because
+the preflight execution context was under-specified. This section formalizes
+the contract so that preflights are deterministically implementable and
+verifiable in isolation.
+
+### 18.1 Working Directory
+
+All preflight checks execute with the working directory set to the repository
+root. The repository root is resolved at `govctl` startup as
+`GOVCTL_PREFLIGHTS_PROJECT_ROOT` (the parent of `dev/bin/`). This directory is
+the same as `GOVCTL_EXEC_PROJECT_ROOT` used for target command execution.
+
+Preflight implementations must not assume or change the working directory.
+
+### 18.2 Path Resolution
+
+Preflight check arguments that contain file paths (e.g.,
+`config-template-complete:staging/container/photo-ingress.conf`) are resolved
+as follows:
+
+| Path form | Resolution |
+|-----------|------------|
+| Relative (no leading `/`) | Prepend `$GOVCTL_PREFLIGHTS_PROJECT_ROOT/` |
+| Absolute (leading `/`) | Use as-is |
+
+The `token-source-consistent` check reads two fixed paths relative to the
+project root: `webui/.env` and `staging/container/photo-ingress.conf`. These
+paths are intrinsic to the check definition, not supplied as arguments.
+
+### 18.3 Evaluation Order and Short-Circuit Behavior
+
+Preflights declared on a target are evaluated in manifest-declared order
+(array index 0 first). The following rules apply:
+
+| Scope | Behavior |
+|-------|----------|
+| Within a target | All declared preflights are evaluated. There is no early exit on first preflight failure within a single target. Every preflight emits either a `preflight_passed` or `preflight_failed` JSONL event. |
+| Across targets | If any preflight for a target fails, the target is marked skipped. In fail-fast mode (the default, without `--continue-on-error`), the entire run stops after the first target whose preflights fail. In continue mode, subsequent independent targets proceed. |
+
+Consequence for verification: a `govctl check <target>` invocation always
+produces one JSONL event per declared preflight, regardless of pass or fail.
+Verification scripts must inspect per-check events, not the overall exit code,
+to determine whether a specific preflight passed.
+
+### 18.4 Isolation Requirement
+
+New preflight checks must be verifiable in isolation from pre-existing
+checks on the same target. Specifically:
+
+- A verification that targets a single check (e.g., `token-source-consistent`)
+must not depend on the pass/fail state of unrelated checks on the same target
+(e.g., `container-running:dev-photo-ingress`).
+- `govctl check <target> --format json` emits individual `preflight_passed`
+and `preflight_failed` events. Verification scripts must filter by check name,
+not by aggregate outcome.
+
+### 18.5 JSONL Session Identity
+
+A "current session" for JSONL inspection is a single `govctl` invocation.
+Each invocation generates a unique run ID (`<YYYYMMDD>T<HHMMSS>-<6-char-hex>`)
+and writes all events to `artifacts/govctl/run-<run-id>/events.jsonl`.
+Preflight events within that file belong to exactly one session. There is no
+cross-invocation session concept.
+
+---
+
+## 19. Token Placeholder Semantics
+
+**Status:** proposed  
+**Date:** 2026-04-08  
+**Motivation:** The staging config template (`staging/container/photo-ingress.conf`)
+contains the literal value `inspect-chunk3-token` — a legacy test artifact.
+The template already uses the pattern `STAGING_CLIENT_ID_PLACEHOLDER` for
+credentials that must be replaced before use. This section extends that
+pattern to API tokens and defines how preflights treat placeholders.
+
+### 19.1 Decision
+
+Accepted. The concrete token value `inspect-chunk3-token` in the staging
+config template is replaced with the placeholder `API_TOKEN_PLACEHOLDER`.
+The same replacement is applied to `webui/.env` (`PUBLIC_API_TOKEN`).
+
+### 19.2 Placeholder Convention
+
+A placeholder is a value matching the pattern `*_PLACEHOLDER` (suffix match,
+case-sensitive). Placeholders signal that the value must be substituted with
+a real credential before the artifact is used in a running environment.
+
+### 19.3 Consistency with Invariants T1–T6
+
+| Invariant | Impact |
+|-----------|--------|
+| T1 | The canonical source (`[web] api_token`) contains a placeholder in the template. The placeholder is not a token — it is a substitution marker. T1 holds because the authoritative value is whatever occupies this field after substitution. |
+| T2 | `webui/.env` `PUBLIC_API_TOKEN` must be byte-identical to the config template value. When both contain `API_TOKEN_PLACEHOLDER`, they are consistent. T2 holds. |
+| T3 | No impact. The backend reads the INI at runtime after substitution. |
+| T4 | The `[web]` section exists and `api_token` is defined (non-empty). T4 holds. The placeholder is a defined value. |
+| T5 | Placeholder strings are not secret values. However, preflights must not distinguish between placeholders and real tokens in their output — the redaction rule (T5) applies uniformly. |
+| T6 | Constant-time comparison applies to runtime token validation. Preflight comparison of source files also uses constant-time comparison per T6. No change. |
+
+### 19.4 Preflight Treatment of Placeholders
+
+| Check | Placeholder behavior |
+|-------|----------------------|
+| `token-source-consistent` | Compares the values in `webui/.env` and the config template. If both contain `API_TOKEN_PLACEHOLDER`, the check passes (values are byte-identical). The check does not distinguish placeholders from real tokens. |
+| `config-template-complete` | Verifies `[web]` section exists and `api_token` is non-empty. `API_TOKEN_PLACEHOLDER` satisfies non-empty. The check passes. |
+
+### 19.5 Build-Time vs Template-Time Distinction
+
+Placeholders are permitted in version-controlled template files. They are
+forbidden at build time in the following sense:
+
+- `govctl` preflights validate source consistency and template completeness.
+  Placeholders satisfy both checks.
+- The staging smoke suite (`stagingctl smoke`) validates runtime behavior.
+  An API endpoint returning 401 for all requests because the token is a
+  literal placeholder will fail the smoke suite. This is the intended
+  enforcement boundary — smoke, not preflight.
+- Preflights do not reject placeholders. Smoke tests do. This separation
+  preserves the principle that preflights validate structure, not operational
+  readiness.
+
+### 19.6 Affected Files
+
+| File | Field | Old value | New value |
+|------|-------|-----------|-----------|
+| `staging/container/photo-ingress.conf` | `[web] api_token` | `inspect-chunk3-token` | `API_TOKEN_PLACEHOLDER` |
+| `webui/.env` | `PUBLIC_API_TOKEN` | `inspect-chunk3-token` | `API_TOKEN_PLACEHOLDER` |
+
+These file changes are implementation actions for the hardening roadmap,
+not part of this design patch. This section defines the semantics only.

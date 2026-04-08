@@ -121,7 +121,11 @@ import json, sys
 m = json.loads(open(sys.argv[1]).read())
 out = {
     "targets": [
-        {"name": k, "description": v.get("description", "")}
+            {
+                "name": k,
+                "description": v.get("description", ""),
+                "preflight": v.get("preflight", []),
+            }
         for k, v in m["targets"].items()
     ],
     "groups": [
@@ -141,6 +145,11 @@ for name, target in m["targets"].items():
     desc = target.get("description", "")
     lock = "  [lock]" if target.get("lock") else ""
     print(f"  {name:<40} {desc}{lock}")
+    preflights = target.get("preflight", [])
+    if preflights:
+        print(f"{'':44} preflight: {', '.join(preflights)}")
+    else:
+        print(f"{'':44} preflight: (none)")
 
 print()
 print("Groups:")
@@ -208,8 +217,12 @@ PY
             continue
         fi
 
+        local -a preflight_items=()
         while IFS= read -r check; do
-            [[ -z "$check" ]] && continue
+            [[ -n "$check" ]] && preflight_items+=("$check")
+        done <<< "$preflight_list"
+
+        for check in "${preflight_items[@]}"; do
             local pf_reason pf_exit
             pf_exit=0
             pf_reason="$(govctl_run_preflight "$check")" || pf_exit=$?
@@ -219,7 +232,7 @@ PY
                 results+=("FAIL|$target|$check|${pf_reason}")
                 overall_exit=1
             fi
-        done <<< "$preflight_list"
+        done
     done < "$resolved_file"
 
     # Emit output.

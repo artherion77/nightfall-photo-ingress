@@ -4,11 +4,11 @@ After=network.target
 
 [Service]
 Type=simple
-User=photo-ingress
-Group=photo-ingress
-WorkingDirectory=/opt/photo-ingress
-EnvironmentFile=/etc/nightfall/photo-ingress-api.env
-ExecStart=/opt/photo-ingress/.venv/bin/uvicorn api.app:app --host ${NIGHTFALL_API_HOST:-127.0.0.1} --port ${NIGHTFALL_API_PORT:-8000}
+User=root
+Group=root
+WorkingDirectory=/opt
+Environment=PATH=/opt/ingress/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=/usr/bin/env uvicorn api.app:app --host 0.0.0.0 --port 8000
 Restart=on-failure
 RestartSec=5
 

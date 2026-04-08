@@ -32,7 +32,12 @@ targets:
 
   backend.build.wheel:
     description: "Build Python wheel into dist/"
-    command: "python -m build --wheel --outdir dist/"
+    command: |
+      build_python="python3"
+      if [[ -x ./.venv/bin/python ]]; then
+        build_python="./.venv/bin/python"
+      fi
+      "$build_python" -m build --wheel --outdir dist/
     requires: []
     preflight: []
     lock: false
@@ -94,12 +99,17 @@ targets:
   web.build:
     description: "Production SvelteKit build (webui)"
     command: |
-      lxc exec dev-photo-ingress -- bash -c \
-        'cd /opt/nightfall-webui && npm run build'
+      rm -rf webui/build
+      mkdir -p webui/build
+      lxc exec dev-photo-ingress -- bash -lc \
+        'set -euo pipefail; cd /opt/nightfall-webui && npm run build >&2 && tar -C build -czf - .' \
+        | tar -xzf - -C webui/build
     requires: [dev.stack-ready.webui]
     preflight:
       - container-running:dev-photo-ingress
       - stack-drift-free:webui
+      - token-source-consistent
+      - config-template-complete:staging/container/photo-ingress.conf
     lock: true
 
   metrics.build.dashboard:
@@ -150,12 +160,26 @@ targets:
 
   staging.install:
     description: "Build wheel and install into staging container"
-    command: "./dev/bin/stagingctl install"
-    requires: [backend.build.wheel]
+    command: "./dev/bin/stagingctl install \"$(ls -t dist/*.whl | head -1)\""
+    requires: [backend.build.wheel, web.build]
     preflight:
       - container-running:staging-photo-ingress
       - bridge-network:br-staging
+      - artifact-hash-recorded:web.build
+      - artifact-hash-recorded:backend.build.wheel
+      - artifact-hash-verified:webui/build/
+      - artifact-hash-verified:dist/*.whl
+      - token-source-consistent
     lock: false
+
+  staging.e2e.module1:
+    description: "Run E2E Suite Module 1"
+    command: "./.venv/bin/python -m pytest tests/e2e -v --tb=short"
+    requires: [staging.install]
+    preflight:
+      - container-running:staging-photo-ingress
+    lock: false
+    timeout_seconds: 120
 
   staging.smoke:
     description: "Run headless smoke assertions in staging"
@@ -195,7 +219,7 @@ groups:
     targets: [backend.build.wheel, web.build, metrics.build.dashboard]
 
   staging.full:
-    targets: [staging.install, staging.smoke]
+    targets: [staging.install, staging.smoke, staging.e2e.module1]
 
   metrics.full:
     targets:

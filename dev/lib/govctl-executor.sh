@@ -26,6 +26,7 @@
 # Resolve paths relative to this file's location at source time.
 _GOVCTL_EXEC_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 GOVCTL_EXEC_PROJECT_ROOT="$(cd "$_GOVCTL_EXEC_SCRIPT_DIR/../.." && pwd)"
+_GOVCTL_ARTIFACT_HASH_PY="$_GOVCTL_EXEC_SCRIPT_DIR/artifact_hash.py"
 
 # Global repo lock — matches devctl's lock configuration exactly.
 _GOVCTL_REPO_LOCK_FILE="/tmp/nightfall-repo.lock"
@@ -125,6 +126,27 @@ _govctl_banner() {
 }
 
 
+# Compute and emit build_fingerprint event for known artifact-producing targets.
+_govctl_emit_build_fingerprint_if_applicable() {
+    local events_file="$1"
+    local target="$2"
+
+    local artifact_path=""
+    case "$target" in
+        web.build) artifact_path="webui/build/" ;;
+        backend.build.wheel) artifact_path="dist/*.whl" ;;
+        *) return 0 ;;
+    esac
+
+    local sha
+    sha="$(python3 "$_GOVCTL_ARTIFACT_HASH_PY" compute "$artifact_path" --cwd "$GOVCTL_EXEC_PROJECT_ROOT" 2>/dev/null)" || return 1
+
+    _govctl_emit_event "$events_file" \
+        "{\"event\":\"build_fingerprint\",\"target\":\"$target\",\"sha256\":$(_govctl_json_str "$sha"),\"artifact_path\":$(_govctl_json_str "$artifact_path"),\"timestamp\":\"$(_govctl_timestamp)\"}"
+    return 0
+}
+
+
 # ── govctl_execute ────────────────────────────────────────────────────────────
 
 govctl_execute() {
@@ -187,6 +209,8 @@ govctl_execute() {
     _govctl_emit_event "$events_file" \
         "{\"event\":\"run_started\",\"timestamp\":\"$(_govctl_timestamp)\",\"run_id\":\"$run_id\",\"targets\":$targets_json,\"resolved\":$resolved_json}"
 
+    export GOVCTL_EVENTS_FILE="$events_file"
+
     _govctl_banner "govctl run $run_id"
     echo "  Targets requested : $requested_targets_str"
     echo "  Targets resolved  : ${resolved[*]}"
@@ -207,6 +231,7 @@ govctl_execute() {
     # ── Target loop ────────────────────────────────────────────────────────
 
     for target in "${resolved[@]}"; do
+        export GOVCTL_CURRENT_TARGET="$target"
 
         # ── Read target metadata ───────────────────────────────────────────
 
@@ -231,8 +256,19 @@ govctl_execute() {
 
         for check in "${preflights[@]}"; do
             local pf_reason pf_exit
-            pf_reason="$(govctl_run_preflight "$check")" || pf_exit=$?
-            pf_exit="${pf_exit:-0}"
+            unset GOVCTL_ARTIFACT_EVENT_ARTIFACT
+            unset GOVCTL_ARTIFACT_EVENT_EXPECTED
+            unset GOVCTL_ARTIFACT_EVENT_ACTUAL
+
+            local pf_out
+            pf_out="$(mktemp)"
+            if govctl_run_preflight "$check" > "$pf_out"; then
+                pf_exit=0
+            else
+                pf_exit=$?
+            fi
+            pf_reason="$(cat "$pf_out")"
+            rm -f "$pf_out"
 
             if [[ "$pf_exit" -eq 0 ]]; then
                 _govctl_emit_event "$events_file" \
@@ -241,6 +277,23 @@ govctl_execute() {
                 _govctl_emit_event "$events_file" \
                     "{\"event\":\"preflight_failed\",\"target\":\"$target\",\"check\":$(_govctl_json_str "$check"),\"reason\":$(_govctl_json_str "$pf_reason"),\"timestamp\":\"$(_govctl_timestamp)\"}"
                 preflight_ok=0
+            fi
+
+            if [[ "$check" == artifact-hash-verified:* ]]; then
+                local artifact_ref expected_sha actual_sha
+                artifact_ref="${GOVCTL_ARTIFACT_EVENT_ARTIFACT:-}"
+                expected_sha="${GOVCTL_ARTIFACT_EVENT_EXPECTED:-}"
+                actual_sha="${GOVCTL_ARTIFACT_EVENT_ACTUAL:-}"
+
+                if [[ -n "$artifact_ref" && -n "$expected_sha" && -n "$actual_sha" ]]; then
+                    if [[ "$pf_exit" -eq 0 ]]; then
+                        _govctl_emit_event "$events_file" \
+                            "{\"event\":\"artifact_verified\",\"target\":\"$target\",\"artifact\":$(_govctl_json_str "$artifact_ref"),\"expected_sha256\":$(_govctl_json_str "$expected_sha"),\"actual_sha256\":$(_govctl_json_str "$actual_sha"),\"timestamp\":\"$(_govctl_timestamp)\"}"
+                    else
+                        _govctl_emit_event "$events_file" \
+                            "{\"event\":\"artifact_rejected\",\"target\":\"$target\",\"artifact\":$(_govctl_json_str "$artifact_ref"),\"expected_sha256\":$(_govctl_json_str "$expected_sha"),\"actual_sha256\":$(_govctl_json_str "$actual_sha"),\"timestamp\":\"$(_govctl_timestamp)\"}"
+                    fi
+                fi
             fi
         done
 
@@ -311,6 +364,19 @@ govctl_execute() {
         if [[ "$exit_code" -eq 0 ]]; then
             _govctl_emit_event "$events_file" \
                 "{\"event\":\"target_passed\",\"target\":\"$target\",\"exit_code\":0,\"duration_seconds\":$duration_seconds,\"timestamp\":\"$(_govctl_timestamp)\"}"
+
+            if ! _govctl_emit_build_fingerprint_if_applicable "$events_file" "$target"; then
+                _govctl_emit_event "$events_file" \
+                    "{\"event\":\"target_failed\",\"target\":\"$target\",\"exit_code\":1,\"duration_seconds\":$duration_seconds,\"reason\":\"fingerprint_emit_failed\",\"timestamp\":\"$(_govctl_timestamp)\"}"
+                _govctl_banner "$target: FAILED (fingerprint emit failed)"
+                ((total_failed++)) || true
+                _target_failed["$target"]=1
+                if [[ "$continue_on_error" != "1" ]]; then
+                    break
+                fi
+                continue
+            fi
+
             _govctl_banner "$target: PASSED (${duration_seconds}s)"
             ((total_passed++)) || true
         else

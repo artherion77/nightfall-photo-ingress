@@ -11,6 +11,7 @@ from api.services import AuditService
 router = APIRouter(prefix="/api/v1", tags=["audit"])
 
 
+@router.get("/audit/log", response_model=AuditPage)
 @router.get("/audit-log", response_model=AuditPage)
 async def get_audit_log(
     _: str = Depends(verify_api_token),

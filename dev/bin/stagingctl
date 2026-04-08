@@ -35,10 +35,12 @@ STAGING_VOLATILE="${STAGING_VOLATILE:-0}"
 VENV_ROOT="/opt/ingress"
 CONF_DEST="/etc/nightfall/photo-ingress.conf"
 SERVICE_NAME="nightfall-photo-ingress"
+API_SERVICE_NAME="nightfall-photo-ingress-api.service"
 TRASH_PATH_NAME="nightfall-photo-ingress-trash.path"
 TRASH_SERVICE_NAME="nightfall-photo-ingress-trash.service"
 SYSTEMD_SOURCE_DIR="$PROJECT_ROOT/systemd"
 STAGING_SYSTEMD_DIR="$STAGING_ROOT/systemd"
+WEB_BUILD_DIR="$PROJECT_ROOT/webui/build"
 
 if [[ "$STAGING_VOLATILE" == "1" ]]; then
     # Volatile mode: host /run is tmpfs, so evidence/logs are ephemeral.
@@ -120,13 +122,6 @@ cmd_create() {
     mkdir -p "$HOST_EVIDENCE_BASE" "$HOST_LOG_BASE"
     chmod 777 "$HOST_EVIDENCE_BASE" "$HOST_LOG_BASE"
 
-    local tmpfs_host_base
-    tmpfs_host_base="$(_resolve_tmpfs_host_base)"
-    mkdir -p "$tmpfs_host_base/tmp" "$tmpfs_host_base/var-tmp" "$tmpfs_host_base/nightfall-cache"
-    # tmp/var-tmp require sticky-bit semantics; cache dir is plain writable.
-    chmod 1777 "$tmpfs_host_base/tmp" "$tmpfs_host_base/var-tmp"
-    chmod 777 "$tmpfs_host_base/nightfall-cache"
-
     _info "Launching container $CONTAINER (ubuntu:24.04, profiles: default+staging) ..."
     lxc launch ubuntu:24.04 "$CONTAINER" -p "$PROFILE_DEFAULT" -p "$PROFILE_STAGING"
 
@@ -146,14 +141,11 @@ cmd_create() {
     lxc exec "$CONTAINER" -- env STAGING_VOLATILE="$STAGING_VOLATILE" bash "$CT_TMP_DIR/setup.sh"
     # Required by hardened unit ReadWritePaths sandboxing.
     lxc exec "$CONTAINER" -- mkdir -p /run/nightfall-status.d
+    # Required by trash.service TemporaryFileSystem target path.
+    lxc exec "$CONTAINER" -- mkdir -p /var/cache/nightfall-photo-ingress
 
-    _info "Attaching tmpfs boundaries (/tmp, /var/tmp, /var/cache/nightfall-photo-ingress) ..."
-    lxc config device add "$CONTAINER" tmpfs-tmp disk source="$tmpfs_host_base/tmp" path=/tmp
-    lxc config device add "$CONTAINER" tmpfs-var-tmp disk source="$tmpfs_host_base/var-tmp" path=/var/tmp
-    lxc config device add "$CONTAINER" tmpfs-nightfall-cache disk source="$tmpfs_host_base/nightfall-cache" path=/var/cache/nightfall-photo-ingress
-    # Enforce standard world-writable sticky semantics for tmp directories.
-    # Host tmpfs sources may default to restrictive mode/uid, which breaks
-    # systemd services that rely on PrivateTmp.
+    # Enforce standard tmp directory semantics inside the container.
+    # Staging no longer bind-mounts /tmp or /var/tmp from host /run/user/*.
     lxc exec "$CONTAINER" -- chmod 1777 /tmp /var/tmp || true
 
     _info "Attaching bind-mounts ..."
@@ -267,10 +259,63 @@ for line in config_path.read_text(encoding='utf-8').splitlines():
     lxc file push "$tmp_conf" "$CONTAINER$CONF_DEST"
     # Ensure runtime status path exists before starting hardened units.
     lxc exec "$CONTAINER" -- mkdir -p /run/nightfall-status.d
+    # Ensure cache path exists for trash.service TemporaryFileSystem.
+    lxc exec "$CONTAINER" -- mkdir -p /var/cache/nightfall-photo-ingress
+
+    _info "Installing API + trash systemd units and staging overrides ..."
+    lxc file push "$SYSTEMD_SOURCE_DIR/$API_SERVICE_NAME" \
+        "$CONTAINER/etc/systemd/system/$API_SERVICE_NAME"
+    lxc file push "$SYSTEMD_SOURCE_DIR/$TRASH_SERVICE_NAME" \
+        "$CONTAINER/etc/systemd/system/$TRASH_SERVICE_NAME"
+    lxc file push "$SYSTEMD_SOURCE_DIR/$TRASH_PATH_NAME" \
+        "$CONTAINER/etc/systemd/system/$TRASH_PATH_NAME"
+
+    lxc exec "$CONTAINER" -- mkdir -p \
+        "/etc/systemd/system/$API_SERVICE_NAME.d" \
+        "/etc/systemd/system/$SERVICE_NAME.service.d" \
+        "/etc/systemd/system/$SERVICE_NAME.timer.d" \
+        "/etc/systemd/system/$TRASH_SERVICE_NAME.d" \
+        "/etc/systemd/system/$TRASH_PATH_NAME.d"
+
+    if [[ -f "$STAGING_SYSTEMD_DIR/$API_SERVICE_NAME.d/override.conf" ]]; then
+        lxc file push "$STAGING_SYSTEMD_DIR/$API_SERVICE_NAME.d/override.conf" \
+            "$CONTAINER/etc/systemd/system/$API_SERVICE_NAME.d/override.conf"
+    fi
+
+    lxc file push "$STAGING_SYSTEMD_DIR/$SERVICE_NAME.service.d/override.conf" \
+        "$CONTAINER/etc/systemd/system/$SERVICE_NAME.service.d/override.conf"
+    lxc file push "$STAGING_SYSTEMD_DIR/$SERVICE_NAME.timer.d/override.conf" \
+        "$CONTAINER/etc/systemd/system/$SERVICE_NAME.timer.d/override.conf"
+    lxc file push "$STAGING_SYSTEMD_DIR/$TRASH_SERVICE_NAME.d/override.conf" \
+        "$CONTAINER/etc/systemd/system/$TRASH_SERVICE_NAME.d/override.conf"
+    lxc file push "$STAGING_SYSTEMD_DIR/$TRASH_PATH_NAME.d/override.conf" \
+        "$CONTAINER/etc/systemd/system/$TRASH_PATH_NAME.d/override.conf"
+
+    lxc exec "$CONTAINER" -- systemctl daemon-reload
+
+    # Remove legacy /run/user/* bind mounts from older staging containers.
+    # These sources can disappear after host reboot/session changes and break
+    # systemd service sandbox setup before ExecStart.
+    lxc config device remove "$CONTAINER" tmpfs-tmp >/dev/null 2>&1 || true
+    lxc config device remove "$CONTAINER" tmpfs-var-tmp >/dev/null 2>&1 || true
+    lxc config device remove "$CONTAINER" tmpfs-nightfall-cache >/dev/null 2>&1 || true
 
     _info "Running pip install (base + web extras) in container venv ..."
     lxc exec "$CONTAINER" -- \
         "$VENV_ROOT/bin/pip" install --quiet --upgrade --force-reinstall "$CT_TMP_DIR/$whl_name[web]"
+
+    _info "Syncing API source tree to /opt/api ..."
+    lxc exec "$CONTAINER" -- rm -rf /opt/api
+    lxc file push --recursive "$PROJECT_ROOT/api" "$CONTAINER/opt/"
+
+    if [[ -d "$WEB_BUILD_DIR" ]]; then
+        _info "Syncing web build artifact to /opt/webui/build ..."
+        lxc exec "$CONTAINER" -- rm -rf /opt/webui/build
+        lxc exec "$CONTAINER" -- mkdir -p /opt/webui
+        lxc file push --recursive "$WEB_BUILD_DIR" "$CONTAINER/opt/webui/"
+    else
+        _warn "Host web build artifact not found at $WEB_BUILD_DIR; leaving existing /opt/webui/build unchanged."
+    fi
 
     # Push existing token cache if provided (DEPRECATED: use 'stagingctl auth-setup' instead)
     if [[ -n "${STAGING_TOKEN_JSON:-}" && -f "$STAGING_TOKEN_JSON" ]]; then
@@ -287,13 +332,17 @@ for line in config_path.read_text(encoding='utf-8').splitlines():
     lxc exec "$CONTAINER" -- systemctl enable "$SERVICE_NAME.timer"
     lxc exec "$CONTAINER" -- systemctl enable "$TRASH_PATH_NAME"
 
+    _info "Enabling and restarting API service ..."
+    lxc exec "$CONTAINER" -- systemctl enable "$API_SERVICE_NAME"
+    lxc exec "$CONTAINER" -- systemctl restart "$API_SERVICE_NAME"
+
     # Refresh reset baseline after install so `stagingctl reset` returns to
     # an installed, config-valid state with no onboarding token cache.
     lxc delete "$CONTAINER/$SNAPSHOT_CLEAN" 2>/dev/null || true
     _info "Taking LXD snapshot '$SNAPSHOT_CLEAN' (post-install baseline) ..."
     lxc snapshot "$CONTAINER" "$SNAPSHOT_CLEAN"
 
-    _ok "Installed $whl_name. Timer and trash path enabled. Snapshot '$SNAPSHOT_CLEAN' refreshed."
+    _ok "Installed $whl_name. Timer/trash enabled and API service active. Snapshot '$SNAPSHOT_CLEAN' refreshed."
     _info "Run 'stagingctl smoke' to verify or 'stagingctl reset' to roll back."
 }
 

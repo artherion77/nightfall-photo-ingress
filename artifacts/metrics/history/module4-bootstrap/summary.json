@@ -1,22 +1,20 @@
 {
   "schema_version": 1,
   "run_id": "module4-bootstrap",
-  "generated_at": "2026-04-04T12:28:57.924234+00:00",
+  "generated_at": "2026-04-07T18:19:11.283150+00:00",
   "source": {
-    "commit_sha": "831aeb4cf21e7ce3e72948f4005a49187078de74",
+    "commit_sha": "4fd126dc124dcf2388f206f61ea2ee3fc1b97a0c",
     "branch": "main"
   },
   "collection_status": "partial",
   "severity": "warning",
   "indicators": {
     "failed_checks": 0,
-    "warning_checks": 3,
-    "delta_items": 11
+    "warning_checks": 1,
+    "delta_items": 16
   },
   "previous_successful_run_id": "module3-bootstrap",
   "warnings": [
-    "modules.backend.metrics.complexity not available",
-    "modules.backend.metrics.coverage not available",
     "modules.frontend.metrics.test_coverage not available"
   ],
   "failures": []
