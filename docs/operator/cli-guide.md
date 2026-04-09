@@ -10,7 +10,7 @@
 
 This guide covers the CLI commands for initial setup (Entra app registration, auth bootstrap) and regular operational use (config check, poll, status inspection).
 
-For queue management commands (accept, reject, purge, sync-import), see [operational-playbook.md](operational-playbook.md).
+For queue management commands (accept, reject, purge, sync-import, auth-failure cleanup), see [operational-playbook.md](operational-playbook.md).
 
 ---
 

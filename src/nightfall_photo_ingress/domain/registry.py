@@ -90,6 +90,82 @@ class Registry:
             _run_migrations(conn)
             _ensure_optional_tables(conn)
 
+    def backup_to(self, destination: Path | str) -> Path:
+        """Create a SQLite-consistent backup of the registry database."""
+
+        destination_path = Path(destination)
+        destination_path.parent.mkdir(parents=True, exist_ok=True)
+
+        with self._connect() as source_conn:
+            _set_pragmas(source_conn)
+            with sqlite3.connect(destination_path) as backup_conn:
+                source_conn.backup(backup_conn)
+
+        return destination_path
+
+    def prune_auth_failure_audit_backlog(self, *, keep_latest: int = 0) -> int:
+        """Prune historical auth_failure rows while preserving append-only guarantees during normal operation."""
+
+        if keep_latest < 0:
+            raise RegistryError("keep_latest must be >= 0")
+
+        with self._connect() as conn:
+            _set_pragmas(conn)
+            conn.execute("BEGIN IMMEDIATE")
+
+            total_auth_failures = int(
+                conn.execute(
+                    "SELECT COUNT(*) FROM audit_log WHERE action = 'auth_failure'",
+                ).fetchone()[0]
+            )
+            prune_count = max(0, total_auth_failures - keep_latest)
+            if prune_count == 0:
+                conn.commit()
+                return 0
+
+            retained_clause = ""
+            retained_params: tuple[object, ...] = ("auth_failure",)
+            if keep_latest > 0:
+                retained_clause = (
+                    " OR id IN ("
+                    "SELECT id FROM audit_log WHERE action = ? ORDER BY id DESC LIMIT ?"
+                    ")"
+                )
+                retained_params = ("auth_failure", "auth_failure", keep_latest)
+
+            conn.execute(
+                """
+                CREATE TABLE audit_log_rebuilt (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    sha256 TEXT,
+                    account_name TEXT,
+                    action TEXT NOT NULL,
+                    reason TEXT,
+                    details_json TEXT,
+                    actor TEXT NOT NULL,
+                    ts TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                f"""
+                INSERT INTO audit_log_rebuilt (id, sha256, account_name, action, reason, details_json, actor, ts)
+                SELECT id, sha256, account_name, action, reason, details_json, actor, ts
+                FROM audit_log
+                WHERE action != ?{retained_clause}
+                ORDER BY id ASC
+                """,
+                retained_params,
+            )
+            conn.execute("DROP TRIGGER IF EXISTS trg_audit_log_no_update")
+            conn.execute("DROP TRIGGER IF EXISTS trg_audit_log_no_delete")
+            conn.execute("DROP TABLE audit_log")
+            conn.execute("ALTER TABLE audit_log_rebuilt RENAME TO audit_log")
+            _ensure_audit_log_triggers(conn)
+            conn.commit()
+
+        return prune_count
+
     def create_or_update_file(
         self,
         *,
@@ -1095,6 +1171,24 @@ BEGIN
     SELECT RAISE(FAIL, 'audit_log is append-only');
 END;
 """
+
+
+def _ensure_audit_log_triggers(conn: sqlite3.Connection) -> None:
+    conn.executescript(
+        """
+        CREATE TRIGGER IF NOT EXISTS trg_audit_log_no_update
+        BEFORE UPDATE ON audit_log
+        BEGIN
+            SELECT RAISE(FAIL, 'audit_log is append-only');
+        END;
+
+        CREATE TRIGGER IF NOT EXISTS trg_audit_log_no_delete
+        BEFORE DELETE ON audit_log
+        BEGIN
+            SELECT RAISE(FAIL, 'audit_log is append-only');
+        END;
+        """
+    )
 
 
 def _utc_now() -> str:

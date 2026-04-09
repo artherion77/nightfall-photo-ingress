@@ -101,6 +101,68 @@ nightfall-photo-ingress sync-import --dry-run --path /etc/nightfall/photo-ingres
 
 ---
 
+## Pruning Historical auth_failure Audit Backlog
+
+Use this one-time maintenance command after deploying the auth-failure rate limiting fix when historical `auth_failure` rows have already overwhelmed the audit timeline.
+
+```bash
+nightfall-photo-ingress prune-auth-failures --path /etc/nightfall/photo-ingress.conf
+```
+
+By default this command:
+- creates a SQLite-consistent backup next to the registry database with a timestamped `.bak` suffix,
+- rebuilds `audit_log` without historical `auth_failure` rows,
+- preserves all non-`auth_failure` audit history,
+- restores the `audit_log` append-only triggers after the rebuild.
+
+### Optional retention window
+
+To keep the latest `N` `auth_failure` rows instead of removing all historical backlog:
+
+```bash
+nightfall-photo-ingress prune-auth-failures \
+  --path /etc/nightfall/photo-ingress.conf \
+  --keep-latest 100
+```
+
+### Explicit backup path
+
+```bash
+nightfall-photo-ingress prune-auth-failures \
+  --path /etc/nightfall/photo-ingress.conf \
+  --backup-path /var/backups/nightfall/registry-pre-auth-prune.db
+```
+
+### Verification
+
+```bash
+sqlite3 /var/lib/ingress/registry.db "SELECT action, COUNT(*) FROM audit_log GROUP BY action ORDER BY COUNT(*) DESC;"
+sqlite3 /var/lib/ingress/registry.db "SELECT COUNT(*) FROM audit_log WHERE action = 'auth_failure';"
+```
+
+Expected result:
+- `auth_failure` count is reduced to the configured retention window,
+- non-auth audit events remain intact,
+- future auth failures are bounded by the rate limiter added in Fix 4.
+
+### Rollback
+
+1. Stop the API service:
+	```bash
+	systemctl stop nightfall-photo-ingress-api.service
+	```
+2. Restore the backup over the registry path:
+	```bash
+	cp /path/to/registry-pre-prune.bak /var/lib/ingress/registry.db
+	```
+3. Restart the API service:
+	```bash
+	systemctl start nightfall-photo-ingress-api.service
+	```
+4. Re-run the verification queries above.
+
+---
+
 ## Status File Interpretation
 
 The status file at `/run/nightfall-status.d/photo-ingress.json` is written atomically after each command run.

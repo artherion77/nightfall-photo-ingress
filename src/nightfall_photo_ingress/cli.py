@@ -133,6 +133,24 @@ def _build_parser() -> argparse.ArgumentParser:
     config_check.add_argument("--path", default="/etc/nightfall/photo-ingress.conf")
     config_check.set_defaults(handler=_cmd_config_check)
 
+    prune_auth_failures = subparsers.add_parser(
+        "prune-auth-failures",
+        help="Create a backup and prune historical auth_failure audit rows.",
+    )
+    prune_auth_failures.add_argument("--path", default="/etc/nightfall/photo-ingress.conf")
+    prune_auth_failures.add_argument(
+        "--backup-path",
+        default=None,
+        help="Optional explicit backup destination for the registry database.",
+    )
+    prune_auth_failures.add_argument(
+        "--keep-latest",
+        type=int,
+        default=0,
+        help="Keep the latest N auth_failure rows instead of pruning all historical rows.",
+    )
+    prune_auth_failures.set_defaults(handler=_cmd_prune_auth_failures)
+
     return parser
 
 
@@ -633,6 +651,57 @@ def _cmd_config_check(args: argparse.Namespace) -> int:
         details={"path": args.path, "errors": errors},
     )
     return 2
+
+
+def _cmd_prune_auth_failures(args: argparse.Namespace) -> int:
+    """Create a backup and prune historical auth_failure audit rows."""
+
+    try:
+        app_config = load_config(args.path)
+        registry = Registry(app_config.core.registry_path)
+        registry.initialize()
+
+        if args.keep_latest < 0:
+            raise ValueError("--keep-latest must be >= 0")
+
+        backup_path = Path(args.backup_path) if args.backup_path else registry.db_path.with_suffix(
+            f".auth-failure-prune-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.bak"
+        )
+        registry.backup_to(backup_path)
+        pruned_count = registry.prune_auth_failure_audit_backlog(keep_latest=args.keep_latest)
+
+        LOGGER.info(
+            "auth failure backlog prune completed",
+            extra={
+                "registry_path": str(registry.db_path),
+                "backup_path": str(backup_path),
+                "keep_latest": args.keep_latest,
+                "pruned_count": pruned_count,
+            },
+        )
+        _emit_status_snapshot(
+            state="healthy",
+            command="prune-auth-failures",
+            success=True,
+            details={
+                "registry_path": str(registry.db_path),
+                "backup_path": str(backup_path),
+                "keep_latest": args.keep_latest,
+                "pruned_count": pruned_count,
+            },
+        )
+        print(f"Backup written to: {backup_path}")
+        print(f"Pruned auth_failure rows: {pruned_count}")
+        return 0
+    except (RegistryError, ValueError) as exc:
+        LOGGER.error(str(exc))
+        _emit_status_snapshot(
+            state="degraded",
+            command="prune-auth-failures",
+            success=False,
+            details={"error": str(exc)},
+        )
+        return 2
 
 
 def _resolve_target_account(app_config: AppConfig, requested_name: str | None):

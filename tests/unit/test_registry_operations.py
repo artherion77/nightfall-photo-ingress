@@ -191,6 +191,70 @@ def test_append_audit_event_allows_sha256_none_and_details_payload(tmp_path: Pat
     assert row[2] == '{"status":401}'
 
 
+def test_prune_auth_failure_backlog_preserves_non_auth_audit_and_append_only_guards(tmp_path: Path) -> None:
+    reg = _new_registry(tmp_path)
+    sha = "a" * 64
+    reg.append_audit_event(
+        sha256=sha,
+        action="accepted",
+        reason="ok",
+        actor="operator",
+    )
+    reg.append_audit_event(
+        sha256=None,
+        action="auth_failure",
+        reason="Missing Authorization header",
+        actor="api_auth",
+        details_json='{"path":"/api/v1/health"}',
+    )
+    reg.append_audit_event(
+        sha256=None,
+        action="auth_failure",
+        reason="Missing Authorization header",
+        actor="api_auth",
+        details_json='{"path":"/api/v1/staging"}',
+    )
+
+    pruned = reg.prune_auth_failure_audit_backlog(keep_latest=0)
+
+    assert pruned == 2
+    remaining = reg.list_audit_events(sha256=sha)
+    assert [event.action for event in remaining] == ["accepted"]
+
+    conn = sqlite3.connect(reg.db_path)
+    try:
+        total_auth = conn.execute("SELECT COUNT(*) FROM audit_log WHERE action = 'auth_failure'").fetchone()[0]
+        assert total_auth == 0
+        with pytest.raises(sqlite3.DatabaseError):
+            conn.execute("DELETE FROM audit_log WHERE action = 'accepted'")
+    finally:
+        conn.close()
+
+
+def test_prune_auth_failure_backlog_can_keep_latest_rows(tmp_path: Path) -> None:
+    reg = _new_registry(tmp_path)
+    for suffix in ("a", "b", "c"):
+        reg.append_audit_event(
+            sha256=None,
+            action="auth_failure",
+            reason=f"reason-{suffix}",
+            actor="api_auth",
+        )
+
+    pruned = reg.prune_auth_failure_audit_backlog(keep_latest=1)
+
+    assert pruned == 2
+    conn = sqlite3.connect(reg.db_path)
+    try:
+        rows = conn.execute(
+            "SELECT reason FROM audit_log WHERE action = 'auth_failure' ORDER BY id ASC"
+        ).fetchall()
+    finally:
+        conn.close()
+
+    assert [row[0] for row in rows] == ["reason-c"]
+
+
 def test_external_hash_cache_upsert_is_idempotent(tmp_path: Path) -> None:
     """Sync-import external hash cache rows should upsert deterministically."""
 
