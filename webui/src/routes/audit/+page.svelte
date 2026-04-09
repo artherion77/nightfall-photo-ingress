@@ -54,9 +54,9 @@
 	<h1>Audit Timeline</h1>
 	<div class="filters">
 		<button onclick={() => applyFilter(null)}>All</button>
-		<button onclick={() => applyFilter('accepted')}>Accepted</button>
-		<button onclick={() => applyFilter('rejected')}>Rejected</button>
-		<button onclick={() => applyFilter('deferred')}>Deferred</button>
+		<button onclick={() => applyFilter('triage_accept_applied')}>Accepted</button>
+		<button onclick={() => applyFilter('triage_reject_applied')}>Rejected</button>
+		<button onclick={() => applyFilter('triage_defer_applied')}>Deferred</button>
 	</div>
 	<AuditTimeline {events} {loading} {hasMore} onLoadMore={loadMore} />
 </section>
