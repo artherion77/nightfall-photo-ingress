@@ -84,7 +84,7 @@
         "./dev/bin/devctl test-web-unit"
       ],
       "test.integration": [
-        "./dev/bin/devctl test-web-e2e"
+        "./.venv/bin/python -m pytest tests/e2e -v --tb=short"
       ],
       "build": [
         "npm --prefix webui run build"
@@ -97,7 +97,7 @@
         "./dev/bin/devctl setup"
       ],
       "e2e": [
-        "./dev/bin/devctl test-web-e2e"
+        "./.venv/bin/python -m pytest tests/e2e -v --tb=short"
       ]
     }
   },
@@ -116,7 +116,6 @@
       "test-web-typecheck",
       "test-metrics-dashboard-typecheck",
       "test-web-unit",
-      "test-web-e2e",
       "status",
       "shell"
     ],
@@ -126,8 +125,7 @@
     "cacheMounts": {
       "npm_home": "~/.npm -> /root/.npm",
       "npm_cache": "~/.cache/npm -> /root/.cache/npm",
-      "pip_cache": "~/.cache/pip -> /root/.cache/pip",
-      "playwright_cache": "~/.cache/ms-playwright -> /root/.cache/ms-playwright"
+      "pip_cache": "~/.cache/pip -> /root/.cache/pip"
     }
   },
   "govctl": {
@@ -222,10 +220,10 @@
       "./dev/bin/devctl test-web-unit"
     ],
     "web.test.integration": [
-      "./dev/bin/devctl test-web-e2e"
+      "./.venv/bin/python -m pytest tests/e2e -v --tb=short"
     ],
     "web.test.e2e": [
-      "./dev/bin/devctl test-web-e2e"
+      "./.venv/bin/python -m pytest tests/e2e -v --tb=short"
     ],
     "mcp.smoke.success": [
       "echo '[mcp.smoke.success] ok'"
@@ -280,7 +278,7 @@
         "./.venv/bin/python -m pytest tests/integration"
       ],
       "web": [
-        "./dev/bin/devctl test-web-e2e"
+        "./.venv/bin/python -m pytest tests/e2e -v --tb=short"
       ]
     },
     "e2e": {
@@ -288,7 +286,7 @@
         "./dev/bin/stagingctl smoke"
       ],
       "web": [
-        "./dev/bin/devctl test-web-e2e"
+        "./.venv/bin/python -m pytest tests/e2e -v --tb=short"
       ]
     }
   }

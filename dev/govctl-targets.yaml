@@ -87,13 +87,12 @@ targets:
     timeout_seconds: 120
 
   web.test.e2e:
-    description: "Playwright end-to-end tests"
-    command: "./dev/bin/devctl test-web-e2e"
-    requires: [dev.stack-ready.webui]
+    description: "E2E test suite (runs against staging-photo-ingress)"
+    command: "./.venv/bin/python -m pytest tests/e2e -v --tb=short"
+    requires: [staging.install]
     preflight:
-      - container-running:dev-photo-ingress
-      - stack-drift-free:webui
-    lock: true
+      - container-running:staging-photo-ingress
+    lock: false
     timeout_seconds: 300
 
   web.build:

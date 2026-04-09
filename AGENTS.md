@@ -16,7 +16,7 @@ Implemented strategy:
 - LXC snapshot reuse + bind-mount caches (standard).
 
 Why this choice:
-- Faster repeated bootstrap/reset cycles for Python, npm, and Playwright artifacts.
+- Faster repeated bootstrap/reset cycles for Python and npm artifacts.
 - Deterministic clean-state recovery via one canonical snapshot.
 - Lower operational complexity than custom image pipelines.
 
@@ -41,27 +41,25 @@ The dev container setup configures these bind-mount caches:
 - npm home: ~/.npm -> /root/.npm
 - npm cache: ~/.cache/npm -> /root/.cache/npm
 - pip cache: ~/.cache/pip -> /root/.cache/pip
-- Playwright cache: ~/.cache/ms-playwright -> /root/.cache/ms-playwright
 
 ## devctl Commands (Cached Install Flow)
 
+These are the real, exposed devctl commands (see `dev/bin/devctl` case statement):
+
 - ./dev/bin/devctl setup
-- ./dev/bin/devctl bootstrap-python
-- ./dev/bin/devctl bootstrap-webui
-- ./dev/bin/devctl bootstrap-playwright
-- ./dev/bin/devctl snapshot-create
-- ./dev/bin/devctl reset
+- ./dev/bin/devctl reset [--base]
+- ./dev/bin/devctl update [--scope node|webui|dashboard|all] [--simulate]
+- ./dev/bin/devctl check
+- ./dev/bin/devctl ensure-stack-ready [webui|dashboard|all]
 - ./dev/bin/devctl assert-cached-ready
 - ./dev/bin/devctl status
+- ./dev/bin/devctl shell
+- ./dev/bin/devctl run-webui
 
 Typical flow:
 
 ```bash
 ./dev/bin/devctl setup
-./dev/bin/devctl bootstrap-python
-./dev/bin/devctl bootstrap-webui
-./dev/bin/devctl bootstrap-playwright
-./dev/bin/devctl snapshot-create
 ./dev/bin/devctl reset
 ./dev/bin/devctl status
 ```
@@ -96,6 +94,24 @@ MCP-mapped test tasks (`backend.test.unit`, `web.test.unit`) route through govct
 - backend.test.unit
 - backend.test.integration
 - web.test.unit
+
+## Playwright E2E Tests
+
+Policy: Playwright browser E2E test suites run against the staging container
+(staging-photo-ingress), NOT the dev container (dev-photo-ingress).
+
+The dev container has no requirement for Playwright browser binaries. Do not
+add `npx playwright install` or any browser-install step to the devctl
+bootstrap flow.
+
+Canonical E2E execution targets:
+- govctl: `./dev/bin/govctl run staging.e2e.module1`
+- MCP: `staging.e2e.module1` task (requires staging-photo-ingress running)
+- Direct: `./.venv/bin/python -m pytest tests/e2e -v --tb=short`
+
+The `devctl test-web-e2e` command remains available only as a contract-test
+harness hook (via DEVCTL_CONTRACT_TEST_ROOT override). It is not a workflow
+entry point for browser E2E.
 
 Important safety rule:
 - MCP must not run arbitrary install commands directly.

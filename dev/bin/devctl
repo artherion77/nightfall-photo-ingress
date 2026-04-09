@@ -1245,10 +1245,9 @@ Commands:
   run-api                           API run scaffold (not yet implemented).
   run-webui                         Sync webui sources and start Vite dev server.
   test-web-typecheck                Run webui Svelte/TypeScript typecheck.
-  test-metrics-dashboard-typecheck  Run metrics dashboard Svelte/TypeScript typecheck.
-  test-web-unit                     Run Vitest unit/component tests.
-  test-web-e2e                      Run Playwright e2e browser tests.
-  status                            Show container, snapshot, and cache mount status.
+    test-metrics-dashboard-typecheck  Run metrics dashboard Svelte/TypeScript typecheck.
+    test-web-unit                     Run Vitest unit/component tests.
+    status                            Show container, snapshot, and cache mount status.
   shell                             Open interactive shell in development container.
 
 Environment variables:
@@ -1265,6 +1264,13 @@ Notes:
     Contract-test overrides are intended for unit/contract harnesses only.
     When DEVCTL_CONTRACT_TEST_ROOT is set, web test commands run on the host
     against that path and do not require container dependencies.
+
+    Playwright / browser E2E:
+    'test-web-e2e' is available as a contract-test harness hook via
+    DEVCTL_CONTRACT_TEST_ROOT, but is NOT the canonical browser E2E entry
+    point. Browser E2E tests run against the staging container.
+    Canonical commands: govctl run staging.e2e.module1
+                   or: .venv/bin/python -m pytest tests/e2e -v --tb=short
 USAGE
     exit 1
 }

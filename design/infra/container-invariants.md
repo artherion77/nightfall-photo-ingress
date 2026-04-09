@@ -59,7 +59,6 @@ applies incremental changes and gates on the regression suite.
 | `cache-root-npm-home` | `~/.npm` | `/root/.npm` | npm package cache |
 | `cache-root-cache-npm` | `~/.cache/npm` | `/root/.cache/npm` | npm secondary cache |
 | `cache-root-cache-pip` | `~/.cache/pip` | `/root/.cache/pip` | pip package cache |
-| `cache-root-cache-playwright` | `~/.cache/ms-playwright` | `/root/.cache/ms-playwright` | Playwright browser binaries |
 
 All cache devices are idempotently removed and re-added on each setup.
 Host directories are created with `mkdir -p` and `chmod 0777`.
@@ -233,7 +232,7 @@ exist.
 ### 4.3 Host/Container Boundary Invariants
 
 **INV-HCB-1: Cache bind-mounts are dev-only.**  
-LXC bind-mount devices for package caches (`npm`, `pip`, `playwright`)
+LXC bind-mount devices for package caches (`npm`, `pip`)
 are attached only to the dev container. The staging container has no
 cache bind-mounts.
 

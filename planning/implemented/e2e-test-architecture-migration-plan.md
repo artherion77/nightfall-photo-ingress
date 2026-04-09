@@ -1,6 +1,14 @@
 # E2E Test Architecture Migration Plan
 
 Status: Implemented (2026-04-04)
+
+> **Superseded (2026-04-09):** The decision to run browser E2E tests inside the
+> dev container was reversed. Playwright/browser E2E test suites now run against
+> the **staging container** (staging-photo-ingress), not the dev container.
+> The `devctl test-web-e2e` command is retained as a contract-test harness hook
+> only (via DEVCTL_CONTRACT_TEST_ROOT). Canonical E2E entry point:
+> `govctl run staging.e2e.module1`. See AGENTS.md § Playwright E2E Tests.
+
 Date: 2026-04-04
 Scope: Execute Sections 4 and 5 from the E2E test architecture consolidation as deterministic, chunk-oriented execution units.
 
