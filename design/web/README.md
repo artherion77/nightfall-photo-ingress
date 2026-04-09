@@ -15,6 +15,7 @@ layer of the system.
 | [webui-design-tokens-phase1.md](webui-design-tokens-phase1.md) | Phase 1 | Dark-mode design token catalogue; CSS custom property naming scheme; token categories and usage rules |
 | [web-control-plane-architecture-phase2.md](web-control-plane-architecture-phase2.md) | Phase 2 | Reverse-proxy integration, SSR migration path, API versioning policy, session management, and feature additions |
 | [web-control-plane-architecture-phase3.md](web-control-plane-architecture-phase3.md) | Phase 3 | Advanced features: multi-account support, photo-wheel infinite scroll upgrade, KPI config API |
+| [photowheel-visual-design-decisions.md](photowheel-visual-design-decisions.md) | — | Authoritative design decisions for PhotoWheel viewport, card geometry, overlap, and thumbnail loading |
 
 ## Delivery Roadmaps
 
