@@ -1,12 +1,28 @@
+# Superseded: Dev Container Workflow
+
+This document is retained only as a redirect stub.
+
+The authoritative developer workflow documentation is now:
+
+- `docs/development-handbook.md` for host setup, development container lifecycle,
+  governor-first commands, test suites, and dev-to-staging promotion flow.
+- `docs/operations-runbook.md` for packaged runtime and operator deployment
+  context when a development task crosses into staging or production behavior.
+
+Do not add new substantive workflow content here.
 # Development Container Workflow
 
 **Status:** active (initial scaffold)  
 **Container target:** `dev-photo-ingress`  
-**See also:** [environment-setup.md](environment-setup.md), [../operator/maintenance.md](../operator/maintenance.md), [../../design/architecture/environment-separation-and-container-lifecycle.md](../../design/architecture/environment-separation-and-container-lifecycle.md)
+**See also:** [../development-handbook.md](../development-handbook.md), [environment-setup.md](environment-setup.md), [../operator/maintenance.md](../operator/maintenance.md), [../../design/architecture/environment-separation-and-container-lifecycle.md](../../design/architecture/environment-separation-and-container-lifecycle.md)
 
 ---
 
 ## Overview
+
+For the consolidated developer workflow, command surface policy, and promotion
+flow from dev to staging to production, start with
+[docs/development-handbook.md](../development-handbook.md).
 
 This document defines the planned workflow for a dedicated development container.
 It is intentionally separate from staging so developer tooling does not alter

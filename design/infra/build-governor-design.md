@@ -80,8 +80,9 @@ Targets have implicit dependencies that are only encoded in operator knowledge:
 - `./dev/bin/metricsctl generate-dashboard` acquires the global repo lock and calls
   `devctl` internally for drift preflight, but the caller cannot inspect this
   chain.
-- `devctl test-web-e2e` requires `devctl ensure-stack-ready webui` to have run
-  first.
+- The legacy `devctl test-web-e2e` harness depends on `devctl ensure-stack-ready webui`,
+  but the canonical automation path is now the governor-backed staging flow
+  (`govctl run web.test.e2e --json` or `govctl run staging.e2e.module1 --json`).
 
 Without a declared dependency graph, automation (CI, MCP orchestration, agents)
 cannot safely parallelize independent targets or correctly sequence dependent
@@ -688,7 +689,7 @@ Example: the MCP mapping for `backend.test.unit` could change from:
 ```
 to:
 ```json
-{"command": "cd $WORKSPACE && ./dev/bin/govctl backend.test.unit --json"}
+{"command": "cd $WORKSPACE && ./dev/bin/govctl run backend.test.unit --json"}
 ```
 
 The `--json` flag gives the MCP server structured JSONL it can parse without
@@ -912,7 +913,7 @@ script, or command it delegates to.
 | `web.typecheck` | `devctl test-web-typecheck` | `dev/bin/devctl` | Yes | svelte-kit sync + svelte-check |
 | `web.typecheck.dashboard` | `devctl test-metrics-dashboard-typecheck` | `dev/bin/devctl` | Yes | Dashboard-specific typecheck |
 | `web.test.unit` | `devctl test-web-unit` | `dev/bin/devctl` | Yes | svelte-check + vitest run |
-| `web.test.e2e` | `devctl test-web-e2e` | `dev/bin/devctl` | Yes | Playwright |
+| `web.test.e2e` | `pytest tests/e2e -v --tb=short` via govctl target | `.venv` + pytest | No | Canonical staging-backed browser E2E |
 | `web.build` | `npm run build` via `lxc exec` | webui/package.json | Yes | SvelteKit → adapter-static |
 | `metrics.build.dashboard` | `build-metrics-dashboard` | `dev/bin/build-metrics-dashboard` | Yes | SvelteKit → tar → fingerprint |
 | `metrics.collect.backend` | `./dev/bin/metricsctl collect-backend` | metricsctl | Yes | Module 2 |
@@ -921,8 +922,8 @@ script, or command it delegates to.
 | `metrics.generate.dashboard` | `./dev/bin/metricsctl generate-dashboard` | metricsctl | Yes | Module 5 (internal devctl preflight) |
 | `metrics.publish` | `./dev/bin/metricsctl publish` | metricsctl | Yes | Module 7 |
 | `staging.install` | `stagingctl install` | `dev/bin/stagingctl` | No | Builds wheel + deploys to staging container |
-| `staging.smoke` | `stagingctl smoke` | `dev/bin/stagingctl` | No | JSONL evidence collection |
-| `staging.smoke-live` | `stagingctl smoke-live` | `dev/bin/stagingctl` | No | Authenticated poll + secret scan |
+| `staging.smoke` | `stagingctl smoke` | `dev/bin/stagingctl` | No | Wrapped by govctl target for automation |
+| `staging.smoke-live` | `stagingctl smoke-live` | `dev/bin/stagingctl` | No | Wrapped by govctl target for automation |
 
 ### 14.1 Existing Shared Infrastructure Reused
 
@@ -1285,7 +1286,7 @@ forbidden at build time in the following sense:
 
 - `govctl` preflights validate source consistency and template completeness.
   Placeholders satisfy both checks.
-- The staging smoke suite (`stagingctl smoke`) validates runtime behavior.
+- The canonical automation path is `govctl run staging.smoke --json`; that target delegates to `stagingctl smoke` to validate runtime behavior.
   An API endpoint returning 401 for all requests because the token is a
   literal placeholder will fail the smoke suite. This is the intended
   enforcement boundary — smoke, not preflight.

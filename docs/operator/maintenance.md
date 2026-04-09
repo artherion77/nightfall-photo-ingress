@@ -126,10 +126,10 @@ Staging validation intentionally remains focused on wheel-based release rehearsa
 Web UI development workflows are defined separately under the proposed dev
 container model (`dev-photo-ingress`).
 
-See [docs/deployment/dev-container-workflow.md](../deployment/dev-container-workflow.md)
-for the design and planned command surface.
+See [docs/development-handbook.md](../development-handbook.md) for the active
+developer workflow and command surface.
 
 ---
 
 *For failure handling during staging, see [troubleshooting.md](troubleshooting.md).*  
-*For install and container setup, see [deployment/environment-setup.md](../deployment/environment-setup.md).*
+*For install and container setup, see [docs/operations-runbook.md](../operations-runbook.md).*

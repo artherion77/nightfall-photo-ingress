@@ -17,7 +17,7 @@ Scope: Execute Sections 4 and 5 from the E2E test architecture consolidation as 
 - Variant B intent delivered: pytest-first remains primary, with selective Playwright contract and policy integration.
 - Implementation anchors delivered and validated:
 	- `dev/bin/devctl`: strict `test-web-unit` and `test-web-e2e` contracts with deterministic behavior and `E2E_ARTIFACT_PATH` output.
-	- `.mcp/model.json`: `web.test.e2e` and `web.test.integration` map to real `./dev/bin/devctl test-web-e2e` execution.
+	- `.mcp/model.json`: executable task mappings now route through `./dev/bin/govctl run ... --json`; `web.test.e2e` and `web.test.integration` resolve to `govctl`, which delegates to the canonical staging-backed E2E target.
 	- `tests/unit/test_devctl_contracts.py` and `tests/unit/test_mcp_web_tasks.py`: contract coverage for devctl and MCP task execution semantics.
 - Reusable browser capability-chain harness added for extension:
 	- `tests/integration/browser_chain_harness/`.
@@ -36,9 +36,9 @@ Status: Completed (2026-04-04)
 Delivered summary:
 - Implemented strict `devctl test-web-unit` contract: no placeholder pass path, deterministic fail on missing tests, deterministic logs.
 - Implemented strict `devctl test-web-e2e` contract: deterministic exit behavior, deterministic logs, explicit `E2E_ARTIFACT_PATH` output.
-- Added real MCP mappings:
-	- `web.test.e2e` -> `./dev/bin/devctl test-web-e2e`
-	- `web.test.integration` -> `./dev/bin/devctl test-web-e2e`
+- Current execution surface (2026-04-10):
+	- `web.test.e2e` -> `./dev/bin/govctl run web.test.e2e --json`
+	- `web.test.integration` -> `./dev/bin/govctl run web.test.integration --json`
 - Added isolated pytest coverage for devctl contracts and MCP task execution semantics.
 - Performed drift audit across devctl implementation, MCP mappings, and task execution behavior; drift resolved.
 
@@ -53,11 +53,11 @@ Define strict, non-placeholder execution contracts for frontend test commands an
 ### Steps
 1. Define target behavior for `devctl test-web-unit` without a placeholder-pass fallback.
 2. Define `devctl test-web-e2e` command contract (arguments, exit semantics, artifact path output).
-3. Define MCP mappings for `web.test.e2e` and a real `web.test.integration` execution path.
+3. Define the canonical governor-backed execution path for `web.test.e2e` and `web.test.integration`.
 4. Record pass/fail criteria and expected logs for each command.
 
 ### Acceptance Criteria
-- A written command contract exists for `test-web-unit`, `test-web-e2e`, and MCP task mappings.
+- A written command contract exists for `test-web-unit`, `test-web-e2e`, and governor-backed MCP task mappings.
 - No command contract includes placeholder success semantics.
 - Command contracts are deterministic and produce unambiguous exit behavior.
 

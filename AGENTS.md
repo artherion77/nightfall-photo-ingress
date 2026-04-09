@@ -42,19 +42,27 @@ The dev container setup configures these bind-mount caches:
 - npm cache: ~/.cache/npm -> /root/.cache/npm
 - pip cache: ~/.cache/pip -> /root/.cache/pip
 
-## devctl Commands (Cached Install Flow)
+## devctl Commands (Underlying Tooling)
 
-These are the real, exposed devctl commands (see `dev/bin/devctl` case statement):
+`devctl` remains the underlying environment-management tool, but it is no longer the canonical automation entry point for MCP or agent workflows. The governor surface is `govctl run ... --json`; direct `devctl` use is reserved for local tool development, container maintenance, or troubleshooting a specific delegated command.
+
+These are the real, exposed `devctl` commands (see `dev/bin/devctl` case statement):
 
 - ./dev/bin/devctl setup
+- ./dev/bin/devctl destroy
 - ./dev/bin/devctl reset [--base]
 - ./dev/bin/devctl update [--scope node|webui|dashboard|all] [--simulate]
 - ./dev/bin/devctl check
 - ./dev/bin/devctl ensure-stack-ready [webui|dashboard|all]
 - ./dev/bin/devctl assert-cached-ready
+- ./dev/bin/devctl run-api
 - ./dev/bin/devctl status
 - ./dev/bin/devctl shell
 - ./dev/bin/devctl run-webui
+- ./dev/bin/devctl test-web-typecheck
+- ./dev/bin/devctl test-metrics-dashboard-typecheck
+- ./dev/bin/devctl test-web-unit
+- ./dev/bin/devctl test-web-e2e
 
 Typical flow:
 
@@ -84,16 +92,29 @@ Commands:
 
 JSON mode (`--json`) writes JSONL events to stdout and stores artifacts under `artifacts/govctl/`.
 
-## MCP Tasks (devctl-first)
+## MCP Tasks (govctl-only execution surface)
 
-Canonical MCP tasks now use devctl orchestration for environment prepare/reset.
-MCP-mapped test tasks (`backend.test.unit`, `web.test.unit`) route through govctl `--json` for structured output.
+Canonical MCP tasks now route through `govctl run ... --json`, including dev-container lifecycle wrappers. `devctl`, `stagingctl`, `metricsctl`, and direct Python entry points remain implementation details behind `govctl` targets, not MCP-facing command surfaces.
 
 - devcontainer.prepare
+- devcontainer.check
+- devcontainer.update
 - devcontainer.reset
 - backend.test.unit
 - backend.test.integration
 - web.test.unit
+- web.test.integration
+- web.test.e2e
+- metrics.status
+- metrics.run-now
+- metrics.publish
+- metrics.install
+- metrics.stop
+
+One-command-surface policy:
+- For MCP execution and agent automation, use `govctl run TARGET --json` only.
+- Do not add direct `devctl`, `stagingctl`, `metricsctl`, or raw Python commands to `.mcp/model.json` mappings.
+- Direct tool invocations are allowed only when implementing or debugging the underlying tools themselves, or when no `govctl` target exists yet.
 
 ## Playwright E2E Tests
 
@@ -105,9 +126,8 @@ add `npx playwright install` or any browser-install step to the devctl
 bootstrap flow.
 
 Canonical E2E execution targets:
-- govctl: `./dev/bin/govctl run staging.e2e.module1`
+- govctl: `./dev/bin/govctl run staging.e2e.module1 --json`
 - MCP: `staging.e2e.module1` task (requires staging-photo-ingress running)
-- Direct: `./.venv/bin/python -m pytest tests/e2e -v --tb=short`
 
 The `devctl test-web-e2e` command remains available only as a contract-test
 harness hook (via DEVCTL_CONTRACT_TEST_ROOT override). It is not a workflow
@@ -178,13 +198,19 @@ curl -sS -X POST http://<server>/mcp/exec \
 Run backend unit tests through govctl JSON mode (agent-friendly stream):
 
 ```bash
-./dev/bin/govctl backend.test.unit --json
+./dev/bin/govctl run backend.test.unit --json
 ```
 
 Run web unit tests through govctl JSON mode:
 
 ```bash
-./dev/bin/govctl web.test.unit --json
+./dev/bin/govctl run web.test.unit --json
+```
+
+Run devcontainer prepare through the canonical governor surface:
+
+```bash
+./dev/bin/govctl run devcontainer.prepare --json
 ```
 
 Inspect status/log/context:
@@ -235,8 +261,10 @@ Agents are encouraged to augment this list with troubleshooting items discovered
 - Cache mounts missing:
   - Run ./dev/bin/devctl setup and then ./dev/bin/devctl status
 - Snapshot missing:
-  - Run ./dev/bin/devctl snapshot-create
+  - Run ./dev/bin/devctl setup
 - Reset fails:
   - Ensure clean snapshot exists and run ./dev/bin/devctl assert-cached-ready
 - Test task unavailable:
   - Verify task key exists in .mcp/model.json under mappings
+- Governor task unavailable:
+  - Run ./dev/bin/govctl list and verify the target exists in dev/govctl-targets.yaml

@@ -49,8 +49,8 @@ Important frontend gaps:
 Devcontainer/MCP/devctl status:
 - devctl can install Node, Vitest, Playwright, and cache browser binaries: [dev/bin/devctl](../../dev/bin/devctl)
 - Cache mounts are already defined (npm/pip/playwright): [dev/bin/devctl](../../dev/bin/devctl), [.mcp/model.json](../../.mcp/model.json)
-- Chunk 1 delivery: `devctl test-web-unit` and `devctl test-web-e2e` now use strict, non-placeholder contracts with deterministic failure behavior and explicit logs/artifact path output: [dev/bin/devctl](../../dev/bin/devctl)
-- Chunk 1 delivery: MCP mappings `web.test.e2e` and `web.test.integration` now resolve to real command paths (`./dev/bin/devctl test-web-e2e`) without placeholder echo paths: [.mcp/model.json](../../.mcp/model.json)
+- Chunk 1 delivery: `devctl test-web-unit` and `devctl test-web-e2e` remain strict underlying tool contracts with deterministic behavior and explicit logs/artifact path output: [dev/bin/devctl](../../dev/bin/devctl)
+- Current implementation note (2026-04-10): MCP mappings no longer call those tool contracts directly. `.mcp/model.json` now routes executable tasks through `./dev/bin/govctl run ... --json`, and `web.test.e2e` / `web.test.integration` resolve to the governor surface instead of direct `devctl` commands: [.mcp/model.json](../../.mcp/model.json)
 
 ## 2. Playwright Potential (Pros/Cons + Concrete Scenarios)
 
@@ -193,7 +193,7 @@ Chunk 4 delivery note (CI and MCP Rollout Plan):
 	- Retention window: 14 days for PR artifacts, 30 days for nightly/main artifacts.
 	- Storage guardrail: if weekly artifact growth exceeds policy budget, reduce retained media to trace + one screenshot per failed test.
 - MCP task output requirements finalized for artifact discoverability:
-	- `web.test.e2e` and `web.test.integration` task outputs must include a deterministic artifact marker line:
+	- `web.test.e2e` and `web.test.integration` task outputs must include a deterministic artifact marker line via the delegated governor target output:
 		- `E2E_ARTIFACT_PATH=<absolute-or-workspace-relative-path>`
 	- On failed runs, MCP status/log payload must include:
 		- task id,
