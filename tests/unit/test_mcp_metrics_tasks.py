@@ -37,42 +37,43 @@ def test_model_exposes_metrics_mcp_task_mappings() -> None:
     model = json.loads((workspace_root / ".mcp" / "model.json").read_text(encoding="utf-8"))
 
     mappings = model["mappings"]
-    assert mappings["metrics.status"] == ["./dev/bin/metricsctl status"]
-    assert mappings["metrics.run-now"] == ["./dev/bin/metricsctl run-now"]
-    assert mappings["metrics.publish"] == ["./dev/bin/metricsctl publish"]
-    assert mappings["metrics.install"] == ["./dev/bin/metricsctl install"]
-    assert mappings["metrics.stop"] == ["./dev/bin/metricsctl stop"]
+    assert mappings["metrics.status"] == ["./dev/bin/govctl run metrics.status --json"]
+    assert mappings["metrics.run-now"] == ["./dev/bin/govctl run metrics.run-now --json"]
+    assert mappings["metrics.publish"] == ["./dev/bin/govctl run metrics.publish --json"]
+    assert mappings["metrics.install"] == ["./dev/bin/govctl run metrics.install --json"]
+    assert mappings["metrics.stop"] == ["./dev/bin/govctl run metrics.stop --json"]
 
 
 def test_metrics_mcp_tasks_delegate_to_metricsctl_in_isolated_workspace(tmp_path: Path) -> None:
     workspace_root = tmp_path
     (workspace_root / ".mcp").mkdir(parents=True, exist_ok=True)
 
-    metricsctl = workspace_root / "dev" / "bin" / "metricsctl"
-    metricsctl.parent.mkdir(parents=True, exist_ok=True)
-    metricsctl.write_text(
+    govctl = workspace_root / "dev" / "bin" / "govctl"
+    govctl.parent.mkdir(parents=True, exist_ok=True)
+    govctl.write_text(
         "#!/usr/bin/env bash\n"
         "set -euo pipefail\n"
-        "cmd=\"${1:-}\"\n"
+        "if [[ \"${1:-}\" != \"run\" ]]; then echo 'unknown'; exit 1; fi\n"
+        "cmd=\"${2:-}\"\n"
         "case \"$cmd\" in\n"
-        "  status) echo '{\"runtime\":\"ok\"}' ;;\n"
-        "  run-now) echo '{\"status\":\"success\"}' ;;\n"
-        "  publish) echo '{\"status\":\"published\"}' ;;\n"
-        "  install) echo '{\"installed\":true}' ;;\n"
-        "  stop) echo '{\"enabled\":false}' ;;\n"
+        "  metrics.status) echo '{\"runtime\":\"ok\"}' ;;\n"
+        "  metrics.run-now) echo '{\"status\":\"success\"}' ;;\n"
+        "  metrics.publish) echo '{\"status\":\"published\"}' ;;\n"
+        "  metrics.install) echo '{\"installed\":true}' ;;\n"
+        "  metrics.stop) echo '{\"enabled\":false}' ;;\n"
         "  *) echo 'unknown' ; exit 1 ;;\n"
         "esac\n",
         encoding="utf-8",
     )
-    metricsctl.chmod(0o755)
+    govctl.chmod(0o755)
 
     model = {
         "mappings": {
-            "metrics.status": ["./dev/bin/metricsctl status"],
-            "metrics.run-now": ["./dev/bin/metricsctl run-now"],
-            "metrics.publish": ["./dev/bin/metricsctl publish"],
-            "metrics.install": ["./dev/bin/metricsctl install"],
-            "metrics.stop": ["./dev/bin/metricsctl stop"],
+            "metrics.status": ["./dev/bin/govctl run metrics.status --json"],
+            "metrics.run-now": ["./dev/bin/govctl run metrics.run-now --json"],
+            "metrics.publish": ["./dev/bin/govctl run metrics.publish --json"],
+            "metrics.install": ["./dev/bin/govctl run metrics.install --json"],
+            "metrics.stop": ["./dev/bin/govctl run metrics.stop --json"],
         }
     }
     (workspace_root / ".mcp" / "model.json").write_text(json.dumps(model), encoding="utf-8")

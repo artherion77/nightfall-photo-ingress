@@ -49,55 +49,42 @@
   "domains": {
     "backend": {
       "test.unit": [
-        "./dev/bin/devctl setup",
-        "./dev/bin/devctl assert-cached-ready",
-        "./dev/bin/devctl reset",
-        "./.venv/bin/python -m pytest tests/unit"
+        "./dev/bin/govctl run backend.test.unit --json"
       ],
       "test.integration": [
-        "./dev/bin/devctl setup",
-        "./dev/bin/devctl assert-cached-ready",
-        "./dev/bin/devctl reset",
-        "./.venv/bin/python -m pytest tests/integration"
+        "./dev/bin/govctl run backend.test.integration --json"
       ],
       "build": [
-        "python -m build"
+        "./dev/bin/govctl run backend.build.wheel --json"
       ],
       "deploy.dev": [
-        "./dev/bin/devctl setup",
-        "./dev/bin/devctl run-api"
+        "./dev/bin/govctl run backend.deploy.dev --json"
       ],
       "deploy.staging": [
-        "./dev/bin/stagingctl install"
+        "./dev/bin/govctl run staging.install --json"
       ],
       "e2e": [
-        "./dev/bin/stagingctl smoke"
+        "./dev/bin/govctl run backend.e2e --json"
       ]
     },
     "web": {
       "test.unit": [
-        "./dev/bin/devctl setup",
-        "./dev/bin/devctl assert-cached-ready",
-        "./dev/bin/devctl reset",
-        "./dev/bin/devctl test-web-typecheck",
-        "./dev/bin/devctl test-metrics-dashboard-typecheck",
-        "./dev/bin/devctl test-web-unit"
+        "./dev/bin/govctl run test.web --json"
       ],
       "test.integration": [
-        "./dev/bin/devctl test-web-e2e"
+        "./dev/bin/govctl run web.test.integration --json"
       ],
       "build": [
-        "npm --prefix webui run build"
+        "./dev/bin/govctl run web.build --json"
       ],
       "deploy.dev": [
-        "./dev/bin/devctl setup",
-        "./dev/bin/devctl run-webui"
+        "./dev/bin/govctl run web.deploy.dev --json"
       ],
       "deploy.staging": [
-        "./dev/bin/devctl setup"
+        "./dev/bin/govctl run staging.install --json"
       ],
       "e2e": [
-        "./dev/bin/devctl test-web-e2e"
+        "./dev/bin/govctl run web.test.e2e --json"
       ]
     }
   },
@@ -116,6 +103,7 @@
       "test-web-typecheck",
       "test-metrics-dashboard-typecheck",
       "test-web-unit",
+      "test-web-e2e",
       "status",
       "shell"
     ],
@@ -155,14 +143,10 @@
   },
   "devcontainer": {
     "prepare": [
-      "./dev/bin/devctl setup",
-      "./dev/bin/devctl assert-cached-ready",
-      "./dev/bin/devctl status"
+      "./dev/bin/govctl run devcontainer.prepare --json"
     ],
     "reset": [
-      "./dev/bin/devctl reset",
-      "./dev/bin/devctl assert-cached-ready",
-      "./dev/bin/devctl status"
+      "./dev/bin/govctl run devcontainer.reset --json"
     ]
   },
   "staging": {
@@ -178,52 +162,37 @@
   },
   "mappings": {
     "devcontainer.prepare": [
-      "./dev/bin/devctl setup",
-      "./dev/bin/devctl assert-cached-ready",
-      "./dev/bin/devctl status"
+      "./dev/bin/govctl run devcontainer.prepare --json"
     ],
     "devcontainer.check": [
-      "./dev/bin/devctl check"
+      "./dev/bin/govctl run devcontainer.check --json"
     ],
     "devcontainer.update": [
-      "./dev/bin/devctl update"
+      "./dev/bin/govctl run devcontainer.update --json"
     ],
     "devcontainer.reset": [
-      "./dev/bin/devctl reset",
-      "./dev/bin/devctl assert-cached-ready",
-      "./dev/bin/devctl status"
+      "./dev/bin/govctl run devcontainer.reset --json"
     ],
     "backend.test.unit": [
-      "./dev/bin/govctl backend.test.unit --json"
+      "./dev/bin/govctl run backend.test.unit --json"
     ],
     "backend.test.unit.direct": [
-      "./dev/bin/devctl setup",
-      "./dev/bin/devctl assert-cached-ready",
-      "./dev/bin/devctl reset",
-      "./.venv/bin/python -m pytest tests/unit"
+      "./dev/bin/govctl run backend.test.unit --json"
     ],
     "backend.test.integration": [
-      "./dev/bin/devctl setup",
-      "./dev/bin/devctl assert-cached-ready",
-      "./dev/bin/devctl reset",
-      "./.venv/bin/python -m pytest tests/integration"
+      "./dev/bin/govctl run backend.test.integration --json"
     ],
     "web.test.unit": [
-      "./dev/bin/govctl web.test.unit --json"
+      "./dev/bin/govctl run web.test.unit --json"
     ],
     "web.test.unit.direct": [
-      "./dev/bin/devctl setup",
-      "./dev/bin/devctl assert-cached-ready",
-      "./dev/bin/devctl reset",
-      "./dev/bin/devctl test-web-typecheck",
-      "./dev/bin/devctl test-metrics-dashboard-typecheck",
-      "./dev/bin/devctl test-web-unit"
+      "./dev/bin/govctl run test.web --json"
     ],
     "web.test.integration": [
-      "./dev/bin/devctl test-web-e2e"
+      "./dev/bin/govctl run web.test.integration --json"
     ],
     "web.test.e2e": [
-      "./dev/bin/devctl test-web-e2e"
+      "./dev/bin/govctl run web.test.e2e --json"
     ],
     "mcp.smoke.success": [
       "echo '[mcp.smoke.success] ok'"
@@ -232,61 +201,50 @@
       "echo '[mcp.smoke.fail] intentional failure' && false"
     ],
     "metrics.status": [
-      "./dev/bin/metricsctl status"
+      "./dev/bin/govctl run metrics.status --json"
     ],
     "metrics.run-now": [
-      "./dev/bin/metricsctl run-now"
+      "./dev/bin/govctl run metrics.run-now --json"
     ],
     "metrics.publish": [
-      "./dev/bin/metricsctl publish"
+      "./dev/bin/govctl run metrics.publish --json"
     ],
     "metrics.build-dashboard": [
-      "./dev/bin/build-metrics-dashboard"
+      "./dev/bin/govctl run metrics.build.dashboard --json"
     ],
     "metrics.install": [
-      "./dev/bin/metricsctl install"
+      "./dev/bin/govctl run metrics.install --json"
     ],
     "metrics.stop": [
-      "./dev/bin/metricsctl stop"
+      "./dev/bin/govctl run metrics.stop --json"
     ],
     "web.e2e": [
-      "./dev/bin/stagingctl smoke"
+      "./dev/bin/govctl run web.test.e2e --json"
     ]
   },
   "verifications": {
     "unit": {
       "backend": [
-        "./dev/bin/devctl setup",
-        "./dev/bin/devctl assert-cached-ready",
-        "./dev/bin/devctl reset",
-        "./.venv/bin/python -m pytest tests/unit"
+        "./dev/bin/govctl run backend.test.unit --json"
       ],
       "web": [
-        "./dev/bin/devctl setup",
-        "./dev/bin/devctl assert-cached-ready",
-        "./dev/bin/devctl reset",
-        "./dev/bin/devctl test-web-typecheck",
-        "./dev/bin/devctl test-metrics-dashboard-typecheck",
-        "./dev/bin/devctl test-web-unit"
+        "./dev/bin/govctl run test.web --json"
       ]
     },
     "integration": {
       "backend": [
-        "./dev/bin/devctl setup",
-        "./dev/bin/devctl assert-cached-ready",
-        "./dev/bin/devctl reset",
-        "./.venv/bin/python -m pytest tests/integration"
+        "./dev/bin/govctl run backend.test.integration --json"
       ],
       "web": [
-        "./dev/bin/devctl test-web-e2e"
+        "./dev/bin/govctl run web.test.integration --json"
       ]
     },
     "e2e": {
       "backend": [
-        "./dev/bin/stagingctl smoke"
+        "./dev/bin/govctl run backend.e2e --json"
       ],
       "web": [
-        "./dev/bin/devctl test-web-e2e"
+        "./dev/bin/govctl run web.test.e2e --json"
       ]
     }
   }

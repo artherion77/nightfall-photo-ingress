@@ -22,12 +22,9 @@ def test_web_test_unit_mapping_uses_govctl_fast_loop() -> None:
     commands = model["mappings"]["web.test.unit"]
     direct_commands = model["mappings"]["web.test.unit.direct"]
 
-    assert commands == ["./dev/bin/govctl web.test.unit --json"]
+    assert commands == ["./dev/bin/govctl run web.test.unit --json"]
 
-    assert "./dev/bin/devctl reset" in direct_commands
-    assert "./dev/bin/devctl assert-cached-ready" in direct_commands
-    assert "./dev/bin/devctl test-web-typecheck" in direct_commands
-    assert "./dev/bin/devctl test-metrics-dashboard-typecheck" in direct_commands
+    assert direct_commands == ["./dev/bin/govctl run test.web --json"]
     assert "./dev/bin/devctl snapshot-create" not in commands
 
 
@@ -49,8 +46,8 @@ def test_devcontainer_mappings_include_check_and_update() -> None:
     model = json.loads((workspace_root / ".mcp" / "model.json").read_text(encoding="utf-8"))
     mappings = model["mappings"]
 
-    assert mappings["devcontainer.check"] == ["./dev/bin/devctl check"]
-    assert mappings["devcontainer.update"] == ["./dev/bin/devctl update"]
+    assert mappings["devcontainer.check"] == ["./dev/bin/govctl run devcontainer.check --json"]
+    assert mappings["devcontainer.update"] == ["./dev/bin/govctl run devcontainer.update --json"]
 
 
 def test_devctl_does_not_install_web_deps_during_runtime_checks() -> None:

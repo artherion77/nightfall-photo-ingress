@@ -4,6 +4,44 @@ defaults:
   timeout_seconds: 300
 
 targets:
+  devcontainer.prepare:
+    description: "Prepare dev container and cached bootstrap state"
+    command: |
+      ./dev/bin/devctl setup
+      ./dev/bin/devctl assert-cached-ready
+      ./dev/bin/devctl status
+    requires: []
+    preflight: []
+    lock: false
+
+  devcontainer.check:
+    description: "Read-only dev container drift report"
+    command: "./dev/bin/devctl check"
+    requires: []
+    preflight:
+      - container-running:dev-photo-ingress
+    lock: false
+
+  devcontainer.update:
+    description: "Refresh dev container stacks"
+    command: "./dev/bin/devctl update"
+    requires: [dev.ensure-running]
+    preflight:
+      - container-running:dev-photo-ingress
+    lock: false
+
+  devcontainer.reset:
+    description: "Reset dev container to cached-ready baseline"
+    command: |
+      ./dev/bin/devctl reset
+      ./dev/bin/devctl assert-cached-ready
+      ./dev/bin/devctl status
+    requires: [dev.ensure-running]
+    preflight:
+      - container-running:dev-photo-ingress
+      - cache-mounts-active
+    lock: false
+
   dev.ensure-running:
     description: "Ensure dev container exists and is running"
     command: |
@@ -40,6 +78,22 @@ targets:
       "$build_python" -m build --wheel --outdir dist/
     requires: []
     preflight: []
+    lock: false
+
+  backend.deploy.dev:
+    description: "Run backend API in the dev container"
+    command: "./dev/bin/devctl run-api"
+    requires: [dev.ensure-running]
+    preflight:
+      - container-running:dev-photo-ingress
+    lock: false
+
+  backend.e2e:
+    description: "Run backend-oriented staging smoke checks"
+    command: "./dev/bin/stagingctl smoke"
+    requires: [staging.install]
+    preflight:
+      - container-running:staging-photo-ingress
     lock: false
 
   backend.test.unit:
@@ -105,6 +159,15 @@ targets:
     lock: false
     timeout_seconds: 300
 
+  web.test.integration:
+    description: "Web integration test suite"
+    command: "./.venv/bin/python -m pytest tests/e2e -v --tb=short"
+    requires: [staging.install]
+    preflight:
+      - container-running:staging-photo-ingress
+    lock: false
+    timeout_seconds: 300
+
   web.build:
     description: "Production SvelteKit build (webui)"
     command: |
@@ -121,6 +184,14 @@ targets:
       - config-template-complete:staging/container/photo-ingress.conf
     lock: true
 
+  web.deploy.dev:
+    description: "Run web UI in the dev container"
+    command: "./dev/bin/devctl run-webui"
+    requires: [dev.ensure-running]
+    preflight:
+      - container-running:dev-photo-ingress
+    lock: false
+
   metrics.build.dashboard:
     description: "Build metrics dashboard statics + fingerprint"
     command: "./dev/bin/build-metrics-dashboard"
@@ -134,36 +205,109 @@ targets:
 
   metrics.collect.backend:
     description: "Collect backend metrics (Module 2)"
-    command: "./dev/bin/metricsctl collect-backend"
+    command: |
+      metrics_python="python3"
+      if [[ -x ./.venv/bin/python ]]; then
+        metrics_python="./.venv/bin/python"
+      fi
+      "$metrics_python" ./metricsctl collect-backend
+    requires: []
+    preflight: []
+    lock: true
+
+  metrics.status:
+    description: "Report metrics runtime status"
+    command: |
+      metrics_python="python3"
+      if [[ -x ./.venv/bin/python ]]; then
+        metrics_python="./.venv/bin/python"
+      fi
+      "$metrics_python" ./metricsctl status
+    requires: []
+    preflight: []
+    lock: true
+
+  metrics.run-now:
+    description: "Trigger metrics pipeline immediately"
+    command: |
+      metrics_python="python3"
+      if [[ -x ./.venv/bin/python ]]; then
+        metrics_python="./.venv/bin/python"
+      fi
+      "$metrics_python" ./metricsctl run-now
     requires: []
     preflight: []
     lock: true
 
   metrics.collect.frontend:
     description: "Collect frontend metrics (Module 3)"
-    command: "./dev/bin/metricsctl collect-frontend"
+    command: |
+      metrics_python="python3"
+      if [[ -x ./.venv/bin/python ]]; then
+        metrics_python="./.venv/bin/python"
+      fi
+      "$metrics_python" ./metricsctl collect-frontend
     requires: []
     preflight: []
     lock: true
 
   metrics.aggregate:
     description: "Aggregate collected metrics (Module 4)"
-    command: "./dev/bin/metricsctl aggregate"
+    command: |
+      metrics_python="python3"
+      if [[ -x ./.venv/bin/python ]]; then
+        metrics_python="./.venv/bin/python"
+      fi
+      "$metrics_python" ./metricsctl aggregate
     requires: [metrics.collect.backend, metrics.collect.frontend]
     preflight: []
     lock: true
 
   metrics.generate.dashboard:
     description: "Generate dashboard from aggregated data (Module 5)"
-    command: "./dev/bin/metricsctl generate-dashboard"
+    command: |
+      metrics_python="python3"
+      if [[ -x ./.venv/bin/python ]]; then
+        metrics_python="./.venv/bin/python"
+      fi
+      "$metrics_python" ./metricsctl generate-dashboard
     requires: [metrics.aggregate, metrics.build.dashboard]
     preflight: []
     lock: true
 
   metrics.publish:
     description: "Publish metrics surface (Module 7)"
-    command: "./dev/bin/metricsctl publish"
+    command: |
+      metrics_python="python3"
+      if [[ -x ./.venv/bin/python ]]; then
+        metrics_python="./.venv/bin/python"
+      fi
+      "$metrics_python" ./metricsctl publish
     requires: [metrics.generate.dashboard]
+    preflight: []
+    lock: true
+
+  metrics.install:
+    description: "Install metrics automation"
+    command: |
+      metrics_python="python3"
+      if [[ -x ./.venv/bin/python ]]; then
+        metrics_python="./.venv/bin/python"
+      fi
+      "$metrics_python" ./metricsctl install
+    requires: []
+    preflight: []
+    lock: true
+
+  metrics.stop:
+    description: "Stop metrics automation"
+    command: |
+      metrics_python="python3"
+      if [[ -x ./.venv/bin/python ]]; then
+        metrics_python="./.venv/bin/python"
+      fi
+      "$metrics_python" ./metricsctl stop
+    requires: []
     preflight: []
     lock: true
 

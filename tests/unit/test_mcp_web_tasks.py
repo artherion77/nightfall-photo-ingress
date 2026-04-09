@@ -39,8 +39,8 @@ def test_model_exposes_real_web_task_mappings() -> None:
     mappings = model["mappings"]
     assert "web.test.e2e" in mappings
     assert "web.test.integration" in mappings
-    assert mappings["web.test.e2e"][-1] == "./dev/bin/devctl test-web-e2e"
-    assert mappings["web.test.integration"][-1] == "./dev/bin/devctl test-web-e2e"
+    assert mappings["web.test.e2e"] == ["./dev/bin/govctl run web.test.e2e --json"]
+    assert mappings["web.test.integration"] == ["./dev/bin/govctl run web.test.integration --json"]
 
 
 def test_web_mcp_tasks_execute_successfully_in_isolated_workspace(tmp_path: Path) -> None:
@@ -48,24 +48,23 @@ def test_web_mcp_tasks_execute_successfully_in_isolated_workspace(tmp_path: Path
     (workspace_root / ".mcp").mkdir(parents=True, exist_ok=True)
     (workspace_root / "dev" / "bin").mkdir(parents=True, exist_ok=True)
 
-    # Minimal deterministic devctl shim for MCP task execution tests.
-    devctl = workspace_root / "dev" / "bin" / "devctl"
-    devctl.write_text(
+    govctl = workspace_root / "dev" / "bin" / "govctl"
+    govctl.write_text(
         "#!/usr/bin/env bash\n"
         "set -euo pipefail\n"
-        "case \"${1:-}\" in\n"
-        "  test-web-e2e) echo \"shim:web-e2e\" ;;\n"
-        "  test-web-unit) echo \"shim:web-unit\" ;;\n"
+        "if [[ \"${1:-}\" != \"run\" ]]; then echo \"unexpected\"; exit 1; fi\n"
+        "case \"${2:-}\" in\n"
+        "  web.test.e2e|web.test.integration) echo \"shim:web-e2e\" ;;\n"
         "  *) echo \"shim:noop\" ;;\n"
         "esac\n",
         encoding="utf-8",
     )
-    devctl.chmod(0o755)
+    govctl.chmod(0o755)
 
     model = {
         "mappings": {
-            "web.test.e2e": ["./dev/bin/devctl test-web-e2e"],
-            "web.test.integration": ["./dev/bin/devctl test-web-e2e"],
+            "web.test.e2e": ["./dev/bin/govctl run web.test.e2e --json"],
+            "web.test.integration": ["./dev/bin/govctl run web.test.integration --json"],
         }
     }
     (workspace_root / ".mcp" / "model.json").write_text(json.dumps(model), encoding="utf-8")
