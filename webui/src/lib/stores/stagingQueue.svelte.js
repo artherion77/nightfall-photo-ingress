@@ -4,6 +4,8 @@ import { getStagingPage } from '$lib/api/staging';
 import { generateIdempotencyKey, postAccept, postDefer, postReject } from '$lib/api/triage';
 import { toast } from '$lib/stores/toast.svelte';
 
+const DEFAULT_PAGE_LIMIT = 20;
+
 const initial = {
   items: [],
   cursor: null,
@@ -71,9 +73,12 @@ function shiftActive(delta) {
 async function triageItem(action, itemId, idempotencyKey) {
   let snapshot = null;
   const key = idempotencyKey ?? generateIdempotencyKey();
+  let revalidatedActiveIndex = 0;
+  let refreshLimit = DEFAULT_PAGE_LIMIT;
 
   update((state) => {
     snapshot = state;
+    refreshLimit = Math.max(state.items.length, DEFAULT_PAGE_LIMIT);
     const removedIndex = state.items.findIndex((item) => item.sha256 === itemId);
     if (removedIndex === -1) {
       return state;
@@ -81,12 +86,14 @@ async function triageItem(action, itemId, idempotencyKey) {
 
     const items = state.items.filter((item) => item.sha256 !== itemId);
     const activeIndex = Math.min(state.activeIndex, Math.max(items.length - 1, 0));
+    revalidatedActiveIndex = activeIndex;
 
     return {
       ...state,
       items,
       total: Math.max(0, state.total - 1),
       activeIndex,
+      loading: true,
       error: null
     };
   });
@@ -94,23 +101,42 @@ async function triageItem(action, itemId, idempotencyKey) {
   try {
     if (action === 'accept') {
       await postAccept(itemId, key);
-      return;
     }
     if (action === 'reject') {
       await postReject(itemId, key);
-      return;
     }
     if (action === 'defer') {
       await postDefer(itemId, key);
-      return;
+    } else if (action !== 'accept' && action !== 'reject') {
+      throw new Error(`Unsupported triage action: ${action}`);
     }
-    throw new Error(`Unsupported triage action: ${action}`);
   } catch (error) {
     if (snapshot) {
       set(snapshot);
     }
     const message = error instanceof Error ? error.message : 'Triage action failed';
     update((state) => ({ ...state, error: message }));
+    toast.push(message, 'error');
+    throw error;
+  }
+
+  try {
+    const page = await getStagingPage(null, refreshLimit);
+    update((state) => {
+      const items = page.items ?? [];
+      return {
+        ...state,
+        items,
+        cursor: page.cursor ?? null,
+        total: page.total ?? state.total,
+        activeIndex: Math.min(revalidatedActiveIndex, Math.max(items.length - 1, 0)),
+        loading: false,
+        error: null
+      };
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to refresh staging queue';
+    update((state) => ({ ...state, loading: false, error: message }));
     toast.push(message, 'error');
     throw error;
   }
