@@ -325,6 +325,20 @@ assert_exit "check no-preflight: exits 0" 0 "$rc"
 assert_contains "check no-preflight: shows no preflights message" "no preflights" "$output"
 
 
+# ── Test: run subcommand alias ───────────────────────────────────────────────
+# Regression for issue #18: `govctl run <target>` must be identical to `govctl <target>`
+
+output="$(run_govctl run t.alpha --log-dir "$LOG_DIR")"
+rc=$?
+assert_exit "run alias: exits 0" 0 "$rc"
+assert_contains "run alias: shows target banner" "t.alpha" "$output"
+assert_contains "run alias: shows PASSED" "PASSED" "$output"
+
+rc=0
+run_govctl run no-such-target --log-dir "$LOG_DIR" > /dev/null 2>&1 || rc=$?
+assert_exit "run alias unknown target: exits non-zero" 1 "$rc"
+
+
 # ── Test: unknown target exits non-zero ──────────────────────────────────────
 
 rc=0

@@ -420,11 +420,12 @@ cmd_help() {
 govctl — build governor for nightfall-photo-ingress
 
 Usage:
-  govctl <target|group> [<target|group> ...] [options]   Run targets
-  govctl list   [--format human|json]                    List all targets/groups
+  govctl run <target|group> [<target|group> ...] [options]   Run targets
+  govctl <target|group> [<target|group> ...] [options]       Run targets (short form)
+  govctl list   [--format human|json]                        List all targets/groups
   govctl check  [<target|group> ...]  [--format human|json]  Check preflights
   govctl graph  [<target|group> ...]  [--format human|dot]   Show dependency graph
-  govctl help                                            Show this help
+  govctl help                                                Show this help
 
 Run Options:
   --dry-run              Print execution plan without running
@@ -433,9 +434,11 @@ Run Options:
   --log-dir <path>       Artifact directory (default: artifacts/govctl/)
 
 Examples:
-  govctl backend.test.unit
-  govctl test.all --dry-run
-  govctl test.all --continue-on-error
+  govctl run backend.test.unit
+  govctl run test.all --dry-run
+  govctl run test.all --continue-on-error
+  govctl run test.all --json
+  govctl backend.test.unit          (bare form also works)
   govctl list --format json
   govctl check test.all --format json
   govctl graph test.all --format dot | dot -Tpng -o graph.png
@@ -452,9 +455,10 @@ if [[ $# -eq 0 ]]; then
 fi
 
 case "$1" in
-    list)   shift; cmd_list  "$@" ;;
-    check)  shift; cmd_check "$@" ;;
-    graph)  shift; cmd_graph "$@" ;;
+    list)         shift; cmd_list  "$@" ;;
+    check)        shift; cmd_check "$@" ;;
+    graph)        shift; cmd_graph "$@" ;;
+    run)          shift; cmd_run   "$@" ;;
     help|--help|-h) cmd_help ;;
-    *)      cmd_run "$@" ;;
+    *)            cmd_run "$@" ;;
 esac
