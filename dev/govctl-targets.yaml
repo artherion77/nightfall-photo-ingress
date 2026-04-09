@@ -44,7 +44,12 @@ targets:
 
   backend.test.unit:
     description: "Run backend unit tests"
-    command: "pytest tests/unit -q"
+    command: |
+      test_python="python3"
+      if [[ -x ./.venv/bin/python ]]; then
+        test_python="./.venv/bin/python"
+      fi
+      "$test_python" -m pytest tests/unit -q
     requires: []
     preflight: []
     lock: false
@@ -52,7 +57,12 @@ targets:
 
   backend.test.integration:
     description: "Run backend integration tests"
-    command: "pytest tests/integration -q"
+    command: |
+      test_python="python3"
+      if [[ -x ./.venv/bin/python ]]; then
+        test_python="./.venv/bin/python"
+      fi
+      "$test_python" -m pytest tests/integration -q
     requires: []
     preflight: []
     lock: false
