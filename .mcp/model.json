@@ -84,7 +84,7 @@
         "./dev/bin/devctl test-web-unit"
       ],
       "test.integration": [
-        "./.venv/bin/python -m pytest tests/e2e -v --tb=short"
+        "./dev/bin/devctl test-web-e2e"
       ],
       "build": [
         "npm --prefix webui run build"
@@ -97,7 +97,7 @@
         "./dev/bin/devctl setup"
       ],
       "e2e": [
-        "./.venv/bin/python -m pytest tests/e2e -v --tb=short"
+        "./dev/bin/devctl test-web-e2e"
       ]
     }
   },
@@ -220,10 +220,10 @@
       "./dev/bin/devctl test-web-unit"
     ],
     "web.test.integration": [
-      "./.venv/bin/python -m pytest tests/e2e -v --tb=short"
+      "./dev/bin/devctl test-web-e2e"
     ],
     "web.test.e2e": [
-      "./.venv/bin/python -m pytest tests/e2e -v --tb=short"
+      "./dev/bin/devctl test-web-e2e"
     ],
     "mcp.smoke.success": [
       "echo '[mcp.smoke.success] ok'"
@@ -278,7 +278,7 @@
         "./.venv/bin/python -m pytest tests/integration"
       ],
       "web": [
-        "./.venv/bin/python -m pytest tests/e2e -v --tb=short"
+        "./dev/bin/devctl test-web-e2e"
       ]
     },
     "e2e": {
@@ -286,7 +286,7 @@
         "./dev/bin/stagingctl smoke"
       ],
       "web": [
-        "./.venv/bin/python -m pytest tests/e2e -v --tb=short"
+        "./dev/bin/devctl test-web-e2e"
       ]
     }
   }
