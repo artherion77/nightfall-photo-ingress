@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 import hmac
 import json
 import sqlite3
+from time import monotonic
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -13,10 +14,59 @@ from nightfall_photo_ingress.config import AppConfig
 from api.dependencies import get_app_config
 
 _security = HTTPBearer(auto_error=False)
+_AUTH_FAILURE_AUDIT_WINDOW_SECONDS = 60.0
+_AUTH_FAILURE_AUDIT_MAX_KEYS = 1024
 
 
 def _utc_now_iso() -> str:
     return datetime.now(UTC).isoformat()
+
+
+def _normalize_auth_failure_path(path: str) -> str:
+    if path.startswith("/api/v1/thumbnails/"):
+        return "/api/v1/thumbnails/{sha256}"
+    return path
+
+
+def _should_audit_auth_failure(
+    request: Request,
+    *,
+    client_ip: str,
+    status_code: int,
+    detail: str,
+) -> bool:
+    now = monotonic()
+    rate_limit_state: dict[tuple[str, str, str, int, str], float] | None = getattr(
+        request.app.state,
+        "auth_failure_audit_rate_limit",
+        None,
+    )
+    if rate_limit_state is None:
+        rate_limit_state = {}
+        request.app.state.auth_failure_audit_rate_limit = rate_limit_state
+
+    if len(rate_limit_state) >= _AUTH_FAILURE_AUDIT_MAX_KEYS:
+        expired_keys = [
+            key
+            for key, last_seen in rate_limit_state.items()
+            if now - last_seen >= _AUTH_FAILURE_AUDIT_WINDOW_SECONDS
+        ]
+        for key in expired_keys:
+            rate_limit_state.pop(key, None)
+
+    key = (
+        client_ip,
+        request.method,
+        _normalize_auth_failure_path(str(request.url.path)),
+        status_code,
+        detail,
+    )
+    last_seen = rate_limit_state.get(key)
+    if last_seen is not None and now - last_seen < _AUTH_FAILURE_AUDIT_WINDOW_SECONDS:
+        return False
+
+    rate_limit_state[key] = now
+    return True
 
 
 def _write_auth_failure_audit(
@@ -32,6 +82,14 @@ def _write_auth_failure_audit(
         return
 
     client_ip = request.client.host if request.client else "unknown"
+    if not _should_audit_auth_failure(
+        request,
+        client_ip=client_ip,
+        status_code=status_code,
+        detail=detail,
+    ):
+        return
+
     details = json.dumps(
         {
             "path": str(request.url.path),

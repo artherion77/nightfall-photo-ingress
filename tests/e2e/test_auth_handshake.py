@@ -19,6 +19,10 @@ def _latest_auth_failure(audit_payload: dict) -> list[dict]:
     return [event for event in events if event.get("action") == "auth_failure"]
 
 
+def _auth_failure_count(conn: sqlite3.Connection) -> int:
+    return int(conn.execute("SELECT COUNT(*) FROM audit_log WHERE action = 'auth_failure'").fetchone()[0])
+
+
 def _make_inmemory_registry() -> sqlite3.Connection:
     conn = sqlite3.connect(":memory:", check_same_thread=False)
     conn.execute(
@@ -71,6 +75,13 @@ def _build_local_auth_client(app_config: AppConfig) -> TestClient:
     @app.get("/api/v1/health")
     async def _health(_: str = Depends(verify_api_token)) -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.get("/api/v1/thumbnails/{sha256}")
+    async def _thumbnail(
+        sha256: str,
+        _: str = Depends(verify_api_token),
+    ) -> dict[str, str]:
+        return {"sha256": sha256}
 
     return TestClient(app)
 
@@ -159,3 +170,47 @@ def test_case_5_missing_web_section_returns_401_deterministic_fixture(
     )
     assert response.status_code == 401
     assert response.json().get("detail") == "API token not configured"
+
+
+def test_case_6_repeated_identical_auth_failures_are_rate_limited(
+    tmp_path: Path,
+    template_path: Path,
+) -> None:
+    """Case 6: identical auth failures should not create unbounded duplicate audit rows."""
+    app_config = _load_config_variant(
+        template_path,
+        tmp_path / "case6-rate-limit.conf",
+        include_web=True,
+        api_token_override="rate-limit-token",
+    )
+    client = _build_local_auth_client(app_config)
+    registry_conn = client.app.state.registry_conn
+
+    first = client.get("/api/v1/health")
+    second = client.get("/api/v1/health")
+
+    assert first.status_code == 401
+    assert second.status_code == 401
+    assert _auth_failure_count(registry_conn) == 1
+
+
+def test_case_7_thumbnail_auth_failures_are_bucketed_by_route_family(
+    tmp_path: Path,
+    template_path: Path,
+) -> None:
+    """Case 7: repeated thumbnail auth failures across different hashes should collapse into one audited failure per window."""
+    app_config = _load_config_variant(
+        template_path,
+        tmp_path / "case7-thumbnail-rate-limit.conf",
+        include_web=True,
+        api_token_override="thumbnail-rate-limit-token",
+    )
+    client = _build_local_auth_client(app_config)
+    registry_conn = client.app.state.registry_conn
+
+    first = client.get("/api/v1/thumbnails/abc123")
+    second = client.get("/api/v1/thumbnails/def456")
+
+    assert first.status_code == 401
+    assert second.status_code == 401
+    assert _auth_failure_count(registry_conn) == 1
