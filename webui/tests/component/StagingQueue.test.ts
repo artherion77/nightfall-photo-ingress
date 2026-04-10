@@ -209,4 +209,54 @@ describe('stagingQueue full refresh behavior', () => {
     expect(state.activeIndex).toBe(0);
     expect(state.items.map((item: { sha256: string }) => item.sha256)).toEqual(['x', 'y']);
   });
+
+  it('does not toggle loading true during background full refresh when items already exist', async () => {
+    stagingQueue.hydrate([
+      { sha256: 'a', filename: 'a.jpg' },
+      { sha256: 'b', filename: 'b.jpg' },
+    ]);
+
+    fetchMock.mockResolvedValue(
+      jsonResponse({
+        items: [
+          { sha256: 'a', filename: 'a.jpg' },
+          { sha256: 'b', filename: 'b.jpg' },
+        ],
+        total: 2,
+        cursor: null,
+      }),
+    );
+
+    const loadingStates: boolean[] = [];
+    const unsubscribe = stagingQueue.subscribe((state: { loading: boolean }) => {
+      loadingStates.push(state.loading);
+    });
+
+    await stagingQueue.loadPage();
+    unsubscribe();
+
+    expect(loadingStates.includes(true)).toBe(false);
+    expect(readState(stagingQueue).loading).toBe(false);
+  });
+
+  it('sets loading true for initial load when queue is empty', async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({
+        items: [{ sha256: 'x', filename: 'x.jpg' }],
+        total: 1,
+        cursor: null,
+      }),
+    );
+
+    const loadingStates: boolean[] = [];
+    const unsubscribe = stagingQueue.subscribe((state: { loading: boolean }) => {
+      loadingStates.push(state.loading);
+    });
+
+    await stagingQueue.loadPage();
+    unsubscribe();
+
+    expect(loadingStates.includes(true)).toBe(true);
+    expect(readState(stagingQueue).loading).toBe(false);
+  });
 });

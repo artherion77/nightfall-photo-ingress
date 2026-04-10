@@ -45,7 +45,14 @@ function mergeItemsByIdentity(currentItems, serverItems) {
 }
 
 async function loadPage(cursor = null, limit = DEFAULT_PAGE_LIMIT) {
-  update((state) => ({ ...state, loading: true, error: null }));
+  update((state) => {
+    const shouldShowLoading = Boolean(cursor) || state.items.length === 0;
+    return {
+      ...state,
+      loading: shouldShowLoading,
+      error: null,
+    };
+  });
   try {
     const page = await getStagingPage(cursor, limit);
     update((state) => {
