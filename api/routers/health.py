@@ -24,16 +24,23 @@ async def get_health(
     """Get current health status."""
     return HealthService.get_health(
         poll_interval_minutes=app_config.core.poll_interval_minutes,
+        poll_lock_path=app_config.core.registry_path.with_suffix(".poll.lock"),
     )
 
 
 @router.post("/poll/trigger", response_model=PollTriggerResponse, status_code=202)
 async def trigger_poll(
     _: str = Depends(verify_api_token),
+    app_config: AppConfig = Depends(get_app_config),
     config_path: str = Depends(get_config_path),
 ) -> PollTriggerResponse:
     """Trigger an immediate poll cycle in the background."""
-    if get_poller_status() == "in_progress":
+    if (
+        get_poller_status(
+            lock_path=app_config.core.registry_path.with_suffix(".poll.lock"),
+        )
+        == "in_progress"
+    ):
         raise HTTPException(status_code=409, detail="Poll already in progress")
     subprocess.Popen(
         [sys.executable, "-m", "nightfall_photo_ingress", "poll",

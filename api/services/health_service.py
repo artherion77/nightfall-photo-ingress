@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import errno
+import fcntl
 import json
 import subprocess
 from datetime import UTC, datetime
+from pathlib import Path
 
 from api.schemas import HealthResponse, ServiceStatus
 from nightfall_photo_ingress.status import STATUS_FILE_PATH
@@ -51,10 +54,31 @@ def _get_timer_next_elapse_iso() -> str | None:
         return None
 
 
-def get_poller_status() -> str:
-    """Determine poller operational status from systemd; never raises."""
+def _is_poll_lock_held(lock_path: Path | None) -> bool:
+    """Return True when the global poll lock is currently held by another process."""
+    if lock_path is None:
+        return False
+    try:
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        with lock_path.open("a+", encoding="utf-8") as handle:
+            try:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError as exc:
+                if exc.errno in {errno.EACCES, errno.EAGAIN}:
+                    return True
+                return False
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            return False
+    except Exception:
+        return False
+
+
+def get_poller_status(*, lock_path: Path | None = None) -> str:
+    """Determine poller operational status from systemd and poll lock state; never raises."""
     svc = _systemctl_is_active(_SERVICE_UNIT)
     if svc == "active":
+        return "in_progress"
+    if _is_poll_lock_held(lock_path):
         return "in_progress"
     timer = _systemctl_is_active(_TIMER_UNIT)
     if timer == "active":
@@ -68,7 +92,11 @@ class HealthService:
     """Provides health status information."""
 
     @staticmethod
-    def get_health(*, poll_interval_minutes: int = 0) -> HealthResponse:
+    def get_health(
+        *,
+        poll_interval_minutes: int = 0,
+        poll_lock_path: Path | None = None,
+    ) -> HealthResponse:
         """Read health snapshot from status file and systemd state."""
 
         try:
@@ -82,7 +110,7 @@ class HealthService:
                 raw_ts = status_data.get("updated_at")
                 last_poll_at = raw_ts if isinstance(raw_ts, str) and raw_ts else None
 
-            poller_status = get_poller_status()
+            poller_status = get_poller_status(lock_path=poll_lock_path)
             next_poll_at = _get_timer_next_elapse_iso()
 
             return HealthResponse(
