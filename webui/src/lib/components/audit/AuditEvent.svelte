@@ -14,31 +14,33 @@
 </script>
 
 <li class="event" data-testid="audit-event">
-  <div class="message">{event.description || event.action}</div>
-  <div class="meta">
-    {#if event.filename}
-      <span class="filename">{event.filename}</span>
-    {:else}
-      <span class="filename filename--muted">filename unavailable</span>
-    {/if}
-    <span class="sep">|</span>
-    <span class="account">{event.account_name ?? 'account unavailable'}</span>
-    <span class="sep">|</span>
-    <span class="action-code">{event.action}</span>
-    <span class="sep">|</span>
-    <span class="sha">{shortSha(event.sha256)}</span>
-    <span class="sep">|</span>
-    <span class="actor">{event.actor ?? 'api'}</span>
-    <span class="sep">|</span>
-    <time>{event.ts}</time>
-  </div>
+  <span class="message">{event.description || event.action}</span>
+  <span class="sep">|</span>
+  {#if event.filename}
+    <span class="filename">{event.filename}</span>
+  {:else}
+    <span class="filename filename--muted">filename unavailable</span>
+  {/if}
+  <span class="sep">|</span>
+  <span class="account">{event.account_name ?? 'account unavailable'}</span>
+  <span class="sep">|</span>
+  <span class="action-code">{event.action}</span>
+  <span class="sep">|</span>
+  <span class="sha">{shortSha(event.sha256)}</span>
+  <span class="sep">|</span>
+  <span class="actor">{event.actor ?? 'api'}</span>
+  <span class="sep">|</span>
+  <time>{event.ts}</time>
 </li>
 
 <style>
   .event {
     display: flex;
-    flex-direction: column;
-    gap: var(--space-1);
+    align-items: center;
+    gap: var(--space-2);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
     padding: var(--space-2) 0;
     border-bottom: 1px solid var(--border-subtle);
     font-size: var(--text-sm);
@@ -47,13 +49,9 @@
   .message {
     color: var(--text-primary);
     font-weight: var(--text-md-weight);
-  }
-
-  .meta {
-    color: var(--text-secondary);
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
   }
 
   .filename {
@@ -74,5 +72,6 @@
   .actor,
   time {
     color: var(--text-secondary);
+    flex: 0 0 auto;
   }
 </style>

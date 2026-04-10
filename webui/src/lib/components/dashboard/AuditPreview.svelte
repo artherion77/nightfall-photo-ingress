@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AuditEventItem from '$lib/components/audit/AuditEvent.svelte';
   import type { AuditEvent as EventItem } from '$lib/api/audit';
 
   interface Props {
@@ -19,11 +20,7 @@
   {:else}
     <ul>
       {#each events as event}
-        <li>
-          <strong>{event.action}</strong>
-          <span>{event.sha256 ? event.sha256.slice(0, 12) : 'n/a'}</span>
-          <time>{event.ts}</time>
-        </li>
+        <AuditEventItem {event} />
       {/each}
     </ul>
   {/if}
@@ -50,13 +47,5 @@
     list-style: none;
     display: flex;
     flex-direction: column;
-    gap: var(--space-2);
-  }
-
-  li {
-    display: grid;
-    grid-template-columns: 120px 1fr auto;
-    gap: var(--space-3);
-    font-size: var(--text-sm);
   }
 </style>
