@@ -2,6 +2,7 @@
   import { onDestroy } from 'svelte';
   import EmptyState from '$lib/components/common/EmptyState.svelte';
   import PhotoCard from './PhotoCard.svelte';
+  import { thumbnailSrc } from './photocard-image';
   import {
     clampIndex,
     computeWheelStep,
@@ -20,8 +21,6 @@
   } from './photowheel-momentum';
   import {
     getPreloadIndexes,
-    getRenderWindow,
-    getWindowSlotCounts,
     PRELOAD_RADIUS,
     RENDER_RADIUS,
     shouldRunIdlePreload,
@@ -32,6 +31,8 @@
     filename: string;
     account?: string;
     first_seen_at?: string;
+    size_bytes?: number;
+    onedrive_id?: string;
   }
 
   interface Props {
@@ -41,9 +42,13 @@
     onAccept?: () => void;
     onReject?: () => void;
     onDefer?: () => void;
+    onDragStateChange?: (dragging: boolean) => void;
+    onOpenDetails?: () => void;
+    actionsDisabled?: boolean;
   }
 
-  let { items, activeIndex = 0, onSelect, onAccept, onReject, onDefer }: Props = $props();
+  let { items, activeIndex = 0, onSelect, onAccept, onReject, onDefer, onDragStateChange, onOpenDetails, actionsDisabled = false }: Props = $props();
+  const SLOT_COUNT = 2 * RENDER_RADIUS + 1;
 
   let wheelAccumulator = 0;
   let lastWheelTs = 0;
@@ -57,9 +62,45 @@
   let momentumActiveIndex: number | null = null;
   let transitionTimer: ReturnType<typeof setTimeout> | null = null;
   let preloadedImages: HTMLImageElement[] = [];
+  let dragging = $state(false);
 
   const TRANSITION_SETTLE_MS = 220;
 
+    // Phase 2: directional content-entrance animation.
+    // When activeIndex changes, the center slot receives a transient translateX
+    // offset in the direction the new content enters from.  The CSS transition
+    // (350ms) then animates it back to the stable Phase 1 centre position.
+      let prevActiveIndexForAnim: number | null = null;
+
+      // centerSlotEl is bound to the center-slot div via bind:this so that the
+      // Web Animations API can drive the entrance animation directly on the element
+      // without going through Svelte's CSS-transition path (which requires the
+      // browser to see two distinct paint states — not guaranteed when both the
+      // +offsetX and the 0px assignments happen inside the same task).
+        let centerSlotEl: HTMLDivElement | null = $state(null);
+
+      $effect(() => {
+        const curr = activeIndex;
+        if (prevActiveIndexForAnim !== null && curr !== prevActiveIndexForAnim && centerSlotEl) {
+          const dir: 1 | -1 = curr > prevActiveIndexForAnim ? 1 : -1;
+          const offsetX = dir * 60;
+          // dir > 0 → navigate right → new content enters from the right (+X).
+          // dir < 0 → navigate left  → new content enters from the left  (−X).
+          centerSlotEl.animate(
+            [
+              {
+                transform: `translateX(-50%) translateY(-50%) translateX(${offsetX}px) translateZ(60px) rotateY(0deg) scale(1.0)`,
+              },
+              {
+                transform:
+                  'translateX(-50%) translateY(-50%) translateX(0px) translateZ(60px) rotateY(0deg) scale(1.0)',
+              },
+            ],
+              { duration: 200, easing: 'cubic-bezier(0.2, 0, 0, 1)', fill: 'none' },
+          );
+        }
+        prevActiveIndexForAnim = curr;
+      });
   function clearTransitionTimer(): void {
     if (!transitionTimer) return;
     clearTimeout(transitionTimer);
@@ -152,6 +193,11 @@
   }
 
   function handleKeydown(event: KeyboardEvent): void {
+    if (dragging) {
+      event.preventDefault();
+      return;
+    }
+
     cancelMotionOnNewInput();
 
     if (event.key === 'ArrowLeft') {
@@ -195,6 +241,11 @@
   }
 
   function handleWheel(event: WheelEvent): void {
+    if (dragging) {
+      event.preventDefault();
+      return;
+    }
+
     cancelMotionOnNewInput();
 
     if (items.length === 0) {
@@ -224,6 +275,10 @@
   }
 
   function handleTouchStart(event: TouchEvent): void {
+    if (dragging) {
+      return;
+    }
+
     cancelMotionOnNewInput();
 
     const touch = event.touches[0];
@@ -270,6 +325,10 @@
   }
 
   function handleSlotClick(index: number): void {
+    if (dragging) {
+      return;
+    }
+
     cancelMotionOnNewInput();
     const next = clampIndex(index, items.length);
     if (next !== activeIndex) {
@@ -280,7 +339,37 @@
     }
   }
 
+  function handleDragStart(event: DragEvent, itemIndex: number): void {
+    const item = items[itemIndex];
+    if (!item) {
+      event.preventDefault();
+      return;
+    }
+
+    cancelMotion();
+    interactionState = 'IDLE';
+    const transfer = event.dataTransfer;
+    if (!transfer) {
+      event.preventDefault();
+      return;
+    }
+
+    transfer.effectAllowed = 'move';
+    transfer.setData('text/plain', item.sha256);
+    transfer.setData('application/x-nightfall-sha256', item.sha256);
+    dragging = true;
+    onDragStateChange?.(true);
+  }
+
+  function handleDragEnd(): void {
+    dragging = false;
+    onDragStateChange?.(false);
+  }
+
   onDestroy(() => {
+    if (dragging) {
+      onDragStateChange?.(false);
+    }
     cancelMotion();
     for (const img of preloadedImages) {
       img.src = '';
@@ -308,7 +397,7 @@
     preloadedImages = indexes.map((index) => {
       const img = new Image();
       img.decoding = 'async';
-      img.src = `/api/v1/thumbnails/${items[index]?.sha256 ?? ''}`;
+      img.src = thumbnailSrc(items[index]?.sha256 ?? '');
       return img;
     });
 
@@ -320,25 +409,33 @@
     };
   });
 
-  function slotStyle(index: number): string {
-    const dist = Math.abs(index - activeIndex);
+  function slotStyle(slotPos: number): string {
+    const delta = slotPos - RENDER_RADIUS;
+    const dist = Math.abs(delta);
+    const direction = delta < 0 ? 1 : delta > 0 ? -1 : 0;
+    const left = delta === 0 ? '50%' : `calc(50% + (${delta} * var(--slot-offset)))`;
+    const rotationDeg = dist === 0 ? 0 : dist === 1 ? 15 : 30;
+    const overlapTranslatePx = dist === 0 ? 0 : dist === 1 ? 48 : 64;
     if (dist === 0) {
       return [
-        'transform: translateZ(60px)',
+        `left: ${left}`,
+          'transform: translateX(-50%) translateY(-50%) translateZ(60px) rotateY(0deg) scale(1.0)',
         'opacity: 1',
         `filter: blur(var(--wheel-blur-center))`,
         'z-index: 10',
       ].join('; ') + ';';
     } else if (dist === 1) {
       return [
-        'transform: translateZ(-20px) scale(0.78)',
+        `left: ${left}`,
+        `transform: translateX(-50%) translateY(-50%) translateX(${direction * overlapTranslatePx}px) translateZ(-20px) rotateY(${direction * rotationDeg}deg) scale(0.78)`,
         'opacity: 0.7',
         `filter: blur(var(--wheel-blur-near))`,
         'z-index: 5',
       ].join('; ') + ';';
     } else {
       return [
-        'transform: translateZ(-80px) scale(0.60)',
+        `left: ${left}`,
+        `transform: translateX(-50%) translateY(-50%) translateX(${direction * overlapTranslatePx}px) translateZ(-80px) rotateY(${direction * rotationDeg}deg) scale(0.60)`,
         'opacity: 0.4',
         `filter: blur(var(--wheel-blur-far))`,
         'z-index: 2',
@@ -371,44 +468,38 @@
   {#if items.length === 0}
     <EmptyState message="No pending items in staging queue." />
   {:else}
-    {@const window = getRenderWindow(activeIndex, items.length, RENDER_RADIUS)}
-    {@const slotCounts = getWindowSlotCounts(window, items.length)}
-    <div class="track">
-      {#if slotCounts.left > 0}
-        <div
-          class="spacer"
-          aria-hidden="true"
-          style={`--slot-count: ${slotCounts.left}`}
-        ></div>
-      {/if}
-
-      {#each items.slice(window.start, window.end + 1) as item, localIndex (item.sha256)}
-        {@const index = window.start + localIndex}
-        <div
-          class="slot"
-          class:is-active={index === activeIndex}
-          style={slotStyle(index)}
-          role="button"
-          tabindex="0"
-          onclick={() => handleSlotClick(index)}
-          onkeydown={(event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-              event.preventDefault();
-              handleSlotClick(index);
-            }
-          }}
-        >
-          <PhotoCard item={item} active={index === activeIndex} />
-        </div>
+    <div class="stage">
+      {#each Array.from({ length: SLOT_COUNT }, (_, i) => i) as slotPos (slotPos)}
+        {@const itemIndex = activeIndex - RENDER_RADIUS + slotPos}
+        {#if itemIndex >= 0 && itemIndex < items.length}
+          {#if slotPos === RENDER_RADIUS}
+            <div
+              class="slot is-active"
+              class:is-dragging={dragging}
+              style={slotStyle(slotPos)}
+                bind:this={centerSlotEl}
+              role="button"
+              tabindex={0}
+              draggable="true"
+              onclick={() => handleSlotClick(itemIndex)}
+              ondragstart={(event) => handleDragStart(event, itemIndex)}
+              ondragend={handleDragEnd}
+              onkeydown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  handleSlotClick(itemIndex);
+                }
+              }}
+            >
+              <PhotoCard item={items[itemIndex]} active={true} onOpenDetails={onOpenDetails} onAccept={onAccept} onReject={onReject} actionsDisabled={actionsDisabled} />
+            </div>
+          {:else}
+            <div class="slot" style={slotStyle(slotPos)} aria-hidden="true">
+              <PhotoCard item={items[itemIndex]} active={false} />
+            </div>
+          {/if}
+        {/if}
       {/each}
-
-      {#if slotCounts.right > 0}
-        <div
-          class="spacer"
-          aria-hidden="true"
-          style={`--slot-count: ${slotCounts.right}`}
-        ></div>
-      {/if}
     </div>
   {/if}
 </section>
@@ -419,20 +510,31 @@
     border-radius: var(--radius-md);
     padding: var(--space-4);
     background: var(--surface-card);
-    overflow-x: auto;
-    perspective: 600px;
+    overflow-x: hidden;
+    overflow-y: hidden;
+    perspective: 860px;
+    overscroll-behavior: contain;
+    height: 100%;
+    box-sizing: border-box;
   }
 
-  .track {
-    display: flex;
-    gap: var(--space-4);
-    align-items: center;
-    justify-content: center;
-    padding-block: var(--space-8);
+  .stage {
+    position: relative;
+    width: 100%;
+    overflow: visible;
+    --slot-width: clamp(280px, 38vw, min(480px, 50vw));
+    --slot-gap: var(--space-2);
+    --slot-offset: calc(var(--slot-width) * 0.86 + var(--slot-gap));
+    height: 100%;
+    box-sizing: border-box;
+    padding-block: var(--space-5);
   }
 
   .slot {
-    flex-shrink: 0;
+    position: absolute;
+    top: 50%;
+    width: var(--slot-width);
+    transform-origin: center center;
     cursor: pointer;
     transition:
       transform var(--duration-slow) var(--easing-default),
@@ -440,12 +542,11 @@
       filter var(--duration-slow) var(--easing-default);
   }
 
-  .spacer {
-    flex: 0 0 calc(var(--slot-count) * (220px + var(--space-4)));
+  .slot.is-active {
+    border-radius: var(--radius-md);
   }
 
-  .slot.is-active {
-    outline: 1px solid var(--action-primary);
-    border-radius: var(--radius-md);
+  .slot.is-active.is-dragging {
+    opacity: 0.5 !important;
   }
 </style>

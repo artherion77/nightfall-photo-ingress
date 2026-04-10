@@ -1,7 +1,9 @@
+import { PUBLIC_API_TOKEN } from '$env/static/public';
+
 export type ImageState = 'loading' | 'loaded' | 'error';
 
 export function thumbnailSrc(sha256: string): string {
-  return `/api/v1/thumbnails/${sha256}`;
+  return `/api/v1/thumbnails/${sha256}?token=${encodeURIComponent(PUBLIC_API_TOKEN)}`;
 }
 
 export function isImageFilename(filename: string): boolean {

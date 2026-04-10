@@ -48,4 +48,40 @@ describe('photowheel windowing helpers', () => {
     expect(shouldRunIdlePreload('MOMENTUM')).toBe(false);
     expect(shouldRunIdlePreload('TRANSITIONING')).toBe(false);
   });
+
+  it('renders single item with no spacers', () => {
+    const window = getRenderWindow(0, 1);
+    const counts = getWindowSlotCounts(window, 1);
+
+    expect(counts.visible).toBe(1);
+    expect(counts.left).toBe(0);
+    expect(counts.right).toBe(0);
+  });
+
+  it('renders all items with no spacers when itemCount < RENDER_RADIUS', () => {
+    const window = getRenderWindow(1, 3);
+    const counts = getWindowSlotCounts(window, 3);
+
+    expect(counts.visible).toBe(3);
+    expect(counts.left).toBe(0);
+    expect(counts.right).toBe(0);
+  });
+
+  it('returns empty window and zero slots for empty list', () => {
+    const window = getRenderWindow(0, 0);
+    const counts = getWindowSlotCounts(window, 0);
+
+    expect(counts.visible).toBe(0);
+    expect(counts.left).toBe(0);
+    expect(counts.right).toBe(0);
+  });
+
+  it('returns no preload indexes for empty list', () => {
+    expect(getPreloadIndexes(0, 0, PRELOAD_RADIUS)).toEqual([]);
+  });
+
+  it('returns only available neighbors when itemCount < PRELOAD_RADIUS', () => {
+    // 2 items: only index 1 is a neighbor of index 0
+    expect(getPreloadIndexes(0, 2, PRELOAD_RADIUS)).toEqual([1]);
+  });
 });

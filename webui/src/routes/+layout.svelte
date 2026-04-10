@@ -34,5 +34,6 @@
 
   main {
     padding: var(--space-5);
+    min-height: 0;
   }
 </style>

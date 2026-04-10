@@ -141,6 +141,22 @@ async def verify_api_token(
     """
     
     if not credentials:
+        query_token = request.query_params.get("token")
+        if query_token is not None:
+            if not app_config.web.api_token:
+                _raise_auth_error(
+                    request,
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="API token not configured",
+                )
+            if hmac.compare_digest(query_token, app_config.web.api_token):
+                return query_token
+            _raise_auth_error(
+                request,
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token",
+            )
+
         _raise_auth_error(
             request,
             status_code=status.HTTP_401_UNAUTHORIZED,

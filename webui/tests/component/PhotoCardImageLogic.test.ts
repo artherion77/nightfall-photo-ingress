@@ -14,7 +14,7 @@ import {
 
 describe('PhotoCard image logic', () => {
   it('builds thumbnail API src from sha256', () => {
-    expect(thumbnailSrc('abc123')).toBe('/api/v1/thumbnails/abc123');
+    expect(thumbnailSrc('abc123')).toBe('/api/v1/thumbnails/abc123?token=inspect-chunk3-token');
   });
 
   it('detects image and video filenames', () => {
@@ -27,7 +27,9 @@ describe('PhotoCard image logic', () => {
   it('maps fallback labels by file type', () => {
     expect(fallbackLabel('frame.jpg')).toBe('IMAGE ERROR');
     expect(fallbackLabel('movie.mov')).toBe('VIDEO FILE');
+    expect(fallbackLabel('CLIP.MOV')).toBe('VIDEO FILE');
     expect(fallbackLabel('notes.pdf')).toBe('DOCUMENT FILE');
+    expect(fallbackLabel('archive.bin')).toBe('DOCUMENT FILE');
   });
 
   it('exposes deterministic state transitions for load and error', () => {

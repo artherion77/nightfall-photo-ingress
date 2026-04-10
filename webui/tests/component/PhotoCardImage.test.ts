@@ -12,7 +12,7 @@ import {
 
 describe('PhotoCard image contract', () => {
   it('uses thumbnail endpoint src format', () => {
-    expect(thumbnailSrc('abc123')).toBe('/api/v1/thumbnails/abc123');
+    expect(thumbnailSrc('abc123')).toBe('/api/v1/thumbnails/abc123?token=inspect-chunk3-token');
   });
 
   it('has deterministic loading and fallback visibility states', () => {

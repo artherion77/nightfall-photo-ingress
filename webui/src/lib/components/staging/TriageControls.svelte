@@ -7,11 +7,13 @@
   interface Props {
     disabled?: boolean;
     mode?: ControlMode;
+    dragActive?: boolean;
     onAccept?: (idempotencyKey: string) => void;
     onReject?: (idempotencyKey: string) => void;
   }
 
-  let { disabled = false, mode = 'both', onAccept, onReject }: Props = $props();
+  let { disabled = false, mode = 'both', dragActive = false, onAccept, onReject }: Props = $props();
+  let dragOverTarget = $state<'accept' | 'reject' | null>(null);
 
   function acceptWithKey() {
     onAccept?.(generateIdempotencyKey());
@@ -19,6 +21,50 @@
 
   function rejectWithKey() {
     onReject?.(generateIdempotencyKey());
+  }
+
+  function extractedSha(event: DragEvent): string {
+    const transfer = event.dataTransfer;
+    if (!transfer) return '';
+    return transfer.getData('application/x-nightfall-sha256') || transfer.getData('text/plain') || '';
+  }
+
+  function handleDragOver(event: DragEvent, target: 'accept' | 'reject'): void {
+    if (!dragActive || disabled) {
+      return;
+    }
+
+    if (!extractedSha(event)) {
+      return;
+    }
+
+    event.preventDefault();
+    dragOverTarget = target;
+  }
+
+  function handleDragLeave(target: 'accept' | 'reject'): void {
+    if (dragOverTarget === target) {
+      dragOverTarget = null;
+    }
+  }
+
+  function handleDrop(event: DragEvent, target: 'accept' | 'reject'): void {
+    if (!dragActive || disabled) {
+      return;
+    }
+
+    event.preventDefault();
+    const sha = extractedSha(event);
+    dragOverTarget = null;
+    if (!sha) {
+      return;
+    }
+
+    if (target === 'accept') {
+      acceptWithKey();
+      return;
+    }
+    rejectWithKey();
   }
 </script>
 
@@ -37,8 +83,36 @@
 
   {#if mode === 'cta' || mode === 'both'}
     <div class="cta-controls" data-testid="triage-cta-controls">
-      <ActionButton variant="accept" label="Accept Selected" {disabled} onclick={acceptWithKey} />
-      <ActionButton variant="reject" label="Reject Selected" {disabled} onclick={rejectWithKey} />
+      <button
+        type="button"
+        class="cta-button cta-accept"
+        class:is-drag-over={dragOverTarget === 'accept'}
+        data-testid="triage-cta-accept"
+        aria-label="Accept"
+        {disabled}
+        onclick={acceptWithKey}
+        ondragover={(event) => handleDragOver(event, 'accept')}
+        ondragleave={() => handleDragLeave('accept')}
+        ondrop={(event) => handleDrop(event, 'accept')}
+      >
+        <span class="cta-icon" aria-hidden="true">&#9995;&#65038;</span>
+        <span class="cta-label">Accept</span>
+      </button>
+      <button
+        type="button"
+        class="cta-button cta-reject"
+        class:is-drag-over={dragOverTarget === 'reject'}
+        data-testid="triage-cta-reject"
+        aria-label="Reject"
+        {disabled}
+        onclick={rejectWithKey}
+        ondragover={(event) => handleDragOver(event, 'reject')}
+        ondragleave={() => handleDragLeave('reject')}
+        ondrop={(event) => handleDrop(event, 'reject')}
+      >
+        <span class="cta-icon" aria-hidden="true">&#9995;&#65038;</span>
+        <span class="cta-label">Reject</span>
+      </button>
     </div>
   {/if}
 
@@ -74,6 +148,84 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: var(--space-3);
+  }
+
+  .cta-button {
+    min-height: 64px;
+    border-radius: var(--radius-md);
+    border: 2px solid transparent;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    cursor: pointer;
+    transition:
+      box-shadow var(--duration-default) var(--easing-default),
+      border-color var(--duration-default) var(--easing-default),
+      transform var(--duration-default) var(--easing-default),
+      background-color var(--duration-default) var(--easing-default);
+  }
+
+  .cta-label {
+    font-size: var(--text-xl);
+    font-weight: var(--text-md-weight);
+  }
+
+  .cta-icon {
+    font-size: var(--text-xl);
+    line-height: 1;
+    display: inline-block;
+    color: inherit;
+  }
+
+  .cta-accept {
+    border-color: var(--border-accept);
+    background-color: color-mix(in srgb, var(--action-accept) 15%, var(--color-bg-900) 85%);
+    color: var(--border-accept);
+  }
+
+  .cta-accept:hover:not(:disabled) {
+    box-shadow: var(--shadow-accept-glow);
+    background-color: color-mix(in srgb, var(--action-accept) 20%, var(--color-bg-900) 80%);
+  }
+
+  .cta-accept:active:not(:disabled) {
+    box-shadow: var(--shadow-accept-glow);
+    transform: translateY(1px);
+    background-color: color-mix(in srgb, var(--action-accept) 25%, var(--color-bg-900) 75%);
+  }
+
+  .cta-accept.is-drag-over:not(:disabled) {
+    box-shadow: var(--shadow-accept-glow);
+    background-color: color-mix(in srgb, var(--action-accept) 20%, var(--color-bg-900) 80%);
+  }
+
+  .cta-reject {
+    border-color: var(--border-reject);
+    background-color: color-mix(in srgb, var(--action-reject) 15%, var(--color-bg-900) 85%);
+    color: var(--border-reject);
+  }
+
+  .cta-reject:hover:not(:disabled) {
+    box-shadow: var(--shadow-reject-glow);
+    background-color: color-mix(in srgb, var(--action-reject) 20%, var(--color-bg-900) 80%);
+  }
+
+  .cta-reject:active:not(:disabled) {
+    box-shadow: var(--shadow-reject-glow);
+    transform: translateY(1px);
+    background-color: color-mix(in srgb, var(--action-reject) 20%, var(--color-bg-900) 80%);
+  }
+
+  .cta-reject.is-drag-over:not(:disabled) {
+    box-shadow: var(--shadow-reject-glow);
+    background-color: color-mix(in srgb, var(--action-reject) 20%, var(--color-bg-900) 80%);
+  }
+
+  .cta-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 
   .hint {
