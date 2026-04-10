@@ -12,7 +12,9 @@ class AuditEvent(BaseModel):
     sha256: str | None = None
     account_name: str | None = None
     action: str
+    description: str
     reason: str | None = None
+    filename: str | None = None
     details: dict | None = None
     actor: str
     ts: str

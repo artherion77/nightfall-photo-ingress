@@ -3,10 +3,12 @@ import { apiFetch } from './client';
 export interface AuditEvent {
   id: number;
   action: string;
+  description: string;
   ts: string;
   actor: string;
   sha256?: string | null;
   account_name?: string;
+  filename?: string | null;
   reason?: string;
   details?: Record<string, unknown>;
 }
