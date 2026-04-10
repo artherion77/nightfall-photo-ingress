@@ -257,6 +257,7 @@ for line in config_path.read_text(encoding='utf-8').splitlines():
 
     lxc exec "$CONTAINER" -- mkdir -p /etc/nightfall
     lxc file push "$tmp_conf" "$CONTAINER$CONF_DEST"
+    lxc exec "$CONTAINER" -- mkdir -p /var/lib/ingress/{staging,pending,accepted,rejected,trash,evidence,tokens,cursors,hashes}
     # Ensure runtime status path exists before starting hardened units.
     lxc exec "$CONTAINER" -- mkdir -p /run/nightfall-status.d
     # Ensure cache path exists for trash.service TemporaryFileSystem.

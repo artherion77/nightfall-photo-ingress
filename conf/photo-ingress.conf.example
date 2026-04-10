@@ -29,24 +29,23 @@ process_accounts_in_config_order = true
 account_worker_count = 1
 
 # ── Paths ────────────────────────────────────────────
-# staging_path: fast temporary storage (ideally on SSD) where files are
-#   downloaded and validated before being moved to the media pool.
-# registry_path: SQLite database that tracks every file ever processed.
-# staging_on_same_pool: set true if staging_path is on the same ZFS pool
-#   as the media paths below, so moves become atomic renames instead of copies.
-staging_path = /mnt/ssd/photo-ingress/staging
-registry_path = /mnt/ssd/photo-ingress/registry.db
-staging_on_same_pool = false
+# Canonical container runtime paths live under /var/lib/ingress.
+# Host-side storage can still be bind-mounted to these paths (for example in
+# staging, only evidence/log paths are host-mounted and queue/registry paths
+# remain container-internal).
+staging_path = /var/lib/ingress/staging
+registry_path = /var/lib/ingress/registry.db
+staging_on_same_pool = true
 
 # ── Output queue paths ───────────────────────────────
 # pending_path:  files awaiting the accept/reject pipeline consumer.
 # accepted_path: files approved by the pipeline consumer.
 # rejected_path: files the pipeline consumer decided to reject.
 # trash_path:    soft-delete destination (safe to prune periodically).
-pending_path = /nightfall/media/photo-ingress/pending
-accepted_path = /nightfall/media/photo-ingress/accepted
-rejected_path = /nightfall/media/photo-ingress/rejected
-trash_path = /nightfall/media/photo-ingress/trash
+pending_path = /var/lib/ingress/pending
+accepted_path = /var/lib/ingress/accepted
+rejected_path = /var/lib/ingress/rejected
+trash_path = /var/lib/ingress/trash
 
 # ── Storage templates ────────────────────────────────
 # Path template relative to pending_path / accepted_path for organising files.
@@ -102,7 +101,7 @@ live_photo_conflict_policy = nearest_capture_time
 # library so that files already present are skipped on first run.
 # sync_hash_import_glob: filename pattern that hash sidecar files match.
 sync_hash_import_enabled = true
-sync_hash_import_path = /nightfall/media/pictures
+sync_hash_import_path = /var/lib/ingress/hashes
 sync_hash_import_glob = .hashes.sha1
 
 # ── Advanced: staging integrity ──────────────────────
@@ -174,8 +173,8 @@ provider = onedrive
 authority = https://login.microsoftonline.com/consumers
 client_id = REPLACE_WITH_CLIENT_ID
 onedrive_root = /Camera Roll
-token_cache = /mnt/ssd/photo-ingress/tokens/christopher.json
-delta_cursor = /mnt/ssd/photo-ingress/cursors/christopher.cursor
+token_cache = /var/lib/ingress/tokens/christopher.json
+delta_cursor = /var/lib/ingress/cursors/christopher.cursor
 
 # Second account — disabled until onboarding is complete.
 # Copy-and-modify this block to add further devices.
@@ -186,8 +185,8 @@ provider = onedrive
 authority = https://login.microsoftonline.com/consumers
 client_id = REPLACE_WITH_CLIENT_ID
 onedrive_root = /Camera Roll
-token_cache = /mnt/ssd/photo-ingress/tokens/bob.json
-delta_cursor = /mnt/ssd/photo-ingress/cursors/bob.cursor
+token_cache = /var/lib/ingress/tokens/bob.json
+delta_cursor = /var/lib/ingress/cursors/bob.cursor
 
 
 # ─────────────────────────────────────────────────────
