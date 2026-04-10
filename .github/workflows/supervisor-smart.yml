@@ -1,0 +1,46 @@
+name: mAOF smart supervisor agent
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"   # alle 30 Minuten
+  workflow_dispatch:
+
+jobs:
+  supervisor-smart:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install GitHub Copilot CLI
+        run: npm install -g @github/copilot-cli
+
+      - name: Authenticate
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$GITHUB_TOKEN" | gh auth login --with-token
+
+      - name: Find stale or inconsistent issues
+        env:
+          REPO: ${{ github.repository }}
+        run: |
+          gh issue list \
+            --repo "$REPO" \
+            --state "open" \
+            --json number,labels,updatedAt \
+            --jq '.[] | select((now - (.updatedAt | fromdate)) > 7200) | .number' > stale.txt
+
+          if [ ! -s stale.txt ]; then
+            echo "No stale issues."
+            exit 0
+          fi
+
+      - name: Run Supervisor Agent on stale issues
+        run: |
+          while read ISSUE_NUMBER; do
+            echo DRY RUN: gh copilot run \
+              --agent "supervisor" \
+              --issue "$ISSUE_NUMBER" \
+              --prompt-file ".github/prompts/issue-supervisor-agent.txt"
+          done < stale.txt

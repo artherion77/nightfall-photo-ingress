@@ -268,3 +268,56 @@ Agents are encouraged to augment this list with troubleshooting items discovered
   - Verify task key exists in .mcp/model.json under mappings
 - Governor task unavailable:
   - Run ./dev/bin/govctl list and verify the target exists in dev/govctl-targets.yaml
+
+## mAOF – Modular Agent Orchestration Framework
+
+The repository uses a modular Agent Orchestration Framework (mAOF) to structure
+deterministic, auditable, multi‑agent workflows. mAOF defines a clear state
+machine, explicit label‑based transitions, and role separation between Analyst,
+Implementation Agent, optional Validator, and the human (or automated)
+Supervisor.
+
+mAOF is compatible with MCP, govctl JSON mode, and GitHub Actions. It supports
+human‑in‑the‑loop supervision and can be fully automated later.
+
+---
+
+### Goals
+
+- Deterministic, audit‑ready agent workflows  
+- Clear separation of responsibilities  
+- Zero‑drift, zero‑overreach execution  
+- Human supervision possible at every stage  
+- Optional second validation ring via GitHub Actions  
+- Full compatibility with MCP task surfaces (`govctl run … --json`)  
+
+---
+
+## mAOF State Machine
+
+The mAOF state machine defines the lifecycle of an issue as it moves through
+agent‑driven analysis, implementation, and optional validation.
+
+```mermaid
+stateDiagram-v2
+    [*] --> open
+
+    open --> analysis: supervisor / human sets\nagent:analysis
+    analysis --> analysis_done: analyst sets\nagent:analysis-done
+
+    analysis_done --> implement: supervisor / human sets\nagent:implement
+    analysis_done --> queued: supervisor / human sets\nagent:queued
+
+    queued --> implement: supervisor / human frees capacity\nagent:implement
+
+    implement --> closed: implementation agent\nRCA + Fix + Validation + Close\nsets agent:done
+
+    closed --> validation: optional supervisor / human\nsets agent:validate
+
+    validation --> done_validated: GH Actions E2E success\nsets agent:done_validated
+    validation --> validation_failed: GH Actions E2E fail\nsets agent:validation-failed
+
+    validation_failed --> validation_agent: validator agent\ninvestigate / fix / reopen
+
+    done_validated --> [*]
+    closed --> [*]

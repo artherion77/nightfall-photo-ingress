@@ -1,0 +1,45 @@
+name: mAOF validation agent
+
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  validate-issue:
+    if: contains(github.event.label.name, 'agent:validate')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install GitHub CLI
+        uses: cli/cli-action@v2
+
+      - name: Run staging E2E validation (staging.e2e.module1)
+        id: e2e
+        run: |
+          set -e
+          ./dev/bin/govctl run staging.e2e.module1 --json
+        continue-on-error: true
+
+      - name: Set label based on validation result
+        env:
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          EXIT_CODE=${{ steps.e2e.outcome == 'success' && '0' || '1' }}
+
+          if [ "$EXIT_CODE" -eq 0 ]; then
+            gh issue edit "$ISSUE_NUMBER" --repo "$REPO" \
+              --add-label "agent:done_validated" \
+              --remove-label "agent:validate"
+            gh issue comment "$ISSUE_NUMBER" --repo "$REPO" \
+              --body "mAOF Validation: staging.e2e.module1 succeeded. Marked as agent:done_validated."
+          else
+            gh issue edit "$ISSUE_NUMBER" --repo "$REPO" \
+              --add-label "agent:validation-failed" \
+              --remove-label "agent:validate"
+            gh issue comment "$ISSUE_NUMBER" --repo "$REPO" \
+              --body "mAOF Validation: staging.e2e.module1 failed. Marked as agent:validation-failed. Validator Agent may investigate."
+          fi

@@ -1,0 +1,55 @@
+name: mAOF light supervisor agent
+
+on:
+  issues:
+    types: [opened, labeled, unlabeled, reopened]
+
+jobs:
+  supervisor-light:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install GitHub CLI
+        uses: cli/cli-action@v2
+
+      - name: Evaluate mAOF state
+        env:
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          REPO: ${{ github.repository }}
+          MAX_PARALLEL_IMPLEMENT: 1
+        run: |
+          # Read labels
+          LABELS=$(gh issue view "$ISSUE_NUMBER" --repo "$REPO" --json labels --jq '.labels[].name')
+
+          # If issue is already done or validated → nothing to do
+          if echo "$LABELS" | grep -qE "agent:done|agent:done_validated"; then
+            echo "Issue already completed. No action."
+            exit 0
+          fi
+
+          # Count active implementers
+          ACTIVE=$(gh issue list \
+            --repo "$REPO" \
+            --label "agent:implement" \
+            --state "open" \
+            --json number \
+            --jq 'length')
+
+          echo "Active implementers: $ACTIVE"
+
+          # If issue is in implement but capacity is full → queue it
+          if echo "$LABELS" | grep -q "agent:implement"; then
+            if [ "$ACTIVE" -gt "$MAX_PARALLEL_IMPLEMENT" ]; then
+              gh issue edit "$ISSUE_NUMBER" --repo "$REPO" --add-label "agent:queued" --remove-label "agent:implement"
+              gh issue comment "$ISSUE_NUMBER" --repo "$REPO" --body "Supervisor-Light: Queued due to capacity limit."
+            fi
+            exit 0
+          fi
+
+          # If issue is queued and capacity is free → release it
+          if echo "$LABELS" | grep -q "agent:queued"; then
+            if [ "$ACTIVE" -lt "$MAX_PARALLEL_IMPLEMENT" ]; then
+              gh issue edit "$ISSUE_NUMBER" --repo "$REPO" --add-label "agent:implement" --remove-label "agent:queued"
+              gh issue comment "$ISSUE_NUMBER" --repo "$REPO" --body "Supervisor-Light: Released from queue."
+            fi
+          fi
