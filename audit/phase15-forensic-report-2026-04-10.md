@@ -205,13 +205,22 @@ The following commits exist ONLY on the orphaned `design` branch. None are ances
 - Working directory clean on `main` branch
 - All must-preserve changes verified present (Audit Fixes 2-4)
 
+### Step 0: Download the patch
+
+The patch is archived in GitHub Gist (attached to issue #28):
+https://gist.github.com/artherion77/a1fee835bac2e568bb9cb4e1f00416ae
+
+```bash
+gh gist view a1fee835bac2e568bb9cb4e1f00416ae --raw > /tmp/phase15-complete-patch.diff
+```
+
 ### Step 1: Apply the unified patch
 
 ```bash
 cd /home/chris/dev/nightfall-photo-ingress
 git checkout main
-git apply --check tmp/phase15-complete-patch.diff   # dry run
-git apply --index tmp/phase15-complete-patch.diff    # apply and stage
+git apply --check /tmp/phase15-complete-patch.diff   # dry run
+git apply --index /tmp/phase15-complete-patch.diff    # apply and stage
 ```
 
 **Conflict expectation: NONE.** Tested via `git apply --check` — applies cleanly.
@@ -276,7 +285,8 @@ git cherry-pick 4a343aa1 c6d9f903 0b9737ca 7b9d63bf d3cc94af dc561551 \
 
 ## I. Patch Bundle
 
-Saved to: `tmp/phase15-complete-patch.diff` (3013 lines, 21 files)
+Archived to GitHub Gist: https://gist.github.com/artherion77/a1fee835bac2e568bb9cb4e1f00416ae
+(attached to issue #28 — 3013 lines, 21 files)
 
 Generated via:
 ```bash
@@ -376,7 +386,7 @@ git diff 5947ffe0 28233ec5 -- 'webui/**' 'tests/e2e/**' 'api/auth.py'
   ],
   "patch_applies_cleanly": true,
   "patch_conflict_count": 0,
-  "patch_file": "tmp/phase15-complete-patch.diff",
+  "patch_file": "https://gist.github.com/artherion77/a1fee835bac2e568bb9cb4e1f00416ae",
   "patch_lines": 3013,
   "patch_files_count": 21,
   "affected_files": [
@@ -402,7 +412,7 @@ git diff 5947ffe0 28233ec5 -- 'webui/**' 'tests/e2e/**' 'api/auth.py'
     "webui/tests/e2e/photowheel.visual-invariants.spec.ts",
     "webui/tests/playwright-shim.d.ts"
   ],
-  "recovery_command": "git apply --index tmp/phase15-complete-patch.diff",
+  "recovery_command": "gh gist view a1fee835bac2e568bb9cb4e1f00416ae --raw > /tmp/phase15-complete-patch.diff && git apply --index /tmp/phase15-complete-patch.diff",
   "verification_commands": [
     "./dev/bin/govctl run test.web --json",
     "./dev/bin/govctl run staging.install --json",
