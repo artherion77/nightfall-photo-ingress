@@ -1,0 +1,54 @@
+name: mAOF implementation agent
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: maof-implement-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  run-implementation-agent:
+    if: github.event.action == 'labeled' && (github.event.label.name == 'agent:implement' || github.event.label.name == 'agent: implement')
+    runs-on: [self-hosted, Linux, X64, nightfall-photo-ingress, workspace]
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
+      ISSUE_NUMBER: ${{ github.event.issue.number }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install GitHub Copilot CLI
+        run: |
+          set -euo pipefail
+          npm install -g @github/copilot-cli
+
+      - name: Verify GitHub CLI authentication
+        run: |
+          set -euo pipefail
+          gh auth status
+
+      - name: Run Implementation Agent
+        run: |
+          set -euo pipefail
+          gh copilot run \
+            --agent "implementation" \
+            --issue $ISSUE_NUMBER \
+            --prompt-file ".github/prompts/issue-implementation-agent.txt"
+
+      - name: Mark Issue as done
+        if: success()
+        run: |
+          set -euo pipefail
+          gh issue edit "$ISSUE_NUMBER" --repo "$REPO" \
+            --add-label "agent:done" \
+            --remove-label "agent:implement" \
+            --remove-label "agent: implement"

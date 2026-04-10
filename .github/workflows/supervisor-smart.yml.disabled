@@ -5,26 +5,39 @@ on:
     - cron: "*/30 * * * *"   # alle 30 Minuten
   workflow_dispatch:
 
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: maof-supervisor-smart
+  cancel-in-progress: false
+
 jobs:
   supervisor-smart:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, nightfall-photo-ingress, workspace]
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Install GitHub Copilot CLI
-        run: npm install -g @github/copilot-cli
+        run: |
+          set -euo pipefail
+          npm install -g @github/copilot-cli
 
-      - name: Authenticate
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: echo "$GITHUB_TOKEN" | gh auth login --with-token
+      - name: Verify GitHub CLI authentication
+        run: |
+          set -euo pipefail
+          gh auth status
 
       - name: Find stale or inconsistent issues
-        env:
-          REPO: ${{ github.repository }}
         run: |
+          set -euo pipefail
           gh issue list \
             --repo "$REPO" \
             --state "open" \
@@ -38,6 +51,7 @@ jobs:
 
       - name: Run Supervisor Agent on stale issues
         run: |
+          set -euo pipefail
           while read ISSUE_NUMBER; do
             echo DRY RUN: gh copilot run \
               --agent "supervisor" \

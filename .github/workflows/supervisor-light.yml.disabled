@@ -4,9 +4,20 @@ on:
   issues:
     types: [opened, labeled, unlabeled, reopened]
 
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: maof-supervisor-light-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
 jobs:
   supervisor-light:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, nightfall-photo-ingress, workspace]
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - name: Install GitHub CLI
@@ -18,8 +29,9 @@ jobs:
           REPO: ${{ github.repository }}
           MAX_PARALLEL_IMPLEMENT: 1
         run: |
+          set -euo pipefail
           # Read labels
-          LABELS=$(gh issue view "$ISSUE_NUMBER" --repo "$REPO" --json labels --jq '.labels[].name')
+          LABELS=$(gh issue view "$ISSUE_NUMBER" --repo "$REPO" --json labels --jq '.labels[].name // empty')
 
           # If issue is already done or validated → nothing to do
           if echo "$LABELS" | grep -qE "agent:done|agent:done_validated"; then
@@ -35,12 +47,24 @@ jobs:
             --json number \
             --jq 'length')
 
+          ACTIVE_ALT=$(gh issue list \
+            --repo "$REPO" \
+            --label "agent: implement" \
+            --state "open" \
+            --json number \
+            --jq 'length')
+
+          ACTIVE=$((ACTIVE + ACTIVE_ALT))
+
           echo "Active implementers: $ACTIVE"
 
           # If issue is in implement but capacity is full → queue it
-          if echo "$LABELS" | grep -q "agent:implement"; then
+          if echo "$LABELS" | grep -qE "agent:implement|agent: implement"; then
             if [ "$ACTIVE" -gt "$MAX_PARALLEL_IMPLEMENT" ]; then
-              gh issue edit "$ISSUE_NUMBER" --repo "$REPO" --add-label "agent:queued" --remove-label "agent:implement"
+              gh issue edit "$ISSUE_NUMBER" --repo "$REPO" \
+                --add-label "agent:queued" \
+                --remove-label "agent:implement" \
+                --remove-label "agent: implement"
               gh issue comment "$ISSUE_NUMBER" --repo "$REPO" --body "Supervisor-Light: Queued due to capacity limit."
             fi
             exit 0
@@ -49,7 +73,9 @@ jobs:
           # If issue is queued and capacity is free → release it
           if echo "$LABELS" | grep -q "agent:queued"; then
             if [ "$ACTIVE" -lt "$MAX_PARALLEL_IMPLEMENT" ]; then
-              gh issue edit "$ISSUE_NUMBER" --repo "$REPO" --add-label "agent:implement" --remove-label "agent:queued"
+              gh issue edit "$ISSUE_NUMBER" --repo "$REPO" \
+                --add-label "agent:implement" \
+                --remove-label "agent:queued"
               gh issue comment "$ISSUE_NUMBER" --repo "$REPO" --body "Supervisor-Light: Released from queue."
             fi
           fi
