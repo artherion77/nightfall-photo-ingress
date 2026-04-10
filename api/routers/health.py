@@ -36,7 +36,7 @@ async def trigger_poll(
     if get_poller_status() == "in_progress":
         raise HTTPException(status_code=409, detail="Poll already in progress")
     subprocess.Popen(
-        [sys.executable, "-m", "nightfall_photo_ingress.cli", "poll",
+        [sys.executable, "-m", "nightfall_photo_ingress", "poll",
          "--path", config_path],
         close_fds=True,
         start_new_session=True,
