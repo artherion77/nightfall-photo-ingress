@@ -1,4 +1,4 @@
-# mAOF – Modular Agent Orchestration Framework
+# mAOF – modular Multi Agent Orchestration Framework
 
 The modular Agent Orchestration Framework (mAOF) defines a deterministic,
 auditable, label‑driven workflow for multi‑agent collaboration inside GitHub.
