@@ -102,7 +102,10 @@
         ondrop={(event) => handleDrop(event, 'accept')}
       >
         <span class="cta-icon" aria-hidden="true">&#9995;&#65038;</span>
-        <span class="cta-label">Accept</span>
+        <span class="cta-copy">
+          <span class="cta-label">Accept</span>
+          <span class="cta-sub">Drag &amp; Drop photos here</span>
+        </span>
       </button>
       <button
         type="button"
@@ -117,7 +120,10 @@
         ondrop={(event) => handleDrop(event, 'reject')}
       >
         <span class="cta-icon" aria-hidden="true">&#9995;&#65038;</span>
-        <span class="cta-label">Reject</span>
+        <span class="cta-copy">
+          <span class="cta-label">Reject</span>
+          <span class="cta-sub">Drag &amp; Drop photos here</span>
+        </span>
       </button>
     </div>
   {/if}
@@ -157,7 +163,7 @@
   }
 
   .cta-button {
-    min-height: 64px;
+    min-height: clamp(84px, 10vh, 96px);
     border-radius: var(--radius-md);
     border: 2px solid transparent;
     display: inline-flex;
@@ -173,9 +179,27 @@
       background-color var(--duration-default) var(--easing-default);
   }
 
+  .cta-copy {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    min-width: 0;
+  }
+
   .cta-label {
     font-size: var(--text-xl);
     font-weight: var(--text-md-weight);
+    line-height: 1.15;
+  }
+
+  .cta-sub {
+    font-size: var(--text-sm);
+    line-height: 1.2;
+    opacity: 0.85;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
   }
 
   .cta-icon {
@@ -183,6 +207,7 @@
     line-height: 1;
     display: inline-block;
     color: inherit;
+    flex: 0 0 auto;
   }
 
   .cta-accept {
