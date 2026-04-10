@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from datetime import UTC, datetime
 from pathlib import PurePosixPath
 
-from api.schemas import AuditEvent, AuditPage
+from api.schemas import AuditDailySummary, AuditEvent, AuditPage
 
 
 _ACTION_DESCRIPTIONS: dict[str, str] = {
@@ -106,6 +107,28 @@ class AuditService:
 
         next_cursor = str(events[-1].id) if has_more and events else None
         return AuditPage(events=events, cursor=next_cursor, has_more=has_more)
+
+    def get_daily_outcome_summary(self) -> AuditDailySummary:
+        """Return accepted/rejected outcome counts for the current UTC day."""
+
+        day_utc = datetime.now(UTC).date().isoformat()
+        row = self.conn.execute(
+            """
+            SELECT
+              SUM(CASE WHEN action IN ('accepted', 'triage_accept_applied') THEN 1 ELSE 0 END) AS accepted_today,
+              SUM(CASE WHEN action IN ('rejected', 'triage_reject_applied') THEN 1 ELSE 0 END) AS rejected_today
+            FROM audit_log
+            WHERE DATE(ts) = DATE('now')
+            """
+        ).fetchone()
+
+        accepted_today = int(row[0] or 0) if row else 0
+        rejected_today = int(row[1] or 0) if row else 0
+        return AuditDailySummary(
+            day_utc=day_utc,
+            accepted_today=accepted_today,
+            rejected_today=rejected_today,
+        )
 
     @staticmethod
     def _describe_action(action: str) -> str:

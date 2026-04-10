@@ -3,14 +3,15 @@
 	import HealthBar from '$lib/components/dashboard/HealthBar.svelte';
 	import KpiGrid from '$lib/components/dashboard/KpiGrid.svelte';
 	import PollRuntimeChart from '$lib/components/dashboard/PollRuntimeChart.svelte';
+	import type { AuditDailySummary, AuditPage } from '$lib/api/audit';
         import type { StagingPage } from '$lib/api/staging';
-        import type { AuditPage } from '$lib/api/audit';
         import type { HealthResponse } from '$lib/api/health';
         import type { EffectiveConfig } from '$lib/api/config';
 
         interface PageData {
                 staging?: StagingPage;
                 audit?: AuditPage;
+			auditSummary?: AuditDailySummary;
                 config?: EffectiveConfig;
                 health?: HealthResponse;
         }
@@ -19,8 +20,8 @@
 
 	let kpis = $derived({
 		pending_count: data.staging?.total ?? 0,
-		accepted_today: 0,
-		rejected_today: 0,
+		accepted_today: data.auditSummary?.accepted_today ?? 0,
+		rejected_today: data.auditSummary?.rejected_today ?? 0,
 		live_photo_pairs: 0,
 		last_poll_duration_s: 0
 	});

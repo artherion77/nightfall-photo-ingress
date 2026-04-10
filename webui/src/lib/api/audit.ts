@@ -19,6 +19,12 @@ export interface AuditPage {
   has_more: boolean;
 }
 
+export interface AuditDailySummary {
+  day_utc: string;
+  accepted_today: number;
+  rejected_today: number;
+}
+
 export function getAuditLog(cursor?: string | null, limit = 50, action?: string | null): Promise<AuditPage> {
   const params = new URLSearchParams();
   params.set('limit', String(limit));
@@ -29,4 +35,8 @@ export function getAuditLog(cursor?: string | null, limit = 50, action?: string 
     params.set('action', action);
   }
   return apiFetch<AuditPage>(`/api/v1/audit-log?${params.toString()}`);
+}
+
+export function getAuditDailySummary(): Promise<AuditDailySummary> {
+  return apiFetch<AuditDailySummary>('/api/v1/audit-log/daily-summary');
 }

@@ -1,6 +1,6 @@
 """Public schema exports for API modules."""
 
-from api.schemas.audit import AuditEvent, AuditPage
+from api.schemas.audit import AuditDailySummary, AuditEvent, AuditPage
 from api.schemas.blocklist import (
     BlockRule,
     BlockRuleCreate,
@@ -16,6 +16,7 @@ from api.schemas.triage import TriageRequest, TriageResponse
 
 __all__ = [
     "AuditEvent",
+    "AuditDailySummary",
     "AuditPage",
     "BlockRule",
     "BlockRuleCreate",

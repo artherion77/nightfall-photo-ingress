@@ -5,7 +5,7 @@ import sqlite3
 
 from api.dependencies import get_registry_connection
 from api.auth import verify_api_token
-from api.schemas import AuditPage
+from api.schemas import AuditDailySummary, AuditPage
 from api.services import AuditService
 
 router = APIRouter(prefix="/api/v1", tags=["audit"])
@@ -27,3 +27,14 @@ async def get_audit_log(
         after_cursor=after,
         action_filter=action,
     )
+
+
+@router.get("/audit/log/daily-summary", response_model=AuditDailySummary)
+@router.get("/audit-log/daily-summary", response_model=AuditDailySummary)
+async def get_audit_log_daily_summary(
+    _: str = Depends(verify_api_token),
+    conn: sqlite3.Connection = Depends(get_registry_connection),
+) -> AuditDailySummary:
+    """Get current-day accepted/rejected audit outcome counters."""
+    service = AuditService(conn)
+    return service.get_daily_outcome_summary()

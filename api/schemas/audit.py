@@ -26,3 +26,11 @@ class AuditPage(BaseModel):
     events: list[AuditEvent]
     cursor: str | None = None
     has_more: bool
+
+
+class AuditDailySummary(BaseModel):
+    """Current-day accepted/rejected outcome counts derived from audit events."""
+
+    day_utc: str
+    accepted_today: int
+    rejected_today: int
