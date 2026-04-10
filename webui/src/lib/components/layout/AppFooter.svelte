@@ -15,9 +15,13 @@
     | 'POLLED_TIMER_STOPPED'
     | 'POLLED_UNKNOWN';
 
+  function isPollBusy(): boolean {
+    return pollInProgress || pollLockActive || $health.poller_status === 'in_progress';
+  }
+
   function getMode(): FooterMode {
     if ($health.error) return 'HEALTH_UNAVAILABLE';
-    if (pollInProgress || $health.poller_status === 'in_progress') return 'POLL_IN_PROGRESS';
+    if (isPollBusy()) return 'POLL_IN_PROGRESS';
     if ($health.last_poll_at === undefined) return 'INITIALIZING';
     if ($health.last_poll_at === null) {
       return $health.poller_status === 'timer_running'
@@ -88,14 +92,28 @@
 
   // ----- Manual poll -----
 
+  const MANUAL_POLL_LOCK_MS = 1500;
+
   let pollInProgress = $state(false);
+  let pollLockActive = $state(false);
   let pollError = $state(false);
   let pollErrorTimer: ReturnType<typeof setTimeout> | null = null;
+  let pollLockTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function startPollLockout(): void {
+    pollLockActive = true;
+    if (pollLockTimer !== null) clearTimeout(pollLockTimer);
+    pollLockTimer = setTimeout(() => {
+      pollLockActive = false;
+      pollLockTimer = null;
+    }, MANUAL_POLL_LOCK_MS);
+  }
 
   async function handleManualPoll() {
-    if (pollInProgress || $health.poller_status === 'in_progress') return;
+    if (isPollBusy()) return;
     pollError = false;
     pollInProgress = true;
+    startPollLockout();
     try {
       await health.triggerPoll();
       await stagingQueue.loadPage();
@@ -113,6 +131,7 @@
   $effect(() => {
     return () => {
       if (pollErrorTimer !== null) clearTimeout(pollErrorTimer);
+      if (pollLockTimer !== null) clearTimeout(pollLockTimer);
     };
   });
 
@@ -179,13 +198,13 @@
     <div class="footer-right-inner">
       <button
         class="poll-button"
-        class:poll-button--busy={pollInProgress || $health.poller_status === 'in_progress'}
-        disabled={pollInProgress || $health.poller_status === 'in_progress' || !!$health.error}
+        class:poll-button--busy={isPollBusy()}
+        disabled={isPollBusy() || !!$health.error}
         onclick={handleManualPoll}
         title="Trigger an immediate poll cycle"
         aria-label="Poll now"
       >
-        {#if pollInProgress}
+        {#if isPollBusy()}
           <span class="spinner spinner--sm" aria-hidden="true"></span>
           Polling…
         {:else}
