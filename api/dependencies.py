@@ -33,3 +33,8 @@ def get_thumbnail_cache_path(request: Request) -> Path:
 
     app_config = get_app_config(request)
     return app_config.core.thumbnail_cache_path
+
+
+def get_config_path(request: Request) -> str:
+    """Return config file path from FastAPI app state."""
+    return getattr(request.app.state, "config_path", "/etc/nightfall/photo-ingress.conf")

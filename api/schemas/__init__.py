@@ -10,6 +10,7 @@ from api.schemas.blocklist import (
 )
 from api.schemas.config import EffectiveConfig
 from api.schemas.health import HealthResponse, ServiceStatus
+from api.schemas.health import PollTriggerResponse
 from api.schemas.staging import StagingItem, StagingPage
 from api.schemas.triage import TriageRequest, TriageResponse
 
@@ -24,6 +25,7 @@ __all__ = [
     "EffectiveConfig",
     "HealthResponse",
     "ServiceStatus",
+    "PollTriggerResponse",
     "StagingItem",
     "StagingPage",
     "TriageRequest",

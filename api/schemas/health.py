@@ -20,4 +20,14 @@ class HealthResponse(BaseModel):
     registry_ok: ServiceStatus
     disk_ok: ServiceStatus
     last_updated_at: str
+    last_poll_at: str | None = None
+    next_poll_at: str | None = None
+    poller_status: str = "unknown"
+    poll_interval_minutes: int = 0
     error: str | None = None
+
+
+class PollTriggerResponse(BaseModel):
+    """Response from the poll trigger endpoint."""
+
+    status: str

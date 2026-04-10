@@ -59,6 +59,8 @@ def create_app(
         else:
             app.state.app_config = load_config(config_path)
 
+        app.state.config_path = config_path
+
         if registry_conn is not None:
             app.state.registry_conn = registry_conn
         else:
