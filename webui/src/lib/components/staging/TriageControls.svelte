@@ -23,6 +23,12 @@
     onReject?.(generateIdempotencyKey());
   }
 
+  function hasPhotoDragType(event: DragEvent): boolean {
+    const types = event.dataTransfer?.types;
+    if (!types) return false;
+    return types.includes('application/x-nightfall-sha256') || types.includes('text/plain');
+  }
+
   function extractedSha(event: DragEvent): string {
     const transfer = event.dataTransfer;
     if (!transfer) return '';
@@ -34,7 +40,7 @@
       return;
     }
 
-    if (!extractedSha(event)) {
+    if (!hasPhotoDragType(event)) {
       return;
     }
 
