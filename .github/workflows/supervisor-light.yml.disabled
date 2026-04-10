@@ -47,24 +47,14 @@ jobs:
             --json number \
             --jq 'length')
 
-          ACTIVE_ALT=$(gh issue list \
-            --repo "$REPO" \
-            --label "agent: implement" \
-            --state "open" \
-            --json number \
-            --jq 'length')
-
-          ACTIVE=$((ACTIVE + ACTIVE_ALT))
-
           echo "Active implementers: $ACTIVE"
 
           # If issue is in implement but capacity is full → queue it
-          if echo "$LABELS" | grep -qE "agent:implement|agent: implement"; then
+          if echo "$LABELS" | grep -q "agent:implement"; then
             if [ "$ACTIVE" -gt "$MAX_PARALLEL_IMPLEMENT" ]; then
               gh issue edit "$ISSUE_NUMBER" --repo "$REPO" \
                 --add-label "agent:queued" \
-                --remove-label "agent:implement" \
-                --remove-label "agent: implement"
+                --remove-label "agent:implement"
               gh issue comment "$ISSUE_NUMBER" --repo "$REPO" --body "Supervisor-Light: Queued due to capacity limit."
             fi
             exit 0

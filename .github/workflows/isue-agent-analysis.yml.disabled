@@ -1,4 +1,4 @@
-name: mAOF implementation agent
+name: mAOF analysis agent
 
 on:
   issues:
@@ -9,12 +9,12 @@ permissions:
   issues: write
 
 concurrency:
-  group: maof-implement-${{ github.event.issue.number }}
+  group: maof-analysis-${{ github.event.issue.number }}
   cancel-in-progress: false
 
 jobs:
-  run-implementation-agent:
-    if: github.event.action == 'labeled' && github.event.label.name == 'agent:implement'
+  run-analysis-agent:
+    if: github.event.action == 'labeled' && github.event.label.name == 'agent:analysis'
     runs-on: [self-hosted, Linux, X64, nightfall-photo-ingress, workspace]
     timeout-minutes: 45
     env:
@@ -36,18 +36,18 @@ jobs:
           set -euo pipefail
           gh auth status
 
-      - name: Run Implementation Agent
+      - name: Run Analysis Agent
         run: |
           set -euo pipefail
           gh copilot run \
-            --agent "implementation" \
-            --issue $ISSUE_NUMBER \
-            --prompt-file ".github/prompts/issue-implementation-agent.txt"
+            --agent "analyst" \
+            --issue "$ISSUE_NUMBER" \
+            --prompt-file ".github/prompts/issue-analyst-agent.txt"
 
-      - name: Mark Issue as done
+      - name: Mark Issue as analysis-done
         if: success()
         run: |
           set -euo pipefail
           gh issue edit "$ISSUE_NUMBER" --repo "$REPO" \
-            --add-label "agent:done" \
-            --remove-label "agent:implement"
+            --add-label "agent:analysis-done" \
+            --remove-label "agent:analysis"

@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   validate-issue:
-    if: github.event.action == 'labeled' && (github.event.label.name == 'agent:validate' || github.event.label.name == 'agent: validate')
+    if: github.event.action == 'labeled' && github.event.label.name == 'agent:validate'
     runs-on: [self-hosted, Linux, X64, nightfall-photo-ingress, workspace]
     timeout-minutes: 45
     env:
@@ -44,15 +44,13 @@ jobs:
           if [ "$EXIT_CODE" -eq 0 ]; then
             gh issue edit "$ISSUE_NUMBER" --repo "$REPO" \
               --add-label "agent:done_validated" \
-              --remove-label "agent:validate" \
-              --remove-label "agent: validate"
+              --remove-label "agent:validate"
             gh issue comment "$ISSUE_NUMBER" --repo "$REPO" \
               --body "mAOF Validation: staging.e2e.module1 succeeded. Marked as agent:done_validated."
           else
             gh issue edit "$ISSUE_NUMBER" --repo "$REPO" \
               --add-label "agent:validation-failed" \
-              --remove-label "agent:validate" \
-              --remove-label "agent: validate"
+              --remove-label "agent:validate"
             gh issue comment "$ISSUE_NUMBER" --repo "$REPO" \
               --body "mAOF Validation: staging.e2e.module1 failed. Marked as agent:validation-failed. Validator Agent may investigate."
           fi
