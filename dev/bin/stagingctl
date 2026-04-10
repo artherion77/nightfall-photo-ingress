@@ -88,6 +88,31 @@ _require_container_exists() {
     nf_require_container_exists "$CONTAINER" "stagingctl create" "stagingctl"
 }
 
+_sanitize_invalid_pillow_distribution() {
+    local removed
+    removed="$(lxc exec "$CONTAINER" -- bash -lc '
+set -e
+shopt -s nullglob
+count=0
+for path in /opt/ingress/lib/python*/site-packages/~illow*; do
+    rm -rf "$path"
+    count=$((count+1))
+done
+printf "%s" "$count"
+')"
+
+    if [[ "$removed" != "0" ]]; then
+        _warn "Removed $removed invalid ~illow artifact(s) from staging venv site-packages."
+    fi
+}
+
+_assert_no_invalid_distribution_warnings() {
+    if lxc exec "$CONTAINER" -- bash -lc \
+        'set -e; /opt/ingress/bin/pip list 2>&1 | grep -q -E "invalid distribution|~illow"'; then
+        _fail "Detected invalid distribution warning in staging venv after install."
+    fi
+}
+
 _validate_network_policy() {
     # Ensure container NIC is bridged to br-staging. Do not alter host networking.
     local expanded
@@ -301,9 +326,15 @@ for line in config_path.read_text(encoding='utf-8').splitlines():
     lxc config device remove "$CONTAINER" tmpfs-var-tmp >/dev/null 2>&1 || true
     lxc config device remove "$CONTAINER" tmpfs-nightfall-cache >/dev/null 2>&1 || true
 
+    _info "Sanitizing known invalid distribution leftovers in staging venv ..."
+    _sanitize_invalid_pillow_distribution
+
     _info "Running pip install (base + web extras) in container venv ..."
     lxc exec "$CONTAINER" -- \
         "$VENV_ROOT/bin/pip" install --quiet --upgrade --force-reinstall "$CT_TMP_DIR/$whl_name[web]"
+
+    _info "Verifying staging venv has no invalid distribution warnings ..."
+    _assert_no_invalid_distribution_warnings
 
     _info "Syncing API source tree to /opt/api ..."
     lxc exec "$CONTAINER" -- rm -rf /opt/api
