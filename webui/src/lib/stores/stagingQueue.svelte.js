@@ -48,15 +48,45 @@ async function loadPage(cursor = null, limit = DEFAULT_PAGE_LIMIT) {
   update((state) => ({ ...state, loading: true, error: null }));
   try {
     const page = await getStagingPage(cursor, limit);
-    update((state) => ({
-      ...state,
-      items: cursor ? [...state.items, ...(page.items ?? [])] : (page.items ?? []),
-      cursor: page.cursor ?? null,
-      total: page.total ?? state.total,
-      activeIndex: cursor ? state.activeIndex : 0,
-      loading: false,
-      error: null
-    }));
+    update((state) => {
+      const resolved = (() => {
+        if (cursor) {
+          return {
+            items: [...state.items, ...(page.items ?? [])],
+            activeIndex: state.activeIndex,
+          };
+        }
+
+        const serverItems = page.items ?? [];
+        if (state.items.length === 0) {
+          return {
+            items: serverItems,
+            activeIndex: 0,
+          };
+        }
+
+        const items = mergeItemsByIdentity(state.items, serverItems);
+        const activeSha = state.items[state.activeIndex]?.sha256;
+        let activeIndex = Math.min(state.activeIndex, Math.max(items.length - 1, 0));
+        if (activeSha) {
+          const found = items.findIndex((item) => item.sha256 === activeSha);
+          if (found >= 0) {
+            activeIndex = found;
+          }
+        }
+
+        return { items, activeIndex };
+      })();
+
+      return {
+        ...state,
+        ...resolved,
+        cursor: page.cursor ?? null,
+        total: page.total ?? state.total,
+        loading: false,
+        error: null,
+      };
+    });
   } catch (error) {
     update((state) => ({ ...state, loading: false, error: error instanceof Error ? error.message : 'Failed to load staging queue' }));
   }

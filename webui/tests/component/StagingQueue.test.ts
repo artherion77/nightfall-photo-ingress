@@ -148,3 +148,65 @@ describe('stagingQueue triage revalidation', () => {
     });
   });
 });
+
+describe('stagingQueue full refresh behavior', () => {
+  beforeEach(() => {
+    toastPushMock.mockReset();
+    fetchMock.mockReset();
+    stagingQueue.clearQueue();
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  it('preserves focused item identity across full refresh', async () => {
+    stagingQueue.hydrate([
+      { sha256: 'a', filename: 'a.jpg' },
+      { sha256: 'b', filename: 'b.jpg' },
+      { sha256: 'c', filename: 'c.jpg' },
+    ]);
+    stagingQueue.setActiveIndex(1);
+
+    fetchMock.mockImplementation(async (input: string) => {
+      if (input === '/api/v1/staging?limit=100') {
+        return jsonResponse({
+          items: [
+            { sha256: 'z', filename: 'z.jpg' },
+            { sha256: 'a', filename: 'a.jpg' },
+            { sha256: 'b', filename: 'b.jpg' },
+            { sha256: 'c', filename: 'c.jpg' },
+          ],
+          total: 4,
+          cursor: null,
+        });
+      }
+      throw new Error(`Unexpected fetch: ${input}`);
+    });
+
+    await stagingQueue.loadPage();
+
+    const state = readState(stagingQueue);
+    expect(state.items.map((item: { sha256: string }) => item.sha256)).toEqual(['z', 'a', 'b', 'c']);
+    expect(state.activeIndex).toBe(2);
+  });
+
+  it('keeps initial full load anchored to first item', async () => {
+    fetchMock.mockImplementation(async (input: string) => {
+      if (input === '/api/v1/staging?limit=100') {
+        return jsonResponse({
+          items: [
+            { sha256: 'x', filename: 'x.jpg' },
+            { sha256: 'y', filename: 'y.jpg' },
+          ],
+          total: 2,
+          cursor: null,
+        });
+      }
+      throw new Error(`Unexpected fetch: ${input}`);
+    });
+
+    await stagingQueue.loadPage();
+
+    const state = readState(stagingQueue);
+    expect(state.activeIndex).toBe(0);
+    expect(state.items.map((item: { sha256: string }) => item.sha256)).toEqual(['x', 'y']);
+  });
+});
