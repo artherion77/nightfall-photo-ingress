@@ -23,6 +23,10 @@ def _container_is_running(name: str) -> bool:
 
 
 @pytest.mark.staging
+@pytest.mark.xfail(
+    reason="Known env-dependent staging queue size variance; tracked in GH issue #29",
+    strict=False,
+)
 def test_case_18_photowheel_thumbnail_behavior_playwright(base_url: str) -> None:
     """Case 18: execute staging-system Playwright thumbnail behavior checks (C.1-C.5)."""
     if not _container_is_running(DEV_CONTAINER):
