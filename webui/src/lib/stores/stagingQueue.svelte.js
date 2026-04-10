@@ -4,7 +4,7 @@ import { getStagingPage } from '$lib/api/staging';
 import { generateIdempotencyKey, postAccept, postDefer, postReject } from '$lib/api/triage';
 import { toast } from '$lib/stores/toast.svelte';
 
-const DEFAULT_PAGE_LIMIT = 20;
+const DEFAULT_PAGE_LIMIT = 100;
 
 const initial = {
   items: [],
@@ -44,7 +44,7 @@ function mergeItemsByIdentity(currentItems, serverItems) {
   });
 }
 
-async function loadPage(cursor = null, limit = 20) {
+async function loadPage(cursor = null, limit = DEFAULT_PAGE_LIMIT) {
   update((state) => ({ ...state, loading: true, error: null }));
   try {
     const page = await getStagingPage(cursor, limit);

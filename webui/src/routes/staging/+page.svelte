@@ -27,6 +27,13 @@
 		stagingQueue.hydrate(data.staging?.items ?? []);
 	});
 
+	$effect(() => {
+		const id = setInterval(() => {
+			stagingQueue.loadPage();
+		}, 30_000);
+		return () => clearInterval(id);
+	});
+
 	let items = $derived($stagingQueue.items ?? []);
 	let activeIndex = $derived($stagingQueue.activeIndex ?? 0);
 	let selected = $derived<StagingItem | null>(items.length > 0 ? items[activeIndex] : null);

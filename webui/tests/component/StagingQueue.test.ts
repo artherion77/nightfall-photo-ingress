@@ -52,7 +52,7 @@ describe('stagingQueue triage revalidation', () => {
         return jsonResponse({ action_correlation_id: 'reject-1', item_id: 'b', state: 'rejected' });
       }
 
-      if (input === '/api/v1/staging?limit=20') {
+      if (input === '/api/v1/staging?limit=100') {
         return jsonResponse({
           items: [
             { sha256: 'a', filename: 'a.jpg' },
@@ -71,7 +71,7 @@ describe('stagingQueue triage revalidation', () => {
 
     expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/v1/triage/b/reject');
     expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ method: 'POST' });
-    expect(fetchMock.mock.calls[1]?.[0]).toBe('/api/v1/staging?limit=20');
+    expect(fetchMock.mock.calls[1]?.[0]).toBe('/api/v1/staging?limit=100');
     expect(readState(stagingQueue)).toMatchObject({
       items: [
         { sha256: 'a', filename: 'a.jpg' },
@@ -102,7 +102,7 @@ describe('stagingQueue triage revalidation', () => {
         return jsonResponse({ action_correlation_id: 'reject-2', item_id: 'b', state: 'rejected' });
       }
 
-      if (input === '/api/v1/staging?limit=20' && fetchMock.mock.calls.length === 2) {
+      if (input === '/api/v1/staging?limit=100' && fetchMock.mock.calls.length === 2) {
         return jsonResponse({
           items: [
             { sha256: 'b', filename: 'b.jpg' },
@@ -113,7 +113,7 @@ describe('stagingQueue triage revalidation', () => {
         });
       }
 
-      if (input === '/api/v1/staging?limit=20' && fetchMock.mock.calls.length === 4) {
+      if (input === '/api/v1/staging?limit=100' && fetchMock.mock.calls.length === 4) {
         return jsonResponse({
           items: [
             { sha256: 'c', filename: 'c.jpg' },
@@ -132,10 +132,10 @@ describe('stagingQueue triage revalidation', () => {
 
     expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/v1/triage/a/accept');
     expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ method: 'POST' });
-    expect(fetchMock.mock.calls[1]?.[0]).toBe('/api/v1/staging?limit=20');
+    expect(fetchMock.mock.calls[1]?.[0]).toBe('/api/v1/staging?limit=100');
     expect(fetchMock.mock.calls[2]?.[0]).toBe('/api/v1/triage/b/reject');
     expect(fetchMock.mock.calls[2]?.[1]).toMatchObject({ method: 'POST' });
-    expect(fetchMock.mock.calls[3]?.[0]).toBe('/api/v1/staging?limit=20');
+    expect(fetchMock.mock.calls[3]?.[0]).toBe('/api/v1/staging?limit=100');
     expect(readState(stagingQueue)).toMatchObject({
       items: [
         { sha256: 'c', filename: 'c.jpg' },
