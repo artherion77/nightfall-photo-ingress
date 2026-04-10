@@ -17,6 +17,33 @@ const initial = {
 
 const { subscribe, update, set } = writable(initial);
 
+function mergeItemsByIdentity(currentItems, serverItems) {
+  const bySha256 = new Map();
+  for (const item of currentItems) {
+    if (item?.sha256) {
+      bySha256.set(item.sha256, item);
+    }
+  }
+
+  return serverItems.map((serverItem) => {
+    const identityKey = serverItem?.sha256;
+    if (!identityKey) {
+      return serverItem;
+    }
+
+    const existingItem = bySha256.get(identityKey);
+    if (!existingItem) {
+      return serverItem;
+    }
+
+    if (existingItem.sha256 !== serverItem.sha256) {
+      return serverItem;
+    }
+
+    return existingItem;
+  });
+}
+
 async function loadPage(cursor = null, limit = 20) {
   update((state) => ({ ...state, loading: true, error: null }));
   try {
@@ -123,7 +150,8 @@ async function triageItem(action, itemId, idempotencyKey) {
   try {
     const page = await getStagingPage(null, refreshLimit);
     update((state) => {
-      const items = page.items ?? [];
+      const serverItems = page.items ?? [];
+      const items = mergeItemsByIdentity(state.items, serverItems);
       return {
         ...state,
         items,
