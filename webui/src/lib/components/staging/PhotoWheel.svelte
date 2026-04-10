@@ -414,8 +414,8 @@
     const dist = Math.abs(delta);
     const direction = delta < 0 ? 1 : delta > 0 ? -1 : 0;
     const left = delta === 0 ? '50%' : `calc(50% + (${delta} * var(--slot-offset)))`;
-    const rotationDeg = dist === 0 ? 0 : dist === 1 ? 15 : 30;
-    const overlapTranslatePx = dist === 0 ? 0 : dist === 1 ? 48 : 64;
+    const rotationDeg = dist === 0 ? 0 : dist === 1 ? 15 : 34;
+    const overlapTranslatePx = dist === 0 ? 0 : dist === 1 ? 48 : 160;
     if (dist === 0) {
       return [
         `left: ${left}`,
@@ -435,7 +435,7 @@
     } else {
       return [
         `left: ${left}`,
-        `transform: translateX(-50%) translateY(-50%) translateX(${direction * overlapTranslatePx}px) translateZ(-80px) rotateY(${direction * rotationDeg}deg) scale(0.60)`,
+        `transform: translateX(-50%) translateY(-50%) translateX(${direction * overlapTranslatePx}px) translateZ(-120px) rotateY(${direction * rotationDeg}deg) scale(0.60)`,
         'opacity: 0.4',
         `filter: blur(var(--wheel-blur-far))`,
         'z-index: 2',

@@ -481,6 +481,13 @@ test.describe('PhotoWheel — Visual Invariants', () => {
     );
 
     if (farLeft && farRight) {
+      const farLeftOverlapWithNear = farLeft.rect.right - leftNear.rect.left;
+      const farRightOverlapWithNear = rightNear.rect.right - farRight.rect.left;
+      expect(farLeftOverlapWithNear).toBeGreaterThan(0);
+      expect(farRightOverlapWithNear).toBeGreaterThan(0);
+      expect(farLeft.zIndex).toBeLessThan(leftNear.zIndex);
+      expect(farRight.zIndex).toBeLessThan(rightNear.zIndex);
+
       expect(Math.abs((active.center - farLeft.center) - (farRight.center - active.center))).toBeLessThanOrEqual(22);
       expect(farLeft.opacity).toBeCloseTo(farRight.opacity, 3);
       expect(farLeft.blurPx).toBeCloseTo(farRight.blurPx, 3);
