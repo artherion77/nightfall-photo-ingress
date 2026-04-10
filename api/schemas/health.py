@@ -24,6 +24,7 @@ class HealthResponse(BaseModel):
     next_poll_at: str | None = None
     poller_status: str = "unknown"
     poll_interval_minutes: int = 0
+    poll_duration_s: float | None = None
     error: str | None = None
 
 

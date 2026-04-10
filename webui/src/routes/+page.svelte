@@ -23,7 +23,7 @@
 		accepted_today: data.auditSummary?.accepted_today ?? 0,
 		rejected_today: data.auditSummary?.rejected_today ?? 0,
 		live_photo_pairs: 0,
-		last_poll_duration_s: 0
+		last_poll_duration_s: data.health?.poll_duration_s ?? 0
 	});
 </script>
 

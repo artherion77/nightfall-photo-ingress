@@ -103,12 +103,17 @@ class HealthService:
             last_poll_at: str | None = None
             success = False
 
+            poll_duration_s: float | None = None
+
             if STATUS_FILE_PATH.exists():
                 content = STATUS_FILE_PATH.read_text(encoding="utf-8")
                 status_data = json.loads(content)
                 success = status_data.get("success", False)
                 raw_ts = status_data.get("updated_at")
                 last_poll_at = raw_ts if isinstance(raw_ts, str) and raw_ts else None
+                raw_dur = status_data.get("details", {}).get("poll_duration_s")
+                if isinstance(raw_dur, (int, float)) and raw_dur >= 0:
+                    poll_duration_s = float(raw_dur)
 
             poller_status = get_poller_status(lock_path=poll_lock_path)
             next_poll_at = _get_timer_next_elapse_iso()
@@ -126,6 +131,7 @@ class HealthService:
                 next_poll_at=next_poll_at,
                 poller_status=poller_status,
                 poll_interval_minutes=poll_interval_minutes,
+                poll_duration_s=poll_duration_s,
                 error=None,
             )
         except Exception as exc:

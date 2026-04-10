@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import fcntl
+import json
 
 import pytest
 
@@ -37,3 +38,33 @@ async def test_health_reports_in_progress_when_poll_lock_is_held(
 
     assert response.status_code == 200
     assert response.json()["poller_status"] == "in_progress"
+
+
+@pytest.mark.anyio
+async def test_health_returns_poll_duration_s_from_status_file(
+    api_client,
+    api_token: str,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    import api.services.health_service as health_svc
+
+    status_file = tmp_path / "photo-ingress.json"
+    status_payload = {
+        "schema_version": 1,
+        "service": "photo-ingress",
+        "version": "2.0.0",
+        "host": "test-host",
+        "state": "healthy",
+        "success": True,
+        "command": "poll",
+        "updated_at": "2026-04-10T12:00:00+00:00",
+        "details": {"poll_duration_s": 7.42},
+    }
+    status_file.write_text(json.dumps(status_payload), encoding="utf-8")
+    monkeypatch.setattr(health_svc, "STATUS_FILE_PATH", status_file)
+
+    response = await api_client.get("/api/v1/health", headers=auth_headers(api_token))
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["poll_duration_s"] == pytest.approx(7.42)

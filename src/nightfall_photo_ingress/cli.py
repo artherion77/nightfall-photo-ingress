@@ -11,6 +11,7 @@ import configparser
 import logging
 import os
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Sequence
@@ -299,6 +300,7 @@ def _cmd_poll(args: argparse.Namespace) -> int:
     """Run OneDrive account polling and staging download for the OneDrive client."""
 
     try:
+        _poll_start = time.monotonic()
         app_config = load_config(args.path)
         registry = Registry(app_config.core.registry_path)
         registry.initialize()
@@ -396,6 +398,7 @@ def _cmd_poll(args: argparse.Namespace) -> int:
                 "ingest_outcome_count": ingest_outcome_count,
                 "ingest_pending_count": ingest_pending_count,
                 "ingest_discarded_count": ingest_discarded_count,
+                "poll_duration_s": round(time.monotonic() - _poll_start, 3),
             },
         )
         return 0

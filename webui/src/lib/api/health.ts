@@ -15,6 +15,7 @@ export interface HealthResponse {
   next_poll_at?: string | null;
   poller_status?: string;
   poll_interval_minutes?: number;
+  poll_duration_s?: number | null;
   error: string | null;
 }
 
