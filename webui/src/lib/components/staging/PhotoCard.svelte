@@ -29,9 +29,49 @@
   let { item, active = false, onOpenDetails, onAccept, onReject, actionsDisabled = false }: Props = $props();
   let imageState: ImageState = $state('loading');
   let showSidecar = $state(false);
+  let previousSha256: string | undefined = $state(undefined);
+  let currentEpoch = $state(0);
+
+  const THUMBNAIL_SHA_RE = /\/api\/v1\/thumbnails\/([^/?#]+)/;
+
+  function currentSha256(): string | undefined {
+    return item.sha256 || undefined;
+  }
+
+  function isDefinedSha(sha: string | undefined): sha is string {
+    return typeof sha === 'string' && sha.length > 0;
+  }
+
+  function parseEventSha256(event: Event): string | undefined {
+    const target = event.currentTarget;
+    if (!(target instanceof HTMLImageElement)) return undefined;
+    const source = target.currentSrc || target.src;
+    const match = THUMBNAIL_SHA_RE.exec(source);
+    return match?.[1];
+  }
+
+  function parseEventEpoch(event: Event): number | undefined {
+    const target = event.currentTarget;
+    if (!(target instanceof HTMLImageElement)) return undefined;
+    const rawEpoch = target.dataset.imageEpoch;
+    if (!rawEpoch) return undefined;
+    const parsed = Number(rawEpoch);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+
+  function shouldAcceptImageEvent(event: Event): boolean {
+    const eventEpoch = parseEventEpoch(event);
+    const eventSha256 = parseEventSha256(event);
+    const activeSha256 = currentSha256();
+    return eventEpoch === currentEpoch && eventSha256 === activeSha256;
+  }
 
   $effect(() => {
-    item.sha256;
+    const nextSha256 = currentSha256();
+    if (!isDefinedSha(nextSha256)) return;
+    if (nextSha256 === previousSha256) return;
+    currentEpoch += 1;
+    previousSha256 = nextSha256;
     imageState = 'loading';
   });
 
@@ -56,11 +96,13 @@
     return `${value.toFixed(1)} ${units[unitIndex]}`;
   }
 
-  function handleImageLoad(): void {
+  function handleImageLoad(event: Event): void {
+    if (!shouldAcceptImageEvent(event)) return;
     imageState = imageLoadedState();
   }
 
-  function handleImageError(): void {
+  function handleImageError(event: Event): void {
+    if (!shouldAcceptImageEvent(event)) return;
     imageState = imageErrorState();
   }
 
@@ -87,6 +129,7 @@
       class="thumb-image"
       class:is-hidden={!shouldShowImage(imageState)}
       src={thumbnailSrc(item.sha256)}
+      data-image-epoch={currentEpoch}
       alt={item.filename}
       loading="lazy"
       decoding="async"
