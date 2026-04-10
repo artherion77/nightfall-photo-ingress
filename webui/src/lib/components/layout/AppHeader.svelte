@@ -12,8 +12,8 @@
   ];
 
   function getHealthLabel() {
-    if (health.error) return 'error';
-    if (!health.polling_ok?.ok || !health.auth_ok?.ok || !health.registry_ok?.ok || !health.disk_ok?.ok) {
+    if ($health.error) return 'error';
+    if (!$health.polling_ok?.ok || !$health.auth_ok?.ok || !$health.registry_ok?.ok || !$health.disk_ok?.ok) {
       return 'warning';
     }
     return 'ok';

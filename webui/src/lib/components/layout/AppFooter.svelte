@@ -16,16 +16,16 @@
     | 'POLLED_UNKNOWN';
 
   function getMode(): FooterMode {
-    if (health.error) return 'HEALTH_UNAVAILABLE';
-    if (pollInProgress || health.poller_status === 'in_progress') return 'POLL_IN_PROGRESS';
-    if (health.last_poll_at === undefined) return 'INITIALIZING';
-    if (health.last_poll_at === null) {
-      return health.poller_status === 'timer_running'
+    if ($health.error) return 'HEALTH_UNAVAILABLE';
+    if (pollInProgress || $health.poller_status === 'in_progress') return 'POLL_IN_PROGRESS';
+    if ($health.last_poll_at === undefined) return 'INITIALIZING';
+    if ($health.last_poll_at === null) {
+      return $health.poller_status === 'timer_running'
         ? 'NEVER_POLLED'
         : 'TIMER_STOPPED_NEVER_POLLED';
     }
-    if (health.poller_status === 'timer_running') return 'POLLED_TIMER_RUNNING';
-    if (health.poller_status === 'timer_stopped') return 'POLLED_TIMER_STOPPED';
+    if ($health.poller_status === 'timer_running') return 'POLLED_TIMER_RUNNING';
+    if ($health.poller_status === 'timer_stopped') return 'POLLED_TIMER_STOPPED';
     return 'POLLED_UNKNOWN';
   }
 
@@ -93,7 +93,7 @@
   let pollErrorTimer: ReturnType<typeof setTimeout> | null = null;
 
   async function handleManualPoll() {
-    if (pollInProgress || health.poller_status === 'in_progress') return;
+    if (pollInProgress || $health.poller_status === 'in_progress') return;
     pollError = false;
     pollInProgress = true;
     try {
@@ -117,7 +117,7 @@
   });
 
   function getRegistryStatus() {
-    return health.registry_ok?.ok ? 'ok' : 'error';
+    return $health.registry_ok?.ok ? 'ok' : 'error';
   }
 </script>
 
@@ -141,8 +141,8 @@
 
     {:else if getMode() === 'NEVER_POLLED'}
       <span class="poll-info">Last poll: never</span>
-      {#if health.next_poll_at && formatFutureTime(health.next_poll_at)}
-        <span class="poll-next">Next: {formatFutureTime(health.next_poll_at)}</span>
+      {#if $health.next_poll_at && formatFutureTime($health.next_poll_at)}
+        <span class="poll-next">Next: {formatFutureTime($health.next_poll_at)}</span>
       {/if}
 
     {:else if getMode() === 'TIMER_STOPPED_NEVER_POLLED'}
@@ -150,23 +150,23 @@
       <span class="poll-badge poll-badge--stopped">⚠ Timer stopped</span>
 
     {:else if getMode() === 'POLLED_TIMER_RUNNING'}
-      <span class="poll-info" title={health.last_poll_at ?? undefined}>
-        Last poll: {formatPastTime(health.last_poll_at)}
+      <span class="poll-info" title={$health.last_poll_at ?? undefined}>
+        Last poll: {formatPastTime($health.last_poll_at)}
       </span>
-      {#if health.next_poll_at && formatFutureTime(health.next_poll_at)}
-        <span class="poll-next">Next: {formatFutureTime(health.next_poll_at)}</span>
+      {#if $health.next_poll_at && formatFutureTime($health.next_poll_at)}
+        <span class="poll-next">Next: {formatFutureTime($health.next_poll_at)}</span>
       {/if}
 
     {:else if getMode() === 'POLLED_TIMER_STOPPED'}
-      <span class="poll-info poll-info--warning" title={health.last_poll_at ?? undefined}>
-        Last poll: {formatPastTime(health.last_poll_at)}
+      <span class="poll-info poll-info--warning" title={$health.last_poll_at ?? undefined}>
+        Last poll: {formatPastTime($health.last_poll_at)}
       </span>
       <span class="poll-badge poll-badge--stopped">⚠ Timer stopped</span>
 
     {:else}
       <!-- POLLED_UNKNOWN -->
-      <span class="poll-info" title={health.last_poll_at ?? undefined}>
-        Last poll: {formatPastTime(health.last_poll_at)}
+      <span class="poll-info" title={$health.last_poll_at ?? undefined}>
+        Last poll: {formatPastTime($health.last_poll_at)}
       </span>
     {/if}
 
@@ -179,8 +179,8 @@
     <div class="footer-right-inner">
       <button
         class="poll-button"
-        class:poll-button--busy={pollInProgress || health.poller_status === 'in_progress'}
-        disabled={pollInProgress || health.poller_status === 'in_progress' || !!health.error}
+        class:poll-button--busy={pollInProgress || $health.poller_status === 'in_progress'}
+        disabled={pollInProgress || $health.poller_status === 'in_progress' || !!$health.error}
         onclick={handleManualPoll}
         title="Trigger an immediate poll cycle"
         aria-label="Poll now"

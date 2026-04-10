@@ -15,7 +15,7 @@ const initialState = {
   error: null
 };
 
-const { subscribe, update } = writable(initialState);
+const { subscribe, set, update } = writable(initialState);
 
 let pollingInterval = null;
 let consecutiveFailures = 0;
@@ -25,8 +25,7 @@ async function fetchHealth() {
   try {
     const data = await getHealth();
     consecutiveFailures = 0;
-    update((state) => ({
-      ...state,
+    set({
       polling_ok: data.polling_ok ?? initialState.polling_ok,
       auth_ok: data.auth_ok ?? initialState.auth_ok,
       registry_ok: data.registry_ok ?? initialState.registry_ok,
@@ -37,7 +36,7 @@ async function fetchHealth() {
       poller_status: data.poller_status ?? 'unknown',
       poll_interval_minutes: data.poll_interval_minutes ?? 0,
       error: null
-    }));
+    });
   } catch (err) {
     consecutiveFailures++;
     if (consecutiveFailures >= FAILURE_THRESHOLD) {
@@ -79,15 +78,5 @@ export const health = {
   subscribe,
   connect,
   disconnect,
-  triggerPoll,
-  ...initialState
+  triggerPoll
 };
-
-// Update store to be reactive to health state changes
-subscribe((state) => {
-  Object.assign(health, state);
-  health.polling_ok_flag = Boolean(state.polling_ok?.ok);
-  health.auth_ok_flag = Boolean(state.auth_ok?.ok);
-  health.registry_ok_flag = Boolean(state.registry_ok?.ok);
-  health.disk_ok_flag = Boolean(state.disk_ok?.ok);
-});
