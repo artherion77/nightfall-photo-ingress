@@ -10,7 +10,7 @@ echo "[setup] Installing system packages ..."
 apt-get update -qq
 apt-get install -y --no-install-recommends \
     python3 python3-pip python3-venv \
-    ca-certificates curl \
+    ca-certificates curl openssl \
     caddy
 
 echo "[setup] Creating application directories ..."

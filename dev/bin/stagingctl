@@ -43,6 +43,11 @@ WEB_BUILD_DIR="$PROJECT_ROOT/webui/build"
 CADDYFILE_SOURCE="$STAGING_ROOT/container/Caddyfile"
 CADDYFILE_DEST="/etc/caddy/Caddyfile"
 CT_TMP_DIR="/root/staging-photo-ingress-tmp"
+TLS_DIR="/etc/caddy/tls"
+TLS_CA_KEY="$TLS_DIR/nightfall-staging-ca.key"
+TLS_CA_CERT="$TLS_DIR/nightfall-staging-ca.crt"
+TLS_SERVER_KEY="$TLS_DIR/staging-photo-ingress.key"
+TLS_SERVER_CERT="$TLS_DIR/staging-photo-ingress.crt"
 
 # Host-persistent evidence/log storage remains required in Phase 2.
 HOST_EVIDENCE_BASE="${STAGING_EVIDENCE_BASE:-/mnt/ssd/staging/photo-ingress/evidence}"
@@ -127,6 +132,66 @@ _validate_network_policy() {
         || _fail "Container NIC is not bridged (expected nictype: bridged)."
     grep -q "parent: br-staging" <<<"$expanded" \
         || _fail "Container NIC is not attached to br-staging."
+}
+
+_provision_container_tls_material() {
+        _info "Ensuring container-local TLS materials for Caddy ..."
+        lxc exec "$CONTAINER" -- bash -lc "
+set -euo pipefail
+
+tls_dir='$TLS_DIR'
+ca_key='$TLS_CA_KEY'
+ca_cert='$TLS_CA_CERT'
+server_key='$TLS_SERVER_KEY'
+server_cert='$TLS_SERVER_CERT'
+server_csr=\"\$tls_dir/staging-photo-ingress.csr\"
+san_file=\"\$tls_dir/staging-photo-ingress-openssl.cnf\"
+
+mkdir -p \"\$tls_dir\"
+chgrp caddy \"\$tls_dir\" 2>/dev/null || true
+chmod 750 \"\$tls_dir\"
+
+if [[ ! -s \"\$ca_key\" || ! -s \"\$ca_cert\" ]]; then
+    openssl genrsa -out \"\$ca_key\" 4096
+    openssl req -x509 -new -nodes -key \"\$ca_key\" -sha256 -days 3650 \\
+        -subj '/CN=Nightfall Staging Internal CA/O=Nightfall/OU=Staging' \\
+        -out \"\$ca_cert\"
+fi
+
+cat > \"\$san_file\" <<'EOF'
+[req]
+distinguished_name = dn
+req_extensions = req_ext
+prompt = no
+
+[dn]
+CN = staging-photo-ingress
+
+[req_ext]
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = staging-photo-ingress
+DNS.2 = localhost
+IP.1 = 127.0.0.1
+IP.2 = ::1
+EOF
+
+if [[ ! -s \"\$server_key\" || ! -s \"\$server_cert\" ]]; then
+    openssl genrsa -out \"\$server_key\" 2048
+    openssl req -new -key \"\$server_key\" -out \"\$server_csr\" -config \"\$san_file\"
+    openssl x509 -req -in \"\$server_csr\" -CA \"\$ca_cert\" -CAkey \"\$ca_key\" \\
+        -CAcreateserial -out \"\$server_cert\" -days 825 -sha256 \\
+        -extensions req_ext -extfile \"\$san_file\"
+fi
+
+chmod 600 \"\$ca_key\"
+chmod 644 \"\$ca_cert\" \"\$server_cert\"
+chgrp caddy \"\$server_key\" 2>/dev/null || true
+chmod 640 \"\$server_key\"
+
+rm -f \"\$server_csr\" \"\$san_file\"
+"
 }
 
 # Generate a UUIDv4-based run-id prefixed with a sortable timestamp (yyyymmddTHHMMSS).
@@ -335,6 +400,7 @@ for line in config_path.read_text(encoding='utf-8').splitlines():
     _info "Installing Caddy config for Web Control Plane ingress ..."
     lxc exec "$CONTAINER" -- mkdir -p /etc/caddy
     lxc file push "$CADDYFILE_SOURCE" "$CONTAINER$CADDYFILE_DEST"
+    _provision_container_tls_material
 
     if [[ -d "$WEB_BUILD_DIR" ]]; then
         _info "Syncing web build artifact to /opt/webui/build ..."
@@ -365,6 +431,7 @@ for line in config_path.read_text(encoding='utf-8').splitlines():
     lxc exec "$CONTAINER" -- systemctl restart "$API_SERVICE_NAME"
 
     _info "Enabling and restarting Caddy reverse proxy ..."
+    lxc exec "$CONTAINER" -- caddy validate --config "$CADDYFILE_DEST"
     lxc exec "$CONTAINER" -- systemctl enable "$CADDY_SERVICE_NAME"
     lxc exec "$CONTAINER" -- systemctl restart "$CADDY_SERVICE_NAME"
 
@@ -447,7 +514,7 @@ cmd_smoke() {
     local rc=0
 
     # ── 1. cli check ─────────────────────────────────────────────────────────
-    _info "Step 1/5: cli-help"
+    _info "Step 1/6: cli-help"
     lxc exec "$CONTAINER" -- \
         "$VENV_ROOT/bin/nightfall-photo-ingress" -h 2>&1 \
         | tee "$evidence_dir/cli-help.log" \
@@ -455,7 +522,7 @@ cmd_smoke() {
         || { _assert_fail "$evidence_dir/assertions.jsonl" "cli_help_check" "non-zero exit"; rc=1; }
 
     # ── 2. config-check ──────────────────────────────────────────────────────
-    _info "Step 2/5: config-check + status export"
+    _info "Step 2/6: config-check + status export"
     lxc exec "$CONTAINER" -- \
         bash -lc "rm -f /run/nightfall-status.d/photo-ingress.json && \
         '$VENV_ROOT/bin/nightfall-photo-ingress' --log-mode json config-check --path '$CONF_DEST'" 2>&1 \
@@ -468,17 +535,30 @@ cmd_smoke() {
         || { _assert_fail "$evidence_dir/assertions.jsonl" "status_file_written" "status snapshot missing or invalid"; rc=1; }
 
     # ── 3. trash processor smoke ──────────────────────────────────────────────
-    _info "Step 3/5: trash processor"
+    _info "Step 3/6: trash processor"
     lxc exec "$CONTAINER" -- \
         systemctl start "$TRASH_SERVICE_NAME" 2>&1 \
         | tee "$evidence_dir/trash-service.log" \
         && _assert_ok "$evidence_dir/assertions.jsonl" "trash_service_start" "trash service completed" \
         || { _assert_fail "$evidence_dir/assertions.jsonl" "trash_service_start" "trash service failed"; rc=1; }
 
-    # ── 4. optional live poll ─────────────────────────────────────────────────
+    # ── 4. TLS ingress policy ──────────────────────────────────────────────────
+    _info "Step 4/6: TLS ingress policy"
+    lxc exec "$CONTAINER" -- bash -lc "
+set -euo pipefail
+https_code=\"\$(curl -sk -o /dev/null -w '%{http_code}' --max-time 5 https://127.0.0.1/ || true)\"
+[[ \"\$https_code\" != \"000\" ]]
+http_code=\"\$(curl -s -o /dev/null -w '%{http_code}' --max-time 3 http://127.0.0.1/ || true)\"
+[[ \"\$http_code\" == \"000\" ]]
+" 2>&1 \
+        | tee "$evidence_dir/tls-policy.log" \
+        && _assert_ok "$evidence_dir/assertions.jsonl" "tls_https_only" "https reachable and http disabled" \
+        || { _assert_fail "$evidence_dir/assertions.jsonl" "tls_https_only" "https check failed or http still reachable"; rc=1; }
+
+    # ── 5. optional live poll ─────────────────────────────────────────────────
     local account="${STAGING_ACCOUNT:-staging}"
     if [[ -n "${STAGING_CLIENT_ID:-}" ]]; then
-        _info "Step 4/5: poll (account=$account)"
+        _info "Step 5/6: poll (account=$account)"
         lxc exec "$CONTAINER" -- \
             "$VENV_ROOT/bin/nightfall-photo-ingress" \
             --log-mode json poll --account "$account" --path "$CONF_DEST" 2>&1 \
@@ -486,13 +566,13 @@ cmd_smoke() {
             && _assert_ok "$evidence_dir/assertions.jsonl" "poll_exit_0" "poll completed" \
             || { _assert_fail "$evidence_dir/assertions.jsonl" "poll_exit_0" "poll failed"; rc=1; }
     else
-        _warn "Step 4/5: poll SKIPPED (STAGING_CLIENT_ID not set)."
+        _warn "Step 5/6: poll SKIPPED (STAGING_CLIENT_ID not set)."
         printf '{"assertion":"poll_skipped","reason":"STAGING_CLIENT_ID_not_set","ts":"%s"}\n' \
             "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$evidence_dir/assertions.jsonl"
     fi
 
-    # ── 5. secret scan ───────────────────────────────────────────────────────
-    _info "Step 5/5: secret scan"
+    # ── 6. secret scan ───────────────────────────────────────────────────────
+    _info "Step 6/6: secret scan"
     lxc file push "$STAGING_ROOT/evidence/secret_scan.py" \
         "$CONTAINER$CT_TMP_DIR/staging_secret_scan.py"
     lxc exec "$CONTAINER" -- \
@@ -737,7 +817,7 @@ Usage: $(basename "$0") <command> [args]
 Commands:
   create              Create LXC container (profiles: default+staging) and baseline state.
   install [wheel]     Push wheel + config, enable service, and refresh 'clean' snapshot.
-  uninstall [--purge] Delete container. --purge also removes host evidence/log directories.
+    uninstall [--purge] Delete container. --purge preserves host evidence/log directories.
   reset               Restore 'clean' snapshot and restart container.
   smoke               Run headless smoke assertions; collect evidence.
   auth-setup          Run interactive device-code auth for the staging account (requires TTY).

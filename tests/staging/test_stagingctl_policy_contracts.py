@@ -14,6 +14,7 @@ import pytest
 STAGINGCTL_PATH = Path(__file__).resolve().parents[2] / "dev" / "bin" / "stagingctl"
 SETUP_PATH = Path(__file__).resolve().parents[2] / "staging" / "container" / "setup.sh"
 README_PATH = Path(__file__).resolve().parents[2] / "staging" / "README.md"
+CADDYFILE_PATH = Path(__file__).resolve().parents[2] / "staging" / "container" / "Caddyfile"
 
 
 @pytest.fixture(scope="module")
@@ -29,6 +30,11 @@ def setup_text() -> str:
 @pytest.fixture(scope="module")
 def readme_text() -> str:
     return README_PATH.read_text(encoding="utf-8")
+
+
+@pytest.fixture(scope="module")
+def caddyfile_text() -> str:
+    return CADDYFILE_PATH.read_text(encoding="utf-8")
 
 
 class TestLaunchProfiles:
@@ -219,3 +225,34 @@ class TestReverseProxyC1:
         assert 'CADDY_SERVICE_NAME="caddy.service"' in stagingctl_text
         assert 'systemctl enable "$CADDY_SERVICE_NAME"' in stagingctl_text
         assert 'systemctl restart "$CADDY_SERVICE_NAME"' in stagingctl_text
+
+
+class TestTlsC2:
+    def test_setup_installs_openssl_for_certificate_generation(self, setup_text: str) -> None:
+        assert "openssl" in setup_text
+
+    def test_stagingctl_defines_container_local_tls_paths(self, stagingctl_text: str) -> None:
+        assert 'TLS_DIR="/etc/caddy/tls"' in stagingctl_text
+        assert 'TLS_CA_CERT="$TLS_DIR/nightfall-staging-ca.crt"' in stagingctl_text
+        assert 'TLS_SERVER_CERT="$TLS_DIR/staging-photo-ingress.crt"' in stagingctl_text
+
+    def test_stagingctl_provisions_internal_ca_and_server_cert(self, stagingctl_text: str) -> None:
+        assert "_provision_container_tls_material" in stagingctl_text
+        assert "Nightfall Staging Internal CA" in stagingctl_text
+        assert "subjectAltName" in stagingctl_text
+
+    def test_stagingctl_validates_caddy_config_before_restart(self, stagingctl_text: str) -> None:
+        assert 'caddy validate --config "$CADDYFILE_DEST"' in stagingctl_text
+
+    def test_stagingctl_smoke_asserts_https_only_ingress(self, stagingctl_text: str) -> None:
+        assert "tls_https_only" in stagingctl_text
+        assert "curl -sk -o /dev/null -w '%{http_code}' --max-time 5 https://127.0.0.1/" in stagingctl_text
+        assert "curl -s -o /dev/null -w '%{http_code}' --max-time 3 http://127.0.0.1/" in stagingctl_text
+
+    def test_caddyfile_is_https_only(self, caddyfile_text: str) -> None:
+        assert "auto_https disable_redirects" in caddyfile_text
+        assert ":443" in caddyfile_text
+        assert "\n:80" not in caddyfile_text
+
+    def test_caddyfile_uses_explicit_tls_material_paths(self, caddyfile_text: str) -> None:
+        assert "tls /etc/caddy/tls/staging-photo-ingress.crt /etc/caddy/tls/staging-photo-ingress.key" in caddyfile_text

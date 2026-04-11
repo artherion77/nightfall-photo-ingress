@@ -17,10 +17,17 @@ The subsystem is intentionally minimal and non-invasive:
 
 ## Reverse proxy boundary (Phase 2 C1)
 
-- Caddy listens on container port `80` and owns all ingress.
+- Caddy listens on container port `443` and owns all ingress.
 - Static SPA assets are served from `/opt/webui/build` by Caddy.
 - API requests under `/api/*` are reverse-proxied to `127.0.0.1:8000`.
 - Uvicorn remains localhost-bound in staging via `nightfall-photo-ingress-api.service.d/override.conf`.
+
+## TLS boundary (Phase 2 C2)
+
+- TLS terminates in-container at Caddy using container-local certificate material under `/etc/caddy/tls`.
+- `stagingctl install` provisions an internal staging CA and a leaf certificate for Caddy.
+- HTTP is not exposed by Caddy in staging; ingress is HTTPS-only on port `443`.
+- Host does not store TLS private keys or certificate material for staging ingress.
 
 ## Launch contract and profiles
 

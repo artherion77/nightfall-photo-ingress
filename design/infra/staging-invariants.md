@@ -29,7 +29,9 @@ The Phase-2 baseline is strict and non-negotiable:
 6. No host-level systemd involvement.
 7. No host-level Caddy involvement.
 8. Uvicorn remains localhost-bound behind in-container Caddy.
-9. Future scope may include a dedicated read-only host mount for media library hash-import validation.
+9. Staging ingress is HTTPS-only with TLS termination in in-container Caddy.
+10. Staging TLS key material remains container-local under `/etc/caddy/tls`.
+11. Future scope may include a dedicated read-only host mount for media library hash-import validation.
 
 ## 3. Reconciled Invariants
 
@@ -40,7 +42,8 @@ The Phase-2 baseline is strict and non-negotiable:
 5. Staging lifecycle commands must not create or bind host-based tmpfs devices for runtime tmp/cache paths.
 6. Staging lifecycle commands must preserve host-mounted persistent evidence/log bindings.
 7. Staging policy contracts must validate the split model: container-local runtime tmpfs plus host-persistent evidence/log mounts.
-8. A future media-library mount, if introduced, must be host-backed and read-only.
+8. TLS termination must stay in-container and HTTPS-only behavior must be validated in staging smoke.
+9. A future media-library mount, if introduced, must be host-backed and read-only.
 
 ## 4. Outdated Staging Contracts and Tests
 

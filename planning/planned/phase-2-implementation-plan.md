@@ -61,20 +61,31 @@ Goal:
 Inputs:
 - ../../design/web/architecture.md
 - ../../design/web/design-decisions.md
+- ../../design/infra/tls.md
 
 Preconditions:
 - C1 complete.
 
 Deliverables:
+- HTTPS-only Caddy staging ingress configuration.
+- Container-local internal CA + leaf certificate lifecycle in stagingctl.
 - TLS trust and certificate handling runbook section.
 - Operator trust-import checklist.
 
 Validation steps:
 1. Validate certificate lifecycle and trust chain steps are deterministic.
 2. Validate HTTPS-only expectations are explicit.
+3. Validate staging smoke asserts HTTPS reachable and HTTP disabled.
 
 Stop-gates:
 1. Do not proceed with LAN gate milestones until TLS runbook is complete.
+2. Do not proceed if TLS private keys leave container-local storage.
+
+Validation evidence:
+1. HTTPS-only Caddy config and cert/key binding are implemented in `../../staging/container/Caddyfile`.
+2. Container-local TLS provisioning and Caddy config validation are implemented in `../../dev/bin/stagingctl`.
+3. C2 contract checks are implemented in `../../tests/staging/test_stagingctl_policy_contracts.py`.
+4. TLS runbook and trust-import flow are documented in `../../design/infra/tls.md`.
 
 ### C3 — Proxy-Level Rate Limiting
 

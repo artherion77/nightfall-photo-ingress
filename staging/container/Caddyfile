@@ -1,4 +1,10 @@
-:80 {
+{
+    auto_https disable_redirects
+}
+
+:443 {
+    tls /etc/caddy/tls/staging-photo-ingress.crt /etc/caddy/tls/staging-photo-ingress.key
+
     encode zstd gzip
 
     @api path /api/* /openapi.json /rapidoc*
