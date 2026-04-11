@@ -24,6 +24,7 @@ def ensure_venv(
     script_path: Path,
     venv_name: str = ".venv",
     guard_var: str | None = None,
+    repo_root: Path | None = None,
 ) -> None:
     """Re-exec the current script under repo venv Python when needed.
 
@@ -31,14 +32,17 @@ def ensure_venv(
     - venv Python does not exist
     - already running in target interpreter
     - reentry guard is set
+
+    When *repo_root* is provided the venv is resolved relative to it instead
+    of being derived from the parent directory of *script_path*.
     """
     script = Path(script_path).resolve()
-    repo_root = script.parent
+    effective_root = Path(repo_root).resolve() if repo_root is not None else script.parent
 
     if os.name == "nt":
-        venv_python = repo_root / venv_name / "Scripts" / "python.exe"
+        venv_python = effective_root / venv_name / "Scripts" / "python.exe"
     else:
-        venv_python = repo_root / venv_name / "bin" / "python"
+        venv_python = effective_root / venv_name / "bin" / "python"
 
     if not venv_python.exists():
         return

@@ -143,5 +143,56 @@ def test_ensure_venv_uses_custom_guard(monkeypatch: pytest.MonkeyPatch, tmp_path
     assert env.get("CUSTOM_GUARD") == "1"
 
 
+def test_ensure_venv_with_explicit_repo_root(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """When repo_root is provided, venv is found there instead of script.parent."""
+    # Script lives in a subdirectory, venv lives at a separate root
+    script = tmp_path / "sub" / "deep" / "tool.py"
+    _touch(script)
+
+    venv_root = tmp_path / "repo"
+    venv_python = venv_root / ".venv" / "bin" / "python"
+    _touch(venv_python)
+
+    monkeypatch.setattr(sys, "executable", "/usr/bin/python3")
+    monkeypatch.setattr(sys, "argv", [str(script)])
+
+    captured: dict[str, object] = {}
+
+    def _fake_execve(path: str, argv: list[str], env: dict[str, str]) -> None:
+        captured["path"] = path
+
+    monkeypatch.setattr(os, "execve", _fake_execve)
+
+    ensure_venv(script, repo_root=venv_root)
+    assert captured["path"] == str(venv_python.resolve())
+
+
+def test_ensure_venv_ignores_script_parent_when_repo_root_given(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Venv next to the script is NOT used when repo_root points elsewhere."""
+    script = tmp_path / "wrong" / "tool.py"
+    _touch(script)
+    # Venv next to script — should be ignored
+    _touch(tmp_path / "wrong" / ".venv" / "bin" / "python")
+
+    # repo_root has no venv
+    repo_root = tmp_path / "correct"
+    repo_root.mkdir(parents=True)
+
+    monkeypatch.setattr(sys, "executable", "/usr/bin/python3")
+
+    called = {"execve": False}
+
+    def _fake_execve(path: str, argv: list[str], env: dict[str, str]) -> None:
+        called["execve"] = True
+
+    monkeypatch.setattr(os, "execve", _fake_execve)
+
+    ensure_venv(script, repo_root=repo_root)
+    # No venv at repo_root → no-op
+    assert called["execve"] is False
+
+
 def test_no_cli_entrypoint_behavior() -> None:
     assert not hasattr(venv_bootstrap, "main")
