@@ -219,7 +219,7 @@ Canonical staging activities include:
 Examples:
 
 ```bash
-./dev/bin/govctl run staging.create --json
+./dev/bin/govctl run staging.ensure-running --json
 ./dev/bin/govctl run staging.install --json
 tests/staging-flow/flowctl run --phase p2
 tests/staging-flow/flowctl run --phase p3

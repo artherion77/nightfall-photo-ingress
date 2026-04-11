@@ -105,6 +105,12 @@ Canonical MCP tasks now route through `govctl run ... --json`, including dev-con
 - web.test.unit
 - web.test.integration
 - web.test.e2e
+- staging.create
+- staging.ensure-running
+- staging.install
+- staging.smoke
+- staging.smoke-live
+- staging.e2e.module1
 - metrics.status
 - metrics.run-now
 - metrics.publish
@@ -126,6 +132,7 @@ add `npx playwright install` or any browser-install step to the devctl
 bootstrap flow.
 
 Canonical E2E execution targets:
+- govctl (staging bootstrap): `./dev/bin/govctl run staging.ensure-running --json`
 - govctl: `./dev/bin/govctl run staging.e2e.module1 --json`
 - MCP: `staging.e2e.module1` task (requires staging-photo-ingress running)
 

@@ -129,6 +129,8 @@ Use `govctl run ... --json` for any scripted or MCP-driven workflow.
 | `backend.deploy.dev` | backend dev-run wrapper; currently delegates to a scaffold |
 | `test.web` | grouped web typecheck and unit suite |
 | `web.build` | production web artifact build |
+| `staging.create` | explicit staging container baseline creation |
+| `staging.ensure-running` | idempotent staging bootstrap (create/start) |
 | `staging.install` | build/install candidate into staging |
 | `staging.smoke` | headless staging smoke validation |
 | `staging.smoke-live` | authenticated live staging rehearsal |
@@ -358,7 +360,8 @@ Goal: produce the wheel and static web artifact that staging will validate.
 ./dev/bin/govctl run web.build --json
 ```
 
-`staging.install` depends on both of these targets, so invoking staging install
+`staging.install` depends on `staging.ensure-running` plus both build targets,
+so invoking staging install
 is usually sufficient when the intent is full candidate validation.
 
 ### 9.3 Staging validation
@@ -368,6 +371,7 @@ Goal: rehearse the release in the staging container using packaged artifacts.
 Canonical flow:
 
 ```bash
+./dev/bin/govctl run staging.ensure-running --json
 ./dev/bin/govctl run staging.install --json
 ./dev/bin/govctl run staging.smoke --json
 ./dev/bin/govctl run web.test.e2e --json
