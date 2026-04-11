@@ -8,6 +8,9 @@ Owner: Systems Engineering
 
 ### C1 — Reverse Proxy Baseline (Caddy)
 
+Status:
+- Implemented (2026-04-11)
+
 Goal:
 - Introduce Caddy as the required ingress boundary for Web Control Plane LAN exposure.
 
@@ -31,6 +34,15 @@ Validation steps:
 Stop-gates:
 1. Do not proceed if topology documentation conflicts with architecture.md.
 2. Do not proceed if ingress boundary ownership is ambiguous.
+
+Validation evidence:
+1. Route ownership and ingress topology are documented in `../../design/web/architecture.md`:
+	- `## 3. Reverse Proxy`
+	- `### 3.2 Proxy Topology (Phase 2)`
+2. Localhost-only application binding is documented in `../../design/web/architecture.md`:
+	- `### 3.3 Uvicorn Binding Change for Phase 2`
+3. Mandatory gate checklist is documented in `../../design/web/architecture.md`:
+	- `### 3.6 Phase 2 Mandatory Reverse Proxy Checklist`
 
 ### C2 — TLS Termination (Internal CA)
 
@@ -223,6 +235,9 @@ Stop-gates:
 
 ### T1 — Reverse Proxy (Caddy) introduction
 
+Status:
+- Completed (2026-04-11)
+
 Description:
 - Establish Caddy as mandatory ingress boundary for Web Control Plane.
 
@@ -235,6 +250,10 @@ Dependencies:
 Acceptance Criteria:
 1. Topology and route ownership documented.
 2. Uvicorn localhost-bound model preserved.
+
+Completion evidence:
+1. Topology and route ownership documented in `../../design/web/architecture.md` section `3.2`.
+2. Uvicorn localhost-bound model documented in `../../design/web/architecture.md` section `3.3`.
 
 ### T2 — TLS termination (internal CA)
 
