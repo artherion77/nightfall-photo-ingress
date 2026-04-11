@@ -46,6 +46,9 @@ Validation evidence:
 
 ### C2 — TLS Termination (Internal CA)
 
+Status:
+- Implemented (2026-04-11)
+
 Goal:
 - Establish TLS termination requirements and trust flow for LAN operators.
 
@@ -66,6 +69,13 @@ Validation steps:
 
 Stop-gates:
 1. Do not proceed with LAN gate milestones until TLS runbook is complete.
+
+Validation evidence:
+1. TLS trust model and certificate handling are documented in `../../design/web/architecture.md`:
+	- `### 3.1 Decision: Caddy over Nginx`
+	- `### 3.6 Phase 2 Mandatory Reverse Proxy Checklist` (item 2)
+2. HTTPS-only boundary requirement is documented in `../../design/web/architecture.md`:
+	- `### 3.6 Phase 2 Mandatory Reverse Proxy Checklist` (item 3)
 
 ### C3 — Proxy-Level Rate Limiting
 
@@ -257,6 +267,9 @@ Completion evidence:
 
 ### T2 — TLS termination (internal CA)
 
+Status:
+- Completed (2026-04-11)
+
 Description:
 - Define and operationalize TLS termination with internal CA trust model.
 
@@ -269,6 +282,10 @@ Dependencies:
 Acceptance Criteria:
 1. Trust import/runbook complete.
 2. HTTPS boundary enforced in planning artifacts.
+
+Completion evidence:
+1. Trust-import and TLS requirement documented in `../../design/web/architecture.md` section `3.6` (item 2).
+2. HTTPS-only boundary documented in `../../design/web/architecture.md` section `3.6` (item 3).
 
 ### T3 — Rate limiting at proxy level
 
