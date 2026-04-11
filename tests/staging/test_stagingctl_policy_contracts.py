@@ -197,3 +197,17 @@ class TestDeprecations:
     def test_deprecation_directs_to_auth_setup(self, stagingctl_text: str) -> None:
         # Warning must point the operator to the correct replacement command
         assert "stagingctl auth-setup" in stagingctl_text
+
+
+class TestReverseProxyC1:
+    def test_setup_installs_caddy_package(self, setup_text: str) -> None:
+        assert "caddy" in setup_text
+
+    def test_stagingctl_pushes_caddyfile(self, stagingctl_text: str) -> None:
+        assert 'CADDYFILE_SOURCE="$STAGING_ROOT/container/Caddyfile"' in stagingctl_text
+        assert 'lxc file push "$CADDYFILE_SOURCE" "$CONTAINER$CADDYFILE_DEST"' in stagingctl_text
+
+    def test_stagingctl_enables_caddy_service(self, stagingctl_text: str) -> None:
+        assert 'CADDY_SERVICE_NAME="caddy.service"' in stagingctl_text
+        assert 'systemctl enable "$CADDY_SERVICE_NAME"' in stagingctl_text
+        assert 'systemctl restart "$CADDY_SERVICE_NAME"' in stagingctl_text

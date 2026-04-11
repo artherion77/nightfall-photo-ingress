@@ -8,11 +8,19 @@ Staging does not own the product unit definitions. Canonical deployable units li
 The subsystem is intentionally minimal and non-invasive:
 
 - uses one LXC container (`staging-photo-ingress`)
+- uses Caddy as the mandatory ingress boundary for LAN exposure
 - does not modify host network definitions
 - does not modify host Python, host systemd, or host packages
 - keeps rollback deterministic via snapshot `clean`
 - installs web control-plane runtime dependencies (`.[web]`) only inside the
   container venv (`/opt/ingress`), never as host-level dev packages
+
+## Reverse proxy boundary (Phase 2 C1)
+
+- Caddy listens on container port `80` and owns all ingress.
+- Static SPA assets are served from `/opt/webui/build` by Caddy.
+- API requests under `/api/*` are reverse-proxied to `127.0.0.1:8000`.
+- Uvicorn remains localhost-bound in staging via `nightfall-photo-ingress-api.service.d/override.conf`.
 
 ## Launch contract and profiles
 
@@ -155,8 +163,11 @@ staging/
   stagingctl
   container/
     setup.sh
+    Caddyfile
     photo-ingress.conf
   systemd/
+    nightfall-photo-ingress-api.service.d/
+      override.conf
     nightfall-photo-ingress.service.d/
       override.conf
     nightfall-photo-ingress.timer.d/

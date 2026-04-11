@@ -36,11 +36,14 @@ VENV_ROOT="/opt/ingress"
 CONF_DEST="/etc/nightfall/photo-ingress.conf"
 SERVICE_NAME="nightfall-photo-ingress"
 API_SERVICE_NAME="nightfall-photo-ingress-api.service"
+CADDY_SERVICE_NAME="caddy.service"
 TRASH_PATH_NAME="nightfall-photo-ingress-trash.path"
 TRASH_SERVICE_NAME="nightfall-photo-ingress-trash.service"
 SYSTEMD_SOURCE_DIR="$PROJECT_ROOT/systemd"
 STAGING_SYSTEMD_DIR="$STAGING_ROOT/systemd"
 WEB_BUILD_DIR="$PROJECT_ROOT/webui/build"
+CADDYFILE_SOURCE="$STAGING_ROOT/container/Caddyfile"
+CADDYFILE_DEST="/etc/caddy/Caddyfile"
 
 if [[ "$STAGING_VOLATILE" == "1" ]]; then
     # Volatile mode: host /run is tmpfs, so evidence/logs are ephemeral.
@@ -172,6 +175,21 @@ cmd_create() {
     # Enforce standard tmp directory semantics inside the container.
     # Staging no longer bind-mounts /tmp or /var/tmp from host /run/user/*.
     lxc exec "$CONTAINER" -- chmod 1777 /tmp /var/tmp || true
+
+    _info "Preparing host tmpfs backing directories ..."
+    local tmpfs_host_base
+    tmpfs_host_base="$(_resolve_tmpfs_host_base)"
+    mkdir -p "$tmpfs_host_base/tmp" "$tmpfs_host_base/var-tmp" "$tmpfs_host_base/nightfall-cache"
+    chmod 777 "$tmpfs_host_base/tmp" "$tmpfs_host_base/var-tmp" "$tmpfs_host_base/nightfall-cache"
+
+    # Reconcile devices to ensure deterministic create behavior.
+    lxc config device remove "$CONTAINER" tmpfs-tmp >/dev/null 2>&1 || true
+    lxc config device remove "$CONTAINER" tmpfs-var-tmp >/dev/null 2>&1 || true
+    lxc config device remove "$CONTAINER" tmpfs-nightfall-cache >/dev/null 2>&1 || true
+
+    lxc config device add "$CONTAINER" tmpfs-tmp disk source="$tmpfs_host_base/tmp" path=/tmp
+    lxc config device add "$CONTAINER" tmpfs-var-tmp disk source="$tmpfs_host_base/var-tmp" path=/var/tmp
+    lxc config device add "$CONTAINER" tmpfs-nightfall-cache disk source="$tmpfs_host_base/nightfall-cache" path=/var/cache/nightfall-photo-ingress
 
     _info "Attaching bind-mounts ..."
     lxc config device add "$CONTAINER" evidence disk \
@@ -340,6 +358,10 @@ for line in config_path.read_text(encoding='utf-8').splitlines():
     lxc exec "$CONTAINER" -- rm -rf /opt/api
     lxc file push --recursive "$PROJECT_ROOT/api" "$CONTAINER/opt/"
 
+    _info "Installing Caddy config for Web Control Plane ingress ..."
+    lxc exec "$CONTAINER" -- mkdir -p /etc/caddy
+    lxc file push "$CADDYFILE_SOURCE" "$CONTAINER$CADDYFILE_DEST"
+
     if [[ -d "$WEB_BUILD_DIR" ]]; then
         _info "Syncing web build artifact to /opt/webui/build ..."
         lxc exec "$CONTAINER" -- rm -rf /opt/webui/build
@@ -368,13 +390,17 @@ for line in config_path.read_text(encoding='utf-8').splitlines():
     lxc exec "$CONTAINER" -- systemctl enable "$API_SERVICE_NAME"
     lxc exec "$CONTAINER" -- systemctl restart "$API_SERVICE_NAME"
 
+    _info "Enabling and restarting Caddy reverse proxy ..."
+    lxc exec "$CONTAINER" -- systemctl enable "$CADDY_SERVICE_NAME"
+    lxc exec "$CONTAINER" -- systemctl restart "$CADDY_SERVICE_NAME"
+
     # Refresh reset baseline after install so `stagingctl reset` returns to
     # an installed, config-valid state with no onboarding token cache.
     lxc delete "$CONTAINER/$SNAPSHOT_CLEAN" 2>/dev/null || true
     _info "Taking LXD snapshot '$SNAPSHOT_CLEAN' (post-install baseline) ..."
     lxc snapshot "$CONTAINER" "$SNAPSHOT_CLEAN"
 
-    _ok "Installed $whl_name. Timer/trash enabled and API service active. Snapshot '$SNAPSHOT_CLEAN' refreshed."
+    _ok "Installed $whl_name. Timer/trash enabled, API active on localhost, Caddy ingress active. Snapshot '$SNAPSHOT_CLEAN' refreshed."
     _info "Run 'stagingctl smoke' to verify or 'stagingctl reset' to roll back."
 }
 
