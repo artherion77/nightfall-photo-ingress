@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
 # Minimal wrapper for manually triggering metrics runner operations.
+#
+# COMPATIBILITY SHIM: This script is a compatibility layer over
+# ./dev/bin/metricsctl and will be deprecated in a future release.
+# Prefer using ./dev/bin/metricsctl directly:
+#   metricsctl run-now   (instead of metrics-runner run)
+#   metricsctl status    (instead of metrics-runner status)
+#   metricsctl publish   (instead of metrics-runner publish-github)
 
 set -euo pipefail
 
