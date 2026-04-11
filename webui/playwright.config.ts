@@ -10,7 +10,6 @@ export default defineConfig({
   reporter: 'line',
   use: {
     baseURL,
-    ignoreHTTPSErrors: process.env.PLAYWRIGHT_IGNORE_HTTPS_ERRORS === '1',
     headless: true,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',

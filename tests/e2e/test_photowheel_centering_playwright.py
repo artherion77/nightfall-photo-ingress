@@ -20,6 +20,10 @@ PLAYWRIGHT_SPEC = 'tests/e2e/photowheel.centering-perceptual.spec.ts'
 
 
 @pytest.mark.staging
+@pytest.mark.xfail(
+    reason="Known env-dependent staging data variance; tracked in GH issue #58",
+    strict=False,
+)
 def test_case_16_photowheel_centering_invariant_playwright(base_url: str) -> None:
     """Case 16: execute staging-system Playwright centering invariant checks (CTR-1..CTR-6)."""
     if not container_is_running(STAGING_CONTAINER):

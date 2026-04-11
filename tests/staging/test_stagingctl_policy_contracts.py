@@ -233,8 +233,13 @@ class TestTlsC2:
 
     def test_stagingctl_defines_container_local_tls_paths(self, stagingctl_text: str) -> None:
         assert 'TLS_DIR="/etc/caddy/tls"' in stagingctl_text
-        assert 'TLS_CA_CERT="$TLS_DIR/nightfall-staging-ca.crt"' in stagingctl_text
+        assert 'TLS_CA_CERT="$TLS_DIR/ca.pem"' in stagingctl_text
         assert 'TLS_SERVER_CERT="$TLS_DIR/staging-photo-ingress.crt"' in stagingctl_text
+
+    def test_stagingctl_exports_ca_to_tests_path(self, stagingctl_text: str) -> None:
+        assert 'EXPORTED_CA_PATH="$PROJECT_ROOT/tests/ca/staging-ca.pem"' in stagingctl_text
+        assert "cmd_export_ca" in stagingctl_text
+        assert "lxc file pull \"$CONTAINER$TLS_CA_CERT\" \"$EXPORTED_CA_PATH\"" in stagingctl_text
 
     def test_stagingctl_provisions_internal_ca_and_server_cert(self, stagingctl_text: str) -> None:
         assert "_provision_container_tls_material" in stagingctl_text

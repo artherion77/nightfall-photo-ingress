@@ -7,7 +7,8 @@ from pathlib import Path
 
 
 RUNNER_ROOT = "/opt/nightfall-webui-runner"
-CA_CERT_IN_STAGING = "/etc/caddy/tls/nightfall-staging-ca.crt"
+CA_CERT_EXPORTED = "/home/chris/dev/nightfall-photo-ingress/tests/ca/staging-ca.pem"
+CA_CERT_IN_STAGING = "/usr/local/share/ca-certificates/staging-ca.crt"
 
 
 def container_is_running(name: str) -> bool:
@@ -18,6 +19,13 @@ def container_is_running(name: str) -> bool:
 
 
 def ensure_staging_playwright_runner_ready(staging_container: str, repo_root: Path) -> None:
+    local_ca = Path(CA_CERT_EXPORTED)
+    if not local_ca.exists():
+        raise AssertionError(
+            f"missing exported CA bundle at {local_ca}; run 'stagingctl export-ca' "
+            "or 'govctl run staging.validate --json' before Playwright E2E"
+        )
+
     sync_cmd = (
         f"cd {repo_root}/webui && "
         "tar -czf - package.json package-lock.json playwright.config.ts tests/e2e tests/playwright-shim.d.ts "
@@ -31,13 +39,28 @@ def ensure_staging_playwright_runner_ready(staging_container: str, repo_root: Pa
             f"stderr:\n{sync.stderr}"
         )
 
+    push_ca = subprocess.run(
+        ["lxc", "file", "push", str(local_ca), f"{staging_container}{CA_CERT_IN_STAGING}"],
+        capture_output=True,
+        text=True,
+    )
+    if push_ca.returncode != 0:
+        raise AssertionError(
+            "failed to push exported CA bundle into staging container:\n"
+            f"stdout:\n{push_ca.stdout}\n\n"
+            f"stderr:\n{push_ca.stderr}"
+        )
+
     bootstrap_cmd = (
         "set -euo pipefail; "
         "if ! command -v node >/dev/null 2>&1; then "
         "  apt-get update >/dev/null && DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs npm >/dev/null; "
         "fi; "
-        f"cp -f {CA_CERT_IN_STAGING} /usr/local/share/ca-certificates/nightfall-staging-ca.crt; "
         "update-ca-certificates >/dev/null; "
+        "mkdir -p /root/.pki/nssdb; "
+        "certutil -N -d sql:/root/.pki/nssdb --empty-password 2>/dev/null || true; "
+        "certutil -D -d sql:/root/.pki/nssdb -n nightfall-staging-ca 2>/dev/null || true; "
+        f"certutil -A -d sql:/root/.pki/nssdb -n nightfall-staging-ca -t 'C,,' -i {CA_CERT_IN_STAGING}; "
         f"cd {RUNNER_ROOT}; "
         "if [[ ! -d node_modules ]]; then npm ci >/dev/null; fi; "
         "npx playwright install --with-deps chromium >/dev/null"
@@ -61,7 +84,6 @@ def run_playwright_spec_in_staging(staging_container: str, spec: str, base_url: 
         f"cd {RUNNER_ROOT}; "
         f"NODE_EXTRA_CA_CERTS={CA_CERT_IN_STAGING} "
         f"STAGING_CA_BUNDLE={CA_CERT_IN_STAGING} "
-        "PLAYWRIGHT_IGNORE_HTTPS_ERRORS=1 "
         f"STAGING_BASE_URL={base_url} "
         f"npx playwright test {spec} --reporter=line"
     )

@@ -262,6 +262,7 @@ Stop-gates:
 	- `https://staging-photo-ingress.home.arpa`
 	- `https://npi.pohl-family.org`
 4. E2E trust path aligned to staging internal CA bundle for strict TLS verification.
+5. Drift-free CA synchronization enforced via `stagingctl export-ca`, exporting `/etc/caddy/tls/ca.pem` to `tests/ca/staging-ca.pem` for all E2E and Playwright trust.
 
 ### C8 — KPI Threshold Configuration + Read-Path Resilience
 

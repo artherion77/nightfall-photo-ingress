@@ -31,7 +31,7 @@ Out of scope:
 ## 3. Container-Local Certificate Paths
 
 - CA key: `/etc/caddy/tls/nightfall-staging-ca.key`
-- CA cert: `/etc/caddy/tls/nightfall-staging-ca.crt`
+- CA cert: `/etc/caddy/tls/ca.pem`
 - Leaf key: `/etc/caddy/tls/staging-photo-ingress.key`
 - Leaf cert: `/etc/caddy/tls/staging-photo-ingress.crt`
 
@@ -49,18 +49,29 @@ Out of scope:
 4. Sign the leaf with the internal CA.
 5. Set file permissions for Caddy runtime readability and key protection.
 6. Validate Caddy config and restart `caddy.service`.
+7. Export CA cert to repo-local trust path via `stagingctl export-ca`:
+   - source: `/etc/caddy/tls/ca.pem`
+   - destination: `tests/ca/staging-ca.pem`
 
 ## 5. Operator Trust Import
 
-For browser trust in LAN testing, import CA cert `nightfall-staging-ca.crt` from inside the container into the operator trust store.
+For browser trust in LAN testing, import CA cert `ca.pem` from inside the container into the operator trust store.
 
 Container pull example:
 
 ```bash
-lxc file pull staging-photo-ingress/etc/caddy/tls/nightfall-staging-ca.crt ./nightfall-staging-ca.crt
+lxc file pull staging-photo-ingress/etc/caddy/tls/ca.pem ./staging-ca.pem
 ```
 
 After import, access staging UI over `https://staging-photo-ingress.home.arpa/`.
+
+For automated test trust synchronization, use:
+
+```bash
+./dev/bin/stagingctl export-ca
+```
+
+This overwrites `tests/ca/staging-ca.pem` and prevents CA drift between staging runtime and host-side E2E clients.
 
 ## 6. Validation Checklist
 

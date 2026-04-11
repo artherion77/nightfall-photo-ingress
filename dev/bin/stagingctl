@@ -12,6 +12,7 @@
 #   stagingctl auth-setup        run interactive device-code auth inside the container
 #   stagingctl smoke-live        run authenticated live poll + secret scan
 #   stagingctl evidence [run-id] list or inspect evidence runs
+#   stagingctl export-ca         export staging CA cert to tests/ca/staging-ca.pem
 #
 # Environment variables:
 #   STAGING_CLIENT_ID   real Azure client_id to substitute into config
@@ -47,9 +48,10 @@ CADDYFILE_DEST="/etc/caddy/Caddyfile"
 CT_TMP_DIR="/root/staging-photo-ingress-tmp"
 TLS_DIR="/etc/caddy/tls"
 TLS_CA_KEY="$TLS_DIR/nightfall-staging-ca.key"
-TLS_CA_CERT="$TLS_DIR/nightfall-staging-ca.crt"
+TLS_CA_CERT="$TLS_DIR/ca.pem"
 TLS_SERVER_KEY="$TLS_DIR/staging-photo-ingress.key"
 TLS_SERVER_CERT="$TLS_DIR/staging-photo-ingress.crt"
+EXPORTED_CA_PATH="$PROJECT_ROOT/tests/ca/staging-ca.pem"
 RELEASES_ROOT="$PROJECT_ROOT/artifacts/releases"
 RELEASES_DIR="$RELEASES_ROOT/versions"
 RELEASE_ACTIVE_LINK="$RELEASES_ROOT/active"
@@ -544,6 +546,26 @@ cmd_install() {
     local release_id
     release_id="$(_release_materialize "$wheel_path")"
     _deploy_release_to_container "$release_id"
+    _export_ca_to_workspace
+}
+
+_export_ca_to_workspace() {
+    _require_container_running
+    _info "Exporting staging CA certificate to $EXPORTED_CA_PATH ..."
+
+    mkdir -p "$(dirname "$EXPORTED_CA_PATH")"
+    rm -f "$EXPORTED_CA_PATH"
+    lxc file pull "$CONTAINER$TLS_CA_CERT" "$EXPORTED_CA_PATH"
+    chmod 0644 "$EXPORTED_CA_PATH"
+
+    _ok "Exported staging CA certificate to $EXPORTED_CA_PATH"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# stagingctl export-ca
+# ─────────────────────────────────────────────────────────────────────────────
+cmd_export_ca() {
+    _export_ca_to_workspace
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -969,7 +991,8 @@ Usage: $(basename "$0") <command> [args]
 
 Commands:
   create              Create LXC container (profiles: default+staging) and baseline state.
-    install [wheel]     Create versioned release (wheel+web build), deploy it, and refresh 'clean' snapshot.
+    install [wheel]     Create versioned release (wheel+web build), deploy it, refresh 'clean' snapshot,
+                                            and export CA to tests/ca/staging-ca.pem.
     releases            List versioned releases and show active release mapping.
     rollback <id>       Switch active release to <id>, redeploy, validate, and log rollback event.
     uninstall [--purge] Delete container. --purge preserves host evidence/log directories.
@@ -979,6 +1002,7 @@ Commands:
   discover-paths      Auto-discover OneDrive paths using cached token (no new login required).
   smoke-live          Run authenticated live poll + secret scan; collect evidence.
   evidence [id]       List or inspect evidence runs.
+    export-ca           Export container CA cert to tests/ca/staging-ca.pem.
 
 Environment variables:
   STAGING_CLIENT_ID       Azure client_id to inject into config.
@@ -1006,6 +1030,7 @@ main() {
         discover-paths) cmd_discover_paths  "$@" ;;
         smoke-live)     cmd_smoke_live      "$@" ;;
         evidence)       cmd_evidence   "$@" ;;
+        export-ca)      cmd_export_ca  "$@" ;;
         *)              _usage ;;
     esac
 }

@@ -153,7 +153,7 @@ targets:
   web.test.e2e:
     description: "E2E test suite (runs against staging-photo-ingress)"
     command: "./.venv/bin/python -m pytest tests/e2e -v --tb=short"
-    requires: [staging.ensure-running, staging.install]
+    requires: [staging.ensure-running, staging.install, staging.validate]
     preflight:
       - container-running:staging-photo-ingress
     lock: false
@@ -162,7 +162,7 @@ targets:
   web.test.integration:
     description: "Web integration test suite"
     command: "./.venv/bin/python -m pytest tests/e2e -v --tb=short"
-    requires: [staging.ensure-running, staging.install]
+    requires: [staging.ensure-running, staging.install, staging.validate]
     preflight:
       - container-running:staging-photo-ingress
     lock: false
@@ -296,10 +296,18 @@ targets:
       - token-source-consistent
     lock: false
 
+  staging.validate:
+    description: "Export staging CA cert for test trust synchronization"
+    command: "./dev/bin/stagingctl export-ca"
+    requires: [staging.ensure-running, staging.install]
+    preflight:
+      - container-running:staging-photo-ingress
+    lock: false
+
   staging.e2e.module1:
     description: "Run E2E Suite Module 1"
     command: "./.venv/bin/python -m pytest tests/e2e -v --tb=short"
-    requires: [staging.ensure-running, staging.install]
+    requires: [staging.ensure-running, staging.install, staging.validate]
     preflight:
       - container-running:staging-photo-ingress
     lock: false
@@ -343,7 +351,7 @@ groups:
     targets: [backend.build.wheel, web.build, metrics.build.dashboard]
 
   staging.full:
-    targets: [staging.ensure-running, staging.install, staging.smoke, staging.e2e.module1]
+    targets: [staging.ensure-running, staging.install, staging.validate, staging.smoke, staging.e2e.module1]
 
   metrics.full:
     targets:
