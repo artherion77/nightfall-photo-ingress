@@ -1,6 +1,6 @@
 # metricsctl Consolidation — RCA Analysis & 3-Phase Migration Plan
 
-**Status:** analysis complete — awaiting Phase 1 approval  
+**Status:** Phase 2 complete — Phase 3 pending  
 **Date:** 2026-04-10  
 **Owner:** Systems Engineering  
 **Issue:** [#8 — Plan: metricsctl consolidation to dev/bin canonical surface (deferred)](https://github.com/artherion77/nightfall-photo-ingress/issues/8)  
@@ -502,33 +502,45 @@ Regression gate results:
 ### Phase 2 — Consolidation & Refactor
 
 #### Code changes
-- [ ] Create `dev/lib/metricsctl.py` with all `cmd_*` functions and CLI wiring from `./metricsctl`
-- [ ] Update `dev/bin/metricsctl` to thin launcher of `dev/lib/metricsctl.py`
-- [ ] Convert `./metricsctl` at repo root to deprecation shim (print warning to stderr, delegate to `dev/bin/metricsctl`)
-- [ ] Confirm `poller_runner._service_unit_content()` still embeds `./dev/bin/metricsctl` (verify unchanged)
-- [ ] Confirm `metrics/systemd/nightfall-metrics-poller.service` references `./dev/bin/metricsctl` (verify unchanged)
+- [x] Create `dev/lib/metricsctl.py` with all `cmd_*` functions and CLI wiring from `./metricsctl`
+- [x] Update `dev/bin/metricsctl` to thin launcher of `dev/lib/metricsctl.py`
+- [x] Convert `./metricsctl` at repo root to deprecation shim (print warning to stderr, delegate to `dev/bin/metricsctl`)
+- [x] Confirm `poller_runner._service_unit_content()` still embeds `./dev/bin/metricsctl` (verified at line 263)
+- [x] Confirm `metrics/systemd/nightfall-metrics-poller.service` references `./dev/bin/metricsctl` (verified at line 9)
 
 #### Caller updates
-- [ ] Audit `tests/` for hard-coded `./metricsctl` paths; update all to `./dev/bin/metricsctl`
-- [ ] Confirm no remaining `./metricsctl` invocations in `dev/` scripts (outside of shim itself)
+- [x] Audit `tests/` for hard-coded `./metricsctl` paths; updated `test_find_repo_root.py` anchor to `dev/lib/metricsctl.py`
+- [x] Confirm no remaining `./metricsctl` invocations in `dev/` scripts (outside of shim itself)
 
 #### Test updates
-- [ ] Add smoke test: `./dev/bin/metricsctl paths` from repo subdirectory returns correct paths
-- [ ] Add regression test: output of `./dev/bin/metricsctl <each-subcommand>` identical to pre-migration `./metricsctl`
+- [x] Add smoke test: `./dev/bin/metricsctl paths` from repo subdirectory returns correct paths
+- [x] Add regression test: output of `./dev/bin/metricsctl <each-subcommand>` identical to pre-migration `./metricsctl`
 
 #### Documentation updates
-- [ ] Update `docs/development-handbook.md` canonical entrypoint table to reference `./dev/bin/metricsctl`
-- [ ] Update `metrics/README.md` metricsctl references
-- [ ] Update `design/infra/metrics-ctl-design.md` with new canonical layout
-- [ ] Update `AGENTS.md` if it references `./metricsctl` as primary entrypoint
-- [ ] Add `# DEPRECATED` header to `./metricsctl` root shim
+- [x] Update `docs/development-handbook.md` canonical entrypoint table to reference `./dev/bin/metricsctl` — already correct
+- [x] Update `metrics/README.md` metricsctl references — already correct
+- [x] Update `design/infra/metrics-ctl-design.md` with new canonical layout — already correct
+- [x] Update `AGENTS.md` if it references `./metricsctl` as primary entrypoint — no bare `./metricsctl` found
+- [x] Add `# DEPRECATED` header to `./metricsctl` root shim
 
 #### Regression gates (must pass before Phase 3 starts)
-- [ ] `./metricsctl` shim prints deprecation warning to stderr, then exits with correct behavior
-- [ ] `./dev/bin/metricsctl` produces identical output for all 20 subcommands
-- [ ] All govctl `metrics.*` targets pass
-- [ ] All MCP metrics task tests pass
-- [ ] Systemd unit reinstall generates correct `ExecStart` path
+- [x] `./metricsctl` shim prints deprecation warning to stderr, then exits with correct behavior
+- [x] `./dev/bin/metricsctl` produces identical output for all 20 subcommands
+- [x] All govctl `metrics.*` targets pass
+- [x] All MCP metrics task tests pass
+- [x] Systemd unit reinstall generates correct `ExecStart` path
+
+#### Phase 2 — Progress
+
+**Status:** Phase 2 complete (2026-04-11)
+
+| Step | Commit | Summary |
+|------|--------|---------|
+| 1 | `97752a0` | Created `dev/lib/metricsctl.py` — full CLI implementation with find_repo_root |
+| 2 | `9303963` | Updated `dev/bin/metricsctl` to thin launcher of `dev/lib/metricsctl.py` |
+| 3 | `1c248ca` | Converted `./metricsctl` to deprecation shim (19 lines, warns + execs) |
+| 4 | `0362e9c` | Updated test anchor from `metricsctl` to `dev/lib/metricsctl.py` |
+| 5 | (this commit) | Regression gate: 496 tests passed; documentation audit — all refs already canonical |
 
 ---
 
