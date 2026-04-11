@@ -1,0 +1,409 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+"""Administrative CLI for Nightfall metrics modules and poller operations.
+
+This entrypoint orchestrates module-specific runners in metrics/runner and keeps
+all command behavior centralized for operators and automation.
+
+Canonical location: dev/lib/metricsctl.py
+Canonical launcher: dev/bin/metricsctl
+"""
+
+import argparse
+import json
+import os
+import sqlite3
+import subprocess
+import sys
+from pathlib import Path
+
+# dev/lib/ is already on sys.path when invoked via dev/bin/metricsctl launcher.
+# Ensure it is present for direct invocations as well.
+_THIS_DIR = Path(__file__).resolve().parent
+if str(_THIS_DIR) not in sys.path:
+    sys.path.insert(0, str(_THIS_DIR))
+
+from find_repo_root import find_repo_root
+from venv_bootstrap import ensure_venv
+
+_REPO_ROOT = find_repo_root(anchor=Path(__file__))
+
+ensure_venv(Path(__file__), repo_root=_REPO_ROOT)
+
+# Ensure repo root is on sys.path so metrics.runner and api.* are importable
+# regardless of CWD.
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from repo_lock import RepoLock
+
+from metrics.runner.aggregator import run_aggregation
+from metrics.runner.backend_collector import run_backend_collection
+from metrics.runner.dashboard_generator import run_dashboard_generation
+from metrics.runner.frontend_collector import run_frontend_collection
+from metrics.runner.module1_init import initialize_module1
+from metrics.runner.module8_ops import apply_retention_policy, ensure_ops_state
+from metrics.runner.poller_runner import (
+    _compute_dashboard_source_fingerprint,
+    _dashboard_needs_rebuild,
+    _dashboard_static_dir,
+    _read_dashboard_build_stamp,
+    cleanup_runtime_artifacts,
+    install_poller,
+    poller_status,
+    publish_metrics,
+    reconfigure_poller,
+    run_now,
+    start_poller,
+    stop_poller,
+    uninstall_poller,
+)
+from metrics.runner.schema_contract import manifest_schema, metrics_schema, validate_manifest_payload, validate_metrics_payload
+from nightfall_photo_ingress.config import load_config
+
+from api.services.thumbnail_service import ThumbnailService
+
+
+def _devctl_dashboard_drift_preflight(repo_root: Path) -> None:
+    """Ensure dashboard dependencies are synchronized before generation.
+
+    We invoke devctl in lock-reentry mode so both tools share one global lock
+    without deadlocking.
+    """
+    devctl_path = repo_root / "dev" / "bin" / "devctl"
+    if not devctl_path.exists():
+        raise RuntimeError(f"Missing devctl at {devctl_path}")
+
+    env = os.environ.copy()
+    env["DEVCTL_GLOBAL_LOCK_HELD"] = "1"
+    subprocess.run(
+        [str(devctl_path), "ensure-stack-ready", "dashboard"],
+        cwd=str(repo_root),
+        env=env,
+        check=True,
+    )
+
+
+def _repo_root() -> Path:
+    """Return repository root via sentinel-based discovery."""
+    return _REPO_ROOT
+
+
+def cmd_init_module1(args: argparse.Namespace) -> int:
+    """Initialize baseline schema/layout artifacts for Module 1."""
+    initialize_module1(_repo_root(), args.run_id)
+    print(f"module1 initialized with run_id={args.run_id}")
+    return 0
+
+
+def cmd_validate_module1(_: argparse.Namespace) -> int:
+    """Validate latest manifest and metrics payloads against schemas."""
+    root = _repo_root()
+    latest_manifest = json.loads((root / "artifacts" / "metrics" / "latest" / "manifest.json").read_text(encoding="utf-8"))
+    latest_metrics = json.loads((root / "artifacts" / "metrics" / "latest" / "metrics.json").read_text(encoding="utf-8"))
+
+    manifest_schema()
+    metrics_schema()
+    validate_manifest_payload(latest_manifest)
+    validate_metrics_payload(latest_metrics)
+
+    print("module1 validation successful")
+    return 0
+
+
+def cmd_paths(_: argparse.Namespace) -> int:
+    """Print key runtime paths consumed by operators and automation."""
+    root = _repo_root()
+    print(str(root / "metrics" / "runner"))
+    print(str(root / "metrics" / "systemd"))
+    print(str(root / "metrics" / "state"))
+    print(str(root / "metrics" / "output"))
+    print(str(root / "artifacts" / "metrics" / "latest"))
+    return 0
+
+
+def cmd_collect_backend(args: argparse.Namespace) -> int:
+    """Run backend collector pipeline (Module 2)."""
+    root = _repo_root()
+    run_backend_collection(
+        repo_root=root,
+        run_id=args.run_id,
+        pytest_target=args.pytest_target,
+        skip_pytest=args.skip_pytest,
+    )
+    print(f"module2 backend collection complete run_id={args.run_id}")
+    return 0
+
+
+def cmd_collect_frontend(args: argparse.Namespace) -> int:
+    """Run frontend collector pipeline (Module 3)."""
+    root = _repo_root()
+    run_frontend_collection(
+        repo_root=root,
+        run_id=args.run_id,
+    )
+    print(f"module3 frontend collection complete run_id={args.run_id}")
+    return 0
+
+
+def cmd_aggregate(args: argparse.Namespace) -> int:
+    """Run aggregation/delta synthesis (Module 4)."""
+    root = _repo_root()
+    run_aggregation(
+        repo_root=root,
+        run_id=args.run_id,
+    )
+    print(f"module4 aggregation complete run_id={args.run_id}")
+    return 0
+
+
+def cmd_generate_dashboard(args: argparse.Namespace) -> int:
+    """Generate dashboard/report artifacts after dependency drift preflight."""
+    root = _repo_root()
+    with RepoLock():
+        _devctl_dashboard_drift_preflight(root)
+        run_dashboard_generation(
+            repo_root=root,
+            run_id=args.run_id,
+        )
+    print(f"module5 dashboard generation complete run_id={args.run_id}")
+    return 0
+
+
+def cmd_install(args: argparse.Namespace) -> int:
+    """Install poller runtime assets and units (Module 6)."""
+    root = _repo_root()
+    payload = install_poller(
+        repo_root=root,
+        frequency_minutes=args.frequency_minutes,
+        max_history_runs=args.max_history_runs,
+    )
+    print(json.dumps(payload, indent=2))
+    return 0
+
+
+def cmd_reconfigure(args: argparse.Namespace) -> int:
+    """Update poller runtime configuration without full reinstall."""
+    root = _repo_root()
+    payload = reconfigure_poller(
+        repo_root=root,
+        frequency_minutes=args.frequency_minutes,
+        max_history_runs=args.max_history_runs,
+    )
+    print(json.dumps(payload, indent=2))
+    return 0
+
+
+def cmd_start(_: argparse.Namespace) -> int:
+    """Enable/start the poller runtime."""
+    root = _repo_root()
+    payload = start_poller(repo_root=root)
+    print(json.dumps(payload, indent=2))
+    return 0
+
+
+def cmd_stop(_: argparse.Namespace) -> int:
+    """Disable/stop the poller runtime."""
+    root = _repo_root()
+    payload = stop_poller(repo_root=root)
+    print(json.dumps(payload, indent=2))
+    return 0
+
+
+def cmd_status(_: argparse.Namespace) -> int:
+    """Return current poller runtime status payload."""
+    root = _repo_root()
+    payload = poller_status(repo_root=root)
+    print(json.dumps(payload, indent=2))
+    return 0
+
+
+def cmd_run_now(args: argparse.Namespace) -> int:
+    """Execute one full poller cycle immediately."""
+    root = _repo_root()
+    payload = run_now(
+        repo_root=root,
+        max_retries=args.max_retries,
+        timeout_seconds=args.timeout_seconds,
+    )
+    print(json.dumps(payload, indent=2))
+    return 0
+
+
+def cmd_uninstall(_: argparse.Namespace) -> int:
+    """Remove poller runtime assets and units."""
+    root = _repo_root()
+    payload = uninstall_poller(repo_root=root)
+    print(json.dumps(payload, indent=2))
+    return 0
+
+
+def cmd_publish(_: argparse.Namespace) -> int:
+    """Publish latest metrics surface to the publication target."""
+    root = _repo_root()
+    payload = publish_metrics(repo_root=root)
+    print(json.dumps(payload, indent=2))
+    return 0
+
+
+def cmd_retention_prune(args: argparse.Namespace) -> int:
+    """Apply retention policy to metrics history artifacts."""
+    root = _repo_root()
+    ensure_ops_state(root)
+    payload = apply_retention_policy(repo_root=root, max_history_runs=args.max_history_runs)
+    print(json.dumps(payload, indent=2))
+    return 0
+
+
+def cmd_extensions_status(_: argparse.Namespace) -> int:
+    """Report optional collector/extension runtime configuration."""
+    root = _repo_root()
+    paths = ensure_ops_state(root)
+    payload = {
+        "paths": paths,
+        "extensions": json.loads((root / paths["extensions_path"]).read_text(encoding="utf-8")),
+    }
+    print(json.dumps(payload, indent=2))
+    return 0
+
+
+def cmd_cleanup_runtime(args: argparse.Namespace) -> int:
+    """Clean generated runtime artifacts (optionally including history)."""
+    root = _repo_root()
+    payload = cleanup_runtime_artifacts(repo_root=root, include_history=args.include_history)
+    print(json.dumps(payload, indent=2))
+    return 0
+
+
+def cmd_dashboard_build_stamp(_: argparse.Namespace) -> int:
+    """Report dashboard build stamp and whether source drift requires rebuild."""
+    root = _repo_root()
+    payload = {
+        "dashboard_index_exists": (_dashboard_static_dir(root) / "index.html").exists(),
+        "build_stamp": _read_dashboard_build_stamp(_dashboard_static_dir(root)),
+        "current_source_fingerprint": _compute_dashboard_source_fingerprint(root),
+        "needs_rebuild": _dashboard_needs_rebuild(root),
+    }
+    print(json.dumps(payload, indent=2))
+    return 0
+
+
+def cmd_thumbnail_gc(args: argparse.Namespace) -> int:
+    """Garbage-collect thumbnail cache entries no longer in pending status."""
+    app_config = load_config(args.config)
+    conn = sqlite3.connect(app_config.core.registry_path, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    try:
+        service = ThumbnailService(conn, app_config.core.thumbnail_cache_path)
+        payload = service.garbage_collect()
+    finally:
+        conn.close()
+
+    print(json.dumps(payload, indent=2))
+    return 0
+
+
+def build_parser() -> argparse.ArgumentParser:
+    """Construct CLI command surface and wire handlers."""
+    parser = argparse.ArgumentParser(description="Nightfall metrics administrative entrypoint")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    init_parser = sub.add_parser("init-module1", help="Initialize Module 1 schema/layout artifacts")
+    init_parser.add_argument("--run-id", default="module1-bootstrap")
+    init_parser.set_defaults(func=cmd_init_module1)
+
+    validate_parser = sub.add_parser("validate-module1", help="Validate Module 1 artifacts and schemas")
+    validate_parser.set_defaults(func=cmd_validate_module1)
+
+    paths_parser = sub.add_parser("paths", help="Print key metrics runtime paths")
+    paths_parser.set_defaults(func=cmd_paths)
+
+    backend_parser = sub.add_parser("collect-backend", help="Run Module 2 backend metrics collector")
+    backend_parser.add_argument("--run-id", default="module2-bootstrap")
+    backend_parser.add_argument("--pytest-target", default="tests/unit")
+    backend_parser.add_argument("--skip-pytest", action="store_true")
+    backend_parser.set_defaults(func=cmd_collect_backend)
+
+    frontend_parser = sub.add_parser("collect-frontend", help="Run Module 3 frontend metrics collector")
+    frontend_parser.add_argument("--run-id", default="module3-bootstrap")
+    frontend_parser.set_defaults(func=cmd_collect_frontend)
+
+    aggregate_parser = sub.add_parser("aggregate", help="Run Module 4 aggregator and delta engine")
+    aggregate_parser.add_argument("--run-id", default="module4-bootstrap")
+    aggregate_parser.set_defaults(func=cmd_aggregate)
+
+    dashboard_parser = sub.add_parser("generate-dashboard", help="Run Module 5 dashboard generator")
+    dashboard_parser.add_argument("--run-id", default="module5-bootstrap")
+    dashboard_parser.set_defaults(func=cmd_generate_dashboard)
+
+    install_parser = sub.add_parser("install", help="Install Module 6 poller runtime and systemd units")
+    install_parser.add_argument("--frequency-minutes", type=int, default=60)
+    install_parser.add_argument("--max-history-runs", type=int, default=120)
+    install_parser.set_defaults(func=cmd_install)
+
+    reconfigure_parser = sub.add_parser("reconfigure", help="Reconfigure Module 6 poller frequency")
+    reconfigure_parser.add_argument("--frequency-minutes", type=int, default=60)
+    reconfigure_parser.add_argument("--max-history-runs", type=int, default=120)
+    reconfigure_parser.set_defaults(func=cmd_reconfigure)
+
+    start_parser = sub.add_parser("start", help="Enable Module 6 poller runtime")
+    start_parser.set_defaults(func=cmd_start)
+
+    stop_parser = sub.add_parser("stop", help="Disable Module 6 poller runtime")
+    stop_parser.set_defaults(func=cmd_stop)
+
+    status_parser = sub.add_parser("status", help="Report Module 6 poller runtime status")
+    status_parser.set_defaults(func=cmd_status)
+
+    run_now_parser = sub.add_parser("run-now", help="Execute Module 6 poller once")
+    run_now_parser.add_argument("--max-retries", type=int, default=1)
+    run_now_parser.add_argument("--timeout-seconds", type=int, default=1800)
+    run_now_parser.set_defaults(func=cmd_run_now)
+
+    uninstall_parser = sub.add_parser("uninstall", help="Uninstall Module 6 poller runtime assets")
+    uninstall_parser.set_defaults(func=cmd_uninstall)
+
+    publish_parser = sub.add_parser("publish", help="Trigger publication action for Module 7 surface")
+    publish_parser.set_defaults(func=cmd_publish)
+
+    retention_parser = sub.add_parser("retention-prune", help="Apply Module 8 history retention policy")
+    retention_parser.add_argument("--max-history-runs", type=int, default=120)
+    retention_parser.set_defaults(func=cmd_retention_prune)
+
+    extensions_parser = sub.add_parser("extensions-status", help="Show Module 8 optional collector configuration")
+    extensions_parser.set_defaults(func=cmd_extensions_status)
+
+    cleanup_parser = sub.add_parser("cleanup-runtime", help="Clean ephemeral metrics runtime artifacts in workspace")
+    cleanup_parser.add_argument("--include-history", action="store_true")
+    cleanup_parser.set_defaults(func=cmd_cleanup_runtime)
+
+    build_stamp_parser = sub.add_parser(
+        "dashboard-build-stamp",
+        help="Show dashboard build stamp and rebuild requirement",
+    )
+    build_stamp_parser.set_defaults(func=cmd_dashboard_build_stamp)
+
+    thumbnail_gc_parser = sub.add_parser(
+        "thumbnail-gc",
+        help="Remove thumbnail cache entries for non-pending items",
+    )
+    thumbnail_gc_parser.add_argument(
+        "--config",
+        default="/etc/nightfall/photo-ingress.conf",
+        help="Path to photo-ingress configuration file",
+    )
+    thumbnail_gc_parser.set_defaults(func=cmd_thumbnail_gc)
+
+    return parser
+
+
+def main() -> int:
+    """Parse arguments and dispatch to the selected command handler."""
+    parser = build_parser()
+    args = parser.parse_args()
+    return int(args.func(args))
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
