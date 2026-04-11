@@ -18,3 +18,5 @@
         file_server
     }
 }
+
+import /etc/caddy/cloudflare-origin.caddy

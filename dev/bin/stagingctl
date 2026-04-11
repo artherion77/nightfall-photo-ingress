@@ -54,12 +54,26 @@ TLS_CA_KEY="$TLS_DIR/nightfall-staging-ca.key"
 TLS_CA_CERT="$TLS_DIR/ca.pem"
 TLS_SERVER_KEY="$TLS_DIR/staging-photo-ingress.key"
 TLS_SERVER_CERT="$TLS_DIR/staging-photo-ingress.crt"
+CLOUDFLARE_ORIGIN_CERT_CT_PATH="$TLS_DIR/cloudflare-origin.crt"
+CLOUDFLARE_ORIGIN_KEY_CT_PATH="$TLS_DIR/cloudflare-origin.key"
+CLOUDFLARE_ORIGIN_INCLUDE_PATH="/etc/caddy/cloudflare-origin.caddy"
+CLOUDFLARE_ORIGIN_RUNTIME_DIR="/run/caddy"
+CLOUDFLARE_ORIGIN_RUNTIME_CERT="$CLOUDFLARE_ORIGIN_RUNTIME_DIR/cloudflare-origin.crt"
+CLOUDFLARE_ORIGIN_RUNTIME_KEY="$CLOUDFLARE_ORIGIN_RUNTIME_DIR/cloudflare-origin.key"
 EXPORTED_CA_PATH="$PROJECT_ROOT/tests/ca/staging-ca.pem"
-CF_TUNNEL_TOKEN_HOST_PATH="/home/chris/.cloudflare-secrets/npi-staging/tunnel-token"
-CF_TUNNEL_TOKEN_CT_PATH="/etc/cloudflared/token"
-CF_TUNNEL_DEVICE_NAME="cloudflared-token"
+CF_TUNNEL_ORIGINCERT_HOST_PATH="/home/chris/.cloudflare-secrets/npi-staging/origincert.pem"
+CF_TUNNEL_ORIGINCERT_CT_PATH="/etc/cloudflared/origincert.pem"
+CF_TUNNEL_CREDENTIALS_HOST_PATH="/home/chris/.cloudflare-secrets/npi-staging/tunnel-credentials.json"
+CF_TUNNEL_CREDENTIALS_CT_PATH="/etc/cloudflared/tunnel-credentials.json"
+CF_TUNNEL_ORIGINCERT_DEVICE_NAME="cloudflared-origincert"
+CF_TUNNEL_CREDENTIALS_DEVICE_NAME="cloudflared-credentials"
 CF_TUNNEL_DEVICE_SHIFT="true"
 CF_TUNNEL_SERVICE_NAME="cloudflared-tunnel.service"
+CF_ORIGIN_CERT_HOST_PATH="/home/chris/.cloudflare-secrets/npi-staging/origin-cert.pem"
+CF_ORIGIN_KEY_HOST_PATH="/home/chris/.cloudflare-secrets/npi-staging/origin-key.pem"
+CF_ORIGIN_CERT_DEVICE_NAME="cloudflare-origin-cert"
+CF_ORIGIN_KEY_DEVICE_NAME="cloudflare-origin-key"
+CF_CLOUDFLARED_CONFIG_PATH="/etc/cloudflared/config.yml"
 RELEASES_ROOT="$PROJECT_ROOT/artifacts/releases"
 RELEASES_DIR="$RELEASES_ROOT/versions"
 RELEASE_ACTIVE_LINK="$RELEASES_ROOT/active"
@@ -153,52 +167,142 @@ _validate_network_policy() {
 _ensure_cloudflared_token_mount() {
     _require_container_exists
 
-    [[ -f "$CF_TUNNEL_TOKEN_HOST_PATH" ]] || _fail "Cloudflare tunnel token missing on host: $CF_TUNNEL_TOKEN_HOST_PATH"
+    [[ -f "$CF_TUNNEL_ORIGINCERT_HOST_PATH" ]] || _fail "Cloudflare tunnel origincert missing on host: $CF_TUNNEL_ORIGINCERT_HOST_PATH"
+    [[ -f "$CF_TUNNEL_CREDENTIALS_HOST_PATH" ]] || _fail "Cloudflare tunnel credentials missing on host: $CF_TUNNEL_CREDENTIALS_HOST_PATH"
 
     lxc exec "$CONTAINER" -- mkdir -p /etc/cloudflared
 
-    if lxc config device show "$CONTAINER" | rg -q "^$CF_TUNNEL_DEVICE_NAME:"; then
-        local existing_source existing_path existing_ro existing_shift
-        existing_source="$(lxc config device get "$CONTAINER" "$CF_TUNNEL_DEVICE_NAME" source 2>/dev/null || true)"
-        existing_path="$(lxc config device get "$CONTAINER" "$CF_TUNNEL_DEVICE_NAME" path 2>/dev/null || true)"
-        existing_ro="$(lxc config device get "$CONTAINER" "$CF_TUNNEL_DEVICE_NAME" readonly 2>/dev/null || true)"
-        existing_shift="$(lxc config device get "$CONTAINER" "$CF_TUNNEL_DEVICE_NAME" shift 2>/dev/null || true)"
-
-        [[ "$existing_source" == "$CF_TUNNEL_TOKEN_HOST_PATH" ]] || lxc config device set "$CONTAINER" "$CF_TUNNEL_DEVICE_NAME" source "$CF_TUNNEL_TOKEN_HOST_PATH"
-        [[ "$existing_path" == "$CF_TUNNEL_TOKEN_CT_PATH" ]] || lxc config device set "$CONTAINER" "$CF_TUNNEL_DEVICE_NAME" path "$CF_TUNNEL_TOKEN_CT_PATH"
-        [[ "$existing_ro" == "true" ]] || lxc config device set "$CONTAINER" "$CF_TUNNEL_DEVICE_NAME" readonly "true"
-        [[ "$existing_shift" == "$CF_TUNNEL_DEVICE_SHIFT" ]] || lxc config device set "$CONTAINER" "$CF_TUNNEL_DEVICE_NAME" shift "$CF_TUNNEL_DEVICE_SHIFT"
-        _info "Cloudflare token mount already present; reconciled mount options."
+    if lxc config device show "$CONTAINER" | rg -q "^$CF_TUNNEL_ORIGINCERT_DEVICE_NAME:"; then
+        lxc config device set "$CONTAINER" "$CF_TUNNEL_ORIGINCERT_DEVICE_NAME" source "$CF_TUNNEL_ORIGINCERT_HOST_PATH"
+        lxc config device set "$CONTAINER" "$CF_TUNNEL_ORIGINCERT_DEVICE_NAME" path "$CF_TUNNEL_ORIGINCERT_CT_PATH"
+        lxc config device set "$CONTAINER" "$CF_TUNNEL_ORIGINCERT_DEVICE_NAME" readonly "true"
+        lxc config device set "$CONTAINER" "$CF_TUNNEL_ORIGINCERT_DEVICE_NAME" shift "$CF_TUNNEL_DEVICE_SHIFT"
     else
-        _info "Adding read-only Cloudflare tunnel token mount ..."
-        lxc config device add "$CONTAINER" "$CF_TUNNEL_DEVICE_NAME" disk \
-            source="$CF_TUNNEL_TOKEN_HOST_PATH" path="$CF_TUNNEL_TOKEN_CT_PATH" readonly=true shift="$CF_TUNNEL_DEVICE_SHIFT"
+        lxc config device add "$CONTAINER" "$CF_TUNNEL_ORIGINCERT_DEVICE_NAME" disk \
+            source="$CF_TUNNEL_ORIGINCERT_HOST_PATH" path="$CF_TUNNEL_ORIGINCERT_CT_PATH" readonly=true shift="$CF_TUNNEL_DEVICE_SHIFT"
     fi
+
+    if lxc config device show "$CONTAINER" | rg -q "^$CF_TUNNEL_CREDENTIALS_DEVICE_NAME:"; then
+        lxc config device set "$CONTAINER" "$CF_TUNNEL_CREDENTIALS_DEVICE_NAME" source "$CF_TUNNEL_CREDENTIALS_HOST_PATH"
+        lxc config device set "$CONTAINER" "$CF_TUNNEL_CREDENTIALS_DEVICE_NAME" path "$CF_TUNNEL_CREDENTIALS_CT_PATH"
+        lxc config device set "$CONTAINER" "$CF_TUNNEL_CREDENTIALS_DEVICE_NAME" readonly "true"
+        lxc config device set "$CONTAINER" "$CF_TUNNEL_CREDENTIALS_DEVICE_NAME" shift "$CF_TUNNEL_DEVICE_SHIFT"
+    else
+        lxc config device add "$CONTAINER" "$CF_TUNNEL_CREDENTIALS_DEVICE_NAME" disk \
+            source="$CF_TUNNEL_CREDENTIALS_HOST_PATH" path="$CF_TUNNEL_CREDENTIALS_CT_PATH" readonly=true shift="$CF_TUNNEL_DEVICE_SHIFT"
+    fi
+
+    _info "Cloudflare local-managed auth mounts configured (origincert + credentials)."
+}
+
+_ensure_cloudflare_origin_mounts_optional() {
+    _require_container_exists
+
+    if [[ ! -f "$CF_ORIGIN_CERT_HOST_PATH" || ! -f "$CF_ORIGIN_KEY_HOST_PATH" ]]; then
+        _warn "Cloudflare Origin cert/key not found on host. WAN origin listener on :8443 will remain disabled."
+        _warn "Expected files: $CF_ORIGIN_CERT_HOST_PATH and $CF_ORIGIN_KEY_HOST_PATH"
+        return
+    fi
+
+    lxc exec "$CONTAINER" -- mkdir -p "$TLS_DIR"
+
+    if lxc config device show "$CONTAINER" | rg -q "^$CF_ORIGIN_CERT_DEVICE_NAME:"; then
+        lxc config device set "$CONTAINER" "$CF_ORIGIN_CERT_DEVICE_NAME" source "$CF_ORIGIN_CERT_HOST_PATH"
+        lxc config device set "$CONTAINER" "$CF_ORIGIN_CERT_DEVICE_NAME" path "$CLOUDFLARE_ORIGIN_CERT_CT_PATH"
+        lxc config device set "$CONTAINER" "$CF_ORIGIN_CERT_DEVICE_NAME" readonly "true"
+        lxc config device set "$CONTAINER" "$CF_ORIGIN_CERT_DEVICE_NAME" shift "$CF_TUNNEL_DEVICE_SHIFT"
+    else
+        lxc config device add "$CONTAINER" "$CF_ORIGIN_CERT_DEVICE_NAME" disk \
+            source="$CF_ORIGIN_CERT_HOST_PATH" path="$CLOUDFLARE_ORIGIN_CERT_CT_PATH" readonly=true shift="$CF_TUNNEL_DEVICE_SHIFT"
+    fi
+
+    if lxc config device show "$CONTAINER" | rg -q "^$CF_ORIGIN_KEY_DEVICE_NAME:"; then
+        lxc config device set "$CONTAINER" "$CF_ORIGIN_KEY_DEVICE_NAME" source "$CF_ORIGIN_KEY_HOST_PATH"
+        lxc config device set "$CONTAINER" "$CF_ORIGIN_KEY_DEVICE_NAME" path "$CLOUDFLARE_ORIGIN_KEY_CT_PATH"
+        lxc config device set "$CONTAINER" "$CF_ORIGIN_KEY_DEVICE_NAME" readonly "true"
+        lxc config device set "$CONTAINER" "$CF_ORIGIN_KEY_DEVICE_NAME" shift "$CF_TUNNEL_DEVICE_SHIFT"
+    else
+        lxc config device add "$CONTAINER" "$CF_ORIGIN_KEY_DEVICE_NAME" disk \
+            source="$CF_ORIGIN_KEY_HOST_PATH" path="$CLOUDFLARE_ORIGIN_KEY_CT_PATH" readonly=true shift="$CF_TUNNEL_DEVICE_SHIFT"
+    fi
+
+    _info "Cloudflare Origin cert/key mounts configured (read-only)."
+}
+
+_assert_cloudflare_origin_mounts_ready() {
+    _require_container_running
+
+    [[ -f "$CF_ORIGIN_CERT_HOST_PATH" ]] || _fail "Missing Cloudflare Origin cert on host: $CF_ORIGIN_CERT_HOST_PATH"
+    [[ -f "$CF_ORIGIN_KEY_HOST_PATH" ]] || _fail "Missing Cloudflare Origin key on host: $CF_ORIGIN_KEY_HOST_PATH"
+
+    lxc exec "$CONTAINER" -- test -s "$CLOUDFLARE_ORIGIN_CERT_CT_PATH" \
+        || _fail "Cloudflare Origin cert not mounted in container at $CLOUDFLARE_ORIGIN_CERT_CT_PATH"
+    lxc exec "$CONTAINER" -- test -s "$CLOUDFLARE_ORIGIN_KEY_CT_PATH" \
+        || _fail "Cloudflare Origin key not mounted in container at $CLOUDFLARE_ORIGIN_KEY_CT_PATH"
+
+    lxc exec "$CONTAINER" -- bash -lc "mount | grep -F ' on $CLOUDFLARE_ORIGIN_CERT_CT_PATH ' | grep -q '(ro,'" \
+        || _fail "Cloudflare Origin cert mount is not read-only"
+    lxc exec "$CONTAINER" -- bash -lc "mount | grep -F ' on $CLOUDFLARE_ORIGIN_KEY_CT_PATH ' | grep -q '(ro,'" \
+        || _fail "Cloudflare Origin key mount is not read-only"
+}
+
+_prepare_cloudflare_origin_runtime_material() {
+    _require_container_running
+
+    if [[ ! -f "$CF_ORIGIN_CERT_HOST_PATH" || ! -f "$CF_ORIGIN_KEY_HOST_PATH" ]]; then
+        return 1
+    fi
+
+    lxc exec "$CONTAINER" -- test -s "$CLOUDFLARE_ORIGIN_CERT_CT_PATH" || return 1
+    lxc exec "$CONTAINER" -- test -s "$CLOUDFLARE_ORIGIN_KEY_CT_PATH" || return 1
+
+    lxc exec "$CONTAINER" -- bash -lc "set -euo pipefail
+install -d -m 0750 -o root -g caddy '$CLOUDFLARE_ORIGIN_RUNTIME_DIR'
+install -m 0440 -o caddy -g caddy '$CLOUDFLARE_ORIGIN_CERT_CT_PATH' '$CLOUDFLARE_ORIGIN_RUNTIME_CERT'
+install -m 0400 -o caddy -g caddy '$CLOUDFLARE_ORIGIN_KEY_CT_PATH' '$CLOUDFLARE_ORIGIN_RUNTIME_KEY'
+runuser -u caddy -- test -r '$CLOUDFLARE_ORIGIN_RUNTIME_CERT'
+runuser -u caddy -- test -r '$CLOUDFLARE_ORIGIN_RUNTIME_KEY'"
 }
 
 _assert_cloudflared_token_mounted_readonly() {
     _require_container_running
 
-    [[ -f "$CF_TUNNEL_TOKEN_HOST_PATH" ]] || _fail "Cloudflare tunnel token missing on host: $CF_TUNNEL_TOKEN_HOST_PATH"
+    [[ -f "$CF_TUNNEL_ORIGINCERT_HOST_PATH" ]] || _fail "Cloudflare tunnel origincert missing on host: $CF_TUNNEL_ORIGINCERT_HOST_PATH"
+    [[ -f "$CF_TUNNEL_CREDENTIALS_HOST_PATH" ]] || _fail "Cloudflare tunnel credentials missing on host: $CF_TUNNEL_CREDENTIALS_HOST_PATH"
 
-    local existing_source existing_path existing_ro existing_shift
-    existing_source="$(lxc config device get "$CONTAINER" "$CF_TUNNEL_DEVICE_NAME" source 2>/dev/null || true)"
-    existing_path="$(lxc config device get "$CONTAINER" "$CF_TUNNEL_DEVICE_NAME" path 2>/dev/null || true)"
-    existing_ro="$(lxc config device get "$CONTAINER" "$CF_TUNNEL_DEVICE_NAME" readonly 2>/dev/null || true)"
-    existing_shift="$(lxc config device get "$CONTAINER" "$CF_TUNNEL_DEVICE_NAME" shift 2>/dev/null || true)"
+    for device_name in "$CF_TUNNEL_ORIGINCERT_DEVICE_NAME" "$CF_TUNNEL_CREDENTIALS_DEVICE_NAME"; do
+        local existing_ro existing_shift
+        existing_ro="$(lxc config device get "$CONTAINER" "$device_name" readonly 2>/dev/null || true)"
+        existing_shift="$(lxc config device get "$CONTAINER" "$device_name" shift 2>/dev/null || true)"
+        [[ "$existing_ro" == "true" ]] || _fail "Cloudflare auth mount '$device_name' is not read-only."
+        [[ "$existing_shift" == "$CF_TUNNEL_DEVICE_SHIFT" ]] || _fail "Cloudflare auth mount '$device_name' must set shift=true"
+    done
 
-    [[ "$existing_source" == "$CF_TUNNEL_TOKEN_HOST_PATH" ]] || _fail "Cloudflare token mount source mismatch. Expected $CF_TUNNEL_TOKEN_HOST_PATH, got ${existing_source:-<unset>}"
-    [[ "$existing_path" == "$CF_TUNNEL_TOKEN_CT_PATH" ]] || _fail "Cloudflare token mount path mismatch. Expected $CF_TUNNEL_TOKEN_CT_PATH, got ${existing_path:-<unset>}"
-    [[ "$existing_ro" == "true" ]] || _fail "Cloudflare token mount is not read-only."
-    [[ "$existing_shift" == "$CF_TUNNEL_DEVICE_SHIFT" ]] || _fail "Cloudflare token mount must set shift=true for unprivileged container access"
+    lxc exec "$CONTAINER" -- test -s "$CF_TUNNEL_ORIGINCERT_CT_PATH" \
+        || _fail "Cloudflare origincert not visible in container at $CF_TUNNEL_ORIGINCERT_CT_PATH"
+    lxc exec "$CONTAINER" -- test -s "$CF_TUNNEL_CREDENTIALS_CT_PATH" \
+        || _fail "Cloudflare credentials not visible in container at $CF_TUNNEL_CREDENTIALS_CT_PATH"
 
-    lxc exec "$CONTAINER" -- test -s "$CF_TUNNEL_TOKEN_CT_PATH" \
-        || _fail "Cloudflare token not visible in container at $CF_TUNNEL_TOKEN_CT_PATH"
-    lxc exec "$CONTAINER" -- bash -lc "head -c 1 '$CF_TUNNEL_TOKEN_CT_PATH' >/dev/null" \
-        || _fail "Cloudflare token exists but is not readable by cloudflared service runtime"
+    lxc exec "$CONTAINER" -- bash -lc "head -c 1 '$CF_TUNNEL_ORIGINCERT_CT_PATH' >/dev/null" \
+        || _fail "Cloudflare origincert is not readable by cloudflared service runtime"
+    lxc exec "$CONTAINER" -- bash -lc "head -c 1 '$CF_TUNNEL_CREDENTIALS_CT_PATH' >/dev/null" \
+        || _fail "Cloudflare credentials are not readable by cloudflared service runtime"
 
-    lxc exec "$CONTAINER" -- bash -lc "mount | grep -F ' on $CF_TUNNEL_TOKEN_CT_PATH ' | grep -q '(ro,'" \
-        || _fail "Cloudflare token mount inside container is not read-only"
+    lxc exec "$CONTAINER" -- bash -lc "mount | grep -F ' on $CF_TUNNEL_ORIGINCERT_CT_PATH ' | grep -q '(ro,'" \
+        || _fail "Cloudflare origincert mount inside container is not read-only"
+    lxc exec "$CONTAINER" -- bash -lc "mount | grep -F ' on $CF_TUNNEL_CREDENTIALS_CT_PATH ' | grep -q '(ro,'" \
+        || _fail "Cloudflare credentials mount inside container is not read-only"
+}
+
+_assert_no_legacy_cloudflared_secret_cache() {
+    _require_container_running
+
+    lxc exec "$CONTAINER" -- bash -lc 'set -euo pipefail
+if [[ -d /root/.cloudflared ]] && find /root/.cloudflared -mindepth 1 -maxdepth 1 -print -quit | grep -q .; then
+    echo "legacy cloudflared secret cache still populated under /root/.cloudflared" >&2
+    exit 1
+fi
+'
 }
 
 _ensure_cloudflared_installed() {
@@ -229,6 +333,8 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y cloudflared
 _ensure_cloudflared_service() {
     _require_container_running
 
+    _write_cloudflared_local_config
+
     _info "Configuring Cloudflare tunnel systemd service ..."
     lxc exec "$CONTAINER" -- bash -lc "cat > /etc/systemd/system/$CF_TUNNEL_SERVICE_NAME <<'EOF'
 [Unit]
@@ -241,7 +347,7 @@ Type=simple
 User=root
 Restart=always
 RestartSec=5s
-ExecStart=/bin/bash -lc 'set -euo pipefail; exec /usr/bin/cloudflared tunnel run --token \"\$(cat $CF_TUNNEL_TOKEN_CT_PATH)\"'
+ExecStart=/bin/bash -lc 'set -euo pipefail; exec /usr/bin/cloudflared --config $CF_CLOUDFLARED_CONFIG_PATH tunnel run'
 
 [Install]
 WantedBy=multi-user.target
@@ -261,13 +367,97 @@ _assert_no_cloudflare_credentials_persisted() {
 
     lxc exec "$CONTAINER" -- bash -lc '
 set -euo pipefail
-for path in /root/.cloudflared /etc/cloudflared/cert.pem /etc/cloudflared/*.json /var/lib/cloudflared/*.json; do
+if [[ -d /root/.cloudflared ]] && find /root/.cloudflared -mindepth 1 -maxdepth 1 -print -quit | grep -q .; then
+    echo "unexpected credential artifact: /root/.cloudflared/*" >&2
+    exit 1
+fi
+
+for path in /etc/cloudflared/cert.pem /var/lib/cloudflared/*.json; do
     if compgen -G "$path" >/dev/null 2>&1; then
         echo "unexpected credential artifact: $path" >&2
         exit 1
     fi
 done
+
+for path in /etc/cloudflared/*.json; do
+    [[ -e "$path" ]] || continue
+    [[ "$path" == "/etc/cloudflared/tunnel-credentials.json" ]] && continue
+    echo "unexpected credential artifact: $path" >&2
+    exit 1
+done
 '
+}
+
+_write_cloudflare_origin_caddy_include() {
+    _require_container_running
+
+    local enable_wan_listener="${1:-0}"
+
+    lxc exec "$CONTAINER" -- bash -lc "set -euo pipefail
+mkdir -p /etc/caddy
+if [[ '$enable_wan_listener' == '1' ]]; then
+cat > '$CLOUDFLARE_ORIGIN_INCLUDE_PATH' <<'EOF'
+https://npi.pohl-family.org:8443 {
+    tls /run/caddy/cloudflare-origin.crt /run/caddy/cloudflare-origin.key
+
+    encode zstd gzip
+
+    @api path /api/* /openapi.json /rapidoc*
+    handle @api {
+        reverse_proxy 127.0.0.1:8000
+    }
+
+    handle {
+        root * /opt/webui/build
+        try_files {path} /200.html
+        file_server
+    }
+}
+EOF
+else
+cat > '$CLOUDFLARE_ORIGIN_INCLUDE_PATH' <<'EOF'
+# Cloudflare Origin listener disabled: missing/unusable origin cert/key runtime material.
+# Provide host files:
+#   /home/chris/.cloudflare-secrets/npi-staging/origin-cert.pem
+#   /home/chris/.cloudflare-secrets/npi-staging/origin-key.pem
+# Runtime cert/key are copied to /run/caddy with owner caddy and strict file modes.
+EOF
+fi"
+}
+
+_write_cloudflared_local_config() {
+    _require_container_running
+
+    local tunnel_id
+    tunnel_id="$(lxc exec "$CONTAINER" -- python3 - <<'PY'
+import json
+from pathlib import Path
+
+cred_path = Path('/etc/cloudflared/tunnel-credentials.json')
+if not cred_path.exists():
+    raise SystemExit(1)
+
+data = json.loads(cred_path.read_text(encoding='utf-8'))
+tunnel_id = data.get('TunnelID')
+if not tunnel_id:
+    raise SystemExit(2)
+
+print(tunnel_id)
+PY
+    )" || _fail "Unable to parse TunnelID from $CF_TUNNEL_CREDENTIALS_CT_PATH"
+
+    lxc exec "$CONTAINER" -- bash -lc "cat > '$CF_CLOUDFLARED_CONFIG_PATH' <<'EOF'
+tunnel: $tunnel_id
+credentials-file: $CF_TUNNEL_CREDENTIALS_CT_PATH
+origincert: $CF_TUNNEL_ORIGINCERT_CT_PATH
+ingress:
+  - hostname: npi.pohl-family.org
+    service: https://127.0.0.1:8443
+    originRequest:
+      originServerName: npi.pohl-family.org
+      caPool: /run/caddy/cloudflare-origin.crt
+  - service: http_status:404
+EOF"
 }
 
 _provision_container_tls_material() {
@@ -474,6 +664,7 @@ cmd_create() {
     lxc config device add "$CONTAINER" logs disk \
         source="$HOST_LOG_BASE" path="$CT_LOG_DIR"
     _ensure_cloudflared_token_mount
+    _ensure_cloudflare_origin_mounts_optional
 
     _info "Installing canonical product systemd units with staging overrides ..."
     lxc file push "$SYSTEMD_SOURCE_DIR/$SERVICE_NAME.service" \
@@ -629,6 +820,13 @@ for line in config_path.read_text(encoding='utf-8').splitlines():
     _info "Installing Caddy config for Web Control Plane ingress ..."
     lxc exec "$CONTAINER" -- mkdir -p /etc/caddy
     lxc file push "$CADDYFILE_SOURCE" "$CONTAINER$CADDYFILE_DEST"
+    _ensure_cloudflare_origin_mounts_optional
+    local wan_origin_ready="0"
+    if _prepare_cloudflare_origin_runtime_material; then
+        wan_origin_ready="1"
+        _info "Prepared caddy-only runtime material for Cloudflare Origin TLS listener."
+    fi
+    _write_cloudflare_origin_caddy_include "$wan_origin_ready"
     _provision_container_tls_material
 
     _info "Syncing versioned web build artifact to /opt/webui/build ..."
@@ -670,6 +868,8 @@ for line in config_path.read_text(encoding='utf-8').splitlines():
 
     _assert_no_cloudflare_credentials_persisted \
         || _fail "Unexpected Cloudflare credentials found in container filesystem"
+    _assert_no_legacy_cloudflared_secret_cache \
+        || _fail "Legacy /root/.cloudflared secret cache must be empty before snapshot refresh"
 
     # Refresh reset baseline after install so `stagingctl reset` returns to
     # an installed, config-valid state with no onboarding token cache.
@@ -724,9 +924,13 @@ cmd_cloudflared_status() {
         _fail "Usage: stagingctl cloudflared-status [--strict]"
     fi
 
-    _info "Checking Cloudflare tunnel token mount policy ..."
+    _info "Checking Cloudflare local-managed auth mount policy ..."
     _assert_cloudflared_token_mounted_readonly
-    _ok "Cloudflare token mount exists and is read-only."
+    _ok "Cloudflare local-managed auth mounts exist and are read-only."
+
+    _info "Checking Cloudflare Origin cert/key mount policy ..."
+    _assert_cloudflare_origin_mounts_ready
+    _ok "Cloudflare Origin cert/key mounts exist and are read-only."
 
     _info "Checking cloudflared installation and runtime state ..."
     lxc exec "$CONTAINER" -- bash -lc 'command -v cloudflared >/dev/null 2>&1' \
@@ -774,6 +978,18 @@ cmd_cloudflared_start() {
     _require_container_running
 
     _assert_cloudflared_token_mounted_readonly
+    _assert_cloudflare_origin_mounts_ready
+
+    local wan_origin_ready="0"
+    if _prepare_cloudflare_origin_runtime_material; then
+        wan_origin_ready="1"
+    fi
+    _write_cloudflare_origin_caddy_include "$wan_origin_ready"
+    [[ "$wan_origin_ready" == "1" ]] || _fail "Cloudflare Origin runtime material is not ready for caddy."
+
+    lxc exec "$CONTAINER" -- caddy validate --config "$CADDYFILE_DEST"
+    lxc exec "$CONTAINER" -- systemctl restart "$CADDY_SERVICE_NAME"
+
     _ensure_cloudflared_installed
     _ensure_cloudflared_service
 
