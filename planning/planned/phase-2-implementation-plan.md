@@ -165,20 +165,30 @@ Inputs:
 - ../../design/web/api.md
 - ../../design/web/architecture.md
 - ../../design/web/design-decisions.md
+- ../../design/infra/api-versioning-checklist.md
 
 Preconditions:
 - C1-C4 in place for stable operations baseline.
 
 Deliverables:
-- Policy enforcement checklist.
-- Versioning traceability artifact for Phase 2 changes.
+- `/api/v1` stability policy with additive vs breaking/deprecated classification rules.
+- API versioning checklist artifact for per-change validation.
+- Versioning traceability references in architecture and design decision docs.
 
 Validation steps:
 1. Confirm all Phase 2 API changes are additive or formally classified.
 2. Confirm deprecation/breaking criteria are documented.
+3. Confirm integration test coverage guards canonical `/api/v1` path presence.
 
 Stop-gates:
 1. No feature-chunk closure without versioning check completion.
+
+Validation evidence:
+1. C5 policy is defined in `../../design/web/api.md` under `Phase 2 Addendum: C5 API Versioning Policy Enforcement`.
+2. C5 architecture cross-reference is documented in `../../design/web/architecture.md` section `7. API Layer`.
+3. C5 decision posture is documented in `../../design/web/design-decisions.md` under `Phase 2 Decision Addendum: C5 API Versioning Posture`.
+4. Per-change checklist artifact is implemented in `../../design/infra/api-versioning-checklist.md`.
+5. `/api/v1` route-presence guardrails are validated in `../../tests/integration/api/test_auth.py`.
 
 ### C6 — Dashboard Filter Sidebar
 

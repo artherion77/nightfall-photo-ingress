@@ -329,6 +329,8 @@ Blocklist CRUD uses optimistic state transitions in `blocklist.svelte.js`:
 
 **See also:** [api.md (Phase 1 source section)](api.md#source-document-web-control-plane-api-phase1md) for detailed API endpoint specification, response schemas, and authentication reference.
 
+**C5 policy reference:** API versioning posture for `/api/v1` is defined in [api.md](api.md#phase-2-addendum-c5-api-versioning-policy-enforcement). Every API change must be evaluated against the checklist in [../infra/api-versioning-checklist.md](../infra/api-versioning-checklist.md).
+
 The current backend exposes read models plus triage and blocklist mutation responses:
 
 - `HealthResponse` with nested `ServiceStatus` objects.

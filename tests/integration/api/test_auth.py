@@ -96,10 +96,23 @@ async def test_openapi_endpoint_does_not_require_auth(api_client) -> None:
     assert response.status_code == 200
     paths = response.json()["paths"]
     assert "/api/v1/health" in paths
+    assert "/api/v1/poll/trigger" in paths
     assert "/api/v1/staging" in paths
+    assert "/api/v1/items/{item_id}" in paths
     assert "/api/v1/audit-log" in paths
+    assert "/api/v1/audit/log" in paths
+    assert "/api/v1/audit-log/daily-summary" in paths
+    assert "/api/v1/audit/log/daily-summary" in paths
     assert "/api/v1/config/effective" in paths
     assert "/api/v1/blocklist" in paths
+    assert "/api/v1/blocklist/{rule_id}" in paths
+    assert "/api/v1/triage/{item_id}/accept" in paths
+    assert "/api/v1/triage/{item_id}/reject" in paths
+    assert "/api/v1/triage/{item_id}/defer" in paths
+    assert "/api/v1/thumbnails/{sha256}" in paths
+
+    # C5 guardrail: no v2 surface is introduced in current Phase 2 scope.
+    assert not any(path.startswith("/api/v2") for path in paths)
 
 
 @pytest.mark.anyio

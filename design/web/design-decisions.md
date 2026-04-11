@@ -3,6 +3,28 @@
 Status: Active
 
 
+## Phase 2 Decision Addendum: C5 API Versioning Posture
+
+Date: 2026-04-11
+Owner: Systems Engineering
+
+Decision:
+1. `/api/v1` is the stable Phase 2 operator API surface.
+2. Phase 2 API changes must be additive by default.
+3. Any breaking or deprecated change requires explicit classification, rationale, and transition documentation before merge.
+4. No `/api/v2` introduction is allowed during current Phase 2 scope.
+
+Rationale:
+1. Phase 2 requires controlled evolution without regressions for existing dashboard/staging/audit/settings flows.
+2. Explicit additive-vs-breaking classification prevents uncontrolled schema and path drift.
+3. LAN-only deployment still benefits from deterministic compatibility and rollback-safe operator behavior.
+
+Implementation guardrails:
+1. Versioning rules are defined in `design/web/api.md` under the C5 addendum.
+2. Every API change must be reviewed against `design/infra/api-versioning-checklist.md`.
+3. Integration tests must continue to assert presence of canonical `/api/v1` paths.
+
+
 This document consolidates invariants, decisions, and rationale documents for the web control plane.
 
 ---

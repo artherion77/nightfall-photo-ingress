@@ -3,6 +3,49 @@
 Status: Active
 
 
+## Phase 2 Addendum: C5 API Versioning Policy Enforcement
+
+### C5.1 `/api/v1` stability guarantees
+
+For Phase 2, `/api/v1` is the stable operator API surface for LAN deployment.
+
+Stability guarantees:
+1. Existing `/api/v1` paths remain available unless explicitly deprecated and announced.
+2. Existing successful response fields remain present and retain compatible meaning.
+3. Existing status-code contracts are not changed for established happy-path behavior without explicit classification.
+4. Alias paths under `/api/v1` (for example `/api/v1/audit/log` and `/api/v1/audit-log`) are treated as compatibility surfaces once published.
+
+### C5.2 additive vs breaking change classification
+
+Additive change (allowed in Phase 2 under `/api/v1`):
+1. Add a new endpoint under `/api/v1` without changing existing endpoint behavior.
+2. Add optional request parameters with safe defaults.
+3. Add response fields that are optional/non-required for existing clients.
+4. Add new enum values only when clients are documented to treat unknown values defensively.
+
+Breaking change (requires explicit classification and rationale):
+1. Remove or rename an existing `/api/v1` path.
+2. Remove response fields or make previously optional fields required.
+3. Change field type/format in a way that breaks existing parsing behavior.
+4. Change status-code semantics for existing successful request patterns.
+5. Tighten validation that causes previously valid payloads to fail, without deprecation window.
+
+### C5.3 deprecation policy (LAN-appropriate)
+
+Deprecations are allowed only with explicit documentation and a transition period.
+
+Rules:
+1. Deprecation must be documented in this file and in the Phase 2 plan with rationale.
+2. Deprecated path/field behavior remains functional for at least one Phase 2 milestone after announcement.
+3. Replacement path/field must be documented before marking old behavior deprecated.
+4. Removal is not performed in the same change that introduces deprecation.
+5. If removal becomes necessary, classify as breaking and record operator impact and rollback plan.
+
+### C5.4 drift prevention policy
+
+For every API change, maintainers must run the API versioning checklist in `../infra/api-versioning-checklist.md` and classify the change as additive or breaking/deprecated before merge.
+
+
 This document consolidates the implemented Phase 1 API specification and the API versioning policy.
 
 ---
