@@ -76,10 +76,10 @@ def test_finds_real_repo_root() -> None:
 def test_metricsctl_repo_root_matches_from_any_cwd(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Verify that _repo_root() in metricsctl resolves correctly regardless of CWD.
 
-    We simulate this by calling find_repo_root with the real metricsctl anchor
-    while CWD is set to a temporary directory.
+    We simulate this by calling find_repo_root with the canonical metricsctl
+    anchor (dev/lib/metricsctl.py) while CWD is set to a temporary directory.
     """
     monkeypatch.chdir(tmp_path)
-    metricsctl_path = REPO_ROOT / "metricsctl"
+    metricsctl_path = REPO_ROOT / "dev" / "lib" / "metricsctl.py"
     result = find_repo_root(anchor=metricsctl_path, sentinel="pyproject.toml")
     assert result == REPO_ROOT
