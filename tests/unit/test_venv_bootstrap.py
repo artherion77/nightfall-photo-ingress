@@ -80,6 +80,7 @@ def test_ensure_venv_noop_when_current_is_target(monkeypatch: pytest.MonkeyPatch
     _touch(venv_python)
 
     monkeypatch.setattr(sys, "executable", str(venv_python))
+    monkeypatch.setattr(sys, "prefix", str(tmp_path / ".venv"))
 
     called = {"execve": False}
 
@@ -99,6 +100,7 @@ def test_ensure_venv_execve_on_mismatch(monkeypatch: pytest.MonkeyPatch, tmp_pat
     _touch(venv_python)
 
     monkeypatch.setattr(sys, "executable", "/usr/bin/python3")
+    monkeypatch.setattr(sys, "prefix", "/usr")
     monkeypatch.setattr(sys, "argv", [str(script), "status", "--json"])
 
     captured: dict[str, object] = {}
@@ -112,8 +114,8 @@ def test_ensure_venv_execve_on_mismatch(monkeypatch: pytest.MonkeyPatch, tmp_pat
 
     ensure_venv(script)
 
-    assert captured["path"] == str(venv_python.resolve())
-    assert captured["argv"] == [str(venv_python.resolve()), str(script.resolve()), "status", "--json"]
+    assert captured["path"] == str(venv_python)
+    assert captured["argv"] == [str(venv_python), str(script.resolve()), "status", "--json"]
 
     env = captured["env"]
     assert isinstance(env, dict)
@@ -128,6 +130,7 @@ def test_ensure_venv_uses_custom_guard(monkeypatch: pytest.MonkeyPatch, tmp_path
     _touch(venv_python)
 
     monkeypatch.setattr(sys, "executable", "/usr/bin/python3")
+    monkeypatch.setattr(sys, "prefix", "/usr")
     monkeypatch.setattr(sys, "argv", [str(script)])
 
     captured: dict[str, object] = {}
@@ -154,6 +157,7 @@ def test_ensure_venv_with_explicit_repo_root(monkeypatch: pytest.MonkeyPatch, tm
     _touch(venv_python)
 
     monkeypatch.setattr(sys, "executable", "/usr/bin/python3")
+    monkeypatch.setattr(sys, "prefix", "/usr")
     monkeypatch.setattr(sys, "argv", [str(script)])
 
     captured: dict[str, object] = {}
@@ -164,7 +168,7 @@ def test_ensure_venv_with_explicit_repo_root(monkeypatch: pytest.MonkeyPatch, tm
     monkeypatch.setattr(os, "execve", _fake_execve)
 
     ensure_venv(script, repo_root=venv_root)
-    assert captured["path"] == str(venv_python.resolve())
+    assert captured["path"] == str(venv_python)
 
 
 def test_ensure_venv_ignores_script_parent_when_repo_root_given(

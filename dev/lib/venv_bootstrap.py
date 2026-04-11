@@ -47,10 +47,12 @@ def ensure_venv(
     if not venv_python.exists():
         return
 
-    current = Path(sys.executable).resolve()
-    target = venv_python.resolve()
-
-    if current == target:
+    # Use sys.prefix to check whether the venv is active rather than
+    # comparing resolved executable paths.  On systems where the venv
+    # Python is a symlink to the system interpreter (common on
+    # Debian/Ubuntu), resolved paths are identical and the old check
+    # would incorrectly skip re-exec.
+    if is_running_in_venv(venv_name):
         return
 
     effective_guard = guard_var or f"NIGHTFALL_{script.stem.upper()}_VENV_REEXEC"
@@ -59,4 +61,4 @@ def ensure_venv(
 
     env = os.environ.copy()
     env[effective_guard] = "1"
-    os.execve(str(target), [str(target), str(script), *sys.argv[1:]], env)
+    os.execve(str(venv_python), [str(venv_python), str(script), *sys.argv[1:]], env)
