@@ -1,21 +1,24 @@
 #!/usr/bin/env bash
 # build-metrics-dashboard — Build the metrics dashboard static site.
 #
-# Syncs sources into the dev container, ensures the dashboard Node stack is
-# up to date (auto-fixes drift via ensure-stack-ready), runs the SvelteKit
-# production build inside the container, and copies the output back to
-# metrics/output/dashboard/static/ in the repository.
-#
 # Usage:
-#   ./dev/bin/build-metrics-dashboard          # sync + build + copy output
-#   ./dev/bin/build-metrics-dashboard --help   # show this message
+#   build-metrics-dashboard           Sync + build + copy output
+#   build-metrics-dashboard help      Show this message
+#
+# Steps:
+#   1. Verify dev container (dev-photo-ingress) is running
+#   2. Sync sources + auto-fix any dashboard stack drift (ensure-stack-ready)
+#   3. Run SvelteKit production build inside the container
+#   4. Copy static output to metrics/output/dashboard/static/
 #
 # Why the container?
 #   The dashboard uses SvelteKit + Vite with a pinned Node.js version managed
 #   via nvm inside dev-photo-ingress.  No system-level Node binary is assumed.
 #   Sources live at /opt/nightfall-metrics-dashboard inside the container; the
-#   static adapter writes output to /dashboard (../../dashboard relative to the
-#   project root in the container).
+#   static adapter writes output to /dashboard.
+#
+# See also:
+#   govctl run metrics.build.dashboard  (preferred — also ensures infra ready)
 
 set -euo pipefail
 
@@ -30,12 +33,16 @@ CONTAINER_DASHBOARD_SRC="/opt/nightfall-metrics-dashboard"
 CONTAINER_BUILD_OUTPUT="/dashboard"
 HOST_OUTPUT_DIR="$PROJECT_ROOT/metrics/output/dashboard/static"
 
-# ── Argument parsing ──────────────────────────────────────────────────────────
+# ── Help ──────────────────────────────────────────────────────────────────────
 
-if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
-    sed -n '/^# Usage:/,/^[^#]/{ /^[^#]/d; s/^# \{0,2\}//; p }' "$0"
-    exit 0
-fi
+_usage() {
+    sed -n '2,/^[^#]/{ /^#/s/^# \{0,1\}//p; }' "${BASH_SOURCE[0]}"
+    exit 1
+}
+
+case "${1:-}" in
+    -h|--help|help) _usage ;;
+esac
 
 if [[ $# -gt 0 ]]; then
     nf_log_fail "$SCOPE" "Unknown argument: $1. Run with --help for usage."

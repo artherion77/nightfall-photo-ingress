@@ -743,8 +743,8 @@ _usage() {
 Usage: $(basename "$0") <command> [args]
 
 Commands:
-    create              Create LXC container (profiles: default+staging) and baseline state.
-    install [wheel]     Push wheel + config, enable service, and refresh 'clean' snapshot.
+  create              Create LXC container (profiles: default+staging) and baseline state.
+  install [wheel]     Push wheel + config, enable service, and refresh 'clean' snapshot.
   uninstall [--purge] Delete container. --purge also removes host evidence/log directories.
   reset               Restore 'clean' snapshot and restart container.
   smoke               Run headless smoke assertions; collect evidence.
@@ -770,16 +770,16 @@ main() {
     shift || true
 
     case "$cmd" in
-        create)     cmd_create     "$@" ;;
-        install)    cmd_install    "$@" ;;
-        uninstall)  cmd_uninstall  "$@" ;;
-        reset)      cmd_reset      "$@" ;;
-        smoke)      cmd_smoke      "$@" ;;
+        create)         cmd_create     "$@" ;;
+        install)        cmd_install    "$@" ;;
+        uninstall)      cmd_uninstall  "$@" ;;
+        reset)          cmd_reset      "$@" ;;
+        smoke)          cmd_smoke      "$@" ;;
         auth-setup)     cmd_auth_setup     "$@" ;;
         discover-paths) cmd_discover_paths  "$@" ;;
         smoke-live)     cmd_smoke_live      "$@" ;;
-        evidence)   cmd_evidence   "$@" ;;
-        *)          _usage ;;
+        evidence)       cmd_evidence   "$@" ;;
+        *)              _usage ;;
     esac
 }
 

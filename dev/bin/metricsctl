@@ -6,29 +6,29 @@
 #   metricsctl help
 #
 # Pipeline commands:
-#   collect-backend           Run Module 2 backend metrics collector
-#   collect-frontend          Run Module 3 frontend metrics collector
-#   aggregate                 Run Module 4 aggregator and delta engine
-#   generate-dashboard        Run Module 5 dashboard generator
-#   publish                   Trigger Module 7 publication action
-#   run-now                   Execute full pipeline once (Module 6 poller)
+#   collect-backend           Run backend metrics collector
+#   collect-frontend          Run frontend metrics collector
+#   aggregate                 Run aggregator and delta engine
+#   generate-dashboard        Run dashboard generator
+#   publish                   Trigger publication action
+#   run-now                   Execute full pipeline once
 #
 # Lifecycle commands:
-#   install                   Install Module 6 poller runtime and systemd units
-#   uninstall                 Uninstall Module 6 poller runtime assets
-#   start                     Enable Module 6 poller runtime
-#   stop                      Disable Module 6 poller runtime
-#   reconfigure               Reconfigure Module 6 poller frequency
-#   status                    Report Module 6 poller runtime status
+#   install                   Install poller runtime and systemd units
+#   uninstall                 Uninstall poller runtime assets
+#   start                     Enable poller runtime
+#   stop                      Disable poller runtime
+#   reconfigure               Reconfigure poller frequency
+#   status                    Report poller runtime status
 #
 # Init & validation:
-#   init-module1              Initialize Module 1 schema/layout artifacts
-#   validate-module1          Validate Module 1 artifacts and schemas
+#   init-module1              Initialize schema/layout artifacts
+#   validate-module1          Validate artifacts and schemas
 #   paths                     Print key metrics runtime paths
 #
 # Maintenance:
-#   retention-prune           Apply Module 8 history retention policy
-#   extensions-status         Show Module 8 optional collector configuration
+#   retention-prune           Apply history retention policy
+#   extensions-status         Show optional collector configuration
 #   cleanup-runtime           Clean ephemeral metrics runtime artifacts
 #   dashboard-build-stamp     Show dashboard build stamp and rebuild status
 #   thumbnail-gc              Remove thumbnail cache entries for non-pending items
