@@ -19,9 +19,10 @@ DEV_LIB = Path(__file__).resolve().parent / "dev" / "lib"
 if str(DEV_LIB) not in sys.path:
     sys.path.insert(0, str(DEV_LIB))
 
+from find_repo_root import find_repo_root
 from venv_bootstrap import ensure_venv
 
-ensure_venv(Path(__file__))
+ensure_venv(Path(__file__), repo_root=find_repo_root(anchor=Path(__file__)))
 
 from repo_lock import RepoLock
 
@@ -73,8 +74,8 @@ def _devctl_dashboard_drift_preflight(repo_root: Path) -> None:
 
 
 def _repo_root() -> Path:
-    """Return repository root based on this script location."""
-    return Path(__file__).resolve().parent
+    """Return repository root via sentinel-based discovery."""
+    return find_repo_root(anchor=Path(__file__))
 
 
 def cmd_init_module1(args: argparse.Namespace) -> int:
