@@ -1,6 +1,8 @@
 # PhotoWheel Visual Design Decisions
 
-Status: Authoritative
+Status: Implemented
+
+
 Date: 2026-04-08
 Owner: Systems Engineering
 Scope: Binding design decisions for PhotoWheel fidelity alignment with approved mockup
@@ -382,7 +384,6 @@ existing `--wheel-blur-*` tokens.
 
 ## Decision D — Stage-Based Slot Architecture
 
-Status: Authoritative
 Date: 2026-04-08
 Supersedes: The spatial-carousel track-and-spacer layout model in
 PhotoWheel.svelte. Existing decisions A.1, A.3, A.4, B-series, and
@@ -526,7 +527,6 @@ scale), opacity, blur, and z-index from B.2 are unchanged.
 
 ## Decision A.2 — Centering Invariant (Revised)
 
-Status: Historical (superseded by Decision D §D.3)
 Date: 2026-04-08
 Supersedes: Decision A §A.2 ("Centering Rules") — original invariant retained
 for intent but replaced by this refined invariant for acceptance testing.
@@ -721,7 +721,6 @@ with no visual correspondence.
 
 ## Decision E — Active Photo Visual Dominance
 
-Status: Authoritative
 Date: 2026-04-09
 
 ### Background
@@ -782,7 +781,6 @@ enforced by the combination of:
 
 ## Decision F — Primary Action Cluster
 
-Status: Authoritative
 Date: 2026-04-09
 
 ### Background
@@ -863,7 +861,6 @@ action.
 
 ## Decision G — Drag and Drop Semantics
 
-Status: Authoritative
 Date: 2026-04-09
 
 ### Background
@@ -940,7 +937,6 @@ fully accessible via:
 
 ## Decision H — Scroll Containment
 
-Status: Authoritative
 Date: 2026-04-09
 
 ### Background
@@ -1001,7 +997,6 @@ not trigger page scroll.
 
 ## Decision I — Operator-First Metadata
 
-Status: Authoritative
 Date: 2026-04-09
 
 ### Background
@@ -1069,7 +1064,6 @@ region (see Decision J).
 
 ## Decision J — Details Presentation Strategy
 
-Status: Authoritative
 Date: 2026-04-09
 
 ### Background
@@ -1126,7 +1120,6 @@ outside the sheet.
 
 ## Decision K — Minimum Viewport and Full-Viewport Layout
 
-Status: Authoritative
 Date: 2026-04-09
 
 ### Background

@@ -1,6 +1,8 @@
 # design/web/roadmaps — Delivery and sequencing index
 
-Status: Active index
+Status: Implemented
+
+
 Date: 2026-04-06
 Owner: Systems Engineering
 

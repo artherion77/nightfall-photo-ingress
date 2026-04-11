@@ -1,3 +1,14 @@
+# PhotoWheel Detailed Design (Consolidated)
+
+Status: Active
+
+
+This document consolidates component-level PhotoWheel detailed design content.
+
+---
+
+## Source Document: photowheel-step-a-photocard-sha-state-machine-design-2026-04-10.md
+
 # PhotoWheel Defect Fix - Step A
 
 ## Scope

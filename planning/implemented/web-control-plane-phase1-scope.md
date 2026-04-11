@@ -1,6 +1,8 @@
 # Phase 1 Re-Evaluation
 
-Status: Decided
+Status: Implemented
+
+
 Date: 2026-04-03 (rev 2: 2026-04-03, drift addendum: 2026-04-06)
 Owner: Systems Engineering
 Supersedes: Relevant sections of design/web/roadmaps/web-control-plane-integration-plan.md (Phase 7),

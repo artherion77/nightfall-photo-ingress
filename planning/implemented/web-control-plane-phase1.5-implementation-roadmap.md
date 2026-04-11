@@ -1,6 +1,8 @@
 # Web Control Plane — Phase 1.5 Implementation Roadmap
 
 Status: Implemented
+
+
 Reviewed by: Claude Opus
 Regression: Green
 Date: 2026-04-07
@@ -89,7 +91,6 @@ P1.5-0: Token System Declaration
 
 ## 3. Chunk P1.5-0 — Token System Declaration
 
-Status: Implemented (2026-04-07)
 
 ### Purpose
 
@@ -148,7 +149,6 @@ migration expectation, and motion-token source-of-truth documented.
 
 ## 4. Chunk P1.5-1 — Thumbnail Backend Integration Contract
 
-Status: Implemented (2026-04-07)
 
 ### Purpose
 
@@ -225,7 +225,6 @@ signed off in architecture documentation.
 
 ## 5. Chunk P1.5-2 — Thumbnail Backend Implementation
 
-Status: Implemented (2026-04-07)
 
 ### Purpose
 
@@ -310,7 +309,6 @@ triage purge hooks, and thumbnail-gc command implemented and validated.
 
 ## 6. Chunk P1.5-3 — PhotoWheel Scroll + Touch Handlers
 
-Status: Implemented (2026-04-07)
 
 ### Purpose
 
@@ -385,7 +383,6 @@ boundary-aware scroll lock added, and input-helper unit tests validated.
 
 ## 7. Chunk P1.5-4 — PhotoCard Image Rendering
 
-Status: Implemented (2026-04-07)
 
 ### Purpose
 
@@ -458,7 +455,6 @@ loading/error fallbacks, and deterministic image-state tests validated.
 
 ## 8. Chunk P1.5-5 — Momentum Engine + ActiveIndex State Machine
 
-Status: Implemented (2026-04-07)
 
 ### Purpose
 
@@ -538,7 +534,6 @@ cancel-on-input semantics implemented and validated.
 
 ## 9. Chunk P1.5-6 — DOM Windowing + Preloading
 
-Status: Implemented (2026-04-07)
 
 ### Purpose
 
@@ -618,7 +613,6 @@ and validated.
 
 ## 10. Chunk P1.5-7 — Regression + Quality Gate
 
-Status: Implemented (2026-04-07)
 
 ### Purpose
 

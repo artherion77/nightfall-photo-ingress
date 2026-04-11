@@ -1,6 +1,16 @@
+# Web Control Plane API (Consolidated)
+
+Status: Active
+
+
+This document consolidates the implemented Phase 1 API specification and the API versioning policy.
+
+---
+
+## Source Document: planning/implemented/web-design-source/web-control-plane-api-phase1.md
+
 # Phase 1 REST API Specification
 
-**Status:** Implemented (Chunks 1, 4, and 5)  
 **Date:** 2026-04-06  
 **Owner:** Systems Engineering
 
@@ -698,7 +708,7 @@ Test coverage includes:
 
 ## 11. Related Documentation
 
-- **Frontend integration:** [webui-architecture-phase1.md](webui-architecture-phase1.md) §7 (API Client Layer)
+- **Frontend integration:** [architecture.md (Phase 1 source section)](architecture.md#source-document-webui-architecture-phase1md) §7 (API Client Layer)
 - **Database schema:** [design/specs/registry.md](../specs/registry.md)
 - **Implementation roadmap:** [roadmaps/web-control-plane-phase1-implementation-roadmap.md](roadmaps/web-control-plane-phase1-implementation-roadmap.md) (Chunk 1 specification)
 
@@ -715,4 +725,57 @@ Fallback behavior for non-API routes is:
 
 This preserves client-side routing for direct navigation to routes such as `/audit`
 or `/staging`.
+
+
+---
+
+## Source Extract: web-control-plane-architecture-phase2.md (API Versioning Policy)
+
+## 5. API Versioning Policy
+
+### 5.1 Current State (Phase 1)
+
+All endpoints are under `/api/v1/`. No formal versioning policy exists yet.
+
+### 5.2 Phase 2 Policy
+
+**Version prefix:** All routes carry a major version prefix (`/api/v1/`, `/api/v2/`,
+etc.). Minor changes that are backwards compatible do not require a new prefix.
+
+**Breaking vs non-breaking change classification:**
+
+| Change type | Classification |
+|-------------|---------------|
+| Adding a new field to a response body | Non-breaking |
+| Adding a new optional query parameter | Non-breaking |
+| Adding a new endpoint | Non-breaking |
+| Removing a field from a response body | Breaking |
+| Changing a field name or type | Breaking |
+| Removing an endpoint | Breaking |
+| Changing required headers or auth scheme | Breaking |
+| Changing pagination cursor format | Breaking |
+
+**Deprecation timeline:**
+- Breaking changes require a new version prefix (e.g., `/api/v2/`).
+- The prior version is supported for a minimum of 60 days after the new version
+  is available, unless a security issue requires immediate removal.
+- Deprecated endpoints return a `Deprecation: true` response header and a
+  `Sunset: {date}` header indicating removal date.
+- The SPA is updated to use the new version before the old version is sunset.
+
+**Intra-version stability guarantee:**
+- Within a single major version, the response shape is stable.
+- Additive changes (new optional fields) are permitted without a version bump.
+- The OpenAPI schema for each version is snapshotted at release and kept in
+  `docs/api/` for reference.
+
+### 5.3 v2 Trigger Conditions
+
+A v2 is warranted when:
+- A response shape change requiring a breaking transition is needed (field rename,
+  restructure, cursor format migration).
+- The authentication scheme migrates from static bearer token to OIDC/OAuth.
+- The pagination strategy changes incompatibly.
+
+---
 

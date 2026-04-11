@@ -1,6 +1,8 @@
 # Tech Stack Decision — Web Control Plane
 
-Status: Decided
+Status: Implemented
+
+
 Date: 2026-04-03
 Owner: Systems Engineering
 

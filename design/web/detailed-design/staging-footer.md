@@ -1,7 +1,9 @@
 # Design: Staging Queue Footer Poll Status
 
+Status: Active
+
+
 **Date:** 2026-04-10
-**Status:** Implemented
 
 ---
 

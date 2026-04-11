@@ -1,6 +1,8 @@
 # Phase 2 Architecture
 
-Status: Proposed
+Status: Implemented
+
+
 Date: 2026-04-03
 Owner: Systems Engineering
 Depends on: design/web/roadmaps/web-control-plane-phase1-scope.md,
