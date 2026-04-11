@@ -205,108 +205,63 @@ targets:
 
   metrics.collect.backend:
     description: "Collect backend metrics (Module 2)"
-    command: |
-      metrics_python="python3"
-      if [[ -x ./.venv/bin/python ]]; then
-        metrics_python="./.venv/bin/python"
-      fi
-      "$metrics_python" ./metricsctl collect-backend
+    command: "./dev/bin/metricsctl collect-backend"
     requires: []
     preflight: []
     lock: true
 
   metrics.status:
     description: "Report metrics runtime status"
-    command: |
-      metrics_python="python3"
-      if [[ -x ./.venv/bin/python ]]; then
-        metrics_python="./.venv/bin/python"
-      fi
-      "$metrics_python" ./metricsctl status
+    command: "./dev/bin/metricsctl status"
     requires: []
     preflight: []
     lock: true
 
   metrics.run-now:
     description: "Trigger metrics pipeline immediately"
-    command: |
-      metrics_python="python3"
-      if [[ -x ./.venv/bin/python ]]; then
-        metrics_python="./.venv/bin/python"
-      fi
-      "$metrics_python" ./metricsctl run-now
+    command: "./dev/bin/metricsctl run-now"
     requires: []
     preflight: []
     lock: true
 
   metrics.collect.frontend:
     description: "Collect frontend metrics (Module 3)"
-    command: |
-      metrics_python="python3"
-      if [[ -x ./.venv/bin/python ]]; then
-        metrics_python="./.venv/bin/python"
-      fi
-      "$metrics_python" ./metricsctl collect-frontend
+    command: "./dev/bin/metricsctl collect-frontend"
     requires: []
     preflight: []
     lock: true
 
   metrics.aggregate:
     description: "Aggregate collected metrics (Module 4)"
-    command: |
-      metrics_python="python3"
-      if [[ -x ./.venv/bin/python ]]; then
-        metrics_python="./.venv/bin/python"
-      fi
-      "$metrics_python" ./metricsctl aggregate
+    command: "./dev/bin/metricsctl aggregate"
     requires: [metrics.collect.backend, metrics.collect.frontend]
     preflight: []
     lock: true
 
   metrics.generate.dashboard:
     description: "Generate dashboard from aggregated data (Module 5)"
-    command: |
-      metrics_python="python3"
-      if [[ -x ./.venv/bin/python ]]; then
-        metrics_python="./.venv/bin/python"
-      fi
-      "$metrics_python" ./metricsctl generate-dashboard
+    command: "./dev/bin/metricsctl generate-dashboard"
     requires: [metrics.aggregate, metrics.build.dashboard]
     preflight: []
     lock: true
 
   metrics.publish:
     description: "Publish metrics surface (Module 7)"
-    command: |
-      metrics_python="python3"
-      if [[ -x ./.venv/bin/python ]]; then
-        metrics_python="./.venv/bin/python"
-      fi
-      "$metrics_python" ./metricsctl publish
+    command: "./dev/bin/metricsctl publish"
     requires: [metrics.generate.dashboard]
     preflight: []
     lock: true
 
   metrics.install:
     description: "Install metrics automation"
-    command: |
-      metrics_python="python3"
-      if [[ -x ./.venv/bin/python ]]; then
-        metrics_python="./.venv/bin/python"
-      fi
-      "$metrics_python" ./metricsctl install
+    command: "./dev/bin/metricsctl install"
     requires: []
     preflight: []
     lock: true
 
   metrics.stop:
     description: "Stop metrics automation"
-    command: |
-      metrics_python="python3"
-      if [[ -x ./.venv/bin/python ]]; then
-        metrics_python="./.venv/bin/python"
-      fi
-      "$metrics_python" ./metricsctl stop
+    command: "./dev/bin/metricsctl stop"
     requires: []
     preflight: []
     lock: true
