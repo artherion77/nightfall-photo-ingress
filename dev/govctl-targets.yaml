@@ -91,7 +91,7 @@ targets:
   backend.e2e:
     description: "Run backend-oriented staging smoke checks"
     command: "./dev/bin/stagingctl smoke"
-    requires: [staging.install]
+    requires: [staging.ensure-running, staging.install]
     preflight:
       - container-running:staging-photo-ingress
     lock: false
@@ -153,7 +153,7 @@ targets:
   web.test.e2e:
     description: "E2E test suite (runs against staging-photo-ingress)"
     command: "./.venv/bin/python -m pytest tests/e2e -v --tb=short"
-    requires: [staging.install]
+    requires: [staging.ensure-running, staging.install]
     preflight:
       - container-running:staging-photo-ingress
     lock: false
@@ -162,7 +162,7 @@ targets:
   web.test.integration:
     description: "Web integration test suite"
     command: "./.venv/bin/python -m pytest tests/e2e -v --tb=short"
-    requires: [staging.install]
+    requires: [staging.ensure-running, staging.install]
     preflight:
       - container-running:staging-photo-ingress
     lock: false
@@ -266,10 +266,26 @@ targets:
     preflight: []
     lock: true
 
+  staging.create:
+    description: "Create staging container baseline"
+    command: "./dev/bin/stagingctl create"
+    requires: []
+    preflight: []
+    lock: false
+
+  staging.ensure-running:
+    description: "Ensure staging container exists and is running"
+    command: |
+      lxc info staging-photo-ingress >/dev/null 2>&1 || ./dev/bin/stagingctl create
+      lxc start staging-photo-ingress 2>/dev/null || true
+    requires: []
+    preflight: []
+    lock: false
+
   staging.install:
     description: "Build wheel and install into staging container"
     command: "./dev/bin/stagingctl install \"$(ls -t dist/*.whl | head -1)\""
-    requires: [backend.build.wheel, web.build]
+    requires: [staging.ensure-running, backend.build.wheel, web.build]
     preflight:
       - container-running:staging-photo-ingress
       - bridge-network:br-staging
@@ -283,7 +299,7 @@ targets:
   staging.e2e.module1:
     description: "Run E2E Suite Module 1"
     command: "./.venv/bin/python -m pytest tests/e2e -v --tb=short"
-    requires: [staging.install]
+    requires: [staging.ensure-running, staging.install]
     preflight:
       - container-running:staging-photo-ingress
     lock: false
@@ -292,7 +308,7 @@ targets:
   staging.smoke:
     description: "Run headless smoke assertions in staging"
     command: "./dev/bin/stagingctl smoke"
-    requires: [staging.install]
+    requires: [staging.ensure-running, staging.install]
     preflight:
       - container-running:staging-photo-ingress
     lock: false
@@ -300,7 +316,7 @@ targets:
   staging.smoke-live:
     description: "Authenticated live poll + secret scan"
     command: "./dev/bin/stagingctl smoke-live"
-    requires: [staging.install]
+    requires: [staging.ensure-running, staging.install]
     preflight:
       - container-running:staging-photo-ingress
     lock: false
@@ -327,7 +343,7 @@ groups:
     targets: [backend.build.wheel, web.build, metrics.build.dashboard]
 
   staging.full:
-    targets: [staging.install, staging.smoke, staging.e2e.module1]
+    targets: [staging.ensure-running, staging.install, staging.smoke, staging.e2e.module1]
 
   metrics.full:
     targets:
