@@ -89,8 +89,23 @@ Validation evidence:
 
 ### C3 — Proxy-Level Rate Limiting
 
-Goal:
-- Define and activate proxy-layer rate limiting policy as mandatory LAN gate control.
+Status:
+- Not applicable for current LAN deployment
+
+Rationale:
+- The Web Control Plane currently operates only on a trusted LAN with authenticated operators and no WAN exposure.
+- There is no untrusted ingress or multi-tenant edge profile in the present deployment model.
+- Adding proxy-level rate limiting now would increase configuration and operational complexity without meaningful risk reduction for this environment.
+
+Decision:
+- C3 is formally skipped for the current deployment profile.
+- No proxy-level rate limiting is implemented for Phase 2 under the current LAN-only posture.
+
+Impact:
+- No Caddy rate-limiting plugin/module work is required for the current LAN deployment.
+- No stagingctl or govctl rate-limiting extensions are required.
+- No additional C3-specific tests or observability surfaces are required.
+- Operator and architecture surfaces remain simpler while preserving current LAN security controls.
 
 Inputs:
 - ../../design/web/architecture.md
@@ -100,15 +115,15 @@ Preconditions:
 - C1 and C2 complete.
 
 Deliverables:
-- Rate limit policy matrix by endpoint class.
-- Validation checklist for threshold behavior and log visibility.
+- C3 applicability decision and rationale documented for current LAN deployment.
+- Re-entry criteria documented for future untrusted ingress profiles.
 
 Validation steps:
-1. Confirm policy applies before requests reach application process.
-2. Confirm observability and policy rollback procedure are documented.
+1. Confirm C3 is explicitly marked as not applicable for current LAN deployment.
+2. Confirm future re-evaluation trigger is documented for WAN or untrusted ingress introduction.
 
 Stop-gates:
-1. No LAN gate sign-off without rate limiting evidence artifact.
+1. Do not introduce WAN or untrusted ingress without opening a dedicated rate-limiting chunk and implementation plan.
 
 ### C4 — Build Artifact Versioning and Rollback
 
@@ -231,7 +246,7 @@ Stop-gates:
 
 1. /api/v1 path baseline remains stable unless explicitly versioned.
 2. Uvicorn remains localhost-bound behind proxy boundary.
-3. Proxy controls (TLS/rate limiting) are mandatory before LAN gate closure.
+3. TLS controls are mandatory for current LAN gate closure; C3 rate limiting is deferred unless deployment exposure changes.
 4. Phase 1.5 interaction invariants remain preserved.
 5. Every chunk output must be traceable to architecture sections and acceptance checks.
 6. Runtime tmpfs and runtime tmp/cache write paths are container-local.
@@ -257,7 +272,7 @@ Reference:
 ## 3. Rollback Strategy
 
 1. Operational rollback uses release-versioned artifact switching.
-2. Proxy policy rollback must be documented with safe fallback behavior.
+2. Proxy policy rollback (TLS boundary) must be documented with safe fallback behavior.
 3. Any chunk introducing deployment risk must include explicit rollback steps before sign-off.
 4. Rollback validation is required for LAN gate closure.
 
@@ -317,18 +332,21 @@ Acceptance Criteria:
 
 ### T3 — Rate limiting at proxy level
 
+Status:
+- Not applicable for current LAN deployment
+
 Description:
-- Apply proxy-level rate policy for API protection and resilience.
+- Deferred task placeholder for future untrusted ingress profiles.
 
 Rationale:
-- Phase 2 mandatory gate requirement.
+- Current deployment remains LAN-only with trusted operators and no WAN exposure.
 
 Dependencies:
-- T1, T2, C3.
+- T1, T2, C3 decision record.
 
 Acceptance Criteria:
-1. Policy matrix documented.
-2. Validation checklist confirms pre-application throttling behavior.
+1. C3 not-applicable decision remains documented and linked to LAN-only posture.
+2. Re-evaluation trigger for WAN or untrusted ingress remains documented.
 
 ### T4 — Build artifact versioning + rollback
 

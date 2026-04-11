@@ -94,3 +94,23 @@ The following behaviors are inconsistent with the corrected baseline:
 1. Add an explicit contract test that fails if host-backed runtime tmp/cache devices are reintroduced.
 2. Add a forward-compatible contract placeholder for future read-only media library host mount validation.
 3. Add a dedicated operational runbook subsection for evidence/log retention and purge policy.
+
+## 8. C3 — Rate Limiting Posture
+
+Status:
+- Not applicable for current LAN deployment
+
+1. No proxy-level rate limiting is implemented for the current LAN-only deployment profile.
+2. The ingress boundary currently relies on:
+   - TLS termination (C2)
+   - local-only API binding behind in-container Caddy
+   - trusted LAN operator access
+3. If WAN exposure or untrusted ingress is introduced in the future, a dedicated rate-limiting chunk must be defined and implemented before enabling that exposure.
+
+Rationale:
+- Current deployment scope is trusted LAN operations only.
+- Present threat model does not justify proxy-level rate-limiting complexity for Phase 2.
+
+Impact:
+- No C3 rate-limiting runtime/config changes are required in current staging.
+- No additional C3-specific staging contracts are required unless deployment exposure changes.
