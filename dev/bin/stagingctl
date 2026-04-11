@@ -14,6 +14,8 @@
 #   stagingctl evidence [run-id] list or inspect evidence runs
 #   stagingctl export-ca         export staging CA cert to tests/ca/staging-ca.pem
 #   stagingctl cloudflared-status check cloudflared service, tunnel connectivity, and logs
+#   stagingctl cloudflared.start start cloudflared tunnel and verify connectivity
+#   stagingctl cloudflared.stop  stop cloudflared tunnel and verify shutdown
 #
 # Environment variables:
 #   STAGING_CLIENT_ID   real Azure client_id to substitute into config
@@ -246,10 +248,8 @@ WantedBy=multi-user.target
 EOF"
 
     lxc exec "$CONTAINER" -- systemctl daemon-reload
-    lxc exec "$CONTAINER" -- systemctl enable "$CF_TUNNEL_SERVICE_NAME"
-    lxc exec "$CONTAINER" -- systemctl restart "$CF_TUNNEL_SERVICE_NAME"
-    lxc exec "$CONTAINER" -- systemctl is-active --quiet "$CF_TUNNEL_SERVICE_NAME" \
-        || _fail "Cloudflare tunnel service failed to start. Inspect with: stagingctl cloudflared-status"
+    # Default-off policy: install provisions the unit but does not auto-start tunnel.
+    lxc exec "$CONTAINER" -- systemctl disable --now "$CF_TUNNEL_SERVICE_NAME" 2>/dev/null || true
 }
 
 _is_cloudflared_tunnel_connected() {
@@ -663,15 +663,10 @@ for line in config_path.read_text(encoding='utf-8').splitlines():
     _ensure_cloudflared_installed
     _ensure_cloudflared_service
 
-    local cloudflared_connected=0
-    for _ in {1..8}; do
-        if _is_cloudflared_tunnel_connected; then
-            cloudflared_connected=1
-            break
-        fi
-        sleep 2
-    done
-    [[ "$cloudflared_connected" == "1" ]] || _fail "Cloudflare tunnel service started but no connection signal found in logs. Run: stagingctl cloudflared-status"
+    if lxc exec "$CONTAINER" -- systemctl is-active --quiet "$CF_TUNNEL_SERVICE_NAME"; then
+        _fail "Cloudflare tunnel must default to OFF after install. Stop it with: stagingctl cloudflared.stop"
+    fi
+    _ok "Cloudflare tunnel unit is provisioned and defaulted to OFF."
 
     _assert_no_cloudflare_credentials_persisted \
         || _fail "Unexpected Cloudflare credentials found in container filesystem"
@@ -770,6 +765,51 @@ cmd_cloudflared_status() {
     lxc exec "$CONTAINER" -- systemctl is-active --quiet "$CADDY_SERVICE_NAME" \
         && _ok "Caddy is active and remains the in-container TLS terminator." \
         || _fail "Caddy is not active; TLS termination posture is broken."
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# stagingctl cloudflared.start
+# ─────────────────────────────────────────────────────────────────────────────
+cmd_cloudflared_start() {
+    _require_container_running
+
+    _assert_cloudflared_token_mounted_readonly
+    _ensure_cloudflared_installed
+    _ensure_cloudflared_service
+
+    _info "Starting cloudflared tunnel service ..."
+    lxc exec "$CONTAINER" -- systemctl start "$CF_TUNNEL_SERVICE_NAME"
+    lxc exec "$CONTAINER" -- systemctl is-active --quiet "$CF_TUNNEL_SERVICE_NAME" \
+        || _fail "Cloudflare tunnel service failed to start. Check: stagingctl cloudflared-status"
+
+    local connected=0
+    for _ in {1..10}; do
+        if _is_cloudflared_tunnel_connected; then
+            connected=1
+            break
+        fi
+        sleep 2
+    done
+    [[ "$connected" == "1" ]] || _fail "Cloudflare tunnel started but no connection signal found in logs. Check: stagingctl cloudflared-status"
+
+    _ok "Cloudflare tunnel started and connected."
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# stagingctl cloudflared.stop
+# ─────────────────────────────────────────────────────────────────────────────
+cmd_cloudflared_stop() {
+    _require_container_running
+
+    _info "Stopping cloudflared tunnel service ..."
+    lxc exec "$CONTAINER" -- systemctl stop "$CF_TUNNEL_SERVICE_NAME" 2>/dev/null || true
+    lxc exec "$CONTAINER" -- systemctl disable "$CF_TUNNEL_SERVICE_NAME" 2>/dev/null || true
+
+    if lxc exec "$CONTAINER" -- systemctl is-active --quiet "$CF_TUNNEL_SERVICE_NAME"; then
+        _fail "Cloudflare tunnel service is still active after stop request."
+    fi
+
+    _ok "Cloudflare tunnel stopped and left disabled (default-off preserved)."
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1196,7 +1236,7 @@ Usage: $(basename "$0") <command> [args]
 Commands:
   create              Create LXC container (profiles: default+staging) and baseline state.
     install [wheel]     Create versioned release (wheel+web build), deploy it, refresh 'clean' snapshot,
-                                            export CA, and ensure cloudflared tunnel is installed and connected.
+                                            export CA, and provision cloudflared in default-OFF mode.
     releases            List versioned releases and show active release mapping.
     rollback <id>       Switch active release to <id>, redeploy, validate, and log rollback event.
     uninstall [--purge] Delete container. --purge preserves host evidence/log directories.
@@ -1208,6 +1248,8 @@ Commands:
   evidence [id]       List or inspect evidence runs.
     export-ca           Export container CA cert to tests/ca/staging-ca.pem.
     cloudflared-status  Check cloudflared service, tunnel connectivity, logs, and secret posture.
+    cloudflared.start   Start cloudflared tunnel and verify connectivity.
+    cloudflared.stop    Stop cloudflared tunnel and verify shutdown.
 
 Environment variables:
   STAGING_CLIENT_ID       Azure client_id to inject into config.
@@ -1237,6 +1279,8 @@ main() {
         evidence)       cmd_evidence   "$@" ;;
         export-ca)      cmd_export_ca  "$@" ;;
         cloudflared-status) cmd_cloudflared_status "$@" ;;
+        cloudflared.start) cmd_cloudflared_start "$@" ;;
+        cloudflared.stop) cmd_cloudflared_stop "$@" ;;
         *)              _usage ;;
     esac
 }

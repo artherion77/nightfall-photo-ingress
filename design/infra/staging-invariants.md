@@ -36,6 +36,7 @@ The Phase-2 baseline is strict and non-negotiable:
 13. Staging CA trust is exported to `tests/ca/staging-ca.pem` for E2E and Playwright trust synchronization.
 14. Future scope may include a dedicated read-only host mount for media library hash-import validation.
 15. No Cloudflare credentials may ever reside inside the container filesystem. All Cloudflare credentials must be mounted read-only from the host.
+16. Cloudflare Tunnel MUST default to OFF and may only be started explicitly via stagingctl/govctl.
 
 ## 3. Reconciled Invariants
 

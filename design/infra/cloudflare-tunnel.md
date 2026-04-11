@@ -41,7 +41,7 @@ Out of scope:
 
 1. Service name: `cloudflared-tunnel.service`
 2. Managed by container systemd:
-   - enabled at boot
+   - disabled by default (default-off policy)
    - restarted on failure
 3. Service logs are collected via `journalctl` for troubleshooting.
 4. `stagingctl cloudflared-status` is the operator status command to verify:
@@ -50,7 +50,18 @@ Out of scope:
    - tunnel connectivity signals in logs
    - recent logs tail
 
-## 5. DNS and TLS Implications
+## 5. Default-Off Operator Controls
+
+1. `stagingctl install` provisions cloudflared and service unit but MUST leave tunnel OFF.
+2. Operators explicitly control runtime with:
+   - `stagingctl cloudflared.start`
+   - `stagingctl cloudflared.stop`
+3. Equivalent govctl targets are available:
+   - `govctl run staging.cloudflared.start --json`
+   - `govctl run staging.cloudflared.stop --json`
+4. Tunnel may only be started through explicit operator command surfaces.
+
+## 6. DNS and TLS Implications
 
 1. DNS points the Cloudflare tunnel hostname to Cloudflare edge as usual.
 2. Inside staging, Caddy remains the TLS endpoint for the app.
@@ -59,9 +70,11 @@ Out of scope:
    - no host-level TLS termination
 4. Existing staging internal CA flow for LAN/operator trust remains valid and independent of cloudflared token auth.
 
-## 6. Operational Validation Checklist
+## 7. Operational Validation Checklist
 
 1. `stagingctl create` mounts `/etc/cloudflared/token` as read-only from host secret path.
-2. `stagingctl install` verifies token mount, installs cloudflared when missing, and starts `cloudflared-tunnel.service`.
-3. `stagingctl cloudflared-status --strict` succeeds with tunnel-connected log evidence.
-4. `govctl run staging.validate --json` fails fast with actionable diagnostics when tunnel posture drifts.
+2. `stagingctl install` verifies token mount, installs cloudflared when missing, and leaves `cloudflared-tunnel.service` OFF.
+3. `stagingctl cloudflared.start` starts and verifies tunnel connectivity.
+4. `stagingctl cloudflared.stop` stops service and verifies shutdown.
+5. `stagingctl cloudflared-status --strict` succeeds with tunnel-connected log evidence after explicit start.
+6. `govctl run staging.cloudflared.start --json` and `govctl run staging.cloudflared.stop --json` behave identically to stagingctl commands.

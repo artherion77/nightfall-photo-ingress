@@ -306,6 +306,22 @@ targets:
       - container-running:staging-photo-ingress
     lock: false
 
+  staging.cloudflared.start:
+    description: "Start staging cloudflared tunnel explicitly"
+    command: "./dev/bin/stagingctl cloudflared.start"
+    requires: [staging.ensure-running, staging.install]
+    preflight:
+      - container-running:staging-photo-ingress
+    lock: false
+
+  staging.cloudflared.stop:
+    description: "Stop staging cloudflared tunnel explicitly"
+    command: "./dev/bin/stagingctl cloudflared.stop"
+    requires: [staging.ensure-running]
+    preflight:
+      - container-running:staging-photo-ingress
+    lock: false
+
   staging.e2e.module1:
     description: "Run E2E Suite Module 1"
     command: "./.venv/bin/python -m pytest tests/e2e -v --tb=short"

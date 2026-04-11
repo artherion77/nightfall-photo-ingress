@@ -268,6 +268,16 @@ Stop-gates:
 3. `stagingctl cloudflared-status` provides operator diagnostics for mount policy, runtime state, tunnel connectivity, and recent logs.
 4. `govctl staging.validate` now fails fast unless both trust-sync (`export-ca`) and Cloudflare tunnel strict status checks pass.
 5. Secret-handling policy is explicit: no Cloudflare credentials may persist in container-local writable filesystem paths.
+
+### C6/C7 Operator Control Delta — Cloudflare Tunnel Default-OFF
+
+1. Cloudflare tunnel runtime now defaults to OFF after `stagingctl install`.
+2. Explicit operator controls are required:
+	- `stagingctl cloudflared.start`
+	- `stagingctl cloudflared.stop`
+3. Equivalent govctl target surfaces are provided:
+	- `staging.cloudflared.start`
+	- `staging.cloudflared.stop`
 3. Staging CORS allowlist normalized to HTTPS origins:
 	- `https://staging-photo-ingress.home.arpa`
 	- `https://npi.pohl-family.org`

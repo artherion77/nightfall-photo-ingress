@@ -273,11 +273,21 @@ class TestCloudflareTunnel:
         assert 'apt-get install -y cloudflared' in stagingctl_text
         assert 'CF_TUNNEL_SERVICE_NAME="cloudflared-tunnel.service"' in stagingctl_text
         assert 'cloudflared tunnel run --token' in stagingctl_text
-        assert 'systemctl enable "$CF_TUNNEL_SERVICE_NAME"' in stagingctl_text
+        assert 'systemctl disable --now "$CF_TUNNEL_SERVICE_NAME"' in stagingctl_text
+
+    def test_stagingctl_enforces_default_off_after_install(self, stagingctl_text: str) -> None:
+        assert "Cloudflare tunnel must default to OFF after install" in stagingctl_text
+        assert "Cloudflare tunnel unit is provisioned and defaulted to OFF." in stagingctl_text
 
     def test_cloudflared_status_command_is_dispatched(self, stagingctl_text: str) -> None:
         assert 'cloudflared-status)' in stagingctl_text
         assert 'cmd_cloudflared_status' in stagingctl_text
+
+    def test_cloudflared_start_stop_commands_are_dispatched(self, stagingctl_text: str) -> None:
+        assert 'cloudflared.start)' in stagingctl_text
+        assert 'cloudflared.stop)' in stagingctl_text
+        assert 'cmd_cloudflared_start' in stagingctl_text
+        assert 'cmd_cloudflared_stop' in stagingctl_text
 
     def test_caddyfile_uses_explicit_tls_material_paths(self, caddyfile_text: str) -> None:
         assert "tls /etc/caddy/tls/staging-photo-ingress.crt /etc/caddy/tls/staging-photo-ingress.key" in caddyfile_text
