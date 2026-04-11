@@ -24,6 +24,27 @@ Implementation guardrails:
 2. Every API change must be reviewed against `design/infra/api-versioning-checklist.md`.
 3. Integration tests must continue to assert presence of canonical `/api/v1` paths.
 
+## Phase 2 Decision Addendum: C6 Dashboard Filter Sidebar
+
+Date: 2026-04-11
+Owner: Systems Engineering
+
+Decision:
+1. Dashboard file-type filtering is implemented client-side against already-loaded dashboard staging data.
+2. Filter state is session-local and non-persistent.
+3. Multiple file-type filters can be active simultaneously.
+4. Filter option accents are derived from dashboard filter design tokens.
+
+Rationale:
+1. C6 requires improved operator focus without introducing API or backend scope.
+2. Client-side filtering avoids server-coupling and preserves existing `/api/v1/staging` contract.
+3. Session-local state aligns with Phase 1.5 interaction invariants and avoids global side effects.
+
+Guardrails:
+1. No backend endpoint changes for C6.
+2. No server-side filtering logic.
+3. Existing dashboard data loading behavior remains unchanged.
+
 
 This document consolidates invariants, decisions, and rationale documents for the web control plane.
 

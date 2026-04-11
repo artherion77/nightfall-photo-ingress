@@ -83,6 +83,17 @@ is organized by category: background, status, action, surface, text, and border.
 | `--status-error`      | `#f87171` | Error/down status (red) |
 | `--status-unknown`    | `#6b7280` | Unknown status (grey) |
 
+### 3.4.1 Dashboard Filter Tokens (Phase 2 C6)
+
+Dashboard file-type filters use semantic tokens instead of hardcoded colors.
+
+| Token                    | Semantic Role |
+|--------------------------|---------------|
+| `--filter-type-image`    | Image file-type option accent |
+| `--filter-type-video`    | Video file-type option accent |
+| `--filter-type-raw`      | RAW photo file-type option accent |
+| `--filter-type-generic`  | Generic/other file-type option accent |
+
 ### 3.4 Action Colours
 
 | Token                      | Value     | Usage |

@@ -67,6 +67,12 @@
   --status-unknown: var(--color-content-400);
   --status-info: var(--color-accent-blue);
 
+  /* Dashboard filter tokens (C6) */
+  --filter-type-image: var(--color-accent-teal);
+  --filter-type-video: var(--color-accent-blue);
+  --filter-type-raw: var(--color-accent-amber);
+  --filter-type-generic: var(--color-content-300);
+
   /* Border Tokens */
   --border-default: var(--color-border-default);
   --border-subtle: var(--color-border-subtle);
