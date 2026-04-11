@@ -1,8 +1,62 @@
 #!/usr/bin/env bash
+# metricsctl — Metrics pipeline controller for nightfall-photo-ingress.
+#
+# Usage:
+#   metricsctl <command> [options]
+#   metricsctl help
+#
+# Pipeline commands:
+#   collect-backend           Run Module 2 backend metrics collector
+#   collect-frontend          Run Module 3 frontend metrics collector
+#   aggregate                 Run Module 4 aggregator and delta engine
+#   generate-dashboard        Run Module 5 dashboard generator
+#   publish                   Trigger Module 7 publication action
+#   run-now                   Execute full pipeline once (Module 6 poller)
+#
+# Lifecycle commands:
+#   install                   Install Module 6 poller runtime and systemd units
+#   uninstall                 Uninstall Module 6 poller runtime assets
+#   start                     Enable Module 6 poller runtime
+#   stop                      Disable Module 6 poller runtime
+#   reconfigure               Reconfigure Module 6 poller frequency
+#   status                    Report Module 6 poller runtime status
+#
+# Init & validation:
+#   init-module1              Initialize Module 1 schema/layout artifacts
+#   validate-module1          Validate Module 1 artifacts and schemas
+#   paths                     Print key metrics runtime paths
+#
+# Maintenance:
+#   retention-prune           Apply Module 8 history retention policy
+#   extensions-status         Show Module 8 optional collector configuration
+#   cleanup-runtime           Clean ephemeral metrics runtime artifacts
+#   dashboard-build-stamp     Show dashboard build stamp and rebuild status
+#   thumbnail-gc              Remove thumbnail cache entries for non-pending items
+#
+# Environment:
+#   REPO_LOCK_TIMEOUT_SEC     Global repo lock wait timeout (default: 300)
+#   DEVCTL_GLOBAL_LOCK_HELD   Set to 1 if caller already holds the repo lock
+#
+# See also: govctl run metrics.<target> --json
+
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+# ── Help ──────────────────────────────────────────────────────────────────────
+
+_usage() {
+    # Extract the comment block at the top of this script (lines starting with #).
+    sed -n '2,/^[^#]/{ /^#/s/^# \{0,1\}//p; }' "${BASH_SOURCE[0]}"
+    exit 1
+}
+
+case "${1:-}" in
+    ""|-h|--help|help) _usage ;;
+esac
+
+# ── Dispatch to Python implementation ─────────────────────────────────────────
 
 # Prefer venv Python; fall back to system python3.
 if [[ -x "$REPO_ROOT/.venv/bin/python" ]]; then
