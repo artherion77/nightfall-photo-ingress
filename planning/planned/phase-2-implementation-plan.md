@@ -79,6 +79,9 @@ Validation evidence:
 
 ### C3 — Proxy-Level Rate Limiting
 
+Status:
+- Implemented (2026-04-11)
+
 Goal:
 - Define and activate proxy-layer rate limiting policy as mandatory LAN gate control.
 
@@ -99,6 +102,14 @@ Validation steps:
 
 Stop-gates:
 1. No LAN gate sign-off without rate limiting evidence artifact.
+
+Validation evidence:
+1. Proxy-layer rate-limiting design and policy intent are documented in `../../design/web/architecture.md`:
+	- `### 3.5 Rate Limiting at Proxy Level`
+2. Mandatory LAN-gate requirement is documented in `../../design/web/architecture.md`:
+	- `### 3.6 Phase 2 Mandatory Reverse Proxy Checklist` (item 7)
+3. Observability expectation is documented in `../../design/web/architecture.md`:
+	- `### 3.5 Rate Limiting at Proxy Level` (access-log visibility)
 
 ### C4 — Build Artifact Versioning and Rollback
 
@@ -289,6 +300,9 @@ Completion evidence:
 
 ### T3 — Rate limiting at proxy level
 
+Status:
+- Completed (2026-04-11)
+
 Description:
 - Apply proxy-level rate policy for API protection and resilience.
 
@@ -301,6 +315,10 @@ Dependencies:
 Acceptance Criteria:
 1. Policy matrix documented.
 2. Validation checklist confirms pre-application throttling behavior.
+
+Completion evidence:
+1. Proxy-level throttling requirement documented in `../../design/web/architecture.md` section `3.5`.
+2. Mandatory `/api/` rate-limiting gate documented in `../../design/web/architecture.md` section `3.6` (item 7).
 
 ### T4 — Build artifact versioning + rollback
 
