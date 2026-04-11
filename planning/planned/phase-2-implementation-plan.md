@@ -133,20 +133,28 @@ Goal:
 Inputs:
 - ../../design/web/architecture.md
 - ../planned/phase-2-architecture-roadmap.md
+- ../../design/infra/releases.md
 
 Preconditions:
 - C1 baseline complete.
 
 Deliverables:
-- Release directory strategy.
+- Versioned release directory strategy for backend wheel and web build artifacts.
+- Deterministic active-release mapping and rollback-safe operation flow.
 - Rollback runbook and validation checklist.
 
 Validation steps:
 1. Validate forward deploy and rollback sequence are deterministic.
 2. Validate release mapping can be audited.
+3. Validate stagingctl install deploys from versioned release artifacts, not ad-hoc artifact paths.
 
 Stop-gates:
 1. No production LAN gate closure without tested rollback path.
+
+Validation evidence:
+1. Versioned release materialization, active mapping, and rollback commands are implemented in `../../dev/bin/stagingctl`.
+2. C4 release and rollback contracts are documented in `../../design/infra/releases.md`.
+3. C4 release mapping and rollback path contract tests are implemented in `../../tests/staging/test_stagingctl_policy_contracts.py`.
 
 ### C5 — API Versioning Policy Enforcement
 

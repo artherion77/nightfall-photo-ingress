@@ -256,3 +256,38 @@ class TestTlsC2:
 
     def test_caddyfile_uses_explicit_tls_material_paths(self, caddyfile_text: str) -> None:
         assert "tls /etc/caddy/tls/staging-photo-ingress.crt /etc/caddy/tls/staging-photo-ingress.key" in caddyfile_text
+
+
+class TestReleaseVersioningC4:
+    def test_stagingctl_defines_release_directory_structure(self, stagingctl_text: str) -> None:
+        assert 'RELEASES_ROOT="$PROJECT_ROOT/artifacts/releases"' in stagingctl_text
+        assert 'RELEASES_DIR="$RELEASES_ROOT/versions"' in stagingctl_text
+        assert 'RELEASE_ACTIVE_LINK="$RELEASES_ROOT/active"' in stagingctl_text
+        assert 'RELEASE_AUDIT_LOG="$RELEASES_ROOT/release-events.jsonl"' in stagingctl_text
+
+    def test_install_materializes_versioned_release(self, stagingctl_text: str) -> None:
+        assert "_release_materialize" in stagingctl_text
+        assert "manifest.json" in stagingctl_text
+        assert "release_created" in stagingctl_text
+
+    def test_install_deploys_from_release_directory(self, stagingctl_text: str) -> None:
+        assert "_deploy_release_to_container" in stagingctl_text
+        assert 'release_dir="$RELEASES_DIR/$release_id"' in stagingctl_text
+        assert 'lxc file push "$release_wheel"' in stagingctl_text
+        assert 'lxc file push --recursive "$release_dir/webui/build"' in stagingctl_text
+
+    def test_release_mapping_has_active_symlink(self, stagingctl_text: str) -> None:
+        assert "_release_set_active" in stagingctl_text
+        assert 'ln -sfn "versions/$release_id" "$RELEASE_ACTIVE_LINK"' in stagingctl_text
+        assert "active_release_switched" in stagingctl_text
+
+    def test_rollback_path_switches_release_and_validates(self, stagingctl_text: str) -> None:
+        assert "cmd_rollback" in stagingctl_text
+        assert 'Usage: stagingctl rollback <release-id>' in stagingctl_text
+        assert "rollback_started" in stagingctl_text
+        assert "rollback_validated" in stagingctl_text
+        assert "systemctl is-active --quiet" in stagingctl_text
+
+    def test_usage_exposes_release_and_rollback_commands(self, stagingctl_text: str) -> None:
+        assert "releases            List versioned releases" in stagingctl_text
+        assert "rollback <id>       Switch active release" in stagingctl_text

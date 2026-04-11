@@ -3,7 +3,9 @@
 #
 # Usage:
 #   stagingctl create            create container baseline
-#   stagingctl install [wheel]   push wheel + config, enable service, refresh "clean" snapshot
+#   stagingctl install [wheel]   materialize versioned release, deploy active release, refresh "clean" snapshot
+#   stagingctl releases          list versioned releases and active release mapping
+#   stagingctl rollback <id>     switch active release to <id>, redeploy, validate, log
 #   stagingctl uninstall         delete container
 #   stagingctl reset             restore "clean" snapshot, restart
 #   stagingctl smoke             run headless smoke assertions, collect evidence
@@ -48,6 +50,10 @@ TLS_CA_KEY="$TLS_DIR/nightfall-staging-ca.key"
 TLS_CA_CERT="$TLS_DIR/nightfall-staging-ca.crt"
 TLS_SERVER_KEY="$TLS_DIR/staging-photo-ingress.key"
 TLS_SERVER_CERT="$TLS_DIR/staging-photo-ingress.crt"
+RELEASES_ROOT="$PROJECT_ROOT/artifacts/releases"
+RELEASES_DIR="$RELEASES_ROOT/versions"
+RELEASE_ACTIVE_LINK="$RELEASES_ROOT/active"
+RELEASE_AUDIT_LOG="$RELEASES_ROOT/release-events.jsonl"
 
 # Host-persistent evidence/log storage remains required in Phase 2.
 HOST_EVIDENCE_BASE="${STAGING_EVIDENCE_BASE:-/mnt/ssd/staging/photo-ingress/evidence}"
@@ -204,6 +210,100 @@ _gen_run_id() {
     printf '%s-%s' "$ts" "$uuid"
 }
 
+_release_init_dirs() {
+    mkdir -p "$RELEASES_DIR"
+    mkdir -p "$RELEASES_ROOT"
+    touch "$RELEASE_AUDIT_LOG"
+}
+
+_release_new_id() {
+    local ts
+    ts="$(date -u +%Y%m%dT%H%M%SZ)"
+    local suffix
+    suffix="$(python3 -c 'import uuid; print(str(uuid.uuid4())[:8])')"
+    printf '%s-%s' "$ts" "$suffix"
+}
+
+_release_get_active_id() {
+    [[ -L "$RELEASE_ACTIVE_LINK" ]] || return 1
+    basename "$(readlink "$RELEASE_ACTIVE_LINK")"
+}
+
+_release_set_active() {
+    local release_id="$1"
+    [[ -d "$RELEASES_DIR/$release_id" ]] || _fail "Release '$release_id' does not exist under $RELEASES_DIR"
+    ln -sfn "versions/$release_id" "$RELEASE_ACTIVE_LINK"
+}
+
+_release_log_event() {
+    local event="$1"
+    local release_id="$2"
+    local detail="${3:-}"
+    printf '{"event":"%s","release_id":"%s","detail":"%s","ts":"%s"}\n' \
+        "$event" "$release_id" "$detail" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$RELEASE_AUDIT_LOG"
+}
+
+_release_materialize() {
+    local wheel_path="${1:-}"
+    _release_init_dirs
+
+    # Build a fresh wheel by default so release creation validates the current tree.
+    if [[ -z "$wheel_path" ]]; then
+        local build_python
+        build_python="python3"
+        if [[ -x "$PROJECT_ROOT/.venv/bin/python" ]]; then
+            build_python="$PROJECT_ROOT/.venv/bin/python"
+        fi
+        local wheel_tmp_dir
+        wheel_tmp_dir="$(mktemp -d "$RELEASES_ROOT/.wheel-build-XXXXXX")"
+        trap 'rm -rf "${wheel_tmp_dir:-}"' RETURN
+        _info "Building fresh wheel for release materialization ..."
+        (cd "$PROJECT_ROOT" && "$build_python" -m build --wheel --outdir "$wheel_tmp_dir")
+        wheel_path="$(ls -t "$wheel_tmp_dir"/*.whl | head -1)"
+    fi
+
+    [[ -f "$wheel_path" ]] || _fail "Wheel not found: $wheel_path"
+    [[ -d "$WEB_BUILD_DIR" ]] || _fail "Web build artifact not found at $WEB_BUILD_DIR. Run web build before staging install."
+
+    local release_id
+    release_id="$(_release_new_id)"
+    local release_dir="$RELEASES_DIR/$release_id"
+    mkdir -p "$release_dir/backend" "$release_dir/webui"
+
+    cp "$wheel_path" "$release_dir/backend/"
+    cp -a "$WEB_BUILD_DIR" "$release_dir/webui/build"
+
+    local release_wheel
+    release_wheel="$(basename "$wheel_path")"
+    local wheel_sha
+    wheel_sha="$(sha256sum "$release_dir/backend/$release_wheel" | awk '{print $1}')"
+    local web_sha
+    web_sha="$(cd "$release_dir/webui/build" && find . -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum | awk '{print $1}')"
+
+    cat > "$release_dir/manifest.json" <<EOF
+{
+  "release_id": "$release_id",
+  "created_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "backend": {
+    "wheel": "$release_wheel",
+    "sha256": "$wheel_sha"
+  },
+  "webui": {
+    "path": "webui/build",
+    "sha256": "$web_sha"
+  }
+}
+EOF
+
+    local previous_active=""
+    previous_active="$(_release_get_active_id || true)"
+    _release_set_active "$release_id"
+    _release_log_event "release_created" "$release_id" "wheel=$release_wheel"
+    _release_log_event "active_release_switched" "$release_id" "from=${previous_active:-none}"
+
+    printf '%s' "$release_id"
+}
+
 # ─────────────────────────────────────────────────────────────────────────────
 # stagingctl create
 # ─────────────────────────────────────────────────────────────────────────────
@@ -277,29 +377,23 @@ cmd_create() {
 # ─────────────────────────────────────────────────────────────────────────────
 # stagingctl install [wheel-path]
 # ─────────────────────────────────────────────────────────────────────────────
-cmd_install() {
-    local wheel_path="${1:-}"
+_deploy_release_to_container() {
+    local release_id="$1"
+    local release_dir="$RELEASES_DIR/$release_id"
+    [[ -d "$release_dir" ]] || _fail "Release '$release_id' not found under $RELEASES_DIR"
 
-    # Build a fresh wheel by default so staging validates the current tree.
-    if [[ -z "$wheel_path" ]]; then
-        local build_python
-        build_python="python3"
-        if [[ -x "$PROJECT_ROOT/.venv/bin/python" ]]; then
-            build_python="$PROJECT_ROOT/.venv/bin/python"
-        fi
-        _info "Building fresh wheel ..."
-        (cd "$PROJECT_ROOT" && "$build_python" -m build --wheel --outdir dist/)
-        wheel_path="$(ls -t "$PROJECT_ROOT/dist/"*.whl | head -1)"
-    fi
-
-    [[ -f "$wheel_path" ]] || _fail "Wheel not found: $wheel_path"
-    _require_container_running
+    local release_wheel
+    release_wheel="$(ls -t "$release_dir/backend/"*.whl 2>/dev/null | head -1 || true)"
+    [[ -n "$release_wheel" && -f "$release_wheel" ]] || _fail "No wheel artifact found in release: $release_dir/backend"
+    [[ -d "$release_dir/webui/build" ]] || _fail "No web build artifact found in release: $release_dir/webui/build"
 
     local whl_name
-    whl_name="$(basename "$wheel_path")"
-    _info "Pushing $whl_name ..."
+    whl_name="$(basename "$release_wheel")"
+
+    _info "Deploying release '$release_id' to staging container ..."
+    _info "Pushing wheel artifact $whl_name from release directory ..."
     lxc exec "$CONTAINER" -- mkdir -p "$CT_TMP_DIR"
-    lxc file push "$wheel_path" "$CONTAINER$CT_TMP_DIR/$whl_name"
+    lxc file push "$release_wheel" "$CONTAINER$CT_TMP_DIR/$whl_name"
 
     # Prepare staging config: substitute real client_id if provided
     local conf_src="$STAGING_ROOT/container/photo-ingress.conf"
@@ -402,14 +496,10 @@ for line in config_path.read_text(encoding='utf-8').splitlines():
     lxc file push "$CADDYFILE_SOURCE" "$CONTAINER$CADDYFILE_DEST"
     _provision_container_tls_material
 
-    if [[ -d "$WEB_BUILD_DIR" ]]; then
-        _info "Syncing web build artifact to /opt/webui/build ..."
-        lxc exec "$CONTAINER" -- rm -rf /opt/webui/build
-        lxc exec "$CONTAINER" -- mkdir -p /opt/webui
-        lxc file push --recursive "$WEB_BUILD_DIR" "$CONTAINER/opt/webui/"
-    else
-        _warn "Host web build artifact not found at $WEB_BUILD_DIR; leaving existing /opt/webui/build unchanged."
-    fi
+    _info "Syncing versioned web build artifact to /opt/webui/build ..."
+    lxc exec "$CONTAINER" -- rm -rf /opt/webui/build
+    lxc exec "$CONTAINER" -- mkdir -p /opt/webui
+    lxc file push --recursive "$release_dir/webui/build" "$CONTAINER/opt/webui/"
 
     # Push existing token cache if provided (DEPRECATED: use 'stagingctl auth-setup' instead)
     if [[ -n "${STAGING_TOKEN_JSON:-}" && -f "$STAGING_TOKEN_JSON" ]]; then
@@ -441,8 +531,18 @@ for line in config_path.read_text(encoding='utf-8').splitlines():
     _info "Taking LXD snapshot '$SNAPSHOT_CLEAN' (post-install baseline) ..."
     lxc snapshot "$CONTAINER" "$SNAPSHOT_CLEAN"
 
-    _ok "Installed $whl_name. Timer/trash enabled, API active on localhost, Caddy ingress active. Snapshot '$SNAPSHOT_CLEAN' refreshed."
+    _release_log_event "release_deployed" "$release_id" "container=$CONTAINER"
+    _ok "Installed release '$release_id' ($whl_name). Timer/trash enabled, API active on localhost, Caddy ingress active. Snapshot '$SNAPSHOT_CLEAN' refreshed."
     _info "Run 'stagingctl smoke' to verify or 'stagingctl reset' to roll back."
+}
+
+cmd_install() {
+    local wheel_path="${1:-}"
+    _require_container_running
+
+    local release_id
+    release_id="$(_release_materialize "$wheel_path")"
+    _deploy_release_to_container "$release_id"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -808,6 +908,58 @@ cmd_evidence() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
+# stagingctl releases
+# ─────────────────────────────────────────────────────────────────────────────
+cmd_releases() {
+    _release_init_dirs
+
+    local active=""
+    active="$(_release_get_active_id || true)"
+    if [[ -n "$active" ]]; then
+        _info "Active release: $active"
+    else
+        _info "Active release: (none)"
+    fi
+
+    _info "Available releases in $RELEASES_DIR:"
+    if compgen -G "$RELEASES_DIR/*" >/dev/null; then
+        ls -1 "$RELEASES_DIR"
+    else
+        _info "(none)"
+    fi
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# stagingctl rollback <release-id>
+# ─────────────────────────────────────────────────────────────────────────────
+cmd_rollback() {
+    local target_release="${1:-}"
+    [[ -n "$target_release" ]] || _fail "Usage: stagingctl rollback <release-id>"
+
+    _release_init_dirs
+    _require_container_running
+    [[ -d "$RELEASES_DIR/$target_release" ]] || _fail "Release '$target_release' does not exist."
+
+    local previous_release=""
+    previous_release="$(_release_get_active_id || true)"
+
+    _info "Switching active release to '$target_release' for rollback ..."
+    _release_set_active "$target_release"
+    _release_log_event "rollback_started" "$target_release" "from=${previous_release:-none}"
+
+    _deploy_release_to_container "$target_release"
+
+    # Deterministic rollback validation: service health + config validity.
+    lxc exec "$CONTAINER" -- systemctl is-active --quiet "$API_SERVICE_NAME"
+    lxc exec "$CONTAINER" -- systemctl is-active --quiet "$CADDY_SERVICE_NAME"
+    lxc exec "$CONTAINER" -- \
+        "$VENV_ROOT/bin/nightfall-photo-ingress" --log-mode json config-check --path "$CONF_DEST" >/dev/null
+
+    _release_log_event "rollback_validated" "$target_release" "services=api,caddy;config_check=pass"
+    _ok "Rollback complete: active release is now '$target_release'."
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Dispatch
 # ─────────────────────────────────────────────────────────────────────────────
 _usage() {
@@ -816,7 +968,9 @@ Usage: $(basename "$0") <command> [args]
 
 Commands:
   create              Create LXC container (profiles: default+staging) and baseline state.
-  install [wheel]     Push wheel + config, enable service, and refresh 'clean' snapshot.
+    install [wheel]     Create versioned release (wheel+web build), deploy it, and refresh 'clean' snapshot.
+    releases            List versioned releases and show active release mapping.
+    rollback <id>       Switch active release to <id>, redeploy, validate, and log rollback event.
     uninstall [--purge] Delete container. --purge preserves host evidence/log directories.
   reset               Restore 'clean' snapshot and restart container.
   smoke               Run headless smoke assertions; collect evidence.
@@ -842,6 +996,8 @@ main() {
     case "$cmd" in
         create)         cmd_create     "$@" ;;
         install)        cmd_install    "$@" ;;
+        releases)       cmd_releases   "$@" ;;
+        rollback)       cmd_rollback   "$@" ;;
         uninstall)      cmd_uninstall  "$@" ;;
         reset)          cmd_reset      "$@" ;;
         smoke)          cmd_smoke      "$@" ;;
