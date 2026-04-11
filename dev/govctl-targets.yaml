@@ -297,8 +297,10 @@ targets:
     lock: false
 
   staging.validate:
-    description: "Export staging CA cert for test trust synchronization"
-    command: "./dev/bin/stagingctl export-ca"
+    description: "Validate staging trust and Cloudflare tunnel posture"
+    command: |
+      ./dev/bin/stagingctl export-ca
+      ./dev/bin/stagingctl cloudflared-status --strict
     requires: [staging.ensure-running, staging.install]
     preflight:
       - container-running:staging-photo-ingress

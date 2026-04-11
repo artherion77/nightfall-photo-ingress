@@ -80,3 +80,13 @@ This overwrites `tests/ca/staging-ca.pem` and prevents CA drift between staging 
 3. HTTP probe to `http://127.0.0.1/` fails from inside container.
 4. Caddy config validates prior to restart.
 5. TLS artifact paths exist under `/etc/caddy/tls` and remain container-local.
+
+## 7. Cloudflare Tunnel Interaction
+
+1. Cloudflare Tunnel connectivity is provided by in-container `cloudflared` and is separate from Caddy TLS termination.
+2. Caddy remains the application TLS terminator in staging.
+3. Cloudflare-origin transport can use either:
+   - Cloudflare Origin Certificate trust to Caddy, or
+   - TLS passthrough policy that still terminates at Caddy in-container.
+4. Token authentication for cloudflared must use a host-mounted, read-only token file at `/etc/cloudflared/token`.
+5. Cloudflare credential artifacts must not persist in container-local writable paths.

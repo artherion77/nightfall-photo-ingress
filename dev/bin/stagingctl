@@ -13,6 +13,7 @@
 #   stagingctl smoke-live        run authenticated live poll + secret scan
 #   stagingctl evidence [run-id] list or inspect evidence runs
 #   stagingctl export-ca         export staging CA cert to tests/ca/staging-ca.pem
+#   stagingctl cloudflared-status check cloudflared service, tunnel connectivity, and logs
 #
 # Environment variables:
 #   STAGING_CLIENT_ID   real Azure client_id to substitute into config
@@ -52,6 +53,11 @@ TLS_CA_CERT="$TLS_DIR/ca.pem"
 TLS_SERVER_KEY="$TLS_DIR/staging-photo-ingress.key"
 TLS_SERVER_CERT="$TLS_DIR/staging-photo-ingress.crt"
 EXPORTED_CA_PATH="$PROJECT_ROOT/tests/ca/staging-ca.pem"
+CF_TUNNEL_TOKEN_HOST_PATH="/home/chris/.cloudflare-secrets/npi-staging/tunnel-token"
+CF_TUNNEL_TOKEN_CT_PATH="/etc/cloudflared/token"
+CF_TUNNEL_DEVICE_NAME="cloudflared-token"
+CF_TUNNEL_DEVICE_SHIFT="true"
+CF_TUNNEL_SERVICE_NAME="cloudflared-tunnel.service"
 RELEASES_ROOT="$PROJECT_ROOT/artifacts/releases"
 RELEASES_DIR="$RELEASES_ROOT/versions"
 RELEASE_ACTIVE_LINK="$RELEASES_ROOT/active"
@@ -140,6 +146,128 @@ _validate_network_policy() {
         || _fail "Container NIC is not bridged (expected nictype: bridged)."
     grep -q "parent: br-staging" <<<"$expanded" \
         || _fail "Container NIC is not attached to br-staging."
+}
+
+_ensure_cloudflared_token_mount() {
+    _require_container_exists
+
+    [[ -f "$CF_TUNNEL_TOKEN_HOST_PATH" ]] || _fail "Cloudflare tunnel token missing on host: $CF_TUNNEL_TOKEN_HOST_PATH"
+
+    lxc exec "$CONTAINER" -- mkdir -p /etc/cloudflared
+
+    if lxc config device show "$CONTAINER" | rg -q "^$CF_TUNNEL_DEVICE_NAME:"; then
+        local existing_source existing_path existing_ro existing_shift
+        existing_source="$(lxc config device get "$CONTAINER" "$CF_TUNNEL_DEVICE_NAME" source 2>/dev/null || true)"
+        existing_path="$(lxc config device get "$CONTAINER" "$CF_TUNNEL_DEVICE_NAME" path 2>/dev/null || true)"
+        existing_ro="$(lxc config device get "$CONTAINER" "$CF_TUNNEL_DEVICE_NAME" readonly 2>/dev/null || true)"
+        existing_shift="$(lxc config device get "$CONTAINER" "$CF_TUNNEL_DEVICE_NAME" shift 2>/dev/null || true)"
+
+        [[ "$existing_source" == "$CF_TUNNEL_TOKEN_HOST_PATH" ]] || lxc config device set "$CONTAINER" "$CF_TUNNEL_DEVICE_NAME" source "$CF_TUNNEL_TOKEN_HOST_PATH"
+        [[ "$existing_path" == "$CF_TUNNEL_TOKEN_CT_PATH" ]] || lxc config device set "$CONTAINER" "$CF_TUNNEL_DEVICE_NAME" path "$CF_TUNNEL_TOKEN_CT_PATH"
+        [[ "$existing_ro" == "true" ]] || lxc config device set "$CONTAINER" "$CF_TUNNEL_DEVICE_NAME" readonly "true"
+        [[ "$existing_shift" == "$CF_TUNNEL_DEVICE_SHIFT" ]] || lxc config device set "$CONTAINER" "$CF_TUNNEL_DEVICE_NAME" shift "$CF_TUNNEL_DEVICE_SHIFT"
+        _info "Cloudflare token mount already present; reconciled mount options."
+    else
+        _info "Adding read-only Cloudflare tunnel token mount ..."
+        lxc config device add "$CONTAINER" "$CF_TUNNEL_DEVICE_NAME" disk \
+            source="$CF_TUNNEL_TOKEN_HOST_PATH" path="$CF_TUNNEL_TOKEN_CT_PATH" readonly=true shift="$CF_TUNNEL_DEVICE_SHIFT"
+    fi
+}
+
+_assert_cloudflared_token_mounted_readonly() {
+    _require_container_running
+
+    [[ -f "$CF_TUNNEL_TOKEN_HOST_PATH" ]] || _fail "Cloudflare tunnel token missing on host: $CF_TUNNEL_TOKEN_HOST_PATH"
+
+    local existing_source existing_path existing_ro existing_shift
+    existing_source="$(lxc config device get "$CONTAINER" "$CF_TUNNEL_DEVICE_NAME" source 2>/dev/null || true)"
+    existing_path="$(lxc config device get "$CONTAINER" "$CF_TUNNEL_DEVICE_NAME" path 2>/dev/null || true)"
+    existing_ro="$(lxc config device get "$CONTAINER" "$CF_TUNNEL_DEVICE_NAME" readonly 2>/dev/null || true)"
+    existing_shift="$(lxc config device get "$CONTAINER" "$CF_TUNNEL_DEVICE_NAME" shift 2>/dev/null || true)"
+
+    [[ "$existing_source" == "$CF_TUNNEL_TOKEN_HOST_PATH" ]] || _fail "Cloudflare token mount source mismatch. Expected $CF_TUNNEL_TOKEN_HOST_PATH, got ${existing_source:-<unset>}"
+    [[ "$existing_path" == "$CF_TUNNEL_TOKEN_CT_PATH" ]] || _fail "Cloudflare token mount path mismatch. Expected $CF_TUNNEL_TOKEN_CT_PATH, got ${existing_path:-<unset>}"
+    [[ "$existing_ro" == "true" ]] || _fail "Cloudflare token mount is not read-only."
+    [[ "$existing_shift" == "$CF_TUNNEL_DEVICE_SHIFT" ]] || _fail "Cloudflare token mount must set shift=true for unprivileged container access"
+
+    lxc exec "$CONTAINER" -- test -s "$CF_TUNNEL_TOKEN_CT_PATH" \
+        || _fail "Cloudflare token not visible in container at $CF_TUNNEL_TOKEN_CT_PATH"
+    lxc exec "$CONTAINER" -- bash -lc "head -c 1 '$CF_TUNNEL_TOKEN_CT_PATH' >/dev/null" \
+        || _fail "Cloudflare token exists but is not readable by cloudflared service runtime"
+
+    lxc exec "$CONTAINER" -- bash -lc "mount | grep -F ' on $CF_TUNNEL_TOKEN_CT_PATH ' | grep -q '(ro,'" \
+        || _fail "Cloudflare token mount inside container is not read-only"
+}
+
+_ensure_cloudflared_installed() {
+    _require_container_running
+
+    if lxc exec "$CONTAINER" -- bash -lc 'command -v cloudflared >/dev/null 2>&1'; then
+        _info "cloudflared already installed in container."
+        return
+    fi
+
+    _info "Installing cloudflared in container ..."
+    if lxc exec "$CONTAINER" -- bash -lc 'set -euo pipefail; apt-get update; DEBIAN_FRONTEND=noninteractive apt-get install -y cloudflared'; then
+        return
+    fi
+
+    _warn "cloudflared package not available in default apt sources; adding official Cloudflare repo ..."
+    lxc exec "$CONTAINER" -- bash -lc '
+set -euo pipefail
+DEBIAN_FRONTEND=noninteractive apt-get install -y gpg ca-certificates curl
+mkdir -p /usr/share/keyrings
+curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | gpg --dearmor -o /usr/share/keyrings/cloudflare-main.gpg
+echo "deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared noble main" > /etc/apt/sources.list.d/cloudflared.list
+apt-get update
+DEBIAN_FRONTEND=noninteractive apt-get install -y cloudflared
+'
+}
+
+_ensure_cloudflared_service() {
+    _require_container_running
+
+    _info "Configuring Cloudflare tunnel systemd service ..."
+    lxc exec "$CONTAINER" -- bash -lc "cat > /etc/systemd/system/$CF_TUNNEL_SERVICE_NAME <<'EOF'
+[Unit]
+Description=Cloudflare Tunnel for Nightfall Staging
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Restart=always
+RestartSec=5s
+ExecStart=/bin/bash -lc 'set -euo pipefail; exec /usr/bin/cloudflared tunnel run --token \"\$(cat $CF_TUNNEL_TOKEN_CT_PATH)\"'
+
+[Install]
+WantedBy=multi-user.target
+EOF"
+
+    lxc exec "$CONTAINER" -- systemctl daemon-reload
+    lxc exec "$CONTAINER" -- systemctl enable "$CF_TUNNEL_SERVICE_NAME"
+    lxc exec "$CONTAINER" -- systemctl restart "$CF_TUNNEL_SERVICE_NAME"
+    lxc exec "$CONTAINER" -- systemctl is-active --quiet "$CF_TUNNEL_SERVICE_NAME" \
+        || _fail "Cloudflare tunnel service failed to start. Inspect with: stagingctl cloudflared-status"
+}
+
+_is_cloudflared_tunnel_connected() {
+    lxc exec "$CONTAINER" -- bash -lc "journalctl -u $CF_TUNNEL_SERVICE_NAME --no-pager -n 200 | grep -Eqi 'registered tunnel connection|connection .+ registered|tunnel conn index|connected to edge'"
+}
+
+_assert_no_cloudflare_credentials_persisted() {
+    _require_container_running
+
+    lxc exec "$CONTAINER" -- bash -lc '
+set -euo pipefail
+for path in /root/.cloudflared /etc/cloudflared/cert.pem /etc/cloudflared/*.json /var/lib/cloudflared/*.json; do
+    if compgen -G "$path" >/dev/null 2>&1; then
+        echo "unexpected credential artifact: $path" >&2
+        exit 1
+    fi
+done
+'
 }
 
 _provision_container_tls_material() {
@@ -345,6 +473,7 @@ cmd_create() {
         source="$HOST_EVIDENCE_BASE" path="$CT_EVIDENCE_DIR"
     lxc config device add "$CONTAINER" logs disk \
         source="$HOST_LOG_BASE" path="$CT_LOG_DIR"
+    _ensure_cloudflared_token_mount
 
     _info "Installing canonical product systemd units with staging overrides ..."
     lxc file push "$SYSTEMD_SOURCE_DIR/$SERVICE_NAME.service" \
@@ -394,6 +523,9 @@ _deploy_release_to_container() {
     whl_name="$(basename "$release_wheel")"
 
     _info "Deploying release '$release_id' to staging container ..."
+    _ensure_cloudflared_token_mount
+    _assert_cloudflared_token_mounted_readonly
+
     _info "Pushing wheel artifact $whl_name from release directory ..."
     lxc exec "$CONTAINER" -- mkdir -p "$CT_TMP_DIR"
     lxc file push "$release_wheel" "$CONTAINER$CT_TMP_DIR/$whl_name"
@@ -528,6 +660,22 @@ for line in config_path.read_text(encoding='utf-8').splitlines():
     lxc exec "$CONTAINER" -- systemctl enable "$CADDY_SERVICE_NAME"
     lxc exec "$CONTAINER" -- systemctl restart "$CADDY_SERVICE_NAME"
 
+    _ensure_cloudflared_installed
+    _ensure_cloudflared_service
+
+    local cloudflared_connected=0
+    for _ in {1..8}; do
+        if _is_cloudflared_tunnel_connected; then
+            cloudflared_connected=1
+            break
+        fi
+        sleep 2
+    done
+    [[ "$cloudflared_connected" == "1" ]] || _fail "Cloudflare tunnel service started but no connection signal found in logs. Run: stagingctl cloudflared-status"
+
+    _assert_no_cloudflare_credentials_persisted \
+        || _fail "Unexpected Cloudflare credentials found in container filesystem"
+
     # Refresh reset baseline after install so `stagingctl reset` returns to
     # an installed, config-valid state with no onboarding token cache.
     lxc delete "$CONTAINER/$SNAPSHOT_CLEAN" 2>/dev/null || true
@@ -544,7 +692,7 @@ cmd_install() {
     _require_container_running
 
     local release_id
-    release_id="$(_release_materialize "$wheel_path")"
+    release_id="$(_release_materialize "$wheel_path" | tail -n 1)"
     _deploy_release_to_container "$release_id"
     _export_ca_to_workspace
 }
@@ -566,6 +714,62 @@ _export_ca_to_workspace() {
 # ─────────────────────────────────────────────────────────────────────────────
 cmd_export_ca() {
     _export_ca_to_workspace
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# stagingctl cloudflared-status [--strict]
+# ─────────────────────────────────────────────────────────────────────────────
+cmd_cloudflared_status() {
+    _require_container_running
+
+    local strict="0"
+    if [[ "${1:-}" == "--strict" ]]; then
+        strict="1"
+    elif [[ -n "${1:-}" ]]; then
+        _fail "Usage: stagingctl cloudflared-status [--strict]"
+    fi
+
+    _info "Checking Cloudflare tunnel token mount policy ..."
+    _assert_cloudflared_token_mounted_readonly
+    _ok "Cloudflare token mount exists and is read-only."
+
+    _info "Checking cloudflared installation and runtime state ..."
+    lxc exec "$CONTAINER" -- bash -lc 'command -v cloudflared >/dev/null 2>&1' \
+        || _fail "cloudflared binary is missing in container. Run: stagingctl install"
+    lxc exec "$CONTAINER" -- systemctl is-active --quiet "$CF_TUNNEL_SERVICE_NAME" \
+        || _fail "Cloudflare tunnel service is not active. Run: stagingctl install"
+    _ok "cloudflared service is active."
+
+    local connected=0
+    for _ in {1..10}; do
+        if _is_cloudflared_tunnel_connected; then
+            connected=1
+            break
+        fi
+        sleep 2
+    done
+
+    if [[ "$connected" == "1" ]]; then
+        _ok "Tunnel connection signal found in cloudflared logs."
+    else
+        if [[ "$strict" == "1" ]]; then
+            _fail "Tunnel connection signal not found in recent logs. See log tail below."
+        else
+            _warn "Tunnel connection signal not found in recent logs."
+        fi
+    fi
+
+    _info "Checking Cloudflare credential persistence policy ..."
+    _assert_no_cloudflare_credentials_persisted \
+        && _ok "No persisted Cloudflare credential artifacts detected in container filesystem."
+
+    _info "Recent cloudflared logs (last 60 lines):"
+    lxc exec "$CONTAINER" -- journalctl -u "$CF_TUNNEL_SERVICE_NAME" -n 60 --no-pager || true
+
+    _info "Caddy TLS terminator check:"
+    lxc exec "$CONTAINER" -- systemctl is-active --quiet "$CADDY_SERVICE_NAME" \
+        && _ok "Caddy is active and remains the in-container TLS terminator." \
+        || _fail "Caddy is not active; TLS termination posture is broken."
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -992,7 +1196,7 @@ Usage: $(basename "$0") <command> [args]
 Commands:
   create              Create LXC container (profiles: default+staging) and baseline state.
     install [wheel]     Create versioned release (wheel+web build), deploy it, refresh 'clean' snapshot,
-                                            and export CA to tests/ca/staging-ca.pem.
+                                            export CA, and ensure cloudflared tunnel is installed and connected.
     releases            List versioned releases and show active release mapping.
     rollback <id>       Switch active release to <id>, redeploy, validate, and log rollback event.
     uninstall [--purge] Delete container. --purge preserves host evidence/log directories.
@@ -1003,6 +1207,7 @@ Commands:
   smoke-live          Run authenticated live poll + secret scan; collect evidence.
   evidence [id]       List or inspect evidence runs.
     export-ca           Export container CA cert to tests/ca/staging-ca.pem.
+    cloudflared-status  Check cloudflared service, tunnel connectivity, logs, and secret posture.
 
 Environment variables:
   STAGING_CLIENT_ID       Azure client_id to inject into config.
@@ -1031,6 +1236,7 @@ main() {
         smoke-live)     cmd_smoke_live      "$@" ;;
         evidence)       cmd_evidence   "$@" ;;
         export-ca)      cmd_export_ca  "$@" ;;
+        cloudflared-status) cmd_cloudflared_status "$@" ;;
         *)              _usage ;;
     esac
 }

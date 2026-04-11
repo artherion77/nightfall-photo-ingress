@@ -259,6 +259,26 @@ class TestTlsC2:
         assert ":443" in caddyfile_text
         assert "\n:80" not in caddyfile_text
 
+
+class TestCloudflareTunnel:
+    def test_stagingctl_defines_token_mount_paths(self, stagingctl_text: str) -> None:
+        assert 'CF_TUNNEL_TOKEN_HOST_PATH="/home/chris/.cloudflare-secrets/npi-staging/tunnel-token"' in stagingctl_text
+        assert 'CF_TUNNEL_TOKEN_CT_PATH="/etc/cloudflared/token"' in stagingctl_text
+
+    def test_stagingctl_adds_read_only_lxd_disk_mount(self, stagingctl_text: str) -> None:
+        assert 'lxc config device add "$CONTAINER" "$CF_TUNNEL_DEVICE_NAME" disk' in stagingctl_text
+        assert 'readonly=true' in stagingctl_text
+
+    def test_stagingctl_installs_and_manages_cloudflared_service(self, stagingctl_text: str) -> None:
+        assert 'apt-get install -y cloudflared' in stagingctl_text
+        assert 'CF_TUNNEL_SERVICE_NAME="cloudflared-tunnel.service"' in stagingctl_text
+        assert 'cloudflared tunnel run --token' in stagingctl_text
+        assert 'systemctl enable "$CF_TUNNEL_SERVICE_NAME"' in stagingctl_text
+
+    def test_cloudflared_status_command_is_dispatched(self, stagingctl_text: str) -> None:
+        assert 'cloudflared-status)' in stagingctl_text
+        assert 'cmd_cloudflared_status' in stagingctl_text
+
     def test_caddyfile_uses_explicit_tls_material_paths(self, caddyfile_text: str) -> None:
         assert "tls /etc/caddy/tls/staging-photo-ingress.crt /etc/caddy/tls/staging-photo-ingress.key" in caddyfile_text
 
