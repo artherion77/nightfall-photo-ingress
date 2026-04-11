@@ -8,9 +8,6 @@ Owner: Systems Engineering
 
 ### C1 — Reverse Proxy Baseline (Caddy)
 
-Status:
-- Implemented (2026-04-11)
-
 Goal:
 - Introduce Caddy as the required ingress boundary for Web Control Plane LAN exposure.
 
@@ -26,14 +23,21 @@ Preconditions:
 Deliverables:
 - Documented Caddy topology, route map, and service boundary.
 - Operational checklist for Caddy process lifecycle and route verification.
+- Phase-2 staging infra baseline contract documented in ../../design/infra/staging-invariants.md.
+- C1.1 stagingctl rewrite: container-local runtime tmpfs with host-persistent evidence/log mounts.
 
 Validation steps:
 1. Verify documented route ownership for static and /api paths.
 2. Verify Uvicorn remains localhost-bound in documented topology.
+3. Verify runtime tmpfs surfaces are container-local.
+4. Verify persistent evidence/log paths remain host-mounted and stable.
+5. Verify future media-library read-only host mount is reserved in infra policy.
 
 Stop-gates:
 1. Do not proceed if topology documentation conflicts with architecture.md.
 2. Do not proceed if ingress boundary ownership is ambiguous.
+3. Do not proceed if runtime tmp/cache uses host-backed tmpfs or host-backed `/tmp`, `/var/tmp`, or cache devices.
+4. Do not proceed if persistent host-mounted evidence/log paths are removed from the Phase-2 infra model.
 
 Validation evidence:
 1. Route ownership and ingress topology are documented in `../../design/web/architecture.md`:
@@ -43,11 +47,13 @@ Validation evidence:
 	- `### 3.3 Uvicorn Binding Change for Phase 2`
 3. Mandatory gate checklist is documented in `../../design/web/architecture.md`:
 	- `### 3.6 Phase 2 Mandatory Reverse Proxy Checklist`
+4. Corrected Phase-2 staging infra baseline is documented in `../../design/infra/staging-invariants.md`.
+5. C1.1 stagingctl and staging contracts are implemented with runtime tmpfs local to container and host-persistent evidence/log mounts:
+	- `../../dev/bin/stagingctl`
+	- `../../tests/staging/test_stagingctl_policy_contracts.py`
+	- `../../staging/README.md`
 
 ### C2 — TLS Termination (Internal CA)
-
-Status:
-- Implemented (2026-04-11)
 
 Goal:
 - Establish TLS termination requirements and trust flow for LAN operators.
@@ -70,17 +76,7 @@ Validation steps:
 Stop-gates:
 1. Do not proceed with LAN gate milestones until TLS runbook is complete.
 
-Validation evidence:
-1. TLS trust model and certificate handling are documented in `../../design/web/architecture.md`:
-	- `### 3.1 Decision: Caddy over Nginx`
-	- `### 3.6 Phase 2 Mandatory Reverse Proxy Checklist` (item 2)
-2. HTTPS-only boundary requirement is documented in `../../design/web/architecture.md`:
-	- `### 3.6 Phase 2 Mandatory Reverse Proxy Checklist` (item 3)
-
 ### C3 — Proxy-Level Rate Limiting
-
-Status:
-- Implemented (2026-04-11)
 
 Goal:
 - Define and activate proxy-layer rate limiting policy as mandatory LAN gate control.
@@ -102,14 +98,6 @@ Validation steps:
 
 Stop-gates:
 1. No LAN gate sign-off without rate limiting evidence artifact.
-
-Validation evidence:
-1. Proxy-layer rate-limiting design and policy intent are documented in `../../design/web/architecture.md`:
-	- `### 3.5 Rate Limiting at Proxy Level`
-2. Mandatory LAN-gate requirement is documented in `../../design/web/architecture.md`:
-	- `### 3.6 Phase 2 Mandatory Reverse Proxy Checklist` (item 7)
-3. Observability expectation is documented in `../../design/web/architecture.md`:
-	- `### 3.5 Rate Limiting at Proxy Level` (access-log visibility)
 
 ### C4 — Build Artifact Versioning and Rollback
 
@@ -235,6 +223,25 @@ Stop-gates:
 3. Proxy controls (TLS/rate limiting) are mandatory before LAN gate closure.
 4. Phase 1.5 interaction invariants remain preserved.
 5. Every chunk output must be traceable to architecture sections and acceptance checks.
+6. Runtime tmpfs and runtime tmp/cache write paths are container-local.
+7. Host-mounted persistent evidence/log paths are required in staging lifecycle operations.
+8. Host-based tmpfs and host-backed `/tmp`, `/var/tmp`, or cache device bindings are prohibited.
+9. No host-level systemd or host-level Caddy operations are part of the Phase-2 staging infra model.
+10. Future media-library host mount support is reserved as read-only for hash import tests.
+
+## 2.1 Phase-2 Infra Baseline
+
+Phase-2 infra baseline requires:
+
+1. container-local tmpfs only
+2. host-mounted persistent evidence/log paths
+3. no host-based tmpfs
+4. no host-backed `/tmp`, `/var/tmp`, or cache device bindings
+5. no host-level systemd or Caddy involvement
+6. future media-library host mount reserved as read-only
+
+Reference:
+- ../../design/infra/staging-invariants.md
 
 ## 3. Rollback Strategy
 
@@ -258,6 +265,7 @@ Stop-gates:
 
 Status:
 - Completed (2026-04-11)
+- C1.1 stagingctl rewrite completed (2026-04-11)
 
 Description:
 - Establish Caddy as mandatory ingress boundary for Web Control Plane.
@@ -275,11 +283,13 @@ Acceptance Criteria:
 Completion evidence:
 1. Topology and route ownership documented in `../../design/web/architecture.md` section `3.2`.
 2. Uvicorn localhost-bound model documented in `../../design/web/architecture.md` section `3.3`.
+3. Phase-2 staging infra baseline and reconciliation contract documented in `../../design/infra/staging-invariants.md`.
+4. C1 infra summary confirms container-local runtime tmpfs and host-persistent evidence/log mounts, with future read-only media mount reserved.
+5. C1.1 implementation artifacts:
+	- `../../dev/bin/stagingctl`
+	- `../../tests/staging/test_stagingctl_policy_contracts.py`
 
 ### T2 — TLS termination (internal CA)
-
-Status:
-- Completed (2026-04-11)
 
 Description:
 - Define and operationalize TLS termination with internal CA trust model.
@@ -294,14 +304,7 @@ Acceptance Criteria:
 1. Trust import/runbook complete.
 2. HTTPS boundary enforced in planning artifacts.
 
-Completion evidence:
-1. Trust-import and TLS requirement documented in `../../design/web/architecture.md` section `3.6` (item 2).
-2. HTTPS-only boundary documented in `../../design/web/architecture.md` section `3.6` (item 3).
-
 ### T3 — Rate limiting at proxy level
-
-Status:
-- Completed (2026-04-11)
 
 Description:
 - Apply proxy-level rate policy for API protection and resilience.
@@ -315,10 +318,6 @@ Dependencies:
 Acceptance Criteria:
 1. Policy matrix documented.
 2. Validation checklist confirms pre-application throttling behavior.
-
-Completion evidence:
-1. Proxy-level throttling requirement documented in `../../design/web/architecture.md` section `3.5`.
-2. Mandatory `/api/` rate-limiting gate documented in `../../design/web/architecture.md` section `3.6` (item 7).
 
 ### T4 — Build artifact versioning + rollback
 

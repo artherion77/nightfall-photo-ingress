@@ -15,7 +15,6 @@
 #   STAGING_CLIENT_ID   real Azure client_id to substitute into config
 #   STAGING_ACCOUNT     account section name to target for live poll (default: staging)
 #   STAGING_TOKEN_JSON  [DEPRECATED] use 'stagingctl auth-setup' instead
-#   STAGING_VOLATILE    set to 1 to use /run/staging-photo-ingress/* tmpfs paths
 
 set -euo pipefail
 
@@ -29,7 +28,6 @@ CONTAINER="staging-photo-ingress"
 SNAPSHOT_CLEAN="clean"
 PROFILE_DEFAULT="default"
 PROFILE_STAGING="staging"
-STAGING_VOLATILE="${STAGING_VOLATILE:-0}"
 
 # ── container-internal paths ──────────────────────────────────────────────────
 VENV_ROOT="/opt/ingress"
@@ -44,21 +42,13 @@ STAGING_SYSTEMD_DIR="$STAGING_ROOT/systemd"
 WEB_BUILD_DIR="$PROJECT_ROOT/webui/build"
 CADDYFILE_SOURCE="$STAGING_ROOT/container/Caddyfile"
 CADDYFILE_DEST="/etc/caddy/Caddyfile"
+CT_TMP_DIR="/root/staging-photo-ingress-tmp"
 
-if [[ "$STAGING_VOLATILE" == "1" ]]; then
-    # Volatile mode: host /run is tmpfs, so evidence/logs are ephemeral.
-    HOST_EVIDENCE_BASE="${STAGING_EVIDENCE_BASE:-/run/staging-photo-ingress/evidence}"
-    HOST_LOG_BASE="${STAGING_LOG_BASE:-/run/staging-photo-ingress/logs}"
-    CT_EVIDENCE_DIR="/run/staging-photo-ingress/evidence"
-    CT_LOG_DIR="/run/staging-photo-ingress/logs"
-else
-    # Persistent mode: evidence/logs stored on ssdpool mount.
-    HOST_EVIDENCE_BASE="${STAGING_EVIDENCE_BASE:-/mnt/ssd/staging/photo-ingress/evidence}"
-    HOST_LOG_BASE="${STAGING_LOG_BASE:-/mnt/ssd/staging/photo-ingress/logs}"
-    CT_EVIDENCE_DIR="/var/lib/ingress/evidence"
-    CT_LOG_DIR="/var/log/nightfall"
-    CT_TMP_DIR="/root/staging-photo-ingress-tmp"
-fi
+# Host-persistent evidence/log storage remains required in Phase 2.
+HOST_EVIDENCE_BASE="${STAGING_EVIDENCE_BASE:-/mnt/ssd/staging/photo-ingress/evidence}"
+HOST_LOG_BASE="${STAGING_LOG_BASE:-/mnt/ssd/staging/photo-ingress/logs}"
+CT_EVIDENCE_DIR="/var/lib/ingress/evidence"
+CT_LOG_DIR="/var/log/nightfall"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Helpers
@@ -69,18 +59,29 @@ _ok()    { nf_log_ok "stagingctl" "$*"; }
 _warn()  { nf_log_warn "stagingctl" "$*"; }
 _fail()  { nf_log_fail "stagingctl" "$*"; }
 
-_resolve_tmpfs_host_base() {
-    if [[ -n "${STAGING_TMPFS_BASE:-}" ]]; then
-        printf '%s' "$STAGING_TMPFS_BASE"
-        return
-    fi
+_configure_container_local_tmpfs() {
+    _info "Configuring container-local runtime tmpfs mounts ..."
+    lxc exec "$CONTAINER" -- bash -lc '
+set -euo pipefail
 
-    local user_run_base="/run/user/${UID}"
-    if [[ -d "$user_run_base" && -w "$user_run_base" ]]; then
-        printf '%s' "$user_run_base/staging-photo-ingress/tmpfs"
-    else
-        printf '%s' "/run/staging-photo-ingress/tmpfs"
-    fi
+mkdir -p /tmp /var/tmp /var/cache/nightfall-photo-ingress
+chmod 1777 /tmp /var/tmp
+chmod 0755 /var/cache/nightfall-photo-ingress
+
+entries=(
+"tmpfs /tmp tmpfs rw,nosuid,nodev,mode=1777,size=512M 0 0"
+"tmpfs /var/tmp tmpfs rw,nosuid,nodev,mode=1777,size=256M 0 0"
+"tmpfs /var/cache/nightfall-photo-ingress tmpfs rw,nosuid,nodev,mode=0755,size=128M 0 0"
+)
+
+for entry in "${entries[@]}"; do
+    grep -Fqx "$entry" /etc/fstab || echo "$entry" >> /etc/fstab
+done
+
+mountpoint -q /tmp || mount /tmp
+mountpoint -q /var/tmp || mount /var/tmp
+mountpoint -q /var/cache/nightfall-photo-ingress || mount /var/cache/nightfall-photo-ingress
+'
 }
 
 _require_container_running() {
@@ -146,7 +147,7 @@ cmd_create() {
         _fail "Container '$CONTAINER' already exists. Run: stagingctl uninstall first."
     fi
 
-    _info "Preparing host evidence/log directories ($([[ "$STAGING_VOLATILE" == "1" ]] && echo volatile || echo persistent)) ..."
+    _info "Preparing host-persistent evidence/log directories ..."
     mkdir -p "$HOST_EVIDENCE_BASE" "$HOST_LOG_BASE"
     chmod 777 "$HOST_EVIDENCE_BASE" "$HOST_LOG_BASE"
 
@@ -166,30 +167,10 @@ cmd_create() {
     _info "Running container bootstrap ..."
     lxc exec "$CONTAINER" -- mkdir -p "$CT_TMP_DIR"
     lxc file push "$STAGING_ROOT/container/setup.sh" "$CONTAINER$CT_TMP_DIR/setup.sh"
-    lxc exec "$CONTAINER" -- env STAGING_VOLATILE="$STAGING_VOLATILE" bash "$CT_TMP_DIR/setup.sh"
+    lxc exec "$CONTAINER" -- bash "$CT_TMP_DIR/setup.sh"
     # Required by hardened unit ReadWritePaths sandboxing.
     lxc exec "$CONTAINER" -- mkdir -p /run/nightfall-status.d
-    # Required by trash.service TemporaryFileSystem target path.
-    lxc exec "$CONTAINER" -- mkdir -p /var/cache/nightfall-photo-ingress
-
-    # Enforce standard tmp directory semantics inside the container.
-    # Staging no longer bind-mounts /tmp or /var/tmp from host /run/user/*.
-    lxc exec "$CONTAINER" -- chmod 1777 /tmp /var/tmp || true
-
-    _info "Preparing host tmpfs backing directories ..."
-    local tmpfs_host_base
-    tmpfs_host_base="$(_resolve_tmpfs_host_base)"
-    mkdir -p "$tmpfs_host_base/tmp" "$tmpfs_host_base/var-tmp" "$tmpfs_host_base/nightfall-cache"
-    chmod 777 "$tmpfs_host_base/tmp" "$tmpfs_host_base/var-tmp" "$tmpfs_host_base/nightfall-cache"
-
-    # Reconcile devices to ensure deterministic create behavior.
-    lxc config device remove "$CONTAINER" tmpfs-tmp >/dev/null 2>&1 || true
-    lxc config device remove "$CONTAINER" tmpfs-var-tmp >/dev/null 2>&1 || true
-    lxc config device remove "$CONTAINER" tmpfs-nightfall-cache >/dev/null 2>&1 || true
-
-    lxc config device add "$CONTAINER" tmpfs-tmp disk source="$tmpfs_host_base/tmp" path=/tmp
-    lxc config device add "$CONTAINER" tmpfs-var-tmp disk source="$tmpfs_host_base/var-tmp" path=/var/tmp
-    lxc config device add "$CONTAINER" tmpfs-nightfall-cache disk source="$tmpfs_host_base/nightfall-cache" path=/var/cache/nightfall-photo-ingress
+    _configure_container_local_tmpfs
 
     _info "Attaching bind-mounts ..."
     lxc config device add "$CONTAINER" evidence disk \
@@ -337,13 +318,6 @@ for line in config_path.read_text(encoding='utf-8').splitlines():
 
     lxc exec "$CONTAINER" -- systemctl daemon-reload
 
-    # Remove legacy /run/user/* bind mounts from older staging containers.
-    # These sources can disappear after host reboot/session changes and break
-    # systemd service sandbox setup before ExecStart.
-    lxc config device remove "$CONTAINER" tmpfs-tmp >/dev/null 2>&1 || true
-    lxc config device remove "$CONTAINER" tmpfs-var-tmp >/dev/null 2>&1 || true
-    lxc config device remove "$CONTAINER" tmpfs-nightfall-cache >/dev/null 2>&1 || true
-
     _info "Sanitizing known invalid distribution leftovers in staging venv ..."
     _sanitize_invalid_pillow_distribution
 
@@ -419,15 +393,7 @@ cmd_uninstall() {
     lxc delete --force "$CONTAINER" 2>/dev/null || true
 
     if [[ "$purge" == "1" ]]; then
-        _info "Purging host evidence/log directories ..."
-        rm -rf "$HOST_EVIDENCE_BASE" "$HOST_LOG_BASE"
-        local tmpfs_host_base
-        tmpfs_host_base="$(_resolve_tmpfs_host_base)"
-        rm -rf "$tmpfs_host_base" 2>/dev/null || sudo -n rm -rf "$tmpfs_host_base" 2>/dev/null || true
-           # In volatile mode, also clean up the now-empty parent under /run/
-           if [[ "$STAGING_VOLATILE" == "1" ]]; then
-               rmdir --ignore-fail-on-non-empty "$(dirname "$HOST_EVIDENCE_BASE")" 2>/dev/null || true
-           fi
+        _warn "--purge preserves host-persistent evidence/log directories by Phase-2 policy."
     fi
 
     _ok "Container deleted."
@@ -783,10 +749,8 @@ Environment variables:
   STAGING_CLIENT_ID       Azure client_id to inject into config.
   STAGING_ACCOUNT         Account section name (default: staging).
   STAGING_TOKEN_JSON      [DEPRECATED] Token cache path to push. Use 'auth-setup' instead.
-  STAGING_VOLATILE        1 => use /run/staging-photo-ingress/{evidence,logs} (tmpfs).
-                          0 => use /mnt/ssd/staging/photo-ingress/{evidence,logs} (default).
-  STAGING_EVIDENCE_BASE   Override host-side evidence directory.
-  STAGING_LOG_BASE        Override host-side log directory.
+    STAGING_EVIDENCE_BASE   Override host-side evidence directory.
+    STAGING_LOG_BASE        Override host-side log directory.
 EOF
     exit 1
 }

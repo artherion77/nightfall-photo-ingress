@@ -66,33 +66,41 @@ class TestStorageModes:
         assert "/mnt/ssd/staging/photo-ingress/evidence" in stagingctl_text
         assert "/mnt/ssd/staging/photo-ingress/logs" in stagingctl_text
 
-    def test_volatile_defaults_match_policy(self, stagingctl_text: str) -> None:
-        assert "/run/staging-photo-ingress/evidence" in stagingctl_text
-        assert "/run/staging-photo-ingress/logs" in stagingctl_text
-
-    def test_staging_volatile_flag_is_supported(self, stagingctl_text: str) -> None:
-        assert 'STAGING_VOLATILE="${STAGING_VOLATILE:-0}"' in stagingctl_text
+    def test_volatile_host_tmpfs_mode_removed(self, stagingctl_text: str) -> None:
+        assert "STAGING_VOLATILE" not in stagingctl_text
+        assert "/run/staging-photo-ingress/evidence" not in stagingctl_text
+        assert "/run/staging-photo-ingress/logs" not in stagingctl_text
 
 
 class TestUninstallPurge:
     def test_uninstall_accepts_purge_flag(self, stagingctl_text: str) -> None:
         assert 'if [[ "${1:-}" == "--purge" ]]; then' in stagingctl_text
 
-    def test_uninstall_purge_removes_evidence_and_logs(self, stagingctl_text: str) -> None:
-        assert 'rm -rf "$HOST_EVIDENCE_BASE" "$HOST_LOG_BASE"' in stagingctl_text
+    def test_uninstall_purge_preserves_evidence_and_logs(self, stagingctl_text: str) -> None:
+        assert "preserves host-persistent evidence/log directories" in stagingctl_text
+        assert 'rm -rf "$HOST_EVIDENCE_BASE" "$HOST_LOG_BASE"' not in stagingctl_text
 
 
 class TestTmpfsBoundaries:
-    def test_tmpfs_devices_added_in_create(self, stagingctl_text: str) -> None:
-        assert 'tmpfs-tmp disk source="$tmpfs_host_base/tmp" path=/tmp' in stagingctl_text
-        assert 'tmpfs-var-tmp disk source="$tmpfs_host_base/var-tmp" path=/var/tmp' in stagingctl_text
-        assert 'tmpfs-nightfall-cache disk source="$tmpfs_host_base/nightfall-cache" path=/var/cache/nightfall-photo-ingress' in stagingctl_text
+    def test_container_local_tmpfs_helper_configures_fstab(self, stagingctl_text: str) -> None:
+        assert "_configure_container_local_tmpfs" in stagingctl_text
+        assert "tmpfs /tmp tmpfs" in stagingctl_text
+        assert "tmpfs /var/tmp tmpfs" in stagingctl_text
+        assert "tmpfs /var/cache/nightfall-photo-ingress tmpfs" in stagingctl_text
+
+    def test_create_does_not_add_host_backed_tmp_devices(self, stagingctl_text: str) -> None:
+        assert "lxc config device add \"$CONTAINER\" tmpfs-tmp" not in stagingctl_text
+        assert "lxc config device add \"$CONTAINER\" tmpfs-var-tmp" not in stagingctl_text
+        assert "lxc config device add \"$CONTAINER\" tmpfs-nightfall-cache" not in stagingctl_text
+
+    def test_host_tmpfs_resolver_removed(self, stagingctl_text: str) -> None:
+        assert "_resolve_tmpfs_host_base" not in stagingctl_text
 
     def test_setup_prepares_cache_directory(self, setup_text: str) -> None:
         assert 'mkdir -p /var/cache/nightfall-photo-ingress' in setup_text
 
-    def test_setup_prepares_volatile_run_paths(self, setup_text: str) -> None:
-        assert 'mkdir -p /run/staging-photo-ingress/{evidence,logs}' in setup_text
+    def test_setup_does_not_prepare_volatile_run_paths(self, setup_text: str) -> None:
+        assert '/run/staging-photo-ingress/{evidence,logs}' not in setup_text
 
 
 class TestDocumentationCoverage:

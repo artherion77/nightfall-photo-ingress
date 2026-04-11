@@ -48,31 +48,23 @@ Expected NIC attributes on the container:
 
 `stagingctl create` validates this container-side network policy.
 
-## Storage modes
+## Storage model (Phase 2 C1.1)
 
-### Persistent mode (default)
-
-- Host evidence: `/mnt/ssd/staging/photo-ingress/evidence`
-- Host logs: `/mnt/ssd/staging/photo-ingress/logs`
+- Host-persistent evidence: `/mnt/ssd/staging/photo-ingress/evidence`
+- Host-persistent logs: `/mnt/ssd/staging/photo-ingress/logs`
 - Container evidence mount point: `/var/lib/ingress/evidence`
 - Container logs mount point: `/var/log/nightfall`
-
-### Volatile mode (`STAGING_VOLATILE=1`)
-
-- Host evidence: `/run/staging-photo-ingress/evidence` (tmpfs)
-- Host logs: `/run/staging-photo-ingress/logs` (tmpfs)
-- Container evidence mount point: `/run/staging-photo-ingress/evidence`
-- Container logs mount point: `/run/staging-photo-ingress/logs`
+- No host tmpfs storage mode is supported.
 
 ## tmpfs boundaries inside the container
 
-To prevent uncontrolled rootfs writes, `stagingctl create` mounts tmpfs on:
+To prevent uncontrolled rootfs writes, `stagingctl create` configures container-local tmpfs on:
 
 - `/tmp`
 - `/var/tmp`
 - `/var/cache/nightfall-photo-ingress`
 
-These mounts are recreated by `create` and naturally reset by snapshot restore.
+These mounts are managed in-container (via `/etc/fstab`) and naturally reset by snapshot restore.
 
 ## Lifecycle commands
 
@@ -98,7 +90,7 @@ These mounts are recreated by `create` and naturally reset by snapshot restore.
 - `stagingctl uninstall`
   removes container only
 - `stagingctl uninstall --purge`
-  removes container and host evidence/log directories for the active storage mode
+  removes container only and preserves host-persistent evidence/log directories
 
 ## Authentication for live testing
 
@@ -137,13 +129,12 @@ All smoke commands write run artifacts to `<host-evidence-base>/<run-id>/`:
 - `assertions.jsonl` — per-assertion pass/fail records
 - `*.log` — raw command output captured per step
 
-Host-evidence-base is mode-dependent (`/mnt/ssd/...` or `/run/...`).
+Host-evidence-base is persistent by default (`/mnt/ssd/...`).
 
 ## Environment variables
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `STAGING_VOLATILE` | `0` | `1` => volatile `/run/staging-photo-ingress/*`; `0` => persistent `/mnt/ssd/staging/photo-ingress/*` |
 | `STAGING_CLIENT_ID` | unset | Azure client id substituted into staging config |
 | `STAGING_ACCOUNT` | `staging` | account name passed to `auth-setup` and `poll` |
 | `STAGING_TOKEN_JSON` | unset | **[DEPRECATED]** Use `stagingctl auth-setup` instead |
