@@ -178,18 +178,19 @@ subjectAltName = @alt_names
 
 [alt_names]
 DNS.1 = staging-photo-ingress
-DNS.2 = localhost
+DNS.2 = staging-photo-ingress.home.arpa
+DNS.3 = npi.pohl-family.org
+DNS.4 = localhost
 IP.1 = 127.0.0.1
 IP.2 = ::1
 EOF
 
-if [[ ! -s \"\$server_key\" || ! -s \"\$server_cert\" ]]; then
-    openssl genrsa -out \"\$server_key\" 2048
-    openssl req -new -key \"\$server_key\" -out \"\$server_csr\" -config \"\$san_file\"
-    openssl x509 -req -in \"\$server_csr\" -CA \"\$ca_cert\" -CAkey \"\$ca_key\" \\
-        -CAcreateserial -out \"\$server_cert\" -days 825 -sha256 \\
-        -extensions req_ext -extfile \"\$san_file\"
-fi
+rm -f "\$server_key" "\$server_cert"
+openssl genrsa -out "\$server_key" 2048
+openssl req -new -key "\$server_key" -out "\$server_csr" -config "\$san_file"
+openssl x509 -req -in "\$server_csr" -CA "\$ca_cert" -CAkey "\$ca_key" \\
+    -CAcreateserial -out "\$server_cert" -days 825 -sha256 \\
+    -extensions req_ext -extfile "\$san_file"
 
 chmod 600 \"\$ca_key\"
 chmod 644 \"\$ca_cert\" \"\$server_cert\"

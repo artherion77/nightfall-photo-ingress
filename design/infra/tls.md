@@ -26,6 +26,7 @@ Out of scope:
 4. TLS artifacts are container-local under `/etc/caddy/tls`.
 5. A staging-internal CA signs the Caddy leaf certificate.
 6. Certificate generation is idempotent and automated by `stagingctl install`.
+7. Canonical staging endpoint is `https://staging-photo-ingress.home.arpa`.
 
 ## 3. Container-Local Certificate Paths
 
@@ -38,8 +39,10 @@ Out of scope:
 
 1. `stagingctl install` pushes Caddy config and invokes TLS provisioning inside the container.
 2. If CA material is missing, generate a new internal CA key+cert.
-3. If leaf material is missing, generate a key and CSR with SANs:
+3. Regenerate the leaf key and CSR on each `stagingctl install`, signed by the existing internal CA, with SANs:
    - `staging-photo-ingress`
+   - `staging-photo-ingress.home.arpa`
+   - `npi.pohl-family.org`
    - `localhost`
    - `127.0.0.1`
    - `::1`
@@ -57,7 +60,7 @@ Container pull example:
 lxc file pull staging-photo-ingress/etc/caddy/tls/nightfall-staging-ca.crt ./nightfall-staging-ca.crt
 ```
 
-After import, access staging UI over `https://<staging-ip-or-host>/`.
+After import, access staging UI over `https://staging-photo-ingress.home.arpa/`.
 
 ## 6. Validation Checklist
 

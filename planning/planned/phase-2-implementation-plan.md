@@ -200,18 +200,31 @@ Inputs:
 - ../../design/web/design-decisions.md
 - ../../design/web/detailed-design/design-tokens.md
 
+
 Preconditions:
 - C5 policy enforcement active.
 
 Deliverables:
-- Documented behavior contract for filter state, options, and scoped effects.
+- Dashboard filter sidebar component with session-local state.
+- Client-side file-type filtering over already-loaded dashboard data.
+- Design-token-driven file-type filter option accents.
 
 Validation steps:
 1. Validate scope and acceptance criteria match Phase 2 architecture.
 2. Validate no conflict with Phase 1.5 interaction invariants.
+3. Validate multi-filter selection and clear-all behavior in UI tests.
 
 Stop-gates:
 1. No completion without acceptance criteria evidence in plan tracking.
+
+Validation evidence:
+1. Sidebar component and dashboard wiring are implemented in `../../webui/src/lib/components/dashboard/FilterSidebar.svelte` and `../../webui/src/routes/+page.svelte`.
+2. Session-local filter state and transitions are implemented in `../../webui/src/lib/stores/filterStore.ts`.
+3. C6 filter token references are documented in `../../design/web/detailed-design/design-tokens.md`.
+4. Dashboard filter state-machine documentation is updated in `../../design/web/architecture.md`.
+5. C6 decision posture is documented in `../../design/web/design-decisions.md`.
+6. Unit tests for filter state transitions are implemented in `../../webui/tests/component/filterStore.test.ts`.
+7. E2E filter behavior coverage is implemented in `../../webui/tests/e2e/dashboard.filter-sidebar.spec.ts`.
 
 ### C7 — Audit Timeline Infinite Scroll
 
@@ -234,6 +247,21 @@ Validation steps:
 
 Stop-gates:
 1. No completion without explicit validation of load termination behavior.
+
+### C6/C7 Drift Fix Summary — 2026-04-11
+
+1. Canonical staging endpoint normalized to `https://staging-photo-ingress.home.arpa` for staging E2E and Playwright defaults.
+2. Staging TLS SAN set expanded to include:
+	- `staging-photo-ingress`
+	- `staging-photo-ingress.home.arpa`
+	- `npi.pohl-family.org`
+	- `localhost`
+	- `127.0.0.1`
+	- `::1`
+3. Staging CORS allowlist normalized to HTTPS origins:
+	- `https://staging-photo-ingress.home.arpa`
+	- `https://npi.pohl-family.org`
+4. E2E trust path aligned to staging internal CA bundle for strict TLS verification.
 
 ### C8 — KPI Threshold Configuration + Read-Path Resilience
 

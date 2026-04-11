@@ -277,6 +277,7 @@ components/
 | `auditLog.svelte.js` | `{ events, cursor, hasMore, filter, loading, error }` | Supports explicit append via `loadMore()` and filter reset via `setFilter(action)`. |
 | `blocklist.svelte.js` | `{ rules, loading, error }` | `hydrate()` plus CRUD actions with optimistic updates and rollback on API errors. |
 | `config.svelte.js` | `{ kpi_thresholds, ...effectiveConfig, loading, error }` | Read-only `load()` from `GET /api/v1/config/effective`. |
+| `filterStore.ts` | `string[]` active file-type filters | Dashboard-local, client-side file-type filtering of already-loaded staging rows. No API calls. |
 
 ### 6.2 Store Design Pattern
 
@@ -299,6 +300,27 @@ managed polling lifecycle rather than a page load function. The polling interval
 error backoff are internal to the store. No component or layout file contains
 `setInterval` or fetch calls related to health — all of that is encapsulated in the
 store module.
+
+### 6.5 Dashboard Filter Sidebar State Machine (C6)
+
+Dashboard file-type filtering is session-local and client-side only.
+
+State model:
+- `activeFilters: string[]`
+- `availableOptions` derived from currently loaded dashboard staging items
+- `filteredItems` derived from `activeFilters` + loaded items
+
+Transitions:
+1. `toggle(filterId)`:
+  - if inactive, add `filterId`
+  - if active, remove `filterId`
+2. `clear()`:
+  - reset `activeFilters` to empty
+
+Invariants:
+1. No API request is triggered by filter toggles.
+2. Multiple filters can be active simultaneously.
+3. Clearing filters restores the full currently-loaded list.
 
 ### 6.3 Optimistic UI (Chunk 4)
 
@@ -1586,12 +1608,24 @@ Static assets are served by Caddy directly from the versioned build directory. T
 removes static file I/O from the Uvicorn process entirely, improving API response
 latency.
 
+Canonical staging endpoint for Phase 2 is `https://staging-photo-ingress.home.arpa`.
+An additional LAN alias `https://npi.pohl-family.org` is supported by the staging
+leaf certificate SAN set.
+
 ### 3.3 Uvicorn Binding Change for Phase 2
 
 In Phase 1, Uvicorn binds to `127.0.0.1:8000` (localhost only).
 In Phase 2, this is unchanged. Uvicorn continues to bind to localhost. Caddy is the
 only process that accepts external connections. This provides defence-in-depth: even
 if Caddy is misconfigured, Uvicorn is not directly reachable from the LAN.
+
+TLS SAN policy for staging leaf certs includes:
+- `staging-photo-ingress`
+- `staging-photo-ingress.home.arpa`
+- `npi.pohl-family.org`
+- `localhost`
+- `127.0.0.1`
+- `::1`
 
 ### 3.4 Security Headers at Proxy Level
 

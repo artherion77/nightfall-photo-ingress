@@ -13,12 +13,12 @@ async def test_configured_origin_receives_cors_headers(api_client, api_token: st
         "/api/v1/health",
         headers={
             **auth_headers(api_token),
-            "Origin": "http://localhost:8000",
+            "Origin": "https://staging-photo-ingress.home.arpa",
         },
     )
 
     assert response.status_code == 200
-    assert response.headers.get("access-control-allow-origin") == "http://localhost:8000"
+    assert response.headers.get("access-control-allow-origin") == "https://staging-photo-ingress.home.arpa"
 
 
 @pytest.mark.anyio
@@ -40,12 +40,12 @@ async def test_preflight_allows_configured_origin(api_client) -> None:
     response = await api_client.options(
         "/api/v1/health",
         headers={
-            "Origin": "http://localhost:8000",
+            "Origin": "https://npi.pohl-family.org",
             "Access-Control-Request-Method": "GET",
             "Access-Control-Request-Headers": "Authorization",
         },
     )
 
     assert response.status_code == 200
-    assert response.headers.get("access-control-allow-origin") == "http://localhost:8000"
+    assert response.headers.get("access-control-allow-origin") == "https://npi.pohl-family.org"
     assert "GET" in response.headers.get("access-control-allow-methods", "")

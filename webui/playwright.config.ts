@@ -1,7 +1,7 @@
 /// <reference path="./tests/playwright-shim.d.ts" />
 import { defineConfig, devices } from '@playwright/test';
 
-const baseURL = process.env.STAGING_BASE_URL ?? 'http://192.168.200.242:8000';
+const baseURL = process.env.STAGING_BASE_URL ?? 'https://staging-photo-ingress.home.arpa';
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -10,6 +10,7 @@ export default defineConfig({
   reporter: 'line',
   use: {
     baseURL,
+    ignoreHTTPSErrors: process.env.PLAYWRIGHT_IGNORE_HTTPS_ERRORS === '1',
     headless: true,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',

@@ -31,7 +31,9 @@ The Phase-2 baseline is strict and non-negotiable:
 8. Uvicorn remains localhost-bound behind in-container Caddy.
 9. Staging ingress is HTTPS-only with TLS termination in in-container Caddy.
 10. Staging TLS key material remains container-local under `/etc/caddy/tls`.
-11. Future scope may include a dedicated read-only host mount for media library hash-import validation.
+11. Canonical staging endpoint is `https://staging-photo-ingress.home.arpa`.
+12. Staging CORS allowlist includes only approved HTTPS origins for operator surfaces.
+13. Future scope may include a dedicated read-only host mount for media library hash-import validation.
 
 ## 3. Reconciled Invariants
 

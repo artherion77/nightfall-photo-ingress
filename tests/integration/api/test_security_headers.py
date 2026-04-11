@@ -32,7 +32,7 @@ async def test_security_headers_present_on_preflight_response(api_client) -> Non
     response = await api_client.options(
         "/api/v1/health",
         headers={
-            "Origin": "http://localhost:8000",
+            "Origin": "https://staging-photo-ingress.home.arpa",
             "Access-Control-Request-Method": "GET",
             "Access-Control-Request-Headers": "Authorization",
         },
