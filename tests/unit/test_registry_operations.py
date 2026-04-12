@@ -290,3 +290,70 @@ def test_external_hash_cache_upsert_is_idempotent(tmp_path: Path) -> None:
     assert row is not None
     assert int(row[0]) == 1
     assert row[1] == "f" * 64
+
+
+def test_external_hash_cache_hash_import_rows_upsert_by_null_source_relpath(tmp_path: Path) -> None:
+    """Hash-import rows with NULL source_relpath must be idempotent."""
+
+    reg = _new_registry(tmp_path)
+    reg.upsert_external_hash_cache(
+        account_name="__hash_import__",
+        source_relpath=None,
+        hash_algo="sha256",
+        hash_value="a" * 64,
+        verified_sha256=None,
+    )
+    reg.upsert_external_hash_cache(
+        account_name="__hash_import__",
+        source_relpath=None,
+        hash_algo="sha256",
+        hash_value="a" * 64,
+        verified_sha256="a" * 64,
+    )
+
+    conn = sqlite3.connect(reg.db_path)
+    try:
+        row = conn.execute(
+            """
+            SELECT COUNT(*), MAX(verified_sha256)
+            FROM external_hash_cache
+            WHERE account_name = ? AND source_relpath IS NULL AND hash_algo = ? AND hash_value = ?
+            """,
+            ("__hash_import__", "sha256", "a" * 64),
+        ).fetchone()
+    finally:
+        conn.close()
+
+    assert row is not None
+    assert int(row[0]) == 1
+    assert row[1] == "a" * 64
+
+
+def test_external_hash_cache_sync_import_rows_remain_path_distinct(tmp_path: Path) -> None:
+    """Legacy sync-import rows remain distinct by source_relpath."""
+
+    reg = _new_registry(tmp_path)
+    for source_relpath in ("album/A.HEIC", "album/B.HEIC"):
+        reg.upsert_external_hash_cache(
+            account_name="__library__",
+            source_relpath=source_relpath,
+            hash_algo="sha1",
+            hash_value="same-hash",
+            verified_sha256=None,
+        )
+
+    conn = sqlite3.connect(reg.db_path)
+    try:
+        row = conn.execute(
+            """
+            SELECT COUNT(*)
+            FROM external_hash_cache
+            WHERE account_name = ? AND hash_algo = ? AND hash_value = ?
+            """,
+            ("__library__", "sha1", "same-hash"),
+        ).fetchone()
+    finally:
+        conn.close()
+
+    assert row is not None
+    assert int(row[0]) == 2

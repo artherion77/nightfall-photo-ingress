@@ -785,7 +785,7 @@ class Registry:
         self,
         *,
         account_name: str,
-        source_relpath: str,
+        source_relpath: str | None,
         hash_algo: str,
         hash_value: str,
         verified_sha256: str | None = None,
@@ -796,23 +796,42 @@ class Registry:
         with self._connect() as conn:
             _set_pragmas(conn)
             conn.execute("BEGIN IMMEDIATE")
-            conn.execute(
-                """
-                INSERT INTO external_hash_cache (
-                    account_name,
-                    source_relpath,
-                    hash_algo,
-                    hash_value,
-                    verified_sha256,
-                    first_seen_at,
-                    updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(account_name, source_relpath, hash_algo, hash_value) DO UPDATE SET
-                    verified_sha256 = COALESCE(excluded.verified_sha256, external_hash_cache.verified_sha256),
-                    updated_at = excluded.updated_at
-                """,
-                (account_name, source_relpath, hash_algo, hash_value, verified_sha256, now, now),
-            )
+            if source_relpath is None:
+                conn.execute(
+                    """
+                    INSERT INTO external_hash_cache (
+                        account_name,
+                        source_relpath,
+                        hash_algo,
+                        hash_value,
+                        verified_sha256,
+                        first_seen_at,
+                        updated_at
+                    ) VALUES (?, NULL, ?, ?, ?, ?, ?)
+                    ON CONFLICT(account_name, hash_algo, hash_value) WHERE source_relpath IS NULL DO UPDATE SET
+                        verified_sha256 = COALESCE(excluded.verified_sha256, external_hash_cache.verified_sha256),
+                        updated_at = excluded.updated_at
+                    """,
+                    (account_name, hash_algo, hash_value, verified_sha256, now, now),
+                )
+            else:
+                conn.execute(
+                    """
+                    INSERT INTO external_hash_cache (
+                        account_name,
+                        source_relpath,
+                        hash_algo,
+                        hash_value,
+                        verified_sha256,
+                        first_seen_at,
+                        updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(account_name, source_relpath, hash_algo, hash_value) DO UPDATE SET
+                        verified_sha256 = COALESCE(excluded.verified_sha256, external_hash_cache.verified_sha256),
+                        updated_at = excluded.updated_at
+                    """,
+                    (account_name, source_relpath, hash_algo, hash_value, verified_sha256, now, now),
+                )
             conn.commit()
 
     def acceptance_count(self, *, sha256: str) -> int:
@@ -1076,7 +1095,81 @@ CREATE TABLE IF NOT EXISTS ui_action_idempotency (
 );
         """
     )
+    _ensure_external_hash_cache_h1_schema(conn)
     conn.commit()
+
+
+def _ensure_external_hash_cache_h1_schema(conn: sqlite3.Connection) -> None:
+    """Apply H1 external_hash_cache shape required for hash-import semantics.
+
+    H1 requires:
+    - `source_relpath` nullable for hash-import rows (`NULL` convention)
+    - uniqueness for hash-import rows by (account_name, hash_algo, hash_value)
+      when `source_relpath IS NULL`
+    """
+
+    columns = conn.execute("PRAGMA table_info(external_hash_cache)").fetchall()
+    if not columns:
+        return
+
+    # sqlite3.Row supports dict access when row_factory is set; fallback to index.
+    source_row = next(
+        (
+            row
+            for row in columns
+            if (row["name"] if isinstance(row, sqlite3.Row) else row[1]) == "source_relpath"
+        ),
+        None,
+    )
+
+    source_notnull = int(source_row["notnull"] if isinstance(source_row, sqlite3.Row) else source_row[3]) if source_row is not None else 0
+
+    if source_notnull == 1:
+        conn.execute("BEGIN IMMEDIATE")
+        conn.executescript(
+            """
+CREATE TABLE IF NOT EXISTS external_hash_cache__h1 (
+    account_name TEXT NOT NULL,
+    source_relpath TEXT,
+    hash_algo TEXT NOT NULL,
+    hash_value TEXT NOT NULL,
+    verified_sha256 TEXT,
+    first_seen_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (account_name, source_relpath, hash_algo, hash_value)
+);
+
+INSERT INTO external_hash_cache__h1 (
+    account_name,
+    source_relpath,
+    hash_algo,
+    hash_value,
+    verified_sha256,
+    first_seen_at,
+    updated_at
+)
+SELECT
+    account_name,
+    source_relpath,
+    hash_algo,
+    hash_value,
+    verified_sha256,
+    first_seen_at,
+    updated_at
+FROM external_hash_cache;
+
+DROP TABLE external_hash_cache;
+ALTER TABLE external_hash_cache__h1 RENAME TO external_hash_cache;
+            """
+        )
+
+    conn.execute(
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_external_hash_cache_hash_import_unique
+        ON external_hash_cache(account_name, hash_algo, hash_value)
+        WHERE source_relpath IS NULL
+        """
+    )
 
 
 def _schema_v2_sql() -> str:
@@ -1150,7 +1243,7 @@ CREATE TABLE IF NOT EXISTS live_photo_pairs (
 
 CREATE TABLE IF NOT EXISTS external_hash_cache (
     account_name TEXT NOT NULL,
-    source_relpath TEXT NOT NULL,
+    source_relpath TEXT,
     hash_algo TEXT NOT NULL,
     hash_value TEXT NOT NULL,
     verified_sha256 TEXT,
@@ -1158,6 +1251,10 @@ CREATE TABLE IF NOT EXISTS external_hash_cache (
     updated_at TEXT NOT NULL,
     PRIMARY KEY (account_name, source_relpath, hash_algo, hash_value)
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_external_hash_cache_hash_import_unique
+ON external_hash_cache(account_name, hash_algo, hash_value)
+WHERE source_relpath IS NULL;
 
 CREATE TRIGGER IF NOT EXISTS trg_audit_log_no_update
 BEFORE UPDATE ON audit_log

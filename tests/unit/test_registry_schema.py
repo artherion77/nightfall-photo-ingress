@@ -62,6 +62,28 @@ def test_canonical_v2_columns_present(tmp_path: Path) -> None:
     assert {"sha256", "account_name", "details_json"}.issubset(audit_cols)
 
 
+def test_external_hash_cache_supports_null_source_relpath_for_hash_import(tmp_path: Path) -> None:
+    """H1 schema allows source_relpath NULL for hash-import rows."""
+
+    db_path = tmp_path / "registry.db"
+    registry = Registry(db_path)
+    registry.initialize()
+
+    conn = sqlite3.connect(db_path)
+    try:
+        cols = conn.execute("PRAGMA table_info(external_hash_cache)").fetchall()
+        source = next(row for row in cols if row[1] == "source_relpath")
+        # PRAGMA table_info: row[3] is notnull flag.
+        assert int(source[3]) == 0
+
+        indexes = conn.execute("PRAGMA index_list(external_hash_cache)").fetchall()
+        index_names = {row[1] for row in indexes}
+    finally:
+        conn.close()
+
+    assert "idx_external_hash_cache_hash_import_unique" in index_names
+
+
 def test_migration_is_idempotent_on_repeated_initialize(tmp_path: Path) -> None:
     """Running initialization repeatedly should preserve schema version and data."""
 
