@@ -935,9 +935,15 @@ cmd_cloudflared_status() {
     _info "Checking cloudflared installation and runtime state ..."
     lxc exec "$CONTAINER" -- bash -lc 'command -v cloudflared >/dev/null 2>&1' \
         || _fail "cloudflared binary is missing in container. Run: stagingctl install"
-    lxc exec "$CONTAINER" -- systemctl is-active --quiet "$CF_TUNNEL_SERVICE_NAME" \
-        || _fail "Cloudflare tunnel service is not active. Run: stagingctl install"
-    _ok "cloudflared service is active."
+    if lxc exec "$CONTAINER" -- systemctl is-active --quiet "$CF_TUNNEL_SERVICE_NAME"; then
+        _ok "cloudflared service is active."
+    else
+        if [[ "$strict" == "1" ]]; then
+            _fail "Cloudflare tunnel service is not active. Run: stagingctl cloudflared.start"
+        else
+            _warn "Cloudflare tunnel service is not active (default-off policy). Start manually: stagingctl cloudflared.start"
+        fi
+    fi
 
     local connected=0
     for _ in {1..10}; do
