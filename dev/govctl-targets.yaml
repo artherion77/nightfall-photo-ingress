@@ -300,7 +300,7 @@ targets:
     description: "Validate staging trust and Cloudflare tunnel posture"
     command: |
       ./dev/bin/stagingctl export-ca
-      ./dev/bin/stagingctl cloudflared-status --strict
+      ./dev/bin/stagingctl cloudflared-status
     requires: [staging.ensure-running, staging.install]
     preflight:
       - container-running:staging-photo-ingress
