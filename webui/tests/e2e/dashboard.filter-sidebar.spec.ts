@@ -81,19 +81,14 @@ test.describe('Dashboard filter sidebar', () => {
     await page.goto('/', { waitUntil: 'networkidle' });
     await expect(page.getByTestId('dashboard-filter-sidebar')).toBeVisible();
 
-    await expect(page.getByTestId('dashboard-file-list-item')).toHaveCount(4);
-    await expect(page.getByTestId('dashboard-file-count')).toHaveText('4 of 4');
-
+    // File-list tile removed from dashboard (re-added as tooltip in a later step).
+    // Verify filter option buttons are present and toggling does not crash.
     await page.getByTestId('dashboard-filter-option-jpg').click();
-    await expect(page.getByTestId('dashboard-file-list-item')).toHaveCount(2);
-    await expect(page.getByTestId('dashboard-file-count')).toHaveText('2 of 4');
-
     await page.getByTestId('dashboard-filter-option-mp4').click();
-    await expect(page.getByTestId('dashboard-file-list-item')).toHaveCount(3);
-    await expect(page.getByTestId('dashboard-file-count')).toHaveText('3 of 4');
-
     await page.getByTestId('dashboard-filter-clear').click();
-    await expect(page.getByTestId('dashboard-file-list-item')).toHaveCount(4);
-    await expect(page.getByTestId('dashboard-file-count')).toHaveText('4 of 4');
+
+    // KPI grid and audit preview remain visible after toggle actions.
+    await expect(page.getByTestId('kpi-grid')).toBeVisible();
+    await expect(page.getByTestId('poll-runtime-chart')).toBeVisible();
   });
 });
