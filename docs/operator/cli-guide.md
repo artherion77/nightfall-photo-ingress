@@ -8,9 +8,29 @@
 
 ## Overview
 
-This guide covers the CLI commands for initial setup (Entra app registration, auth bootstrap) and regular operational use (config check, poll, status inspection).
+This guide covers the CLI commands for initial setup (Entra app registration, auth
+bootstrap) and regular operational use (config check, poll, status inspection).
 
-For queue management commands (accept, reject, purge, sync-import, auth-failure cleanup), see [operational-playbook.md](operational-playbook.md).
+The full command surface of `nightfall-photo-ingress` is:
+
+| Command | Purpose |
+|---------|---------|
+| `auth-setup` | One-time MSAL device-code authentication setup for an account |
+| `discover-paths` | Auto-discover OneDrive folder paths using a cached token |
+| `poll` | Run one poll cycle (delta, download, ingest) |
+| `accept` | Accept a pending file hash and move it to accepted storage |
+| `reject` | Permanently reject a file hash from future downloads |
+| `purge` | Purge a rejected hash and remove its physical staging copy |
+| `process-trash` | Drain the trash directory and batch-reject contents |
+| `config-check` | Validate the configuration file |
+| `prune-auth-failures` | Prune historical `auth_failure` audit backlog |
+| `hash-import` | Seed the dedupe index from `.hashes.v2` files (offline, no ingest) |
+| `sync-import` | *(deprecated — replaced by `hash-import`)* |
+
+For full option details, see [design/cli-config-specification.md](../../design/cli-config-specification.md).
+
+For queue management and import workflows (accept, reject, purge, process-trash,
+hash-import, auth-failure cleanup), see [operational-playbook.md](operational-playbook.md).
 
 ---
 

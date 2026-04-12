@@ -85,19 +85,63 @@ systemctl start nightfall-photo-ingress-trash.service
 
 ## Sync-Import from Permanent Library
 
-Populate the registry with SHA-1 hashes from existing `.hashes.sha1` files in the permanent library. This prevents re-downloading files that are already in the library.
+> **Deprecated.** `sync-import` is legacy and replaced by `hash-import` (Issue #65).
+> Use `hash-import` for new deployments. `sync-import` remains functional for backward
+> compatibility but is scheduled for removal.
+
+Populate the registry with advisory SHA-1 hashes from `.hashes.sha1` files. This was
+the original pre-seed mechanism. The command is read-only with respect to the library.
 
 ```bash
 nightfall-photo-ingress sync-import --path /etc/nightfall/photo-ingress.conf
 ```
 
-Run this once after initial deployment against an existing library. Also run it after bulk additions to the permanent library to keep the advisory hash index current. The command is read-only with respect to the library — it never modifies `.hashes.sha1` files.
-
-Use `--dry-run` to preview the import without writing to the registry:
+Use `--dry-run` to preview without writing:
 
 ```bash
 nightfall-photo-ingress sync-import --dry-run --path /etc/nightfall/photo-ingress.conf
 ```
+
+---
+
+## Hash-Import from Permanent Library (Issue #65)
+
+Seed the registry dedupe index with authoritative SHA-256 hashes from `.hashes.v2`
+files in the permanent library. Imported hashes prevent future re-downloads of content
+already present in the library. This is the canonical replacement for `sync-import`.
+
+The operation is offline (no network), non-auditing (no audit events), not UI-visible,
+and fully idempotent.
+
+```bash
+nightfall-photo-ingress hash-import /nightfall/media/pictures \
+	--path /etc/nightfall/photo-ingress.conf --stats
+```
+
+Use `--dry-run` to preview the import without writing to the registry:
+
+```bash
+nightfall-photo-ingress hash-import /nightfall/media/pictures \
+	--path /etc/nightfall/photo-ingress.conf --dry-run
+```
+
+Run once after initial deployment against an existing library, and after bulk additions
+to keep the dedupe index current. The command never writes to the permanent library.
+
+Options:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--chunk-size <N>` | `1000` | Hashes per import batch |
+| `--dry-run` | off | Preview without writing |
+| `--quiet` | off | Suppress non-error output |
+| `--stats` | off | Show per-chunk statistics |
+| `--stop-on-error` | off | Abort on first invalid file |
+
+> **Note:** `hash-import` requires `.hashes.v2` files produced by
+> `nightfall-immich-rmdups.sh`. The previous `.hashes.sha1` format is not accepted.
+> Run `nightfall-immich-rmdups.sh` against the library first if `.hashes.v2` files
+> are missing.
 
 ---
 
