@@ -69,6 +69,18 @@ class AcceptContext:
     modified_time: str
 
 
+@dataclass(frozen=True)
+class HashImportChunkResult:
+    """Import statistics for one hash-import batch."""
+
+    chunk_index: int
+    imported: int
+    skipped_existing: int
+
+
+HASH_IMPORT_ACCOUNT = "__hash_import__"
+
+
 class Registry:
     """High-level API for schema migration and state transitions."""
 
@@ -833,6 +845,59 @@ class Registry:
                     (account_name, source_relpath, hash_algo, hash_value, verified_sha256, now, now),
                 )
             conn.commit()
+
+    def bulk_insert_hash_import(
+        self,
+        *,
+        hashes: list[str] | tuple[str, ...],
+        chunk_size: int,
+    ) -> tuple[HashImportChunkResult, ...]:
+        """Insert authoritative SHA-256 hash-import rows in chunked transactions."""
+
+        if chunk_size <= 0:
+            raise RegistryError("chunk_size must be > 0")
+        if not hashes:
+            return ()
+
+        results: list[HashImportChunkResult] = []
+        now = _utc_now()
+
+        with self._connect() as conn:
+            _set_pragmas(conn)
+
+            for chunk_index, start in enumerate(range(0, len(hashes), chunk_size), start=1):
+                chunk_hashes = hashes[start : start + chunk_size]
+                before_changes = conn.total_changes
+                conn.execute("BEGIN IMMEDIATE")
+                conn.executemany(
+                    """
+                    INSERT OR IGNORE INTO external_hash_cache (
+                        account_name,
+                        source_relpath,
+                        hash_algo,
+                        hash_value,
+                        verified_sha256,
+                        first_seen_at,
+                        updated_at
+                    ) VALUES (?, NULL, 'sha256', ?, ?, ?, ?)
+                    """,
+                    [
+                        (HASH_IMPORT_ACCOUNT, hash_value, hash_value, now, now)
+                        for hash_value in chunk_hashes
+                    ],
+                )
+                conn.commit()
+
+                imported = conn.total_changes - before_changes
+                results.append(
+                    HashImportChunkResult(
+                        chunk_index=chunk_index,
+                        imported=imported,
+                        skipped_existing=len(chunk_hashes) - imported,
+                    )
+                )
+
+        return tuple(results)
 
     def acceptance_count(self, *, sha256: str) -> int:
         """Return number of acceptance history entries for one SHA-256."""

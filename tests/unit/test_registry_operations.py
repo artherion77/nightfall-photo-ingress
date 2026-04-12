@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from nightfall_photo_ingress.domain.registry import Registry, RegistryError
+from nightfall_photo_ingress.domain.registry import HASH_IMPORT_ACCOUNT, Registry, RegistryError
 
 
 def _new_registry(tmp_path: Path) -> Registry:
@@ -357,3 +357,109 @@ def test_external_hash_cache_sync_import_rows_remain_path_distinct(tmp_path: Pat
 
     assert row is not None
     assert int(row[0]) == 2
+
+
+def test_bulk_insert_hash_import_inserts_rows_and_reports_chunk_stats(tmp_path: Path) -> None:
+    reg = _new_registry(tmp_path)
+
+    results = reg.bulk_insert_hash_import(
+        hashes=["a" * 64, "b" * 64, "c" * 64, "d" * 64],
+        chunk_size=3,
+    )
+
+    assert results == (
+        type(results[0])(chunk_index=1, imported=3, skipped_existing=0),
+        type(results[1])(chunk_index=2, imported=1, skipped_existing=0),
+    )
+
+    conn = sqlite3.connect(reg.db_path)
+    try:
+        rows = conn.execute(
+            """
+            SELECT account_name, source_relpath, hash_algo, hash_value, verified_sha256
+            FROM external_hash_cache
+            WHERE account_name = ?
+            ORDER BY hash_value
+            """,
+            (HASH_IMPORT_ACCOUNT,),
+        ).fetchall()
+    finally:
+        conn.close()
+
+    assert rows == [
+        (HASH_IMPORT_ACCOUNT, None, "sha256", "a" * 64, "a" * 64),
+        (HASH_IMPORT_ACCOUNT, None, "sha256", "b" * 64, "b" * 64),
+        (HASH_IMPORT_ACCOUNT, None, "sha256", "c" * 64, "c" * 64),
+        (HASH_IMPORT_ACCOUNT, None, "sha256", "d" * 64, "d" * 64),
+    ]
+
+
+def test_bulk_insert_hash_import_is_fully_idempotent_across_reimports(tmp_path: Path) -> None:
+    reg = _new_registry(tmp_path)
+    hashes = ["a" * 64, "b" * 64, "c" * 64]
+
+    first = reg.bulk_insert_hash_import(hashes=hashes, chunk_size=10)
+    second = reg.bulk_insert_hash_import(hashes=hashes, chunk_size=10)
+
+    assert first == (type(first[0])(chunk_index=1, imported=3, skipped_existing=0),)
+    assert second == (type(second[0])(chunk_index=1, imported=0, skipped_existing=3),)
+
+    conn = sqlite3.connect(reg.db_path)
+    try:
+        row = conn.execute(
+            "SELECT COUNT(*) FROM external_hash_cache WHERE account_name = ?",
+            (HASH_IMPORT_ACCOUNT,),
+        ).fetchone()
+    finally:
+        conn.close()
+
+    assert row is not None
+    assert int(row[0]) == 3
+
+
+def test_bulk_insert_hash_import_only_inserts_new_rows_for_overlapping_imports(tmp_path: Path) -> None:
+    reg = _new_registry(tmp_path)
+
+    reg.bulk_insert_hash_import(hashes=["a" * 64, "b" * 64], chunk_size=10)
+    results = reg.bulk_insert_hash_import(hashes=["b" * 64, "c" * 64, "d" * 64], chunk_size=10)
+
+    assert results == (type(results[0])(chunk_index=1, imported=2, skipped_existing=1),)
+
+
+def test_bulk_insert_hash_import_does_not_write_files_or_audit_tables(tmp_path: Path) -> None:
+    reg = _new_registry(tmp_path)
+
+    reg.create_or_update_file(sha256="f" * 64, size_bytes=42, status="pending")
+    reg.append_audit_event(sha256="f" * 64, action="pending", reason=None, actor="test")
+    reg.bulk_insert_hash_import(hashes=["a" * 64, "b" * 64], chunk_size=1)
+
+    conn = sqlite3.connect(reg.db_path)
+    try:
+        files_count = conn.execute("SELECT COUNT(*) FROM files").fetchone()[0]
+        audit_count = conn.execute("SELECT COUNT(*) FROM audit_log").fetchone()[0]
+        accepted_count = conn.execute("SELECT COUNT(*) FROM accepted_records").fetchone()[0]
+        metadata_count = conn.execute("SELECT COUNT(*) FROM metadata_index").fetchone()[0]
+        origins_count = conn.execute("SELECT COUNT(*) FROM file_origins").fetchone()[0]
+        pair_count = conn.execute("SELECT COUNT(*) FROM live_photo_pairs").fetchone()[0]
+    finally:
+        conn.close()
+
+    assert files_count == 1
+    assert audit_count == 1
+    assert accepted_count == 0
+    assert metadata_count == 0
+    assert origins_count == 0
+    assert pair_count == 0
+
+
+def test_bulk_insert_hash_import_rejects_non_positive_chunk_size(tmp_path: Path) -> None:
+    reg = _new_registry(tmp_path)
+
+    with pytest.raises(RegistryError, match="chunk_size must be > 0"):
+        reg.bulk_insert_hash_import(hashes=["a" * 64], chunk_size=0)
+
+
+def test_bulk_insert_hash_import_empty_input_returns_no_chunks(tmp_path: Path) -> None:
+    reg = _new_registry(tmp_path)
+
+    assert reg.bulk_insert_hash_import(hashes=[], chunk_size=1000) == ()
