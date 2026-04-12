@@ -198,8 +198,9 @@
 
   .relative-time {
     margin-left: auto;
-    color: var(--text-secondary);
-    font-size: var(--text-sm);
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+    line-height: var(--text-xs-line-height);
     white-space: nowrap;
     flex: 0 0 auto;
   }

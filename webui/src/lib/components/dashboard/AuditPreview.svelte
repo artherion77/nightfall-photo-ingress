@@ -44,6 +44,16 @@
     margin-bottom: var(--space-3);
   }
 
+  .header h2 {
+    margin: 0;
+    font-size: var(--text-lg);
+    font-weight: var(--text-lg-weight);
+    line-height: var(--text-lg-line-height);
+    color: var(--text-primary);
+    padding-bottom: var(--space-1);
+    border-bottom: 2px solid var(--color-accent-teal);
+  }
+
   ul {
     margin: 0;
     padding: 0;

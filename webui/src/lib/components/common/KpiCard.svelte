@@ -66,10 +66,10 @@
   }
 
   .value {
-    font-size: var(--text-xl);
-    font-weight: var(--text-xl-weight);
+    font-size: var(--text-2xl);
+    font-weight: var(--text-2xl-weight);
     color: var(--text-primary);
-    line-height: var(--text-xl-line-height);
+    line-height: var(--text-2xl-line-height);
   }
 
   .status-bar {

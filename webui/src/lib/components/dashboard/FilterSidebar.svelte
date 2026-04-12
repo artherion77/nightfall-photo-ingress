@@ -98,10 +98,12 @@
 
   h2 {
     margin: 0;
-    font-size: var(--text-md);
-    font-weight: var(--text-md-weight);
-    line-height: var(--text-md-line-height);
+    font-size: var(--text-lg);
+    font-weight: var(--text-lg-weight);
+    line-height: var(--text-lg-line-height);
     color: var(--text-primary);
+    padding-bottom: var(--space-1);
+    border-bottom: 2px solid var(--color-accent-teal);
   }
 
   h3 {
