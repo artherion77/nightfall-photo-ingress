@@ -4,6 +4,13 @@ Status: COMPLETE (2026-04-12)
 Date: 2026-04-11 (activated) -> 2026-04-12 (finalized)
 Owner: Systems Engineering
 
+Closure Note (2026-04-12):
+- This plan is closed and archived in `planning/implemented/`.
+- Any previously open or follow-on Phase-2 items are formally de-scoped for the
+	current deployment profile while the system is not operating under enterprise-grade
+	scalability and network conditions.
+- Deferred items should be re-evaluated only if deployment assumptions change.
+
 ## 1. Chunked Execution Plan (C1–C10)
 
 ### C1 — Reverse Proxy Baseline (Caddy)
