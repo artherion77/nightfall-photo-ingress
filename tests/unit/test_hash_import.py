@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from nightfall_photo_ingress.domain.registry import Registry
+from nightfall_photo_ingress.domain.registry import HASH_IMPORT_ACCOUNT, Registry, RegistryError
 from nightfall_photo_ingress.hash_import import (
     HASHFILE_V2_NAME,
     HashImportError,
@@ -56,6 +56,25 @@ def _write_valid_v1(directory: Path, *, files: list[Path]) -> None:
         "\n".join([f"DIRECTORY_HASH {directory_hash}", *rows]),
         encoding="utf-8",
     )
+
+
+def _prepare_single_import_fixture(tmp_path: Path) -> tuple[Registry, Path, str]:
+    root = tmp_path / "pictures"
+    directory = root / "2026" / "inv"
+    directory.mkdir(parents=True)
+    file_path = directory / "A.HEIC"
+    payload = b"inv-hi"
+    file_path.write_bytes(payload)
+    _write_valid_v2(directory, files=[file_path])
+
+    registry = Registry(tmp_path / "registry.db")
+    registry.initialize()
+    imported_hash = _sha256_bytes(payload)
+    return registry, root, imported_hash
+
+
+def _count_rows(conn: sqlite3.Connection, table: str) -> int:
+    return int(conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0])
 
 
 def test_parse_hashes_v2_text_returns_sha256_values_in_order() -> None:
@@ -594,3 +613,123 @@ def test_format_hash_import_error_includes_file_and_line_context() -> None:
     message = format_hash_import_error(HashImportParseError("/tmp/example.hashes.v2", 42, "invalid SHA-256"))
 
     assert message == "ERROR: /tmp/example.hashes.v2: line 42: invalid SHA-256"
+
+
+def test_inv_hi01_imported_hashes_do_not_create_staging_items(tmp_path: Path) -> None:
+    registry, root, _ = _prepare_single_import_fixture(tmp_path)
+    run_hash_import(root_path=root, registry=registry, chunk_size=1000)
+
+    with sqlite3.connect(registry.db_path) as conn:
+        assert _count_rows(conn, "files") == 0
+
+
+def test_inv_hi02_imported_hashes_do_not_create_audit_events(tmp_path: Path) -> None:
+    registry, root, _ = _prepare_single_import_fixture(tmp_path)
+    run_hash_import(root_path=root, registry=registry, chunk_size=1000)
+
+    with sqlite3.connect(registry.db_path) as conn:
+        assert _count_rows(conn, "audit_log") == 0
+
+
+def test_inv_hi03_imported_hashes_do_not_enter_ingest_lifecycle(tmp_path: Path) -> None:
+    registry, root, _ = _prepare_single_import_fixture(tmp_path)
+    run_hash_import(root_path=root, registry=registry, chunk_size=1000)
+
+    with sqlite3.connect(registry.db_path) as conn:
+        statuses = conn.execute("SELECT DISTINCT status FROM files").fetchall()
+    assert statuses == []
+
+
+def test_inv_hi04_imported_hashes_do_not_create_live_photo_pairs(tmp_path: Path) -> None:
+    registry, root, _ = _prepare_single_import_fixture(tmp_path)
+    run_hash_import(root_path=root, registry=registry, chunk_size=1000)
+
+    with sqlite3.connect(registry.db_path) as conn:
+        assert _count_rows(conn, "live_photo_pairs") == 0
+
+
+def test_inv_hi05_imported_hashes_do_not_trigger_media_pipeline_outputs(tmp_path: Path) -> None:
+    registry, root, _ = _prepare_single_import_fixture(tmp_path)
+    before_files = sorted(path.relative_to(root) for path in root.rglob("*"))
+
+    run_hash_import(root_path=root, registry=registry, chunk_size=1000)
+
+    after_files = sorted(path.relative_to(root) for path in root.rglob("*"))
+    assert after_files == before_files
+
+
+def test_inv_hi06_import_is_idempotent_on_repeated_execution(tmp_path: Path) -> None:
+    registry, root, _ = _prepare_single_import_fixture(tmp_path)
+
+    first = run_hash_import(root_path=root, registry=registry, chunk_size=1000)
+    second = run_hash_import(root_path=root, registry=registry, chunk_size=1000)
+
+    assert first.total_imported == 1
+    assert first.total_skipped == 0
+    assert second.total_imported == 0
+    assert second.total_skipped == 1
+
+
+def test_inv_hi07_import_does_not_overwrite_existing_hash_import_rows(tmp_path: Path) -> None:
+    registry, root, imported_hash = _prepare_single_import_fixture(tmp_path)
+    pre = registry.bulk_insert_hash_import(hashes=[imported_hash], chunk_size=1000)
+    assert pre[0].imported == 1
+
+    summary = run_hash_import(root_path=root, registry=registry, chunk_size=1000)
+
+    assert summary.total_imported == 0
+    assert summary.total_skipped == 1
+    with sqlite3.connect(registry.db_path) as conn:
+        rows = conn.execute(
+            """
+            SELECT account_name, source_relpath, hash_algo, hash_value, verified_sha256
+            FROM external_hash_cache
+            WHERE hash_value = ?
+            """,
+            (imported_hash,),
+        ).fetchall()
+    assert rows == [(HASH_IMPORT_ACCOUNT, None, "sha256", imported_hash, imported_hash)]
+
+
+def test_inv_hi08_import_does_not_modify_delta_or_cursor_derived_tables(tmp_path: Path) -> None:
+    registry, root, _ = _prepare_single_import_fixture(tmp_path)
+    run_hash_import(root_path=root, registry=registry, chunk_size=1000)
+
+    with sqlite3.connect(registry.db_path) as conn:
+        assert _count_rows(conn, "metadata_index") == 0
+        assert _count_rows(conn, "file_origins") == 0
+
+
+def test_inv_hi09_imported_hashes_do_not_appear_in_ui_state_tables(tmp_path: Path) -> None:
+    registry, root, _ = _prepare_single_import_fixture(tmp_path)
+    run_hash_import(root_path=root, registry=registry, chunk_size=1000)
+
+    with sqlite3.connect(registry.db_path) as conn:
+        assert _count_rows(conn, "files") == 0
+        assert _count_rows(conn, "audit_log") == 0
+
+
+def test_inv_hi10_imported_hashes_use_hash_import_account_scope_only(tmp_path: Path) -> None:
+    registry, root, _ = _prepare_single_import_fixture(tmp_path)
+    run_hash_import(root_path=root, registry=registry, chunk_size=1000)
+
+    with sqlite3.connect(registry.db_path) as conn:
+        rows = conn.execute("SELECT DISTINCT account_name FROM external_hash_cache").fetchall()
+    assert rows == [(HASH_IMPORT_ACCOUNT,)]
+
+
+def test_inv_hi11_imported_hashes_do_not_trigger_exif_or_pairing_heuristics(tmp_path: Path) -> None:
+    registry, root, _ = _prepare_single_import_fixture(tmp_path)
+    run_hash_import(root_path=root, registry=registry, chunk_size=1000)
+
+    with sqlite3.connect(registry.db_path) as conn:
+        assert _count_rows(conn, "metadata_index") == 0
+        assert _count_rows(conn, "live_photo_pairs") == 0
+
+
+def test_inv_hi12_imported_hashes_are_not_eligible_for_reject_or_purge_lifecycle(tmp_path: Path) -> None:
+    registry, root, imported_hash = _prepare_single_import_fixture(tmp_path)
+    run_hash_import(root_path=root, registry=registry, chunk_size=1000)
+
+    with pytest.raises(RegistryError, match="Cannot purge missing sha256"):
+        registry.finalize_purge_from_rejected(sha256=imported_hash, reason="not-eligible", actor="cli")

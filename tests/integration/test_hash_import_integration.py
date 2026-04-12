@@ -75,6 +75,7 @@ def test_run_hash_import_walks_tree_with_valid_stale_and_v1_backfill_dirs(tmp_pa
     registry = Registry(tmp_path / "registry.db")
     registry.initialize()
     summary = run_hash_import(root_path=root, registry=registry, chunk_size=2)
+    second_summary = run_hash_import(root_path=root, registry=registry, chunk_size=2)
 
     assert summary.directories_processed == 3
     assert summary.valid_caches_consumed == 1
@@ -83,6 +84,8 @@ def test_run_hash_import_walks_tree_with_valid_stale_and_v1_backfill_dirs(tmp_pa
     assert summary.total_imported == 3
     assert summary.total_skipped == 0
     assert [result.imported for result in summary.chunk_results] == [2, 1]
+    assert second_summary.total_imported == 0
+    assert second_summary.total_skipped == 3
 
     conn = sqlite3.connect(registry.db_path)
     try:
@@ -93,6 +96,9 @@ def test_run_hash_import_walks_tree_with_valid_stale_and_v1_backfill_dirs(tmp_pa
             ORDER BY hash_value
             """
         ).fetchall()
+        file_rows = conn.execute("SELECT COUNT(*) FROM files").fetchone()[0]
+        audit_rows = conn.execute("SELECT COUNT(*) FROM audit_log").fetchone()[0]
+        live_pair_rows = conn.execute("SELECT COUNT(*) FROM live_photo_pairs").fetchone()[0]
     finally:
         conn.close()
 
@@ -103,4 +109,7 @@ def test_run_hash_import_walks_tree_with_valid_stale_and_v1_backfill_dirs(tmp_pa
         (HASH_IMPORT_ACCOUNT, None, "sha256", hash_value, hash_value)
         for hash_value in expected_hashes
     ]
+    assert file_rows == 0
+    assert audit_rows == 0
+    assert live_pair_rows == 0
     assert not (dir_c / HASHFILE_V2_NAME).exists()

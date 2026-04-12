@@ -1,4 +1,8 @@
-"""Sync-import parser and import workflow tests."""
+"""Sync-import parser and import workflow tests.
+
+Deprecated context: sync-import remains for backward compatibility only and is
+superseded by hash-import for new deployments.
+"""
 
 from __future__ import annotations
 
