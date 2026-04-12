@@ -171,7 +171,7 @@ re-execute, although in practice bootstrap only runs once (on a version-0 databa
 | `file_origins` | `(account, onedrive_id)` | Maps OneDrive identifiers to `sha256`; supports path-hint tracking across renames |
 | `audit_log` | `id` (AUTOINCREMENT) | Append-only event log for all state transitions and pipeline decisions; protected by immutability triggers |
 | `live_photo_pairs` | `pair_id` | Links two `files` rows (photo + video) as a Live Photo pair; holds `status` for pair lifecycle (see [`design/architecture/live-photo-pair-lifecycle.md`](live-photo-pair-lifecycle.md)) |
-| `external_hash_cache` | `(account_name, source_relpath, hash_algo, hash_value)` | Caches externally-provided hash values (e.g., from sidecar files or provider APIs) alongside their verified `sha256` |
+| `external_hash_cache` | `(account_name, source_relpath, hash_algo, hash_value)` | Caches hashes imported from the permanent library. The `hash-import` CLI (Issue #65) imports authoritative SHA-256 from `.hashes.v2` files; legacy `sync-import` imported advisory SHA-1. Used for dedupe index lookups during ingest pre-download filtering |
 
 ### 6.2 Table Definitions
 

@@ -23,6 +23,8 @@ documents — those are retained in `design/superseeded/` for historical referen
 | V1 CLI command `photo-ingress` (no namespace prefix) | `design/superseeded/v1-lifecycle-baseline-superseded.md` §2 | 2026-04-03 | `nightfall-photo-ingress` | Renamed to carry the `nightfall-` prefix for consistency with all other nightfall tooling and to prevent namespace collisions in system package managers. See DEC-20260403-01. |
 | V1 registry schema version 1 (`files.status` without `pending`) | `design/superseeded/v1-lifecycle-baseline-superseded.md` §5 | 2026-04-02 | Schema version 2 (`design/specs/registry.md`) | V1 schema defined `status CHECK (status IN ('accepted','rejected','purged'))` — no `pending` state existed. Schema version 2 adds `pending` and restructures `accepted_records`. No in-place migration path is supported. |
 | Original web control plane scoping sketch | `design/superseeded/web-control-plane-initial-extension-superseded.md` | 2026-04-01 | `design/web/webui-architecture-phase1.md`, `design/web/web-control-plane-architecture-phase2.md` | The original sketch was a high-level intent document. Replaced by the Phase 1 SvelteKit architecture spec and Phase 2 architecture, which provide detailed component, API, and security specifications. |
+| `sync-import` CLI command and advisory SHA-1 import model | `design/specs/ingest.md` (former "Sync Hash Import Mode" section) | 2026-04-12 | `hash-import` CLI command — `design/cli-config-specification.md` §3 | Advisory SHA-1 import from `.hashes.sha1` files required a first-download SHA-256 verification before imported hashes could gate future skips, negating most download-reduction benefit. Replaced by `hash-import` (Issue #65), which imports authoritative SHA-256 from `.hashes.v2` files directly. See DEC-20260412-01. |
+| `sync_hash_import_enabled`, `sync_hash_import_path`, `sync_hash_import_glob` config keys | `design/cli-config-specification.md` (former §2 Optional Keys) | 2026-04-12 | `[import] chunk_size` config section — `design/cli-config-specification.md` §8 | Legacy config keys for `sync-import` are deprecated. The `hash-import` command uses `<path-to-root>` as a CLI argument and `[import] chunk_size` as config, eliminating path/glob config. See DEC-20260412-01. |
 
 ---
 
@@ -111,6 +113,53 @@ are idempotent and audit-first; permanent library is out of bounds for web write
 carried forward unchanged in both replacement documents.
 
 **Current design:** `design/web/webui-architecture-phase1.md`, `design/web/web-control-plane-architecture-phase2.md`
+
+---
+
+### `sync-import` CLI command and advisory SHA-1 import model
+
+The `sync-import` command imported advisory SHA-1 hashes from `.hashes.sha1` files in
+the permanent library into the `external_hash_cache` table. The imported SHA-1 values
+were advisory only: the `verify_sha256_on_first_download` flag (default `true`) forced
+a first-download server-side SHA-256 verification before an advisory match could gate
+future metadata-only skips.
+
+This model was superseded by the `hash-import` command (Issue #65, DEC-20260412-01).
+Key changes:
+
+1. **Input format**: `.hashes.v2` files (SHA-256 column) replace `.hashes.sha1` files.
+2. **Hash identity**: Authoritative SHA-256 is imported directly; no advisory layer.
+3. **Verification**: No first-download verification required; SHA-256 is canonical at
+   import time.
+4. **Invariants**: 12 mandatory invariants (INV-HI01 through INV-HI12) enforce strict
+   isolation from ingest, audit, lifecycle, and UI subsystems.
+5. **Config**: Legacy `sync_hash_import_*` config keys are deprecated. New `[import]`
+   section with `chunk_size` replaces them.
+
+The `sync-import` command remains available for backward compatibility but is scheduled
+for removal.
+
+**Current design:** `design/cli-config-specification.md` §3 (hash-import)  
+**ADL reference:** DEC-20260412-01 in `design/rationale/architecture-decision-log.md`
+
+---
+
+### `sync_hash_import_*` configuration keys
+
+Three configuration keys under `[core]` were used by the `sync-import` command:
+
+- `sync_hash_import_enabled` (bool, default true)
+- `sync_hash_import_path` (path to permanent library root)
+- `sync_hash_import_glob` (glob pattern, default `.hashes.sha1`)
+
+These keys are deprecated. The `hash-import` command takes `<path-to-root>` as a CLI
+argument and reads chunk size from the new `[import]` config section. The deprecated
+keys are ignored by `hash-import` and are consumed only by the legacy `sync-import`
+command.
+
+**Current config:** `design/cli-config-specification.md` §7 (deprecated keys) and §8
+(`[import]` section)  
+**ADL reference:** DEC-20260412-01 in `design/rationale/architecture-decision-log.md`
 
 ---
 

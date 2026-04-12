@@ -37,6 +37,7 @@ These invariants follow directly from the constraints above and are enforced by 
 | Purge strictly requires prior `rejected` status | `purge` fails on non-rejected files |
 | Triage and blocklist retries do not duplicate state transitions | `ui_action_idempotency` replay in `api/services/triage_service.py` and `api/services/blocklist_service.py` |
 | Enabled blocklist matches never enter pending queue | Ingest evaluates `blocked_rules` and persists matches as `rejected` with discard semantics |
+| Hash-import entries are strictly isolated from ingest, audit, and lifecycle | `hash-import` writes only to `external_hash_cache`; no `files` rows, no audit events, no staging items, no UI visibility. Governed by INV-HI01–INV-HI12 in [architecture/invariants.md](../architecture/invariants.md) |
 
 ## Chunk 4 Note
 

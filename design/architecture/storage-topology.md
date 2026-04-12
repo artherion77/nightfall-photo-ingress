@@ -22,7 +22,7 @@ nightfall/media/photo-ingress  →  /nightfall/media/photo-ingress/
    trash/                 — operator drops files here to trigger rejection flow
 
 nightfall/media/pictures  →  /nightfall/media/pictures/
-   ...                    — permanent library, read-only to ingress (used by Immich and sync-import)
+   ...                    — permanent library, read-only to ingress (used by Immich and hash-import)
 ```
 
 ---

@@ -138,7 +138,7 @@ Field notes:
   - `design/v1-baseline-spec.md`
 
 ## DEC-20260331-03: Accepted queue boundary and dedupe persistence
-- Status: accepted
+- Status: accepted (partially superseded by DEC-20260412-01)
 - Date (UTC): 2026-03-31 16:03:18 UTC
 - Scope: pipeline
 - Decision:
@@ -507,3 +507,58 @@ Field notes:
   - `docs/deployment/dev-container-workflow.md`
   - `staging/README.md`
   - `docs/deployment/environment-setup.md`
+
+## DEC-20260412-01: Hash-import CLI with authoritative SHA-256 and strict invariant isolation
+- Status: accepted
+- Date (UTC): 2026-04-12 00:00:00 UTC
+- Scope: pipeline
+- Decision:
+  - Introduce a new `hash-import` CLI command that imports authoritative SHA-256 hashes
+    from `.hashes.v2` files (produced by `nightfall-immich-rmdups.sh`) into the
+    `external_hash_cache` table of the registry.
+  - The command is governed by 12 mandatory invariants (INV-HI01 through INV-HI12) that
+    enforce strict isolation from ingest, audit, lifecycle, UI, and all other pipeline
+    subsystems.
+  - The legacy `sync-import` command is deprecated. Its advisory SHA-1 model is
+    superseded by direct SHA-256 import.
+  - Legacy config keys (`sync_hash_import_enabled`, `sync_hash_import_path`,
+    `sync_hash_import_glob`) are deprecated. A new `[import]` config section with
+    `chunk_size` is introduced.
+  - Imported hashes prevent re-downloads by populating the dedupe index. They do not
+    create staging items, audit events, lifecycle state, or UI-visible entries.
+- Rationale:
+  - The advisory SHA-1 model required a first-download SHA-256 verification before
+    imported hashes could gate future skips, negating most download-reduction benefit.
+  - Importing authoritative SHA-256 directly eliminates the advisory verification layer,
+    providing immediate dedupe benefit on first encounter.
+  - The 12 invariants prevent scope creep and ensure hash-import remains a minimal,
+    offline, operator-driven operation with no side effects on existing subsystems.
+- Alternatives Considered:
+  - Extend sync-import to also read SHA-256 from `.hashes.v2` files (rejected:
+    perpetuates the advisory model and legacy config surface).
+  - Auto-import on poll startup (rejected: violates offline-only invariant and
+    introduces implicit state changes).
+- Consequences:
+  - DEC-20260331-03 (sync-import pre-seed) is partially superseded: the pre-seed
+    concept is retained but the implementation mechanism changes from advisory SHA-1
+    to authoritative SHA-256 via the new `hash-import` command.
+  - DEC-20260331-04 (`verify_sha256_on_first_download`) remains valid for any
+    remaining advisory SHA-1 entries but is not required for hash-import entries.
+  - New invariant category INV-HI01 through INV-HI12 is added to the invariants
+    catalogue.
+  - Design documents are updated to reflect the hash-import model and deprecation
+    of sync-import.
+- Implementation Notes:
+  - `.hashes.v2` format: `CACHE_SCHEMA v2` header, `DIRECTORY_HASH <40-hex>`,
+    then tab-separated `<sha1>\t<sha256>\t<path>` rows. Only SHA-256 column is used.
+  - Registry entry shape: `{sha256, imported: true, first_seen, source: "hash_import"}`.
+  - CLI options: `--chunk-size`, `--dry-run`, `--quiet`, `--stats`, `--stop-on-error`.
+  - Config: `[import] chunk_size = 1000`. CLI overrides config overrides default.
+- Supersedes:
+  - DEC-20260331-03 (partially: pre-seed mechanism changes)
+- References:
+  - GitHub Issue #65
+  - `design/cli-config-specification.md` (Section 3: hash-import)
+  - `design/architecture/invariants.md` (Hash Import Invariants)
+  - `design/specs/ingest.md` (Hash Import section)
+  - `design/rationale/deprecated-concepts.md` (sync-import deprecation)

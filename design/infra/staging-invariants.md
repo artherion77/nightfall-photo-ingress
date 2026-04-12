@@ -34,7 +34,7 @@ The Phase-2 baseline is strict and non-negotiable:
 11. Canonical staging endpoint is `https://staging-photo-ingress.home.arpa`.
 12. Staging CORS allowlist includes only approved HTTPS origins for operator surfaces.
 13. Staging CA trust is exported to `tests/ca/staging-ca.pem` for E2E and Playwright trust synchronization.
-14. Future scope may include a dedicated read-only host mount for media library hash-import validation.
+14. Future scope may include a dedicated read-only host mount for media library hash-import validation (Issue #65).
 15. No Cloudflare credentials may ever reside inside the container filesystem. All Cloudflare credentials must be mounted read-only from the host.
 16. Cloudflare Tunnel MUST default to OFF and may only be started explicitly via stagingctl/govctl.
 
@@ -92,7 +92,7 @@ The following behaviors are inconsistent with the corrected baseline:
 4. `install` enables in-container API + Caddy services only.
 5. Evidence and logs are collected via host-mounted persistent paths.
 6. `uninstall --purge` must preserve the persistent evidence/log mount contract unless an explicit retention policy says otherwise.
-7. Future media-library host mount support is reserved for read-only hash import tests.
+7. Future media-library host mount support is reserved for read-only hash-import tests (Issue #65).
 
 ## 7. Remaining Follow-up Work
 

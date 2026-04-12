@@ -25,6 +25,7 @@ enforcement mechanism, and a traceable source citation.
 - [Audit Log Invariants](#audit-log-invariants)
 - [Configuration Invariants](#configuration-invariants)
 - [Process Model Invariants](#process-model-invariants)
+- [Hash Import Invariants](#hash-import-invariants)
 
 ---
 
@@ -32,7 +33,7 @@ enforcement mechanism, and a traceable source citation.
 
 | ID | Invariant | Scope | Enforcement | Source |
 |---|---|---|---|---|
-| INV-R01 | SHA-256 is the canonical content identity — never a filename, path, or advisory SHA1 | `files` table | `sha256 TEXT PRIMARY KEY`; advisory SHA1 entries from `external_hash_cache` are never promoted to canonical status without a verified server-side SHA-256 | `design/domain-architecture-overview.md` §5; `design/architecture/ingest-lifecycle-and-crash-recovery.md` §10.3 |
+| INV-R01 | SHA-256 is the canonical content identity — never a filename, path, or SHA-1 | `files` table | `sha256 TEXT PRIMARY KEY`; imported hashes from `hash-import` use SHA-256 directly as canonical identity; legacy advisory SHA-1 entries from `external_hash_cache` are never promoted to canonical status without a verified server-side SHA-256 | `design/domain-architecture-overview.md` §5; `design/architecture/ingest-lifecycle-and-crash-recovery.md` §10.3; `design/cli-config-specification.md` §3 |
 | INV-R02 | `files.status` is constrained to `('pending', 'accepted', 'rejected', 'purged')` | `files` table | `CHECK (status IN ('pending', 'accepted', 'rejected', 'purged'))` SQLite constraint | `design/domain-architecture-overview.md` §5 |
 | INV-R03 | A file in `rejected` status cannot be re-accepted — there is no `rejected → accepted` transition | `files.status` | `accept` CLI requires current status `pending`; `rejected` files are never re-entered into the pending queue | `design/domain-architecture-overview.md` §3 ("Reject-once, reject-forever") |
 | INV-R04 | A rejected SHA-256 encountered again on any future poll is silently discarded with `discard_rejected` semantics — never re-entered into `pending` | `domain/ingest.py` | Registry lookup before persistence; rejected hit deletes staged file and appends discard audit record | `design/specs/ingest.md`; `design/architecture/state-machine.md` |
@@ -52,7 +53,7 @@ enforcement mechanism, and a traceable source citation.
 | INV-S02 | Any `files.current_path` that lies outside the managed queue roots is treated as an operator error | `domain/storage.py` | Accept/reject flows fail closed on out-of-root `current_path` values; no silent move | `design/domain-architecture-overview.md` §6.6 |
 | INV-S03 | `purge` requires the target file to be in `rejected` status — no other status allows purge | `reject.py` | Status check precedes any filesystem operation; purge fails closed on non-`rejected` files | `design/domain-architecture-overview.md` §6.5 |
 | INV-S04 | `purge` refuses to delete files whose path lies outside the `rejected_path` root | `reject.py` | Root-containment safety check is performed before `unlink`; path-traversal-safe | `design/domain-architecture-overview.md` §6.5 |
-| INV-S05 | The permanent library (`/nightfall/media/pictures`) is read-only to the ingress service — no write path crosses this boundary | all modules | No write call site targets the permanent library path; read-only in `sync_import.py` | `design/domain-architecture-overview.md` §1, §3 |
+| INV-S05 | The permanent library (`/nightfall/media/pictures`) is read-only to the ingress service — no write path crosses this boundary | all modules | No write call site targets the permanent library path; `hash-import` reads `.hashes.v2` files but never writes to the permanent library | `design/domain-architecture-overview.md` §1, §3 |
 | INV-S06 | HDD writes occur only on queue transitions (`pending/`, `accepted/`, `rejected/`) — all pre-transition work (staging, hashing, registry) uses SSD | `domain/storage.py`, `domain/registry.py` | Staging directory is on `ssdpool/photo-ingress`; HDD is accessed only for final queue moves | `design/domain-architecture-overview.md` §3 ("Minimize unnecessary I/O") |
 | INV-S07 | Cross-pool moves (SSD staging → HDD queue) use copy-verify-unlink when `staging_on_same_pool = false` — rename is used only when both ends are on the same pool | `domain/storage.py` | `staging_on_same_pool` config flag gates the move strategy; cross-pool copies are verified by content hash before unlink | `design/domain-architecture-overview.md` §7 ("Cross-pool atomic move") |
 
@@ -103,6 +104,33 @@ enforcement mechanism, and a traceable source citation.
 
 ---
 
+---
+
+## Hash Import Invariants
+
+These invariants govern the `hash-import` command (Issue #65). They define strict
+boundary separation between offline hash import and all ingest/audit/lifecycle
+subsystems. In case of conflict with other design statements, these invariants
+take precedence.
+
+| ID | Invariant | Scope | Enforcement | Source |
+|---|---|---|---|---|
+| INV-HI01 | Imported hashes MUST NOT create staging items | `hash_import` module | No staging write path exists in hash-import code; only `external_hash_cache` INSERT | Issue #65 invariant 1 |
+| INV-HI02 | Imported hashes MUST NOT create audit events of any kind | `hash_import` module | No `audit_log` write call in the hash-import code path | Issue #65 invariant 2 |
+| INV-HI03 | Imported hashes MUST NOT enter or modify the ingest lifecycle (pending/accepted/rejected) | `hash_import` module | No `files` table write in hash-import; imported entries have no `files.status` | Issue #65 invariant 3 |
+| INV-HI04 | Imported hashes MUST NOT participate in live-photo-pair detection | `hash_import` module | Hash-import does not invoke pairing logic; no EXIF or stem analysis | Issue #65 invariant 4 |
+| INV-HI05 | Imported hashes MUST NOT trigger thumbnail generation or any media pipeline | `hash_import` module | No thumbnail or media processing calls in hash-import | Issue #65 invariant 5 |
+| INV-HI06 | Imported hashes MUST be fully idempotent — duplicates, overlaps, and re-imports produce no errors or state changes | `hash_import` module | `INSERT OR IGNORE` semantics; duplicate hashes silently skipped | Issue #65 invariant 6 |
+| INV-HI07 | Imported hashes MUST NOT overwrite or mutate existing registry entries | `hash_import` module | `INSERT OR IGNORE` with no `ON CONFLICT DO UPDATE` for existing entries | Issue #65 invariant 7 |
+| INV-HI08 | Imported hashes MUST NOT modify or influence the OneDrive delta token or ingest cursor | `hash_import` module | No cursor or delta-token read/write in hash-import; operates on `external_hash_cache` only | Issue #65 invariant 8 |
+| INV-HI09 | Imported hashes MUST NOT appear in any UI surfaces that represent ingest state (Dashboard, Staging, Audit Preview) | `hash_import` module, API layer | API queries filter on `files` table or `audit_log`; imported entries live in `external_hash_cache` which is not surfaced in UI | Issue #65 invariant 9 |
+| INV-HI10 | Imported hashes MUST NOT infer or assign account ownership — account MUST remain null | `hash_import` module | No `account_name` field set; `external_hash_cache` entries have no account association | Issue #65 invariant 10 |
+| INV-HI11 | Imported hashes MUST NOT participate in EXIF-based heuristics (timestamps, orientation, pairing, clustering) | `hash_import` module | No EXIF processing in hash-import; SHA-256 is the only data extracted from `.hashes.v2` | Issue #65 invariant 11 |
+| INV-HI12 | Imported hashes MUST NOT be eligible for reject/purge operations or any file-based lifecycle actions | `hash_import` module | reject/purge CLI commands operate on `files.status`; imported entries have no `files` row | Issue #65 invariant 12 |
+
+---
+
 *For the design constraints that these invariants are derived from, see [domain/constraints.md](../domain/constraints.md).*  
 *For the full registry schema that enforces structural invariants, see [specs/registry.md](../specs/registry.md).*  
-*For the lifecycle journal behaviour, see [architecture/lifecycle.md](lifecycle.md).*
+*For the lifecycle journal behaviour, see [architecture/lifecycle.md](lifecycle.md).*  
+*For the hash-import CLI specification, see [cli-config-specification.md](../cli-config-specification.md) §3.*

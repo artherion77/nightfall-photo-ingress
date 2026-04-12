@@ -73,6 +73,7 @@ iOS Camera Roll
 - **HDD isolation**: Staging, hashing, and registry all operate on SSD. HDD is only written when a new file first moves to `pending/`, or on explicit accept/reject/purge transitions.
 - **Delta cursor discipline**: Cursor is advanced only after all page-level side effects are durable. Interrupted runs resume safely from last committed cursor.
 - **Registry as system of record**: SHA-256 identity is the authoritative content key. File paths are advisory only (`current_path`).
+- **Hash-import offline path**: The `hash-import` CLI command (Issue #65) reads `.hashes.v2` files from the permanent library and seeds the `external_hash_cache` table with authoritative SHA-256 hashes. This path is entirely separate from the ingest pipeline — it does not download files, does not create `files` rows, does not generate audit events, and does not interact with staging, queue boundaries, or delta cursors. Imported hashes are used solely for dedupe index lookups during ingest pre-download filtering.
 
 ---
 

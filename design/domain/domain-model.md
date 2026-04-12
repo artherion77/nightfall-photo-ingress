@@ -38,7 +38,7 @@ library and has no API or event relationship to the ingest pipeline.
 | **Acceptance record** | `accepted_records` | `domain/registry.py` | Written once per explicit `accept` invocation. Never modified or deleted. Preserves acceptance history even after the operator relocates the file away from `accepted_path`. |
 | **Metadata pre-filter entry** | `metadata_index` | `domain/registry.py` | Written on first successful download. Key: `(account_name, onedrive_id)`. Used on subsequent polls to skip re-downloading an OneDrive item whose `size_bytes` and `modified_time` are unchanged. |
 | **File provenance** | `file_origins` | `domain/registry.py` | Records `(account, onedrive_id) → sha256` for every item ever encountered. Appended on first encounter; never deleted. Key: `(account, onedrive_id)`. |
-| **Advisory hash cache** | `external_hash_cache` | `domain/registry.py` | Stores SHA1 hashes imported from `.hashes.sha1` files in the permanent library via the `sync-import` CLI. `verified_sha256` is populated after first-download SHA-256 confirmation. Used for pre-filtering only; SHA1 is never a canonical identity. |
+| **Hash import cache** | `external_hash_cache` | `domain/registry.py` | Stores hashes imported from the permanent library. The `hash-import` CLI command (Issue #65) imports authoritative SHA-256 hashes from `.hashes.v2` files with `imported = true` and `source = "hash_import"`. Legacy `sync-import` imported advisory SHA-1 from `.hashes.sha1` files (deprecated). Imported entries are used for dedupe index lookups during ingest pre-download filtering only; they do not create `files` rows, audit events, or lifecycle state. See [architecture/invariants.md](../architecture/invariants.md) §Hash Import Invariants. |
 | **Audit event** | `audit_log` | `domain/registry.py` | Append-only; one row per state transition or pipeline event. Protected by SQL triggers against update and delete. Never cleared. |
 | **Live Photo pair** | `live_photo_pairs` | `domain/registry.py` | Links photo component (`photo_sha256`) and video component (`video_sha256`) of an Apple Live Photo by shared filename stem and capture-time heuristic. Status mirrors the component files. |
 | **Ingest terminal event** | `ingest_terminal_audit` | `domain/registry.py` | Optional batch-run audit table; one row per ingest decision keyed by `batch_run_id`. Produced when configured. |
@@ -57,7 +57,7 @@ adapter; adapters do not depend on each other. CLI modules are thin orchestrator
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  cli.py · reject.py · sync_import.py · status.py               │
+│  cli.py · reject.py · hash_import.py · sync_import.py (deprecated) · status.py               │
 │  ─────────────────────────────────────────────────────────────  │
 │  Thin orchestrators only — no business logic                    │
 └───────────────────────┬─────────────────────────────────────────┘
@@ -181,8 +181,11 @@ erDiagram
   represent different views of the same external identifier. `metadata_index` is a
   download-skip optimisation; `file_origins` is a permanent provenance record.
 - `external_hash_cache.verified_sha256` is `NULL` until one server-side SHA-256
-  verification is performed; once populated, advisory SHA1 matches can gate future
-  metadata-only skips.
+  verification is performed (legacy `sync-import` model); for `hash-import` entries,
+  the SHA-256 is authoritative at import time and `verified_sha256` is not required.
+- The `hash-import` command (Issue #65) writes to `external_hash_cache` only and does
+  not create `files` rows. Imported entries have no `files.status`, no lifecycle, and
+  are not visible in audit or UI surfaces.
 - The `live_photo_pairs.status` field mirrors the component file status but is not
   authoritative. Component `files` rows are always the status source of truth.
 
