@@ -4,7 +4,7 @@ Status: Active
 Date: 2026-04-11
 Owner: Systems Engineering
 
-## 1. Chunked Execution Plan (C1–C8)
+## 1. Chunked Execution Plan (C1–C9)
 
 ### C1 — Reverse Proxy Baseline (Caddy)
 
@@ -296,10 +296,10 @@ Validation evidence:
 4. E2E trust path aligned to staging internal CA bundle for strict TLS verification.
 5. Drift-free CA synchronization enforced via `stagingctl export-ca`, exporting `/etc/caddy/tls/ca.pem` to `tests/ca/staging-ca.pem` for all E2E and Playwright trust.
 
-### C8 — KPI Threshold Configuration + Read-Path Resilience
+### C8 — KPI Threshold Configuration
 
 Goal:
-- Deliver KPI threshold API configuration workflow and read-path retry/backoff resilience sign-off.
+- Deliver KPI threshold API configuration workflow.
 
 Status: **COMPLETE (KPI Threshold Workflow)**
 
@@ -317,7 +317,7 @@ Implemented components:
 
 Deliverables:
 - ✅ KPI threshold configuration workflow (fully implemented and tested)
-- ⏳ Read-path retry/backoff validation record (deferred to Phase 2.1 per team guidance)
+- ✅ C8 scope complete
 
 Validation steps completed:
 1. ✅ Threshold management behavior validated against mandatory scope
@@ -339,7 +339,36 @@ Validation steps completed:
 
 Stop-gates:
 1. ✅ Threshold config implementation complete and tested
-2. ⏳ Retry/backoff validation deferred to Phase 2.1 (scope: read-path resilience only; C8 KPI workflow complete)
+2. ✅ C8 closure criteria satisfied
+
+### C9 — Read-Path Resilience (Retry/Backoff Validation)
+
+Goal:
+- Validate and document deterministic retry/backoff behavior for read-only GET flows.
+
+Status: **COMPLETE (Validation-only)**
+
+Scope guardrails:
+1. Validation-only chunk.
+2. No API route/schema changes.
+3. No UI feature additions.
+4. No infra/stagingctl/govctl changes.
+
+Validation evidence:
+1. Backend read-path resilience validation tests added in `../../tests/integration/test_c9_read_path_resilience.py`.
+2. WebUI E2E resilience validation tests added in `../../webui/tests/e2e/api-retry-read-path.spec.ts`.
+3. Architecture state-machine and invariants documented in `../../design/web/architecture.md` section `6.5 C9 Read-Path Retry/Backoff State Machine`.
+4. API retry/backoff semantics documented in `../../design/web/api.md` section `C9 Read-Path Retry/Backoff Semantics (GET)`.
+5. C9 decision record documented in `../../design/web/design-decisions.md`.
+
+Validated policy outcomes:
+1. GET requests remain idempotent and safe to retry.
+2. `503` and network errors are retry-eligible.
+3. `429` honors `Retry-After` semantics.
+4. Non-retryable `4xx` responses do not retry.
+5. Retry loops are bounded (no infinite retry).
+6. UI exits loading state on retry exhaustion and surfaces deterministic error state.
+7. UI prevents duplicate overlapping read-page loads while one request is in-flight.
 
 ## 2. Cross-Chunk Invariants
 

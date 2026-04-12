@@ -4,6 +4,37 @@ Status: Active
 
 ---
 
+## Phase 2 Addendum: C9 Read-Path Retry/Backoff Semantics (GET)
+
+### C9.1 Scope
+
+Automatic retry applies only to read-only requests (`GET`, `HEAD`).
+Mutating requests (`POST`, `PUT`, `PATCH`, `DELETE`) are not automatically retried.
+
+### C9.2 Retry Eligibility Matrix
+
+| Response/Failure | Retry behaviour |
+|---|---|
+| Network error (no HTTP response) | Retry with bounded backoff |
+| `503 Service Unavailable` | Retry with bounded backoff |
+| `429 Too Many Requests` | Retry honoring `Retry-After` when present |
+| `4xx` except `429` | No retry |
+| Retry-eligible failure after max attempts | Stop retrying, surface error |
+
+### C9.3 Bounds and Safety
+
+1. Retry loop is bounded (`maxRetries = 3`, total attempts = 4).
+2. Backoff schedule uses exponential delays with jitter and cannot run indefinitely.
+3. Request orchestration must not issue overlapping duplicate GET loads for the same in-flight view transition.
+4. Retry exhaustion must exit loading state and transition to a user-visible error state.
+
+### C9.4 Validation Evidence
+
+1. Backend validation: `tests/integration/test_c9_read_path_resilience.py`.
+2. WebUI E2E validation: `webui/tests/e2e/api-retry-read-path.spec.ts`.
+
+---
+
 ## Phase 2 Addendum: C8 KPI Threshold Configuration (New in Phase 2)
 
 ### C8 Settings Endpoints

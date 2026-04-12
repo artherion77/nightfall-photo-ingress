@@ -10,5 +10,9 @@
     "sourceMap": true,
     "strict": true,
     "moduleResolution": "bundler"
-  }
+  },
+  "exclude": [
+    "tests/e2e/**",
+    "tests/unit/**"
+  ]
 }

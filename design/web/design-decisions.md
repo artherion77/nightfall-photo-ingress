@@ -3,6 +3,29 @@
 Status: Active
 
 
+## Phase 2 Decision Addendum: C9 Read-Path Resilience (Retry/Backoff Validation)
+
+Date: 2026-04-12
+Owner: Systems Engineering
+
+Decision:
+1. C9 is validation-only and does not change API routes, schemas, UI features, or infrastructure.
+2. Read-path resilience is verified via automated tests across backend read clients and WebUI GET flows.
+3. Retry behavior remains bounded and deterministic for GET/HEAD requests only.
+4. Non-retryable `4xx` behavior remains fail-fast; retries are limited to transient conditions.
+
+Rationale:
+1. Retry/backoff policy already exists and requires policy-conformance evidence before sign-off.
+2. Validation-only execution minimizes risk to Phase 1.5 interaction behavior.
+3. Deterministic bounded retries prevent hidden infinite loops and duplicate request storms.
+
+Implementation guardrails:
+1. No API surface change under `/api/v1`.
+2. No mutation retry automation introduced.
+3. No stagingctl/govctl change required for C9.
+4. Evidence must include backend validation tests and WebUI E2E validation tests.
+
+
 ## Phase 2 Decision Addendum: C8 KPI Threshold Configuration Workflow
 
 Date: 2026-04-12

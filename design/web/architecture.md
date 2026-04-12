@@ -1810,6 +1810,32 @@ on the error banner. The same idempotency key is reused on a manual retry (safe 
 the server replays the prior result on a duplicate key). No automatic retry is performed
 on mutations.
 
+### 6.5 C9 Read-Path Retry/Backoff State Machine
+
+Read-only flows (GET/HEAD) use a bounded retry state machine shared by API client wrappers
+and consumed by route/store loaders.
+
+State machine:
+1. `idle` -> request starts -> `loading`
+2. `loading` + success (`2xx`) -> `success`
+3. `loading` + retry-eligible failure (`429`, `503`, network error) and attempt < max -> `backoff_wait`
+4. `backoff_wait` + timer elapsed -> `loading` (next attempt)
+5. `loading` + non-retryable failure (`4xx` except `429`) -> `terminal_error`
+6. `loading` + retry-eligible failure at max attempts -> `terminal_error`
+7. `terminal_error` -> explicit operator action (refresh/navigation) -> `idle`
+
+Policy invariants validated in C9:
+1. Retries are bounded (`maxRetries = 3`, total attempts = 4).
+2. GET/HEAD only; mutating methods remain fail-fast.
+3. `429` honors `Retry-After` when present.
+4. Non-retryable `4xx` responses do not retry.
+5. No overlapping duplicate page-load requests are allowed while a load is in-flight.
+6. Retry exhaustion exits loading state and surfaces a stable error state.
+
+C9 validation evidence:
+1. Backend resilience validation tests in `tests/integration/test_c9_read_path_resilience.py`.
+2. WebUI E2E retry/backoff validation in `webui/tests/e2e/api-retry-read-path.spec.ts`.
+
 ---
 
 ## 7. SSR as Optional Future Mode

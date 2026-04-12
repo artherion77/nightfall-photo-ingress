@@ -1,4 +1,4 @@
-"""Svelte store for KPI threshold settings state management."""
+// Svelte store for KPI threshold settings state management.
 
 import { writable } from 'svelte/store';
 

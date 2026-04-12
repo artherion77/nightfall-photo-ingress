@@ -162,7 +162,15 @@ def app_config(registry_path: Path, api_token: str) -> AppConfig:
             thumbnail_cache_path=registry_path.parent / "thumbnail-cache",
         ),
         logging=LoggingConfig(log_level="INFO", console_format="json"),
-        web=WebConfig(api_token=api_token, bind_host="127.0.0.1", bind_port=8000),
+        web=WebConfig(
+            api_token=api_token,
+            bind_host="127.0.0.1",
+            bind_port=8000,
+            cors_allowed_origins=(
+                "https://staging-photo-ingress.home.arpa",
+                "https://npi.pohl-family.org",
+            ),
+        ),
         accounts=(),
     )
 
