@@ -126,7 +126,8 @@ nightfall-photo-ingress hash-import /nightfall/media/pictures \
 ```
 
 Run once after initial deployment against an existing library, and after bulk additions
-to keep the dedupe index current. The command never writes to the permanent library.
+to keep the dedupe index current. If `.hashes.v2` is missing/invalid/stale, the
+command recomputes hash data ephemerally before import.
 
 Options:
 
@@ -140,8 +141,8 @@ Options:
 
 > **Note:** `hash-import` requires `.hashes.v2` files produced by
 > `nightfall-immich-rmdups.sh`. The previous `.hashes.sha1` format is not accepted.
-> Run `nightfall-immich-rmdups.sh` against the library first if `.hashes.v2` files
-> are missing.
+> `hash-import` will recompute hash rows in memory when `.hashes.v2` is missing/invalid/stale.
+> The permanent library bind mount remains read-only; hash-import does not write it.
 
 ---
 

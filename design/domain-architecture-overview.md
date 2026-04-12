@@ -152,7 +152,7 @@ nightfall/media/photo-ingress  →  /nightfall/media/photo-ingress/
    trash/                 — operator drops files here to trigger rejection flow
 
 nightfall/media/pictures  →  /nightfall/media/pictures/
-   ...                    — permanent library, read-only to ingress (used by Immich and hash-import)
+    ...                    — permanent library, read-only to ingress (used by Immich and hash-import)
 ```
 
 **ZFS datasets to create (manual pre-requisite):**
@@ -350,7 +350,9 @@ Account execution rule:
 
    - The `hash-import` CLI command imports authoritative SHA-256 hashes from `.hashes.v2` files in the permanent library into the `external_hash_cache` table.
    - It reads `.hashes.v2` files (produced by `nightfall-immich-rmdups.sh`). Only the SHA-256 column is used.
-   - The permanent library remains read-only; `hash-import` never writes to it.
+     - If `.hashes.v2` is missing, invalid, stale, or incomplete, `hash-import`
+         recomputes hash data ephemerally before import.
+     - The permanent library remains read-only; `hash-import` never writes to it.
    - Imported hashes populate the dedupe index and prevent future re-downloads of known content.
    - Hash-import does not create `files` rows, audit events, staging items, or lifecycle state.
    - Governed by 12 mandatory invariants (INV-HI01 through INV-HI12). See [architecture/invariants.md](architecture/invariants.md) §Hash Import Invariants.

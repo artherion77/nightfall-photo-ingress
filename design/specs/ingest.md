@@ -90,10 +90,13 @@ nightfall-photo-ingress hash-import /nightfall/media/pictures --stats
 Key properties:
 
 - Reads `.hashes.v2` files (produced by `nightfall-immich-rmdups.sh`) from the permanent library.
+- If `.hashes.v2` is missing, invalid, stale, or incomplete, it is recomputed
+   before import using ephemeral in-memory hash computation (same format contract
+   as `nightfall-immich-rmdups.sh`).
 - Imports only the SHA-256 column into the `external_hash_cache` table.
 - Does not create `files` rows, audit events, staging items, or lifecycle state.
 - Fully idempotent: duplicates and re-imports are silently skipped.
-- Does not write to the permanent library (read-only access).
+- Does not write to the permanent library; recompute results are transient.
 - Imported hashes prevent future re-downloads of known content during ingest.
 
 For the full hash-import specification (CLI options, input format, invariants, registry

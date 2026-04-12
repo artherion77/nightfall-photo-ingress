@@ -232,7 +232,8 @@ The hash import logic MUST:
    - has a non-empty path in column 3
 
 If any of these checks fail, the `.hashes.v2` file MUST be treated as invalid and
-skipped with a logged warning.
+MUST be recomputed before it can be used for import. If recomputation fails, the
+directory import fails.
 
 #### 3.4.3 Directory Hash Semantics
 
@@ -242,6 +243,25 @@ listing hash, the `.hashes.v2` file MUST be considered stale and MUST NOT be tru
 Stale `.hashes.v2` files MUST be recomputed before their contents are used for import.
 
 There is no "best effort" mode: partially valid `.hashes.v2` files MUST NOT be consumed.
+
+#### 3.4.5 Recompute Requirement (Mandatory)
+
+If a `.hashes.v2` file is missing, invalid, stale (`DIRECTORY_HASH` mismatch),
+partially corrupted, or missing required rows, `hash-import` MUST recompute the
+cache before using it.
+
+Recompute behavior MUST:
+
+1. Enumerate files in the directory.
+2. Compute SHA-1 and SHA-256 for each file.
+3. Build an equivalent in-memory cache representation with `CACHE_SCHEMA v2`,
+   `DIRECTORY_HASH`, and row semantics.
+4. Keep recomputed data ephemeral for the current import run only.
+
+`hash-import` MUST NOT write or rewrite `.hashes.v2` files in the permanent
+library. The permanent-library bind mount remains read-only.
+
+No `.hashes.sha1` fallback is permitted.
 
 #### 3.4.4 Import Column Usage
 
@@ -280,7 +300,8 @@ Only errors are printed.
 | Permission denied | `ERROR: insufficient permissions` |
 | Registry locked | `ERROR: registry is locked` |
 | Stop on error | Import aborts immediately |
-| Stale directory hash | `WARNING: stale .hashes.v2 in <dir>, recomputing` |
+| Stale directory hash | `INFO: stale .hashes.v2 in <dir>; recomputing cache` |
+| Recompute failed | `ERROR: failed to recompute .hashes.v2 in <dir>` |
 
 ### 3.7 Idempotency Rules
 
@@ -379,7 +400,7 @@ Location: /etc/nightfall/photo-ingress.conf (recommended)
 | SSD mountpoint | `/mnt/ssd/photo-ingress` | Staging, registry, token cache, cursors |
 | HDD dataset | `nightfall/media/photo-ingress` | Ingress queue and trash boundary |
 | HDD mountpoint | `/nightfall/media/photo-ingress` | `pending/`, `accepted/`, `rejected/`, and `trash/` |
-| Permanent library | `/nightfall/media/pictures` | Read-only from ingress perspective |
+| Permanent library | `/nightfall/media/pictures` | Read-only to ingress; `hash-import` may recompute cache data ephemerally but never writes the library |
 | Status file | `/run/nightfall-status.d/photo-ingress.json` | Health state export path |
 
 Naming policy:
@@ -654,7 +675,8 @@ The storage template supports the following variables:
 - Rejected files are moved into `rejected_path` and retained until `purge` or manual deletion.
 - The registry remains the source of truth for prior acceptance/rejection. Files moved out of queue paths remain blocked from re-download.
 - `hash-import` seeds the dedupe index from `.hashes.v2` files in the permanent library. Imported hashes prevent future re-downloads of known content. The import is offline, non-audit, and not UI-visible.
-- The permanent library (`/nightfall/media/pictures`) is read-only to the ingress service. Neither `hash-import` nor any other command writes to the permanent library.
+- `hash-import` MUST recompute cache data ephemerally when `.hashes.v2` files are missing, invalid, stale, partially corrupted, or incomplete.
+- The permanent library (`/nightfall/media/pictures`) is read-only to ingress, including `hash-import`; no command may write under this root.
 
 ---
 

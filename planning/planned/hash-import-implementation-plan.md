@@ -170,35 +170,43 @@ Scope:
   `.hashes.v2` files under the given `<path-to-root>`.
 - For each `.hashes.v2` file: parse (H2), then bulk-insert (H3).
 - Directory hash freshness: if `DIRECTORY_HASH` does not match the current
-  directory listing hash, the file is stale and MUST be skipped or recomputed
-  (per CLI spec §3.4). For the initial implementation, stale files are
-  **skipped with a warning** (recompute is deferred to a follow-up).
+  directory listing hash, the file is stale and MUST be recomputed before use
+  (per CLI spec §3.4).
+- Recompute requirement is mandatory for all invalid cache states. If a
+  `.hashes.v2` file is missing, invalid, stale, partially corrupted, or missing
+  required rows, hash-import MUST recompute the cache before using it.
+- Recompute must follow the `nightfall-immich-rmdups.sh` cache format contract:
+  enumerate files and compute SHA-1 + SHA-256 using the same directory-hash
+  algorithm semantics, but keep recompute ephemeral in memory.
 - Aggregate statistics across all directories.
-- The walker MUST NOT write to the permanent library (INV-S05).
+- The walker MUST NOT write to the permanent library. Recompute is ephemeral only.
 
 Acceptance criteria:
 1. Walker discovers all `.hashes.v2` files in a directory tree.
 2. Valid cache files are parsed and imported.
-3. Stale cache files (mismatched directory hash) are skipped with a warning.
-4. Invalid cache files are skipped with an error.
+3. Stale cache files (mismatched directory hash) are recomputed and then imported.
+4. Invalid cache files are recomputed and then imported.
 5. Aggregate statistics sum correctly across directories.
-6. No files are written to the library tree.
+6. No files are written to the library tree; recomputed rows are transient and
+  used for the current import only.
 
 STOP gates:
-1. Do not proceed if the walker writes any file to the library path.
-2. Do not proceed if stale files are silently consumed without validation.
+1. Do not proceed if stale or invalid files are consumed without recompute.
+2. Do not proceed if recompute writes any file to the permanent library.
 3. Do not proceed if directory hash computation uses a different algorithm
    than `nightfall-immich-rmdups.sh`.
 
 Validation:
-- Unit test: walker on fixture tree with 3 directories, 2 valid + 1 stale.
+- Unit test: walker on fixture tree with 3 directories, 2 valid + 1 stale;
+  stale directory cache is recomputed then imported.
 - Unit test: walker on empty directory → no errors, zero stats.
-- Unit test: walker on directory with no `.hashes.v2` → zero stats.
+- Unit test: walker on directory with no `.hashes.v2` → ephemeral recompute is
+  performed, then imported, with no filesystem writes.
 - Integration test: walker on temp tree with known content → correct stats.
 
 Cross-references:
 - `design/cli-config-specification.md` §3.4.3 (directory hash semantics)
-- `design/architecture/storage-topology.md` (permanent library read-only)
+- `design/architecture/storage-topology.md` (permanent library read-only boundary)
 - `design/architecture/invariants.md` INV-S05
 
 Status: Not started
