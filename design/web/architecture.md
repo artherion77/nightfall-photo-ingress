@@ -2348,6 +2348,157 @@ Phase 2 Deployment Dependencies
 
 ---
 
+## 17. Phase 2 C8: KPI Threshold Configuration Workflow
+
+### 17.1 Overview
+
+C8 delivers the operator-facing workflow to view and update KPI (key performance indicator) thresholds for system alerting. Thresholds control when dashboard metrics transition from healthy (green) to warning (yellow) to error (red).
+
+**Scope:**
+- KPI thresholds for pending queue depth and disk usage
+- Dedicated `/settings/kpi` web UI page
+- API endpoints under `/api/v1/settings/kpi-thresholds` (GET, PUT, PATCH, DELETE)
+- Dedicated Svelte store for threshold state management
+- E2E tests validating the full workflow
+
+### 17.2 API Design (C5-compliant, additive)
+
+**Endpoints:**
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/api/v1/settings/kpi-thresholds` | Retrieve current thresholds |
+| PUT | `/api/v1/settings/kpi-thresholds` | Replace all thresholds (full validation) |
+| PATCH | `/api/v1/settings/kpi-thresholds` | Update selected thresholds (partial) |
+| DELETE | `/api/v1/settings/kpi-thresholds` | Reset to factory defaults |
+
+**Schema:**
+
+```typescript
+interface KPIThresholds {
+  pending_warning: number;        // 1–9999 items; error if > pending_error
+  pending_error: number;          // 1–9999 items; error if ≤ pending_warning
+  disk_warning_percent: number;   // 1–99%; error if > disk_error_percent
+  disk_error_percent: number;     // 1–99%; error if ≤ disk_warning_percent
+}
+
+interface KPIThresholdsResponse {
+  thresholds: KPIThresholds;
+  updated_at: string;             // ISO-8601 UTC timestamp
+}
+```
+
+**Validation:**
+- pending_error > pending_warning (enforced by schema)
+- disk_error_percent > disk_warning_percent (enforced by schema)
+- Validation errors return 422 with field-level details
+- All responses include `updated_at` for optimistic UI updates
+
+### 17.3 WebUI Implementation
+
+**Route:** `/settings/kpi` (new)
+
+**Page component:** `webui/src/routes/settings/kpi/+page.svelte`
+
+**Structure:**
+
+1. **Form sections:**
+   - Pending Queue Thresholds (warning/error inputs)
+   - Disk Usage Thresholds (warning/error inputs)
+
+2. **Inline validation:**
+   - Error threshold > warning threshold checked before Save button active
+   - Per-field validation messages visible in real time
+   - All validation rules from schema enforced on client side
+
+3. **State machine:**
+   ```
+   idle → saving → success | error
+   loading (initial load)
+   ```
+
+4. **Actions:**
+   - **Save:** PUT thresholds (full replace semantics)
+   - **Cancel:** Reload from store (discard unsaved changes)
+   - **Reset:** DELETE thresholds (confirm dialog); confirms with user
+
+5. **User feedback:**
+   - Loading spinner during initial fetch
+   - "Saving..." label during PUT/DELETE
+   - Success banner with timestamp after save/reset
+   - Error banner with specific validation messages on failure
+   - Save button disabled if validation errors or API call in progress
+
+### 17.4 State Management (Dedicated Store)
+
+**Store file:** `webui/src/lib/stores/kpiThresholds.svelte.js`
+
+**Store shape:**
+
+```typescript
+{
+  thresholds: {
+    pending_warning: number,
+    pending_error: number,
+    disk_warning_percent: number,
+    disk_error_percent: number
+  },
+  loading: boolean,        // true while initial fetch in flight
+  saving: boolean,         // true while PUT/DELETE/PATCH in flight
+  error: string | null,    // validation or network error message
+  success: boolean,        // true after successful save; auto-clears after 5s
+  updated_at: string | null
+}
+```
+
+**Store methods:**
+
+- `load()` — fetch initial thresholds; sets loading=true, updates thresholds/updated_at
+- `update(thresholds)` — PUT new thresholds; validates before send
+- `reset()` — DELETE to reset; confirms with user
+- `clearError()` — dismiss error message
+- `clearSuccess()` — dismiss success message
+
+**Lifecycle:**
+- Mounted component calls `store.load()`
+- Any error during load sets `loading=false, error=message`
+- Changes to form trigger dirty flag (not auto-saved)
+- Save/Reset API calls show loading state, success/error banner
+
+### 17.5 Error Handling
+
+**Client-side validation errors** (422):
+- Returned by server with field-level messages
+- Displayed below corresponding input field
+- Save button disabled while validation errors exist
+- User can fix and retry
+
+**Network errors** (timeout, 500, etc.):
+- Caught and displayed in error banner
+- User can retry by clicking Save again
+- Loading/saving state correctly restores
+
+**Success handling:**
+- Green banner displays with timestamp
+- Auto-clears after 5 seconds
+- Allows rapid multiple saves without UI clutter
+
+### 17.6 Phase 1.5 Interaction Invariants
+
+**Preserved:**
+- `/api/v1/` endpoint contract unchanged (additive only)
+- Config response still includes `kpi_thresholds` field (was present in Phase 1)
+- Dashboard KPI cards still display current thresholds (no breaking changes)
+- Threshold changes take effect on next KPI card render (no page reload required)
+- Static API token authentication still works (no migration required)
+
+**New in C8:**
+- Dedicated read-write settings endpoints for thresholds
+- Svelte UI route for operator threshold control
+- Validation happens both client-side (inline) and server-side (422 responses)
+
+---
+
 ## 18. Phase 1 → Phase 2 Compatibility Guarantees
 
 Phase 2 must not break any Phase 1 operator workflow. The following constraints apply:

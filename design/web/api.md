@@ -2,6 +2,182 @@
 
 Status: Active
 
+---
+
+## Phase 2 Addendum: C8 KPI Threshold Configuration (New in Phase 2)
+
+### C8 Settings Endpoints
+
+**Path family:** `/api/v1/settings/*`
+
+KPI threshold configuration provides operator-facing APIs for viewing and updating system metric thresholds. This is a Phase 2 additive extension with no breaking changes to Phase 1 APIs.
+
+#### 4.X GET /api/v1/settings/kpi-thresholds
+
+**Auth:** Required
+
+**Description:** Retrieve current KPI thresholds with last-update timestamp.
+
+**Response schema:**
+
+```typescript
+interface KPIThresholdsResponse {
+  thresholds: {
+    pending_warning: number;          // Warning threshold for pending queue items
+    pending_error: number;            // Error threshold for pending queue items
+    disk_warning_percent: number;     // Warning threshold for disk usage %
+    disk_error_percent: number;       // Error threshold for disk usage %
+  };
+  updated_at: string;                // ISO-8601 UTC timestamp of last update
+}
+```
+
+**Validation constraints:**
+
+- pending_error > pending_warning
+- disk_error_percent > disk_warning_percent
+- All numeric values within type bounds (1-9999 for pending, 1-99 for disk %)
+
+**Status codes:**
+
+- `200`: Thresholds retrieved.
+- `401`: Unauthorized (missing or invalid token).
+
+**Example:**
+
+```bash
+curl -H "Authorization: Bearer test-token-12345" \
+  http://localhost:8000/api/v1/settings/kpi-thresholds
+```
+
+```json
+{
+  "thresholds": {
+    "pending_warning": 100,
+    "pending_error": 500,
+    "disk_warning_percent": 80,
+    "disk_error_percent": 95
+  },
+  "updated_at": "2026-04-12T08:30:00Z"
+}
+```
+
+---
+
+#### 4.Y PUT /api/v1/settings/kpi-thresholds
+
+**Auth:** Required
+
+**Description:** Update KPI thresholds with full replacement semantics.
+
+**Request body:** KPIThresholds (JSON)
+
+**Response schema:** KPIThresholdsResponse
+
+**Validation:**
+
+- pending_error must be > pending_warning
+- disk_error_percent must be > disk_warning_percent
+- All values must be within bounds
+
+**Status codes:**
+
+- `200`: Thresholds updated successfully.
+- `422`: Validation failed (field-level errors in response).
+- `401`: Unauthorized.
+
+**Example:**
+
+```bash
+curl -X PUT -H "Authorization: Bearer test-token-12345" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "pending_warning": 150,
+    "pending_error": 600,
+    "disk_warning_percent": 75,
+    "disk_error_percent": 90
+  }' \
+  http://localhost:8000/api/v1/settings/kpi-thresholds
+```
+
+Response (200):
+
+```json
+{
+  "thresholds": {
+    "pending_warning": 150,
+    "pending_error": 600,
+    "disk_warning_percent": 75,
+    "disk_error_percent": 90
+  },
+  "updated_at": "2026-04-12T09:15:00Z"
+}
+```
+
+---
+
+#### 4.Z PATCH /api/v1/settings/kpi-thresholds
+
+**Auth:** Required
+
+**Description:** Partially update KPI thresholds (PATCH semantics).
+
+**Request body:** Partial KPIThresholds (any subset of fields accepted)
+
+**Response schema:** KPIThresholdsResponse (returns all thresholds)
+
+**Behavior:** Processes validation against the merged state (provided fields + current values for omitted fields).
+
+**Status codes:** Same as PUT.
+
+**Example:**
+
+```bash
+curl -X PATCH -H "Authorization: Bearer test-token-12345" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "pending_warning": 120
+  }' \
+  http://localhost:8000/api/v1/settings/kpi-thresholds
+```
+
+---
+
+#### 4.AA DELETE /api/v1/settings/kpi-thresholds
+
+**Auth:** Required
+
+**Description:** Reset KPI thresholds to factory defaults.
+
+**Response schema:** KPIThresholdsResponse (returns default thresholds)
+
+**Status codes:**
+
+- `200`: Thresholds reset.
+- `401`: Unauthorized.
+
+**Example:**
+
+```bash
+curl -X DELETE -H "Authorization: Bearer test-token-12345" \
+  http://localhost:8000/api/v1/settings/kpi-thresholds
+```
+
+Response (200):
+
+```json
+{
+  "thresholds": {
+    "pending_warning": 100,
+    "pending_error": 500,
+    "disk_warning_percent": 80,
+    "disk_error_percent": 95
+  },
+  "updated_at": "2026-04-12T09:20:00Z"
+}
+```
+
+---
 
 ## Phase 2 Addendum: C5 API Versioning Policy Enforcement
 

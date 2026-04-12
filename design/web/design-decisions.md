@@ -3,7 +3,100 @@
 Status: Active
 
 
+## Phase 2 Decision Addendum: C8 KPI Threshold Configuration Workflow
+
+Date: 2026-04-12
+Owner: Systems Engineering
+
+Decision:
+1. KPI threshold configuration is delivered as a dedicated `/settings/kpi` WebUI page backed by new `/api/v1/settings/kpi-thresholds` API endpoints.
+2. All threshold configuration logic (validation, persistence, updates) is backend-enforced.
+3. Client-side form validation mirrors server-side validation rules for inline UX feedback.
+4. Thresholds are managed via PUT (full replace) and PATCH (partial update) semantics with DELETE to reset.
+
+Rationale:
+1. C8 requires operator control over KPI alert thresholds without configuration file edits and API restarts.
+2. Backend validation gates all writes and enforces threshold ordering (warning < error) consistently.
+3. Client-side mirroring enables responsive inline form feedback without round-trips.
+4. Dedicated store isolates threshold state from global config, preventing unintended side effects on other pages.
+
+Implementation guardrails:
+1. `/api/v1/settings/kpi-thresholds` is additive (no breaking changes to Phase 1 `/api/v1/config/effective`).
+2. GET returns current thresholds; PUT/PATCH update; DELETE resets to factory defaults.
+3. All write operations return updated state with `updated_at` timestamp for optimistic UI.
+4. Validation errors (422) include field-level messages for inline form error display.
+5. Store provides `load()`, `update()`, and `reset()` methods; page handles form lifecycle.
+
 ## Phase 2 Decision Addendum: C5 API Versioning Posture
+
+Date: 2026-04-11
+Owner: Systems Engineering
+
+Decision:
+1. `/api/v1` is the stable Phase 2 operator API surface.
+2. Phase 2 API changes must be additive by default.
+3. Any breaking or deprecated change requires explicit classification, rationale, and transition documentation before merge.
+4. No `/api/v2` introduction is allowed during current Phase 2 scope.
+
+Rationale:
+1. Phase 2 requires controlled evolution without regressions for existing dashboard/staging/audit/settings flows.
+2. Explicit additive-vs-breaking classification prevents uncontrolled schema and path drift.
+3. LAN-only deployment still benefits from deterministic compatibility and rollback-safe operator behavior.
+
+Implementation guardrails:
+1. Versioning rules are defined in `design/web/api.md` under the C5 addendum.
+2. Every API change must be reviewed against `design/infra/api-versioning-checklist.md`.
+3. Integration tests must continue to assert presence of canonical `/api/v1` paths.
+
+## Phase 2 Decision Addendum: C6 Dashboard Filter Sidebar
+
+Date: 2026-04-11
+Owner: Systems Engineering
+
+Decision:
+1. Dashboard file-type filtering is implemented client-side against already-loaded dashboard staging data.
+2. Filter state is session-local and non-persistent.
+3. Multiple file-type filters can be active simultaneously.
+4. Filter option accents are derived from dashboard filter design tokens.
+
+Rationale:
+1. C6 requires improved operator focus without introducing API or backend scope.
+2. Client-side filtering avoids server-coupling and preserves existing `/api/v1/staging` contract.
+3. Session-local state aligns with Phase 1.5 interaction invariants and avoids global side effects.
+
+Guardrails:
+1. No backend endpoint changes for C6.
+2. No server-side filtering logic.
+3. Existing dashboard data loading behavior remains unchanged.
+
+## Phase 2 Decision Addendum: C7 Audit Timeline Infinite Scroll
+
+Date: 2026-04-12
+Owner: Systems Engineering
+
+Decision:
+1. Audit timeline pagination interaction migrates from explicit `LoadMoreButton` to observer-driven infinite scroll.
+2. Migration is strictly frontend-only; `/api/v1/audit-log` contract remains unchanged.
+3. A dedicated paging store owns cursor, current page index, accumulated entries, loading state, and terminal state.
+4. Terminal state must always be explicit and visible (`End of timeline`).
+
+Rationale:
+1. C7 is mandatory Phase 2 UX scope while preserving existing pagination semantics.
+2. Dedicated route-local paging state reduces race conditions from overlapping scroll triggers.
+3. Explicit terminal marker preserves operator clarity and avoids ambiguous list completion.
+
+Guardrails:
+1. Page size remains 50 for audit timeline loads.
+2. Ordering remains backend-defined (`id DESC`) with append-only client accumulation.
+3. In-flight guard is mandatory; overlapping next-page requests are prohibited.
+4. Route navigation reset is mandatory to preserve Phase 1.5 interaction invariants.
+
+
+This document consolidates invariants, decisions, and rationale documents for the web control plane.
+
+---
+
+## Source Document: web-control-plane-techstack-decision.md
 
 Date: 2026-04-11
 Owner: Systems Engineering
