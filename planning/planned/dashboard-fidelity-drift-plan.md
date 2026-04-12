@@ -126,7 +126,9 @@ Evidence:
   ("JPG" with count).
 - Source: FilterSidebar.svelte, filterStore.ts (deriveDashboardFileTypeOptions
   groups by raw extension).
-- Severity: MEDIUM
+- Verdict: ACKNOWLEDGED — live button-toggle layout is better UX than mock
+  checkboxes. Keep current toggle pattern; only add missing account dimension.
+- Severity: LOW (cosmetic heading rename only)
 
 #### D-F: Poll runtime chart — bar sparkline vs line chart
 - Mock: "Poll Runtimes (Last 7 Days)" with full SVG/Canvas line chart, Y-axis
@@ -207,19 +209,18 @@ Cross-references:
 - design/ui-mocks/Photo-ingress dashboard with KPIs and audit.png (KPI section)
 
 
-### D2 — Filter Sidebar Redesign
+### D2 — Filter Sidebar: Account Dimension
 
 Scope:
-- Rename sidebar heading: "File Type Filters" -> "Filters" (D-E)
-- Replace per-extension button toggles with checkbox-based conceptual categories
-  matching mock: "All Files", "Images", "Videos", "Documents" (D-E)
-- "All Files" acts as select-all/deselect-all toggle
-- Refactor filterStore.ts to map conceptual categories to extension sets
-  (IMAGE_EXTENSIONS, VIDEO_EXTENSIONS already defined; add DOCUMENT_EXTENSIONS)
+- Rename sidebar heading: "File Type Filters" -> "Filters" (D-E, heading only)
+- Keep existing button-toggle layout for file type filters — live UX is
+  superior to the mock checkbox pattern (operator review, 2026-04-12)
 - Add "account" filter dimension (operator #2):
   - Derive unique accounts from StagingPage items
-  - Add account filter section below file type section
+  - Add account filter section below file type section, using the same
+    button-toggle pattern for visual consistency
   - Filter client-side by item.account
+  - Show account name + item count per account, matching existing toggle style
 
 Files changed:
 - webui/src/lib/stores/filterStore.ts
@@ -228,22 +229,23 @@ Files changed:
 
 Acceptance criteria:
 - Sidebar shows "Filters" heading
-- Four checkbox rows: All Files (checked by default), Images, Videos, Documents
-- Account filter section appears when multiple accounts exist
-- Selecting "Images" filters to IMAGE_EXTENSIONS set; same for Videos, Documents
-- "All Files" unchecked clears all; checked selects all
+- File type toggles remain as-is (per-extension buttons with accent swatches)
+- Account filter section appears below file type section when items have
+  non-null accounts
+- Selecting an account toggle filters dashboard to that account's items
+- Multiple accounts can be active simultaneously (inclusive OR)
 - Existing filterStore unit tests updated or extended
 - TypeScript check passes
 
 Validation:
 - govctl run web.test.unit --json
-- Visual: sidebar matches mock checkboxes
+- Visual: sidebar retains current toggle pattern with new account section
 
 Stop-gate:
 - Do not change backend API surface. All filtering remains client-side.
+- Do not replace button toggles with checkboxes.
 
 Cross-references:
-- design/ui-mocks/Photo-ingress dashboard with KPIs and audit.png (Filters panel)
 - api/schemas/staging.py (StagingItem.account field)
 
 
@@ -497,7 +499,7 @@ The following are explicitly out of scope for this correction plan:
 | Chunk | Title | Operator Finding | Additional Drift | Severity | Backend |
 |-------|-------|-----------------|-----------------|----------|---------|
 | D1 | Chrome & KPI Normalization | #1 (Loaded Files) | D-A, D-B, D-H | HIGH | No |
-| D2 | Filter Sidebar Redesign | #2 (account filter) | D-E | MEDIUM | No |
+| D2 | Filter Sidebar: Account Dimension | #2 (account filter) | D-E (heading only) | MEDIUM | No |
 | D3 | Health Bar Overhaul | — | D-C, D-D | MEDIUM | No |
 | D4 | Audit Event Fidelity | #3 (account), #4 (IP) | D-G, D-I | HIGH | Yes |
 | D5 | Poll Runtime Chart | — | D-F | HIGH | Yes |
