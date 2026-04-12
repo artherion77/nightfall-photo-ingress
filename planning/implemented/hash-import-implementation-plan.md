@@ -1,7 +1,8 @@
 # Hash Import (Issue #65) — Implementation Plan
 
-Status: Planned
+Status: Implemented
 Date: 2026-04-12
+Completed: 2026-04-12
 Owner: Systems Engineering
 Issue: #65
 
@@ -76,7 +77,7 @@ Cross-references:
 - `design/cli-config-specification.md` §3.10 (`source_relpath` convention)
 - `src/nightfall_photo_ingress/domain/registry.py` (schema DDL, upsert method)
 
-Status: Not started
+Status: Implemented
 
 ---
 
@@ -121,7 +122,7 @@ Cross-references:
 - `design/cli-config-specification.md` §3.4 (format spec)
 - Issue #65 comment: §6 Hash Import Input Format
 
-Status: Not started
+Status: Implemented
 
 ---
 
@@ -166,7 +167,7 @@ Cross-references:
 - `design/architecture/invariants.md` INV-HI01–INV-HI12
 - `src/nightfall_photo_ingress/domain/registry.py`
 
-Status: Not started
+Status: Implemented
 
 ---
 
@@ -237,7 +238,7 @@ Cross-references:
 - `design/architecture/storage-topology.md` (permanent library read-only boundary)
 - `design/architecture/invariants.md` INV-S05
 
-Status: Not started
+Status: Implemented
 
 ---
 
@@ -286,7 +287,7 @@ Cross-references:
 - `design/cli-config-specification.md` §3.5 (stats semantics), §3.6 (output format), §3.7 (error handling)
 - `src/nightfall_photo_ingress/logging_bootstrap.py`
 
-Status: Not started
+Status: Implemented
 
 ---
 
@@ -332,7 +333,7 @@ Cross-references:
 - `design/cli-config-specification.md` §3.1–§3.3 (syntax and options)
 - `src/nightfall_photo_ingress/cli.py`
 
-Status: Not started
+Status: Implemented
 
 ---
 
@@ -370,7 +371,7 @@ Cross-references:
 - `design/cli-config-specification.md` §8 (import config), §11 (deprecated keys)
 - `src/nightfall_photo_ingress/config.py`
 
-Status: Not started
+Status: Implemented
 
 ---
 
@@ -420,7 +421,7 @@ Cross-references:
 - `tests/unit/test_sync_import.py` (existing, for comparison)
 - `tests/integration/test_sync_import_integration.py` (existing)
 
-Status: Not started
+Status: Implemented
 
 ---
 
@@ -459,7 +460,7 @@ Cross-references:
 - `design/cli-config-specification.md`
 - `design/architecture/invariants.md`
 
-Status: Not started
+Status: Implemented
 
 ---
 
