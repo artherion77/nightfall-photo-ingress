@@ -7,7 +7,8 @@ export interface AuditEvent {
   ts: string;
   actor: string;
   sha256?: string | null;
-  account_name?: string;
+  account_name?: string | null;
+  client_ip?: string | null;
   filename?: string | null;
   reason?: string;
   details?: Record<string, unknown>;

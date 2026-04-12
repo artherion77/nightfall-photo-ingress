@@ -95,6 +95,7 @@ class AuditService:
                     id=row[0],
                     sha256=row[1],
                     account_name=row[2],
+                    client_ip=(details.get("client_ip") if isinstance(details.get("client_ip"), str) else None),
                     action=action,
                     description=description,
                     reason=row[4],

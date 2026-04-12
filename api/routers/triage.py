@@ -5,7 +5,7 @@ from __future__ import annotations
 import sqlite3
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Path, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Path, Request, status
 from fastapi.responses import JSONResponse
 
 from api.auth import verify_api_token
@@ -23,16 +23,19 @@ def _run_triage_action(
     item_id: str,
     payload: TriageRequest,
     idempotency_key: str,
+    request: Request,
     conn: sqlite3.Connection,
     thumbnail_cache_path: FilePath,
 ) -> JSONResponse:
     service = TriageService(conn, thumbnail_cache_path=thumbnail_cache_path)
+    client_ip = request.client.host if request.client else None
     try:
         status_code, response = service.execute(
             action=action,
             item_id=item_id,
             idempotency_key=idempotency_key,
             reason=payload.reason,
+            client_ip=client_ip,
         )
     except LookupError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
@@ -48,6 +51,7 @@ def _run_triage_action(
 async def triage_accept(
     item_id: Annotated[str, Path(min_length=1, max_length=128)],
     payload: TriageRequest,
+    request: Request,
     _: str = Depends(verify_api_token),
     idempotency_key: str = Header(..., alias="X-Idempotency-Key", min_length=8, max_length=128),
     conn: sqlite3.Connection = Depends(get_registry_connection),
@@ -58,6 +62,7 @@ async def triage_accept(
         item_id=item_id,
         payload=payload,
         idempotency_key=idempotency_key,
+        request=request,
         conn=conn,
         thumbnail_cache_path=thumbnail_cache_path,
     )
@@ -67,6 +72,7 @@ async def triage_accept(
 async def triage_reject(
     item_id: Annotated[str, Path(min_length=1, max_length=128)],
     payload: TriageRequest,
+    request: Request,
     _: str = Depends(verify_api_token),
     idempotency_key: str = Header(..., alias="X-Idempotency-Key", min_length=8, max_length=128),
     conn: sqlite3.Connection = Depends(get_registry_connection),
@@ -77,6 +83,7 @@ async def triage_reject(
         item_id=item_id,
         payload=payload,
         idempotency_key=idempotency_key,
+        request=request,
         conn=conn,
         thumbnail_cache_path=thumbnail_cache_path,
     )
@@ -86,6 +93,7 @@ async def triage_reject(
 async def triage_defer(
     item_id: Annotated[str, Path(min_length=1, max_length=128)],
     payload: TriageRequest,
+    request: Request,
     _: str = Depends(verify_api_token),
     idempotency_key: str = Header(..., alias="X-Idempotency-Key", min_length=8, max_length=128),
     conn: sqlite3.Connection = Depends(get_registry_connection),
@@ -96,6 +104,7 @@ async def triage_defer(
         item_id=item_id,
         payload=payload,
         idempotency_key=idempotency_key,
+        request=request,
         conn=conn,
         thumbnail_cache_path=thumbnail_cache_path,
     )

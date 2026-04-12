@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 import sqlite3
 
-from api.audit_hook import write_triage_compensating_event, write_triage_requested_event
+from api.audit_hook import resolve_account_name, write_triage_compensating_event, write_triage_requested_event
 from api.schemas import TriageResponse
 from api.services.thumbnail_service import ThumbnailService
 
@@ -37,6 +37,7 @@ class TriageService:
         idempotency_key: str,
         reason: str | None,
         actor: str = "api",
+        client_ip: str | None = None,
     ) -> tuple[int, TriageResponse]:
         """Apply one triage transition or replay prior response."""
 
@@ -60,6 +61,7 @@ class TriageService:
             item_id=item_id,
             actor=actor,
             reason=reason,
+            client_ip=client_ip,
         )
         self.conn.commit()
 
@@ -77,13 +79,17 @@ class TriageService:
                 "UPDATE files SET status = ?, updated_at = ? WHERE sha256 = ?",
                 (new_state, now.isoformat(), item_id),
             )
-            details = json.dumps({"item_id": item_id, "state": new_state, "phase": "applied"})
+            details_payload = {"item_id": item_id, "state": new_state, "phase": "applied"}
+            if client_ip:
+                details_payload["client_ip"] = client_ip
+            details = json.dumps(details_payload)
+            account_name = resolve_account_name(self.conn, item_id)
             self.conn.execute(
                 """
                 INSERT INTO audit_log (sha256, account_name, action, reason, details_json, actor, ts)
-                VALUES (?, NULL, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                (item_id, f"triage_{action}_applied", reason, details, actor, now.isoformat()),
+                (item_id, account_name, f"triage_{action}_applied", reason, details, actor, now.isoformat()),
             )
 
             response = TriageResponse(
@@ -114,6 +120,7 @@ class TriageService:
                 item_id=item_id,
                 actor=actor,
                 reason=reason,
+                client_ip=client_ip,
             )
             self.conn.commit()
             raise

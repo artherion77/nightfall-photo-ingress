@@ -11,6 +11,7 @@ class AuditEvent(BaseModel):
     id: int
     sha256: str | None = None
     account_name: str | None = None
+    client_ip: str | None = None
     action: str
     description: str
     reason: str | None = None

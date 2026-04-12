@@ -7,6 +7,8 @@
   }
 
   let { events }: Props = $props();
+  const MAX_PREVIEW_ITEMS = 6;
+  const previewEvents = $derived(events.slice(0, MAX_PREVIEW_ITEMS));
 </script>
 
 <section class="audit-preview" data-testid="audit-preview">
@@ -15,12 +17,12 @@
     <a href="/audit">View all</a>
   </div>
 
-  {#if events.length === 0}
+  {#if previewEvents.length === 0}
     <p>No audit events.</p>
   {:else}
     <ul>
-      {#each events as event}
-        <AuditEventItem {event} />
+      {#each previewEvents as event}
+        <AuditEventItem {event} variant="preview" />
       {/each}
     </ul>
   {/if}
@@ -30,6 +32,7 @@
   .audit-preview {
     padding: var(--space-4);
     border: 1px solid var(--border-default);
+    border-left: 3px solid var(--action-primary);
     border-radius: var(--radius-md);
     background: var(--surface-card);
   }

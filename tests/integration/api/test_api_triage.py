@@ -35,7 +35,7 @@ async def test_accept_transitions_item_to_accepted(api_client, api_token: str, r
 
     events = registry_conn.execute(
         """
-        SELECT action, actor, sha256, ts
+        SELECT action, actor, sha256, ts, account_name
         FROM audit_log
         WHERE sha256 = ? AND action IN (?, ?)
         ORDER BY id ASC
@@ -52,6 +52,7 @@ async def test_accept_transitions_item_to_accepted(api_client, api_token: str, r
     ]
     assert all(event["actor"] == "api" for event in events)
     assert all(event["sha256"] == "abc123def456" for event in events)
+    assert all(event["account_name"] == "personal" for event in events)
     assert all(event["ts"] for event in events)
 
 
@@ -175,7 +176,7 @@ async def test_failure_persists_requested_and_compensating_audit_events(
 
     events = registry_conn.execute(
         """
-        SELECT action, actor, sha256, ts
+        SELECT action, actor, sha256, ts, account_name
         FROM audit_log
         WHERE sha256 = ? AND action IN (?, ?, ?)
         ORDER BY id ASC
@@ -193,6 +194,7 @@ async def test_failure_persists_requested_and_compensating_audit_events(
     ]
     assert all(event["actor"] == "api" for event in events)
     assert all(event["sha256"] == "abc123def456" for event in events)
+    assert all(event["account_name"] == "personal" for event in events)
     assert all(event["ts"] for event in events)
 
     idempotency_row = registry_conn.execute(
