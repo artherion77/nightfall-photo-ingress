@@ -94,13 +94,13 @@ CREATE TABLE IF NOT EXISTS live_photo_pairs (
 ```sql
 CREATE TABLE IF NOT EXISTS external_hash_cache (
     account_name   TEXT NOT NULL,
-    source_relpath TEXT NOT NULL,
+    source_relpath TEXT,
     hash_algo      TEXT NOT NULL,
     hash_value     TEXT NOT NULL,
     verified_sha256 TEXT,
     first_seen_at  TEXT NOT NULL,     -- ISO-8601 UTC
     updated_at     TEXT NOT NULL,     -- ISO-8601 UTC
-    PRIMARY KEY (account_name, source_relpath, hash_algo, hash_value)
+    PRIMARY KEY (account_name, hash_algo, hash_value)
 );
 ```
 
@@ -171,6 +171,7 @@ CREATE TABLE IF NOT EXISTS ui_action_idempotency (
 - **Pending-first**: `accepted_records` is written only on explicit accept, never on unknown ingest.
 - **Provenance-tracked**: `file_origins` records the `(account, onedrive_id)` → `sha256` mapping for every file ever encountered, independent of current status.
 - **Advisory hash import / Hash import**: `external_hash_cache` stores hashes imported from the permanent library. The `hash-import` CLI command (Issue #65) imports authoritative SHA-256 hashes from `.hashes.v2` files directly into this table with `imported = true` and `source = "hash_import"`. The legacy `sync-import` command imported advisory SHA-1 hashes from `.hashes.sha1` files; the `verified_sha256` column was populated after first-download SHA-256 confirmation. The `hash-import` model eliminates the advisory layer by importing SHA-256 directly as canonical identity. Imported hashes do not create `files` rows, audit events, or lifecycle state. See [architecture/invariants.md](../architecture/invariants.md) §Hash Import Invariants (INV-HI01–INV-HI12).
+- **`source_relpath` convention (hash-import)**: `source_relpath` MUST be `NULL` for hash-import entries. It MUST NOT contain file paths, directory paths, synthetic paths, or account-derived paths, because hash-import is hash-index seeding and must not imply file origin.
 
 ### Chunk 1/4/5 Optional Tables (Web Control Plane Phase 1)
 

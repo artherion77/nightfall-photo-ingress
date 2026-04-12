@@ -244,7 +244,50 @@ Stale `.hashes.v2` files MUST be recomputed before their contents are used for i
 
 There is no "best effort" mode: partially valid `.hashes.v2` files MUST NOT be consumed.
 
-#### 3.4.5 Recompute Requirement (Mandatory)
+#### 3.4.4 v1/v2 Backfill Semantics (Mandatory)
+
+The hash-import path MUST follow this cache precedence model exactly:
+
+1. If `.hashes.v2` exists and is valid, use `.hashes.v2`.
+2. If `.hashes.v2` exists but `.hashes.v1` / `.hashes.sha1` is missing, v1 MUST NOT be created.
+3. If `.hashes.v2` is missing but `.hashes.v1` / `.hashes.sha1` exists, v2-equivalent rows
+  MUST be reconstructed ephemerally in memory from v1 cache data.
+4. If both are missing, perform full recompute (SHA-1 + SHA-256).
+5. If `.hashes.v2` exists but is stale or invalid, perform full recompute.
+6. v1 (`.hashes.v1` / `.hashes.sha1`) MUST NEVER be consumed directly as canonical
+  SHA-256 import input.
+7. v1 cache files MUST NEVER be written by photo-ingress.
+
+Note:
+- `nightfall-immich-rmdups.sh` currently uses `.hashes.sha1` as the v1 cache file name.
+- Design references to `.hashes.v1` describe the same legacy v1 cache generation.
+
+#### 3.4.5 Directory Hash Algorithm (Exact)
+
+Directory hash computation MUST match `nightfall-immich-rmdups.sh` semantics exactly:
+
+```bash
+find "$DIR" -maxdepth 1 -type f \
+   ! -name ".hashes.sha1" \
+   ! -name ".hashes.v2" \
+   ! -iname "thumbs.db" \
+   -printf '%f %s %T@\n' \
+| LC_ALL=C sort \
+| sha1sum \
+| awk '{print $1}'
+```
+
+Rules:
+
+- `%f` is the filename (basename only).
+- `%s` is file size in bytes.
+- `%T@` is mtime as epoch float.
+- Sorting is lexicographic under `LC_ALL=C`.
+- The sorted stream is hashed with `sha1sum`.
+- Exclude v1 cache (`.hashes.sha1` / `.hashes.v1`), `.hashes.v2`, and `thumbs.db`.
+- Any deviation from these semantics is drift and MUST NOT be allowed.
+
+#### 3.4.6 Recompute Requirement (Mandatory)
 
 If a `.hashes.v2` file is missing, invalid, stale (`DIRECTORY_HASH` mismatch),
 partially corrupted, or missing required rows, `hash-import` MUST recompute the
@@ -258,12 +301,25 @@ Recompute behavior MUST:
    `DIRECTORY_HASH`, and row semantics.
 4. Keep recomputed data ephemeral for the current import run only.
 
+Recompute triggering conditions are mandatory:
+
+- missing `.hashes.v2`
+- invalid `.hashes.v2`
+- stale `.hashes.v2`
+- corrupted `.hashes.v2`
+- missing required rows
+
+Recompute atomicity rule:
+
+- recompute results are published to the import pipeline as an all-or-nothing
+  in-memory structure; no partial rows are consumed.
+
 `hash-import` MUST NOT write or rewrite `.hashes.v2` files in the permanent
 library. The permanent-library bind mount remains read-only.
 
-No `.hashes.sha1` fallback is permitted.
+No `.hashes.sha1` / v1 fallback is permitted as direct import input.
 
-#### 3.4.4 Import Column Usage
+#### 3.4.7 Import Column Usage
 
 - Only the SHA-256 column (column 2) is used to populate the registry dedupe index.
 - The path column (column 3) is not imported into the registry and MUST NOT be used
@@ -271,7 +327,22 @@ No `.hashes.sha1` fallback is permitted.
 - The SHA-1 column (column 1) is present for compatibility with existing tooling but
   MUST NOT be used as canonical identity in photo-ingress.
 
-### 3.5 Output Format
+### 3.5 Stats Semantics (Recompute-Aware)
+
+When recompute is required, statistics MUST be derived from in-memory recompute
+results and not from cache-file presence.
+
+Stats rules:
+
+1. Stats MUST NOT depend on `.hashes.v2` existing on disk.
+2. Stats MUST NOT be written to disk.
+3. Stats MUST include:
+   - directories processed
+   - recomputes performed
+   - valid caches consumed
+   - stale/invalid caches replaced in-memory
+
+### 3.6 Output Format
 
 #### Standard Mode
 
@@ -291,7 +362,7 @@ DRY RUN: total=2000 new=1998 existing=2
 
 Only errors are printed.
 
-### 3.6 Error Handling
+### 3.7 Error Handling
 
 | Error | Example |
 |-------|---------|
@@ -303,14 +374,15 @@ Only errors are printed.
 | Stale directory hash | `INFO: stale .hashes.v2 in <dir>; recomputing cache` |
 | Recompute failed | `ERROR: failed to recompute .hashes.v2 in <dir>` |
 
-### 3.7 Idempotency Rules
+### 3.8 Idempotency Rules
 
 The `hash-import` operation MUST be:
 
 - Duplicate-tolerant: importing the same hash again produces no error and no state change
 - Order-independent: results are identical regardless of import order
 - Repeatable without side effects: re-running the command yields the same end state
-- Safe under partial overlap: overlapping `.hashes.v2` files are handled gracefully
+- Safe under partial overlap: overlapping `.hashes.v2` files and recomputed
+  in-memory cache rows are handled gracefully
 - Race-free: registry locking is enforced during writes
 
 Behavior:
@@ -318,7 +390,7 @@ Behavior:
 - Existing registry entries are silently skipped (never overwritten)
 - Re-importing the same file produces no errors
 
-### 3.8 Hash-Import Invariants (Mandatory)
+### 3.9 Hash-Import Invariants (Mandatory)
 
 The following 12 invariants are strictly enforced. In case of conflict, these rules
 take precedence over any other existing design statements.
@@ -336,7 +408,7 @@ take precedence over any other existing design statements.
 11. Imported hashes MUST NOT participate in EXIF-based heuristics (timestamps, orientation, pairing, clustering).
 12. Imported hashes MUST NOT be eligible for reject/purge operations or any file-based lifecycle actions.
 
-### 3.9 Registry Semantics
+### 3.10 Registry Semantics
 
 A successful `hash-import` creates or confirms a registry entry with the following
 shape:
@@ -354,7 +426,15 @@ No additional fields are added. Imported entries are used solely for dedupe inde
 lookups during ingest pre-download filtering. They do not participate in the
 `files.status` state machine and carry no lifecycle semantics.
 
-### 3.10 Operational Notes
+`source_relpath` convention (mandatory):
+
+- `source_relpath` MUST be `NULL` for hash-import entries.
+- It MUST NOT contain file paths, directory paths, synthetic paths, or
+  account-derived paths.
+- Reason: hash-import is hash-index seeding and MUST NOT imply file origin
+  provenance.
+
+### 3.11 Operational Notes
 
 - Import is offline (no network access required)
 - Import is not reversible (imported hashes remain in the dedupe index)

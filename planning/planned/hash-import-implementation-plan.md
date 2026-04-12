@@ -35,6 +35,9 @@ Scope:
 - The hash-import path stores entries with `hash_algo = "sha256"`,
   `hash_value = <64-char-hex>`, `account_name = "__hash_import__"` (sentinel
   value; account MUST remain unassigned per INV-HI10).
+- Hash-import entries MUST persist `source_relpath = NULL`.
+- `source_relpath` MUST NOT store file paths, directory paths, synthetic
+  identifiers, or account-derived paths.
 - Evaluate whether the existing `external_hash_cache` schema is sufficient
   or whether a dedicated table or column additions are needed. The existing
   schema has columns: `account_name`, `source_relpath`, `hash_algo`,
@@ -50,6 +53,7 @@ Acceptance criteria:
    by `hash_algo` and/or `account_name` value.
 3. Existing sync-import entries are not affected.
 4. `INSERT OR IGNORE` semantics work correctly for duplicate SHA-256 values.
+5. `source_relpath` is always `NULL` for hash-import entries.
 
 STOP gates:
 1. Do not proceed if the schema change breaks any existing migration sequence.
@@ -57,16 +61,19 @@ STOP gates:
    (violates INV-HI03).
 3. Do not proceed if `account_name` is set to a real account value
    (violates INV-HI10).
+4. Do not proceed if any hash-import row stores a non-NULL `source_relpath`.
 
 Validation:
 - Unit test: insert hash-import entry, verify round-trip read.
 - Unit test: insert duplicate, verify no error and no state change (INV-HI06).
 - Unit test: insert hash-import entry, verify existing sync-import entry is
   not modified (INV-HI07).
+- Unit test: verify `source_relpath IS NULL` for all hash-import inserted rows.
 
 Cross-references:
 - `design/architecture/schema-and-migrations.md`
 - `design/architecture/invariants.md` INV-HI06, INV-HI07, INV-HI10
+- `design/cli-config-specification.md` §3.10 (`source_relpath` convention)
 - `src/nightfall_photo_ingress/domain/registry.py` (schema DDL, upsert method)
 
 Status: Not started
@@ -172,12 +179,23 @@ Scope:
 - Directory hash freshness: if `DIRECTORY_HASH` does not match the current
   directory listing hash, the file is stale and MUST be recomputed before use
   (per CLI spec §3.4).
+- v1/v2 precedence MUST be enforced:
+  1. valid `.hashes.v2` -> use v2
+  2. `.hashes.v2` exists and v1 missing -> do not create v1
+  3. v2 missing and v1 exists -> reconstruct v2-equivalent rows ephemerally
+  4. both missing -> full recompute
+  5. v2 stale/invalid -> full recompute
+  6. v1 never consumed directly as canonical SHA-256 import input
+  7. v1 never written by photo-ingress
 - Recompute requirement is mandatory for all invalid cache states. If a
   `.hashes.v2` file is missing, invalid, stale, partially corrupted, or missing
   required rows, hash-import MUST recompute the cache before using it.
 - Recompute must follow the `nightfall-immich-rmdups.sh` cache format contract:
   enumerate files and compute SHA-1 + SHA-256 using the same directory-hash
   algorithm semantics, but keep recompute ephemeral in memory.
+- Directory hash MUST match the exact script algorithm
+  (`find ... -printf '%f %s %T@\n' | LC_ALL=C sort | sha1sum | awk '{print $1}'`)
+  with cache-file and `thumbs.db` exclusions.
 - Aggregate statistics across all directories.
 - The walker MUST NOT write to the permanent library. Recompute is ephemeral only.
 
@@ -189,12 +207,16 @@ Acceptance criteria:
 5. Aggregate statistics sum correctly across directories.
 6. No files are written to the library tree; recomputed rows are transient and
   used for the current import only.
+7. v1 backfill semantics are enforced exactly (no v1 writes, no direct v1
+  canonical SHA-256 import usage).
 
 STOP gates:
 1. Do not proceed if stale or invalid files are consumed without recompute.
 2. Do not proceed if recompute writes any file to the permanent library.
 3. Do not proceed if directory hash computation uses a different algorithm
    than `nightfall-immich-rmdups.sh`.
+4. Do not proceed if v1 cache is written or consumed directly as canonical
+  SHA-256 import input.
 
 Validation:
 - Unit test: walker on fixture tree with 3 directories, 2 valid + 1 stale;
@@ -202,10 +224,16 @@ Validation:
 - Unit test: walker on empty directory → no errors, zero stats.
 - Unit test: walker on directory with no `.hashes.v2` → ephemeral recompute is
   performed, then imported, with no filesystem writes.
+- Unit test: v2 missing + v1 present -> v2-equivalent rows reconstructed
+  ephemerally and imported.
+- Unit test: v2 present + v1 missing -> import uses v2 and does not create v1.
 - Integration test: walker on temp tree with known content → correct stats.
 
 Cross-references:
 - `design/cli-config-specification.md` §3.4.3 (directory hash semantics)
+- `design/cli-config-specification.md` §3.4.4 (v1/v2 precedence)
+- `design/cli-config-specification.md` §3.4.5 (exact directory hash algorithm)
+- `design/cli-config-specification.md` §3.4.6 (ephemeral recompute)
 - `design/architecture/storage-topology.md` (permanent library read-only boundary)
 - `design/architecture/invariants.md` INV-S05
 
@@ -230,6 +258,8 @@ Scope:
 - Error output per CLI spec §3.6: line-level errors with file context.
 - All log records include fields: `command="hash-import"`, `chunk_index`,
   `imported`, `skipped_existing`, `duration`.
+- `--stats` semantics MUST reflect recompute-aware counters from in-memory
+  processing, not cache-file presence.
 
 Acceptance criteria:
 1. Standard mode prints per-chunk and summary lines.
@@ -238,6 +268,8 @@ Acceptance criteria:
 4. Stats mode prints per-chunk details.
 5. Error messages include file path and line number.
 6. JSON log records have the documented field set.
+7. Stats include: directories processed, recomputes performed, valid caches
+  consumed, stale/invalid caches replaced in-memory.
 
 STOP gates:
 1. Do not proceed if logging writes to any file in the permanent library.
@@ -247,9 +279,11 @@ Validation:
 - Unit test: capture standard mode output, verify format.
 - Unit test: capture dry-run output, verify no DB writes.
 - Unit test: capture quiet mode output, verify only errors.
+- Unit test: stats with missing/stale/invalid caches match recompute-aware
+  counters from in-memory processing.
 
 Cross-references:
-- `design/cli-config-specification.md` §3.5 (output format), §3.6 (error handling)
+- `design/cli-config-specification.md` §3.5 (stats semantics), §3.6 (output format), §3.7 (error handling)
 - `src/nightfall_photo_ingress/logging_bootstrap.py`
 
 Status: Not started
