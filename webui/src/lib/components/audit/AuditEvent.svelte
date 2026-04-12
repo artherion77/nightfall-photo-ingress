@@ -141,8 +141,8 @@
   }
 
   .status-icon {
-    width: var(--space-7);
-    height: var(--space-7);
+    width: var(--text-base);
+    height: var(--text-base);
     flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
