@@ -10,6 +10,7 @@ from nightfall_photo_ingress.config import load_config
 def _write_config(tmp_path: Path, body: str) -> Path:
     """Create a config file for tests."""
 
+    tmp_path.mkdir(parents=True, exist_ok=True)
     cfg = tmp_path / "photo-ingress.conf"
     cfg.write_text(body, encoding="utf-8")
     return cfg
@@ -201,3 +202,77 @@ delta_cursor = /tmp/primary.cursor
     parsed = load_config(cfg)
 
     assert parsed.core.storage_template == "{yyyy}/{mm}/{original}"
+
+
+def test_import_chunk_size_defaults_and_override(tmp_path: Path) -> None:
+    """Import chunk size should default to 1000 and respect [import] override."""
+
+    cfg_default = _write_config(
+        tmp_path / "default",
+        """
+[core]
+config_version = 2
+poll_interval_minutes = 15
+process_accounts_in_config_order = true
+staging_path = /mnt/ssd/photo-ingress/staging
+pending_path = /nightfall/media/photo-ingress/pending
+accepted_path = /nightfall/media/photo-ingress/accepted
+rejected_path = /nightfall/media/photo-ingress/rejected
+trash_path = /nightfall/media/photo-ingress/trash
+registry_path = /mnt/ssd/photo-ingress/registry.db
+staging_on_same_pool = false
+verify_sha256_on_first_download = true
+max_downloads_per_poll = 200
+max_poll_runtime_seconds = 300
+sync_hash_import_enabled = true
+sync_hash_import_path = /nightfall/media/pictures
+sync_hash_import_glob = .hashes.sha1
+
+[account.primary]
+enabled = true
+provider = onedrive
+authority = https://login.microsoftonline.com/consumers
+client_id = cid
+onedrive_root = /Camera Roll
+token_cache = /tmp/primary.token
+delta_cursor = /tmp/primary.cursor
+""".strip(),
+    )
+
+    cfg_override = _write_config(
+        tmp_path / "override",
+        """
+[core]
+config_version = 2
+poll_interval_minutes = 15
+process_accounts_in_config_order = true
+staging_path = /mnt/ssd/photo-ingress/staging
+pending_path = /nightfall/media/photo-ingress/pending
+accepted_path = /nightfall/media/photo-ingress/accepted
+rejected_path = /nightfall/media/photo-ingress/rejected
+trash_path = /nightfall/media/photo-ingress/trash
+registry_path = /mnt/ssd/photo-ingress/registry.db
+staging_on_same_pool = false
+verify_sha256_on_first_download = true
+max_downloads_per_poll = 200
+max_poll_runtime_seconds = 300
+sync_hash_import_enabled = true
+sync_hash_import_path = /nightfall/media/pictures
+sync_hash_import_glob = .hashes.sha1
+
+[import]
+chunk_size = 250
+
+[account.primary]
+enabled = true
+provider = onedrive
+authority = https://login.microsoftonline.com/consumers
+client_id = cid
+onedrive_root = /Camera Roll
+token_cache = /tmp/primary.token
+delta_cursor = /tmp/primary.cursor
+""".strip(),
+    )
+
+    assert load_config(cfg_default).import_config.chunk_size == 1000
+    assert load_config(cfg_override).import_config.chunk_size == 250

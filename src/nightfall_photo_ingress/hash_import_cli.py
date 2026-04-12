@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import argparse
-import configparser
 import logging
 from pathlib import Path
 from typing import Callable
 
-from .config import ConfigError
+from .config import ConfigError, load_config
 from .domain.registry import Registry, RegistryError
 from .hash_import import HashImportError, run_hash_import_command
 
@@ -24,10 +23,14 @@ def cmd_hash_import(
     """Import authoritative permanent-library hashes into the registry cache."""
 
     try:
-        registry_path = resolve_hash_import_registry_path(args.path)
+        app_config = load_config(args.path)
+        registry_path = app_config.core.registry_path
         registry = Registry(registry_path)
         registry.initialize()
-        chunk_size = resolve_hash_import_chunk_size(config_path=args.path, cli_chunk_size=args.chunk_size)
+        chunk_size = resolve_hash_import_chunk_size(
+            config_path=args.path,
+            cli_chunk_size=args.chunk_size,
+        )
         summary = run_hash_import_command(
             root_path=Path(args.root_path),
             registry=registry,
@@ -66,39 +69,17 @@ def cmd_hash_import(
 
 
 def resolve_hash_import_registry_path(config_path: str | Path) -> Path:
-    """Resolve the registry path from raw config without requiring H7 config model changes."""
+    """Resolve the registry path using typed configuration parsing."""
 
-    parser = configparser.ConfigParser(interpolation=None)
-    parser.optionxform = str
-    with open(config_path, "r", encoding="utf-8") as handle:
-        parser.read_file(handle)
-
-    if not parser.has_section("core") or not parser.has_option("core", "registry_path"):
-        raise ConfigError("hash-import requires [core] registry_path")
-    return Path(parser.get("core", "registry_path"))
+    return load_config(config_path).core.registry_path
 
 
 def resolve_hash_import_chunk_size(*, config_path: str | Path, cli_chunk_size: int | None) -> int:
-    """Resolve hash-import chunk size using CLI, optional raw config, then default."""
+    """Resolve hash-import chunk size using CLI override or typed config."""
 
     if cli_chunk_size is not None:
         if cli_chunk_size <= 0:
             raise ValueError("hash-import chunk size must be > 0")
         return cli_chunk_size
 
-    parser = configparser.ConfigParser(interpolation=None)
-    parser.optionxform = str
-    with open(config_path, "r", encoding="utf-8") as handle:
-        parser.read_file(handle)
-
-    if parser.has_section("import") and parser.has_option("import", "chunk_size"):
-        raw_value = parser.get("import", "chunk_size")
-        try:
-            chunk_size = int(raw_value)
-        except ValueError as exc:
-            raise ValueError("hash-import chunk size must be an integer") from exc
-        if chunk_size <= 0:
-            raise ValueError("hash-import chunk size must be > 0")
-        return chunk_size
-
-    return 1000
+    return load_config(config_path).import_config.chunk_size

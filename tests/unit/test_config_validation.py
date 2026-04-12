@@ -208,3 +208,19 @@ def test_queue_roots_must_be_distinct(tmp_path: Path) -> None:
 
     with pytest.raises(ConfigError, match="lifecycle roots must remain distinct"):
         load_config(cfg)
+
+
+def test_import_chunk_size_must_be_positive(tmp_path: Path) -> None:
+    """[import] chunk_size must be > 0 when provided."""
+
+    cfg = _write_config(
+        tmp_path,
+        _base_core()
+        + "\n\n"
+        + "[import]\nchunk_size = 0\n"
+        + "\n"
+        + _account("primary"),
+    )
+
+    with pytest.raises(ConfigError, match=r"\[import\] chunk_size must be > 0"):
+        load_config(cfg)

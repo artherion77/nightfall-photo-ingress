@@ -9,7 +9,7 @@ from __future__ import annotations
 import configparser
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 SUPPORTED_CONFIG_VERSION = 2
@@ -90,6 +90,13 @@ class WebConfig:
 
 
 @dataclass(frozen=True)
+class ImportConfig:
+    """Optional hash-import tuning configuration."""
+
+    chunk_size: int = 1000
+
+
+@dataclass(frozen=True)
 class AccountConfig:
     """Configuration for one source account section."""
 
@@ -121,6 +128,7 @@ class AppConfig:
     logging: LoggingConfig
     web: WebConfig
     accounts: tuple[AccountConfig, ...]
+    import_config: ImportConfig = field(default_factory=ImportConfig)
 
     def ordered_enabled_accounts(self) -> tuple[AccountConfig, ...]:
         """Return enabled accounts based on configured ordering policy.
@@ -174,11 +182,13 @@ def load_config(path: Path | str) -> AppConfig:
     core = _parse_core(parser, errors)
     logging_cfg = _parse_logging(parser, errors)
     web_cfg = _parse_web(parser, errors)
+    import_cfg = _parse_import(parser, errors)
     accounts = _parse_accounts(parser, core.max_downloads_per_poll, errors)
     _validate_section_model(parser, errors)
 
     _validate_accounts(accounts, errors)
     _validate_core(core, errors)
+    _validate_import(import_cfg, errors)
 
     if errors:
         raise ConfigError("\n".join(errors))
@@ -189,6 +199,7 @@ def load_config(path: Path | str) -> AppConfig:
         logging=logging_cfg,
         web=web_cfg,
         accounts=tuple(accounts),
+        import_config=import_cfg,
     )
 
 
@@ -443,6 +454,18 @@ def _parse_web(parser: configparser.ConfigParser, errors: list[str]) -> WebConfi
     )
 
 
+def _parse_import(parser: configparser.ConfigParser, errors: list[str]) -> ImportConfig:
+    """Parse optional [import] values and apply defaults."""
+
+    if "import" not in parser:
+        return ImportConfig()
+
+    section = parser["import"]
+    return ImportConfig(
+        chunk_size=_get_int(section, "chunk_size", errors, default=1000),
+    )
+
+
 def _parse_accounts(
     parser: configparser.ConfigParser,
     inherited_max_downloads: int,
@@ -642,11 +665,18 @@ def _validate_accounts(accounts: list[AccountConfig], errors: list[str]) -> None
             )
 
 
+def _validate_import(import_cfg: ImportConfig, errors: list[str]) -> None:
+    """Validate [import] constraints."""
+
+    if import_cfg.chunk_size <= 0:
+        errors.append("[import] chunk_size must be > 0")
+
+
 def _validate_section_model(parser: configparser.ConfigParser, errors: list[str]) -> None:
     """Reject legacy or unsupported section names for canonical v2 config."""
 
     for section_name in parser.sections():
-        if section_name in {"core", "logging", "web"}:
+        if section_name in {"core", "logging", "web", "import"}:
             continue
         if section_name.startswith("account."):
             continue
