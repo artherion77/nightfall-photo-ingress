@@ -20,7 +20,7 @@ All mandatory Phase-2 objectives have been delivered and validated:
 
 **LAN exposure gate is signed off** with all operational and technical requirements satisfied.
 
-**Phase 2 roadmap is now archived.** All active planning continues in `planning/implemented/phase-2-implementation-plan.md` (read-only) and future work is tracked in `planning/planned/*` (Phase 3+).
+**Phase 2 roadmap is now archived.** Phase-2 historical artifacts are retained in `planning/implemented/` (read-only), and future work is tracked in `planning/planned/*` (Phase 3+).
 
 ---
 

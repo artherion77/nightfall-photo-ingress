@@ -1,10 +1,10 @@
 # Web Control Plane — Phase 2 Implementation Plan
 
-Status: Active
-Date: 2026-04-11
+Status: COMPLETE (2026-04-12)
+Date: 2026-04-11 (activated) -> 2026-04-12 (finalized)
 Owner: Systems Engineering
 
-## 1. Chunked Execution Plan (C1–C9)
+## 1. Chunked Execution Plan (C1–C10)
 
 ### C1 — Reverse Proxy Baseline (Caddy)
 
@@ -14,7 +14,7 @@ Goal:
 Inputs:
 - ../../design/web/architecture.md (Phase 2 reverse-proxy sections)
 - ../../design/web/design-decisions.md (Phase 2 mandatory posture)
-- ../planned/phase-2-architecture-roadmap.md
+- ../implemented/phase-2-architecture-roadmap.md
 
 Preconditions:
 - Phase 1 baseline stable.
@@ -132,7 +132,7 @@ Goal:
 
 Inputs:
 - ../../design/web/architecture.md
-- ../planned/phase-2-architecture-roadmap.md
+- ../implemented/phase-2-architecture-roadmap.md
 - ../../design/infra/releases.md
 
 Preconditions:
