@@ -68,3 +68,28 @@ async def test_health_returns_poll_duration_s_from_status_file(
     assert response.status_code == 200
     payload = response.json()
     assert payload["poll_duration_s"] == pytest.approx(7.42)
+
+
+@pytest.mark.anyio
+async def test_poll_history_returns_7_entries(
+    api_client,
+    api_token: str,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    import api.services.poll_history as poll_hist
+
+    monkeypatch.setattr(poll_hist, "STATUS_FILE_PATH", tmp_path / "nonexistent.json")
+    monkeypatch.setattr(poll_hist, "_HISTORY_FILE_PATH", tmp_path / "history.jsonl")
+
+    response = await api_client.get(
+        "/api/v1/health/poll-history", headers=auth_headers(api_token)
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, list)
+    assert len(data) == 7
+    for entry in data:
+        assert "day" in entry
+        assert "duration_s" in entry
+        assert entry["day"] in {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"}

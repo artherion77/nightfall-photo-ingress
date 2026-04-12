@@ -32,3 +32,10 @@ class PollTriggerResponse(BaseModel):
     """Response from the poll trigger endpoint."""
 
     status: str
+
+
+class PollHistoryEntry(BaseModel):
+    """Single day entry in the poll duration history."""
+
+    day: str
+    duration_s: float

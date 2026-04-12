@@ -23,10 +23,19 @@ export interface PollTriggerResponse {
   status: string;
 }
 
+export interface PollHistoryEntry {
+  day: string;
+  duration_s: number;
+}
+
 export function getHealth(): Promise<HealthResponse> {
   return apiFetch<HealthResponse>('/api/v1/health');
 }
 
 export function triggerPoll(): Promise<PollTriggerResponse> {
   return apiFetch<PollTriggerResponse>('/api/v1/poll/trigger', { method: 'POST' });
+}
+
+export function getPollHistory(): Promise<PollHistoryEntry[]> {
+  return apiFetch<PollHistoryEntry[]>('/api/v1/health/poll-history');
 }

@@ -12,7 +12,7 @@
 	} from '$lib/stores/filterStore';
 	import type { AuditDailySummary, AuditPage } from '$lib/api/audit';
         import type { StagingPage } from '$lib/api/staging';
-        import type { HealthResponse } from '$lib/api/health';
+        import type { HealthResponse, PollHistoryEntry } from '$lib/api/health';
         import type { EffectiveConfig } from '$lib/api/config';
 
         interface PageData {
@@ -21,6 +21,7 @@
 			auditSummary?: AuditDailySummary;
                 config?: EffectiveConfig;
                 health?: HealthResponse;
+                pollHistory?: PollHistoryEntry[];
         }
 
         let { data }: { data: PageData } = $props();
@@ -77,7 +78,7 @@
 			{#if data.health}
 			<HealthBar health={data.health} />
 			{/if}
-			<PollRuntimeChart values={[kpis.last_poll_duration_s]} />
+			<PollRuntimeChart history={data.pollHistory ?? []} />
 
 			<section class="dashboard-files" data-testid="dashboard-file-list">
 				<div class="files-header">

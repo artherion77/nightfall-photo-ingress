@@ -9,9 +9,10 @@ from nightfall_photo_ingress.config import AppConfig
 from api.auth import verify_api_token
 from api.dependencies import get_app_config, get_config_path
 from api.schemas import HealthResponse
-from api.schemas.health import PollTriggerResponse
+from api.schemas.health import PollHistoryEntry, PollTriggerResponse
 from api.services import HealthService
 from api.services.health_service import get_poller_status
+from api.services.poll_history import get_poll_history_7days
 
 router = APIRouter(prefix="/api/v1", tags=["health"])
 
@@ -49,3 +50,12 @@ async def trigger_poll(
         start_new_session=True,
     )
     return PollTriggerResponse(status="accepted")
+
+
+@router.get("/health/poll-history", response_model=list[PollHistoryEntry])
+async def get_poll_history(
+    _: str = Depends(verify_api_token),
+) -> list[PollHistoryEntry]:
+    """Return last 7 days of poll duration history (oldest first, missing days = 0)."""
+    entries = get_poll_history_7days()
+    return [PollHistoryEntry(**e) for e in entries]
