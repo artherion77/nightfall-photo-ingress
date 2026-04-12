@@ -229,6 +229,13 @@ _require_base_snapshot() {
 
 _sync_webui_sources() {
     lxc exec "$CONTAINER" -- mkdir -p "$DEV_WEBUI_ROOT"
+    lxc exec "$CONTAINER" -- bash -c "
+set -euo pipefail
+find '$DEV_WEBUI_ROOT' -mindepth 1 -maxdepth 1 \
+    ! -name node_modules \
+    ! -name .svelte-kit \
+    ! -name build \
+    -exec rm -rf {} +"
     tar -C "$PROJECT_ROOT" \
         --exclude='webui/node_modules' \
         --exclude='webui/.svelte-kit' \
