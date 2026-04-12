@@ -1,25 +1,21 @@
 {
   "schema_version": 1,
-  "run_id": "module6-20260412T214404-1",
-  "generated_at": "2026-04-12T21:44:26.169045+00:00",
+  "run_id": "module4-bootstrap",
+  "generated_at": "2026-04-12T22:02:59.364710+00:00",
   "source": {
-    "commit_sha": "8bfc05ddddb1033f57ee91c0ba12a878c1658b7b",
+    "commit_sha": "681891cde0ffb76dc5f4052d2703adf4cf2d5bd1",
     "branch": "main"
   },
   "collection_status": "partial",
   "severity": "warning",
   "indicators": {
     "failed_checks": 0,
-    "warning_checks": 5,
+    "warning_checks": 1,
     "delta_items": 16
   },
-  "previous_successful_run_id": "module4-bootstrap",
+  "previous_successful_run_id": "module3-bootstrap",
   "warnings": [
-    "modules.frontend.metrics.test_coverage not available",
-    "modules.optional_collectors.collectors.openapi_complexity not available",
-    "modules.optional_collectors.collectors.api_surface_diff not available",
-    "modules.optional_collectors.collectors.vitest_coverage not available",
-    "modules.optional_collectors.collectors.playwright_coverage not available"
+    "modules.frontend.metrics.test_coverage not available"
   ],
   "failures": []
 }

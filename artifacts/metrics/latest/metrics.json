@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "run_id": "module6-20260412T214404-1",
+  "run_id": "module4-bootstrap",
   "source": {
-    "commit_sha": "8bfc05ddddb1033f57ee91c0ba12a878c1658b7b",
+    "commit_sha": "681891cde0ffb76dc5f4052d2703adf4cf2d5bd1",
     "branch": "main"
   },
   "collection_status": "partial",
@@ -7487,13 +7487,13 @@
         "coverage": {
           "status": "success",
           "exit_code": 0,
-          "duration_seconds": 20.605,
+          "duration_seconds": 21.704,
           "coverage_percent": 77.61571373006612,
           "covered_lines": 3991,
           "num_statements": 5142,
           "missing_lines": 1151,
-          "coverage_json": "metrics/output/backend/module6-20260412T214404-1/coverage.json",
-          "pytest_log": "metrics/output/backend/module6-20260412T214404-1/pytest-coverage.log",
+          "coverage_json": "metrics/output/backend/module2-bootstrap/coverage.json",
+          "pytest_log": "metrics/output/backend/module2-bootstrap/pytest-coverage.log",
           "python_executable": "/home/chris/dev/nightfall-photo-ingress/.venv/bin/python"
         }
       }
@@ -13208,72 +13208,10 @@
           "reason": "deferred_until_vitest_playwright_maturity"
         }
       }
-    },
-    "optional_collectors": {
-      "status": "partial",
-      "collectors": {
-        "bundle_size": {
-          "optional": true,
-          "status": "available",
-          "source": "bundle_stats_json",
-          "chunk_count": 43,
-          "total_kb": 370.2,
-          "gzip_kb": 97.4,
-          "brotli_kb": 83.3,
-          "largest_chunk": {
-            "name": "index.js",
-            "type": "js",
-            "raw_bytes": 127240,
-            "raw_kb": 124.3
-          },
-          "top_contributors": [
-            {
-              "id": "/opt/nightfall-webui/node_modules/svelte/src/internal/server/renderer.js",
-              "rendered_kb": 23.9
-            },
-            {
-              "id": "/opt/nightfall-webui/node_modules/svelte/src/internal/client/reactivity/batch.js",
-              "rendered_kb": 21.7
-            },
-            {
-              "id": "/opt/nightfall-webui/node_modules/@sveltejs/kit/src/runtime/server/page/render.js",
-              "rendered_kb": 20.7
-            },
-            {
-              "id": "/opt/nightfall-webui/node_modules/@sveltejs/kit/src/runtime/form-utils.js",
-              "rendered_kb": 20.5
-            },
-            {
-              "id": "/opt/nightfall-webui/node_modules/@sveltejs/kit/src/runtime/server/respond.js",
-              "rendered_kb": 18.5
-            }
-          ]
-        },
-        "openapi_complexity": {
-          "status": "not_available",
-          "optional": true,
-          "reason": "disabled"
-        },
-        "api_surface_diff": {
-          "status": "not_available",
-          "optional": true,
-          "reason": "disabled"
-        },
-        "vitest_coverage": {
-          "status": "not_available",
-          "optional": true,
-          "reason": "disabled"
-        },
-        "playwright_coverage": {
-          "status": "not_available",
-          "optional": true,
-          "reason": "disabled"
-        }
-      }
     }
   },
   "delta": {
-    "previous_run_id": "module4-bootstrap",
+    "previous_run_id": "module3-bootstrap",
     "comparisons": {
       "modules.backend.metrics.loc.files": {
         "current": 201,

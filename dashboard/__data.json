@@ -1,18 +1,18 @@
 {
   "projectName": "nightfall++photo-ingress",
-  "commitSha": "8bfc05d",
-  "commitFull": "8bfc05ddddb1033f57ee91c0ba12a878c1658b7b",
-  "runId": "module6-20260412T214404-1",
-  "lastRunAt": "2026-04-12T21:44:26.169055+00:00",
+  "commitSha": "681891c",
+  "commitFull": "681891cde0ffb76dc5f4052d2703adf4cf2d5bd1",
+  "runId": "module4-bootstrap",
+  "lastRunAt": "2026-04-12T22:02:59.364721+00:00",
   "sourceBranch": "main",
   "repoUrl": "https://github.com/artherion77/nightfall-photo-ingress",
   "repoHeadUrl": "https://github.com/artherion77/nightfall-photo-ingress/tree/main",
-  "repoCommitUrl": "https://github.com/artherion77/nightfall-photo-ingress/commit/8bfc05ddddb1033f57ee91c0ba12a878c1658b7b",
+  "repoCommitUrl": "https://github.com/artherion77/nightfall-photo-ingress/commit/681891cde0ffb76dc5f4052d2703adf4cf2d5bd1",
   "runMeta": {
-    "startedAt": "2026-04-12T21:44:26.154205+00:00",
-    "finishedAt": "2026-04-12T21:44:26.169055+00:00",
-    "durationSeconds": 0.0149,
-    "runId": "module6-20260412T214404-1",
+    "startedAt": "2026-04-12T22:02:59.351715+00:00",
+    "finishedAt": "2026-04-12T22:02:59.364721+00:00",
+    "durationSeconds": 0.013,
+    "runId": "module4-bootstrap",
     "branch": "main"
   },
   "versions": {
@@ -3478,40 +3478,8 @@
       "endpoints": 9,
       "schemas": 8
     },
-    "bundleSizeKb": 370,
-    "bundleSizeDetail": {
-      "totalKb": 370.2,
-      "gzipKb": 97.4,
-      "brotliKb": 83.3,
-      "largestChunk": {
-        "name": "index.js",
-        "type": "js",
-        "raw_bytes": 127240,
-        "raw_kb": 124.3
-      },
-      "topContributors": [
-        {
-          "id": "/opt/nightfall-webui/node_modules/svelte/src/internal/server/renderer.js",
-          "rendered_kb": 23.9
-        },
-        {
-          "id": "/opt/nightfall-webui/node_modules/svelte/src/internal/client/reactivity/batch.js",
-          "rendered_kb": 21.7
-        },
-        {
-          "id": "/opt/nightfall-webui/node_modules/@sveltejs/kit/src/runtime/server/page/render.js",
-          "rendered_kb": 20.7
-        },
-        {
-          "id": "/opt/nightfall-webui/node_modules/@sveltejs/kit/src/runtime/form-utils.js",
-          "rendered_kb": 20.5
-        },
-        {
-          "id": "/opt/nightfall-webui/node_modules/@sveltejs/kit/src/runtime/server/respond.js",
-          "rendered_kb": 18.5
-        }
-      ]
-    },
+    "bundleSizeKb": null,
+    "bundleSizeDetail": null,
     "openapiScore": null
   },
   "footer": {
@@ -3522,12 +3490,12 @@
   },
   "trendRows": [
     {
-      "runId": "module4-bootstrap",
+      "runId": "module6-20260412T214404-1",
       "severity": "warning",
-      "warningChecks": 1,
+      "warningChecks": 5,
       "failedChecks": 0,
       "deltaItems": 16,
-      "generatedAt": "2026-04-12T21:43:41.000414+00:00"
+      "generatedAt": "2026-04-12T21:44:26.169045+00:00"
     },
     {
       "runId": "module6-20260411T072531-1",
@@ -3560,14 +3528,14 @@
       "reason": null
     },
     "bundleSize": {
-      "status": "available",
+      "status": "unknown",
       "reason": null
     }
   },
   "buildStamp": {
-    "generatedAt": "2026-04-12T21:59:32.655629+00:00",
-    "commitSha": "8bfc05ddddb1033f57ee91c0ba12a878c1658b7b",
-    "runId": "module6-20260412T214404-1"
+    "generatedAt": "2026-04-12T22:03:04.874534+00:00",
+    "commitSha": "681891cde0ffb76dc5f4052d2703adf4cf2d5bd1",
+    "runId": "module4-bootstrap"
   },
-  "lastPublishedAt": "2026-04-12T21:59:32.697611+00:00"
+  "lastPublishedAt": "2026-04-12T22:03:04.915485+00:00"
 }
