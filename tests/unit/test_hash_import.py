@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import io
 import hashlib
 import os
 import subprocess
+import json
+import logging
+import sqlite3
 from pathlib import Path
 
 import pytest
@@ -15,14 +19,17 @@ from nightfall_photo_ingress.hash_import import (
     HashImportError,
     HashImportParseError,
     build_hash_import_directory_plan,
+    format_hash_import_error,
     parse_hashes_v2_file,
     parse_hashes_v2_text,
     run_hash_import,
+    run_hash_import_command,
     _compute_directory_hash,
     _parse_hashes_v1_cache,
     _parse_hashes_v2_cache,
     _sha1_file,
 )
+from nightfall_photo_ingress.logging_bootstrap import JsonFormatter
 
 
 def _sha1_bytes(value: bytes) -> str:
@@ -405,3 +412,185 @@ def test_sha1_file_hashes_streamed_content(tmp_path: Path) -> None:
     file_path.write_bytes(b"streamed-content")
 
     assert _sha1_file(file_path) == _sha1_bytes(b"streamed-content")
+
+
+def test_run_hash_import_command_standard_output_renders_chunks_and_done(tmp_path: Path) -> None:
+    root = tmp_path / "pictures"
+    first_dir = root / "2026" / "11"
+    second_dir = root / "2026" / "12"
+    first_dir.mkdir(parents=True)
+    second_dir.mkdir(parents=True)
+    first_file = first_dir / "A.HEIC"
+    second_file = second_dir / "B.HEIC"
+    first_file.write_bytes(b"alpha")
+    second_file.write_bytes(b"beta")
+
+    _write_valid_v2(first_dir, files=[first_file])
+    _write_valid_v2(second_dir, files=[second_file])
+
+    registry = Registry(tmp_path / "registry.db")
+    registry.initialize()
+    out = io.StringIO()
+
+    summary = run_hash_import_command(
+        root_path=root,
+        registry=registry,
+        chunk_size=1,
+        dry_run=False,
+        quiet=False,
+        stats=False,
+        out=out,
+    )
+
+    rendered = out.getvalue().strip().splitlines()
+    assert rendered[0].startswith("[chunk 1] imported=1 skipped_existing=0 duration=")
+    assert rendered[1].startswith("[chunk 2] imported=1 skipped_existing=0 duration=")
+    assert rendered[2] == "DONE: total_imported=2 total_skipped=0"
+    assert summary.total_imported == 2
+
+
+def test_run_hash_import_command_dry_run_prints_summary_without_db_writes(tmp_path: Path) -> None:
+    root = tmp_path / "pictures"
+    directory = root / "2026" / "13"
+    directory.mkdir(parents=True)
+    file_path = directory / "C.HEIC"
+    file_path.write_bytes(b"gamma")
+    _write_valid_v2(directory, files=[file_path])
+
+    registry = Registry(tmp_path / "registry.db")
+    registry.initialize()
+    out = io.StringIO()
+
+    summary = run_hash_import_command(
+        root_path=root,
+        registry=registry,
+        chunk_size=1000,
+        dry_run=True,
+        quiet=False,
+        stats=False,
+        out=out,
+    )
+
+    assert out.getvalue().strip() == "DRY RUN: total=1 new=1 existing=0"
+    assert summary.total_imported == 1
+    with sqlite3.connect(registry.db_path) as conn:
+        assert conn.execute("SELECT COUNT(*) FROM external_hash_cache").fetchone()[0] == 0
+
+
+def test_run_hash_import_command_quiet_mode_suppresses_non_error_output(tmp_path: Path) -> None:
+    root = tmp_path / "pictures"
+    directory = root / "2026" / "14"
+    directory.mkdir(parents=True)
+    file_path = directory / "D.HEIC"
+    file_path.write_bytes(b"delta")
+    _write_valid_v2(directory, files=[file_path])
+
+    registry = Registry(tmp_path / "registry.db")
+    registry.initialize()
+    out = io.StringIO()
+
+    run_hash_import_command(
+        root_path=root,
+        registry=registry,
+        chunk_size=1000,
+        dry_run=False,
+        quiet=True,
+        stats=True,
+        out=out,
+    )
+
+    assert out.getvalue() == ""
+
+
+def test_run_hash_import_command_stats_mode_includes_recompute_aware_counters(tmp_path: Path) -> None:
+    root = tmp_path / "pictures"
+    valid_dir = root / "2026" / "15"
+    stale_dir = root / "2026" / "16"
+    valid_dir.mkdir(parents=True)
+    stale_dir.mkdir(parents=True)
+    valid_file = valid_dir / "A.HEIC"
+    stale_file = stale_dir / "B.HEIC"
+    valid_file.write_bytes(b"alpha")
+    stale_file.write_bytes(b"beta")
+    _write_valid_v2(valid_dir, files=[valid_file])
+    (stale_dir / ".hashes.v2").write_text(
+        "\n".join(
+            [
+                "CACHE_SCHEMA v2",
+                "DIRECTORY_HASH 0000000000000000000000000000000000000000",
+                f"{_sha1_bytes(b'beta')}\t{_sha256_bytes(b'beta')}\t{stale_file}",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    registry = Registry(tmp_path / "registry.db")
+    registry.initialize()
+    out = io.StringIO()
+
+    run_hash_import_command(
+        root_path=root,
+        registry=registry,
+        chunk_size=1000,
+        dry_run=True,
+        quiet=False,
+        stats=True,
+        out=out,
+    )
+
+    rendered = out.getvalue().strip().splitlines()
+    assert rendered[0] == "DRY RUN: total=2 new=2 existing=0"
+    assert rendered[1].startswith("[chunk 1] imported=2 skipped_existing=0 duration=")
+    assert rendered[2] == (
+        "STATS: directories_processed=2 recomputes_performed=1 "
+        "valid_caches_consumed=1 stale_invalid_caches_replaced=1"
+    )
+
+
+def test_run_hash_import_command_emits_structured_json_log_fields(tmp_path: Path) -> None:
+    root = tmp_path / "pictures"
+    directory = root / "2026" / "17"
+    directory.mkdir(parents=True)
+    file_path = directory / "E.HEIC"
+    file_path.write_bytes(b"epsilon")
+    _write_valid_v2(directory, files=[file_path])
+
+    registry = Registry(tmp_path / "registry.db")
+    registry.initialize()
+
+    log_stream = io.StringIO()
+    handler = logging.StreamHandler(log_stream)
+    handler.setFormatter(JsonFormatter())
+    logger = logging.getLogger("test.hash_import.command")
+    logger.handlers.clear()
+    logger.propagate = False
+    logger.setLevel(logging.INFO)
+    logger.addHandler(handler)
+    try:
+        run_hash_import_command(
+            root_path=root,
+            registry=registry,
+            chunk_size=1000,
+            dry_run=False,
+            quiet=True,
+            stats=False,
+            logger=logger,
+        )
+    finally:
+        logger.handlers.clear()
+
+    payloads = [json.loads(line) for line in log_stream.getvalue().strip().splitlines()]
+    assert len(payloads) == 2
+    assert payloads[0]["command"] == "hash-import"
+    assert payloads[0]["chunk_index"] == 1
+    assert payloads[0]["imported"] == 1
+    assert payloads[0]["skipped_existing"] == 0
+    assert isinstance(payloads[0]["duration"], float)
+    assert payloads[1]["chunk_index"] == 0
+    assert payloads[1]["directories_processed"] == 1
+
+
+def test_format_hash_import_error_includes_file_and_line_context() -> None:
+    message = format_hash_import_error(HashImportParseError("/tmp/example.hashes.v2", 42, "invalid SHA-256"))
+
+    assert message == "ERROR: /tmp/example.hashes.v2: line 42: invalid SHA-256"

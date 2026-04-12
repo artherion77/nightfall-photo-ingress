@@ -76,6 +76,7 @@ class HashImportChunkResult:
     chunk_index: int
     imported: int
     skipped_existing: int
+    duration_seconds: float | None = None
 
 
 HASH_IMPORT_ACCOUNT = "__hash_import__"

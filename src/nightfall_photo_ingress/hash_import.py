@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import os
 import re
+import sqlite3
 import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
+from time import perf_counter
+from typing import TextIO
 
 from .domain.registry import HashImportChunkResult, Registry
 from .domain.storage import sha256_file
@@ -22,6 +27,7 @@ SHA1_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
 IGNORED_FILENAMES = frozenset({HASHFILE_V2_NAME, *HASHFILE_V1_NAMES})
 IGNORED_BASENAMES_CASEFOLD = frozenset({"thumbs.db"})
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -147,6 +153,55 @@ def build_hash_import_directory_plan(*, root_path: Path, directory: Path) -> Has
 def run_hash_import(*, root_path: Path, registry: Registry, chunk_size: int) -> HashImportSummary:
     """Walk a library tree and import authoritative SHA-256 hashes."""
 
+    plans = _collect_hash_import_plans(root_path)
+    chunk_results = _execute_hash_import_chunks(
+        registry=registry,
+        hashes=[sha256_value for plan in plans for sha256_value in plan.sha256_values],
+        chunk_size=chunk_size,
+        dry_run=False,
+    )
+    return _build_hash_import_summary(plans=plans, chunk_results=chunk_results)
+
+
+def run_hash_import_command(
+    *,
+    root_path: Path,
+    registry: Registry,
+    chunk_size: int,
+    dry_run: bool,
+    quiet: bool,
+    stats: bool,
+    logger: logging.Logger | None = None,
+    out: TextIO | None = None,
+) -> HashImportSummary:
+    """Execute hash-import with human output and structured log records."""
+
+    target_logger = logger or LOGGER
+    target_out = out or sys.stdout
+
+    plans = _collect_hash_import_plans(root_path)
+    chunk_results = _execute_hash_import_chunks(
+        registry=registry,
+        hashes=[sha256_value for plan in plans for sha256_value in plan.sha256_values],
+        chunk_size=chunk_size,
+        dry_run=dry_run,
+    )
+    summary = _build_hash_import_summary(plans=plans, chunk_results=chunk_results)
+
+    _emit_hash_import_logs(target_logger, summary=summary, chunk_results=chunk_results, dry_run=dry_run)
+    _write_hash_import_output(target_out, summary=summary, dry_run=dry_run, quiet=quiet, stats=stats)
+    return summary
+
+
+def format_hash_import_error(exc: Exception) -> str:
+    """Render hash-import errors with CLI-facing prefix text."""
+
+    return f"ERROR: {exc}"
+
+
+def _collect_hash_import_plans(root_path: Path) -> tuple[HashImportDirectoryPlan, ...]:
+    """Validate root and build directory plans in stable tree order."""
+
     if not root_path.exists():
         raise HashImportError(f"hash-import root does not exist: {root_path}")
     if not root_path.is_dir():
@@ -154,41 +209,201 @@ def run_hash_import(*, root_path: Path, registry: Registry, chunk_size: int) -> 
 
     directories = _iter_candidate_directories(root_path)
     if not directories:
-        return HashImportSummary(
-            directories_processed=0,
-            recomputes_performed=0,
-            valid_caches_consumed=0,
-            stale_invalid_caches_replaced=0,
-            total_imported=0,
-            total_skipped=0,
-            chunk_results=(),
-        )
+        return ()
+    return tuple(build_hash_import_directory_plan(root_path=root_path, directory=directory) for directory in directories)
 
-    recomputes_performed = 0
-    valid_caches_consumed = 0
-    stale_invalid_caches_replaced = 0
-    all_hashes: list[str] = []
 
-    for directory in directories:
-        plan = build_hash_import_directory_plan(root_path=root_path, directory=directory)
-        all_hashes.extend(plan.sha256_values)
-        if plan.source == "cache_v2":
-            valid_caches_consumed += 1
-        else:
-            recomputes_performed += 1
-        if plan.stale_or_invalid_cache_replaced:
-            stale_invalid_caches_replaced += 1
+def _build_hash_import_summary(
+    *,
+    plans: tuple[HashImportDirectoryPlan, ...],
+    chunk_results: tuple[HashImportChunkResult, ...],
+) -> HashImportSummary:
+    """Assemble aggregate summary from per-directory plans and chunk results."""
 
-    chunk_results = registry.bulk_insert_hash_import(hashes=all_hashes, chunk_size=chunk_size)
     return HashImportSummary(
-        directories_processed=len(directories),
-        recomputes_performed=recomputes_performed,
-        valid_caches_consumed=valid_caches_consumed,
-        stale_invalid_caches_replaced=stale_invalid_caches_replaced,
+        directories_processed=len(plans),
+        recomputes_performed=sum(1 for plan in plans if plan.source != "cache_v2"),
+        valid_caches_consumed=sum(1 for plan in plans if plan.source == "cache_v2"),
+        stale_invalid_caches_replaced=sum(1 for plan in plans if plan.stale_or_invalid_cache_replaced),
         total_imported=sum(result.imported for result in chunk_results),
         total_skipped=sum(result.skipped_existing for result in chunk_results),
         chunk_results=chunk_results,
     )
+
+
+def _execute_hash_import_chunks(
+    *,
+    registry: Registry,
+    hashes: list[str],
+    chunk_size: int,
+    dry_run: bool,
+) -> tuple[HashImportChunkResult, ...]:
+    """Execute or simulate chunked hash-import work."""
+
+    if chunk_size <= 0:
+        raise HashImportError("chunk_size must be > 0")
+    if not hashes:
+        return ()
+
+    reports: list[HashImportChunkResult] = []
+    known_existing = _fetch_existing_hash_import_hashes(registry.db_path, hashes) if dry_run else set()
+    simulated_seen = set(known_existing)
+
+    for chunk_index, start in enumerate(range(0, len(hashes), chunk_size), start=1):
+        chunk_hashes = hashes[start : start + chunk_size]
+        if dry_run:
+            imported = 0
+            skipped_existing = 0
+            for hash_value in chunk_hashes:
+                if hash_value in simulated_seen:
+                    skipped_existing += 1
+                    continue
+                imported += 1
+                simulated_seen.add(hash_value)
+            reports.append(
+                HashImportChunkResult(
+                    chunk_index=chunk_index,
+                    imported=imported,
+                    skipped_existing=skipped_existing,
+                )
+            )
+            continue
+
+        start_ts = perf_counter()
+        chunk_result = registry.bulk_insert_hash_import(
+            hashes=chunk_hashes,
+            chunk_size=len(chunk_hashes),
+        )[0]
+        duration_seconds = perf_counter() - start_ts
+        reports.append(
+            HashImportChunkResult(
+                chunk_index=chunk_index,
+                imported=chunk_result.imported,
+                skipped_existing=chunk_result.skipped_existing,
+                duration_seconds=duration_seconds,
+            )
+        )
+
+    return tuple(reports)
+
+
+def _fetch_existing_hash_import_hashes(db_path: Path, hashes: list[str]) -> set[str]:
+    """Return hash-import SHA-256 values already present in the registry."""
+
+    existing: set[str] = set()
+    unique_hashes = sorted(set(hashes))
+    if not unique_hashes:
+        return existing
+
+    with sqlite3.connect(db_path) as conn:
+        for start in range(0, len(unique_hashes), 500):
+            chunk = unique_hashes[start : start + 500]
+            placeholders = ", ".join("?" for _ in chunk)
+            rows = conn.execute(
+                f"""
+                SELECT hash_value
+                FROM external_hash_cache
+                WHERE account_name = '__hash_import__'
+                  AND source_relpath IS NULL
+                  AND hash_algo = 'sha256'
+                  AND hash_value IN ({placeholders})
+                """,
+                chunk,
+            ).fetchall()
+            existing.update(str(row[0]) for row in rows)
+    return existing
+
+
+def _emit_hash_import_logs(
+    logger: logging.Logger,
+    *,
+    summary: HashImportSummary,
+    chunk_results: tuple[HashImportChunkResult, ...],
+    dry_run: bool,
+) -> None:
+    """Emit structured chunk and summary logs for hash-import."""
+
+    total_duration = 0.0
+    for result in chunk_results:
+        duration_seconds = result.duration_seconds or 0.0
+        total_duration += duration_seconds
+        logger.info(
+            "hash-import chunk completed",
+            extra={
+                "command": "hash-import",
+                "chunk_index": result.chunk_index,
+                "imported": result.imported,
+                "skipped_existing": result.skipped_existing,
+                "duration": round(duration_seconds, 6),
+                "dry_run": dry_run,
+            },
+        )
+
+    logger.info(
+        "hash-import summary",
+        extra={
+            "command": "hash-import",
+            "chunk_index": 0,
+            "imported": summary.total_imported,
+            "skipped_existing": summary.total_skipped,
+            "duration": round(total_duration, 6),
+            "dry_run": dry_run,
+            "directories_processed": summary.directories_processed,
+            "recomputes_performed": summary.recomputes_performed,
+            "valid_caches_consumed": summary.valid_caches_consumed,
+            "stale_invalid_caches_replaced": summary.stale_invalid_caches_replaced,
+        },
+    )
+
+
+def _write_hash_import_output(
+    out: TextIO,
+    *,
+    summary: HashImportSummary,
+    dry_run: bool,
+    quiet: bool,
+    stats: bool,
+) -> None:
+    """Render human output for hash-import modes."""
+
+    if quiet:
+        return
+
+    if not dry_run:
+        for result in summary.chunk_results:
+            duration_seconds = result.duration_seconds or 0.0
+            print(
+                f"[chunk {result.chunk_index}] imported={result.imported} "
+                f"skipped_existing={result.skipped_existing} duration={duration_seconds:.2f}s",
+                file=out,
+            )
+        print(
+            f"DONE: total_imported={summary.total_imported} total_skipped={summary.total_skipped}",
+            file=out,
+        )
+    else:
+        total = summary.total_imported + summary.total_skipped
+        print(
+            f"DRY RUN: total={total} new={summary.total_imported} existing={summary.total_skipped}",
+            file=out,
+        )
+        if stats:
+            for result in summary.chunk_results:
+                print(
+                    f"[chunk {result.chunk_index}] imported={result.imported} "
+                    f"skipped_existing={result.skipped_existing} duration={(result.duration_seconds or 0.0):.2f}s",
+                    file=out,
+                )
+
+    if stats:
+        print(
+            "STATS: "
+            f"directories_processed={summary.directories_processed} "
+            f"recomputes_performed={summary.recomputes_performed} "
+            f"valid_caches_consumed={summary.valid_caches_consumed} "
+            f"stale_invalid_caches_replaced={summary.stale_invalid_caches_replaced}",
+            file=out,
+        )
 
 
 def _parse_hashes_v2_lines(text: str, *, source: str) -> tuple[str, tuple[tuple[str, str, str], ...]]:
