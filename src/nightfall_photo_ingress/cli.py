@@ -62,7 +62,64 @@ def _emit_status_snapshot(*, state: str, command: str, success: bool, details: d
 def _build_parser() -> argparse.ArgumentParser:
     """Build and return the top-level argument parser."""
 
-    parser = argparse.ArgumentParser(prog="nightfall-photo-ingress")
+    class _Formatter(argparse.RawDescriptionHelpFormatter):
+        """Suppress the auto-generated subcommand listing; DESCRIPTION already lists them."""
+
+        def _format_action(self, action: argparse.Action) -> str:
+            if action.nargs == argparse.PARSER:
+                return ""
+            return super()._format_action(action)
+
+    description = """\
+SYNOPSIS:
+    nightfall-photo-ingress [OPTIONS] COMMAND [COMMAND-ARGS]
+
+DESCRIPTION:
+    Operator CLI for the Nightfall photo ingress runtime. Manages OneDrive
+    account polling, ingest decisions, hash deduplication, and staging
+    lifecycle operations against a local SQLite registry.
+
+    Commands:
+      auth-setup            Initialize account authentication via device-code flow.
+      discover-paths        Auto-discover OneDrive Camera Roll storage paths.
+      poll                  Run one poll-and-ingest cycle for configured accounts.
+      reject                Reject a staged SHA-256 hash permanently.
+      accept                Accept a pending SHA-256 hash for ingest.
+      purge                 Purge a rejected hash and its staged file from disk.
+      process-trash         Scan and process the staging trash directory.
+      sync-import           Import advisory hashes from a library share (legacy).
+      hash-import           Import authoritative SHA-256 hashes from a library tree.
+      config-check          Validate the configuration file.
+      prune-auth-failures   Create a backup and prune historical auth failure rows.
+
+    Run 'nightfall-photo-ingress COMMAND --help' for per-command options.\
+"""
+
+    epilog = """\
+EXAMPLES:
+    # Validate configuration
+    nightfall-photo-ingress config-check --path /etc/nightfall/photo-ingress.conf
+
+    # Run one poll cycle
+    nightfall-photo-ingress poll --path /etc/nightfall/photo-ingress.conf
+
+    # Import library hashes (dry run with stats)
+    nightfall-photo-ingress hash-import /nightfall/media/pictures --dry-run --stats
+
+    # Reject a staged hash
+    nightfall-photo-ingress reject <sha256> --reason "duplicate"
+
+    # Prune auth failure audit rows, keeping latest 10
+    nightfall-photo-ingress prune-auth-failures --keep-latest 10\
+"""
+
+    parser = argparse.ArgumentParser(
+        prog="nightfall-photo-ingress",
+        description=description,
+        epilog=epilog,
+        formatter_class=_Formatter,
+    )
+    parser._action_groups[1].title = "OPTIONS"
     parser.add_argument(
         "--log-mode",
         choices=["json", "human"],
@@ -80,7 +137,7 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Write redacted httpx/httpcore transport diagnostics to a dedicated file instead of console output.",
     )
 
-    subparsers = parser.add_subparsers(dest="command")
+    subparsers = parser.add_subparsers(dest="command", metavar="COMMAND")
 
     auth = subparsers.add_parser("auth-setup", help="Initialize account authentication.")
     auth.add_argument("--account", help="Optional account name.", default=None)
