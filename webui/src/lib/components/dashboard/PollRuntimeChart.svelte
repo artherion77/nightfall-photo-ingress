@@ -12,13 +12,13 @@
 
   // SVG viewport constants
   const CHART_W = 320;
-  const CHART_H = 160;
+  const CHART_H = 220;
   const ML = 44; // margin left
   const MR = 12; // margin right
-  const MT = 24; // margin top
-  const MB = 32; // margin bottom
+  const MT = 16; // margin top
+  const MB = 28; // margin bottom
   const PLOT_W = CHART_W - ML - MR; // 264
-  const PLOT_H = CHART_H - MT - MB; // 104
+  const PLOT_H = CHART_H - MT - MB;
 
   // Ensure exactly 7 entries; filled left with zeros for missing days
   const DEFAULT_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -127,6 +127,9 @@
     border: 1px solid var(--border-default);
     border-radius: var(--radius-md);
     background: var(--surface-card);
+    display: grid;
+    grid-template-rows: auto 1fr;
+    min-height: 0;
   }
 
   .chart-title {
@@ -140,12 +143,13 @@
 
   .chart-svg {
     width: 100%;
-    height: auto;
+    height: 100%;
     display: block;
   }
 
   .axis-label {
-    font-size: 10px;
+    font-size: var(--text-sm);
+    font-weight: var(--text-sm-weight);
     fill: var(--text-muted);
     font-family: var(--font-family-base, sans-serif);
   }
