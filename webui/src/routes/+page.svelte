@@ -5,8 +5,9 @@
 	import KpiGrid from '$lib/components/dashboard/KpiGrid.svelte';
 	import PollRuntimeChart from '$lib/components/dashboard/PollRuntimeChart.svelte';
 	import {
-		applyDashboardFileTypeFilters,
+		applyDashboardFilters,
 		createFilterStore,
+		deriveDashboardAccountOptions,
 		deriveDashboardFileTypeOptions,
 	} from '$lib/stores/filterStore';
 	import type { AuditDailySummary, AuditPage } from '$lib/api/audit';
@@ -36,7 +37,14 @@
 
 	const dashboardItems = $derived(data.staging?.items ?? []);
 	const filterOptions = $derived(deriveDashboardFileTypeOptions(dashboardItems));
-	const filteredItems = $derived(applyDashboardFileTypeFilters(dashboardItems, $dashboardFilterStore));
+	const accountOptions = $derived(deriveDashboardAccountOptions(dashboardItems));
+	const filteredItems = $derived(
+		applyDashboardFilters(
+			dashboardItems,
+			$dashboardFilterStore.activeFilters,
+			$dashboardFilterStore.activeAccounts,
+		),
+	);
 
 	function formatItemType(filename: string): string {
 		const normalized = filename.toLowerCase().trim();
@@ -53,9 +61,15 @@
 	<div class="dashboard-layout">
 		<FilterSidebar
 			options={filterOptions}
-			activeFilters={$dashboardFilterStore}
+			accountOptions={accountOptions}
+			activeFilters={$dashboardFilterStore.activeFilters}
+			activeAccounts={$dashboardFilterStore.activeAccounts}
 			onToggle={(id) => dashboardFilterStore.toggle(id)}
-			onClear={() => dashboardFilterStore.clear()}
+			onToggleAccount={(account) => dashboardFilterStore.toggleAccount(account)}
+			onClear={() => {
+				dashboardFilterStore.clear();
+				dashboardFilterStore.clearAccounts();
+			}}
 		/>
 
 		<div class="dashboard-main">

@@ -1,26 +1,30 @@
 <script lang="ts">
-  import type { DashboardFileTypeOption } from '$lib/stores/filterStore';
+  import type { DashboardAccountOption, DashboardFileTypeOption } from '$lib/stores/filterStore';
 
   interface Props {
     options: DashboardFileTypeOption[];
+    accountOptions: DashboardAccountOption[];
     activeFilters: string[];
+    activeAccounts: Set<string>;
     onToggle: (filterId: string) => void;
+    onToggleAccount: (account: string) => void;
     onClear: () => void;
   }
 
-  let { options, activeFilters, onToggle, onClear }: Props = $props();
+  let { options, accountOptions, activeFilters, activeAccounts, onToggle, onToggleAccount, onClear }: Props = $props();
 
   const activeSet = $derived(new Set(activeFilters));
+  const activeAccountsSet = $derived(activeAccounts);
 </script>
 
 <aside class="filter-sidebar" data-testid="dashboard-filter-sidebar" aria-label="Dashboard file type filters">
   <div class="header">
-    <h2>File Type Filters</h2>
+    <h2>Filters</h2>
     <button
       type="button"
       class="clear-button"
       onclick={onClear}
-      disabled={activeFilters.length === 0}
+      disabled={activeFilters.length === 0 && activeAccounts.size === 0}
       data-testid="dashboard-filter-clear"
     >
       Clear
@@ -47,6 +51,29 @@
         </li>
       {/each}
     </ul>
+  {/if}
+
+  {#if accountOptions.length > 0}
+    <div class="account-section" data-testid="dashboard-account-filter-section">
+      <h3>Accounts</h3>
+      <ul class="filter-list">
+        {#each accountOptions as option}
+          <li>
+            <button
+              type="button"
+              class:active={activeAccountsSet.has(option.id)}
+              style={`--filter-accent: var(${option.tokenVar})`}
+              onclick={() => onToggleAccount(option.id)}
+              data-testid={`dashboard-account-filter-option-${option.id}`}
+            >
+              <span class="swatch" aria-hidden="true"></span>
+              <span class="label">{option.label}</span>
+              <span class="count">{option.count}</span>
+            </button>
+          </li>
+        {/each}
+      </ul>
+    </div>
   {/if}
 </aside>
 
@@ -75,6 +102,20 @@
     font-weight: var(--text-md-weight);
     line-height: var(--text-md-line-height);
     color: var(--text-primary);
+  }
+
+  h3 {
+    margin: 0;
+    font-size: var(--text-sm);
+    font-weight: var(--text-md-weight);
+    line-height: var(--text-sm-line-height);
+    color: var(--text-secondary);
+  }
+
+  .account-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
   }
 
   .clear-button {
