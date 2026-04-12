@@ -1,10 +1,30 @@
 # Web Control Plane — Phase 2 Architecture Roadmap
 
-Status: Active
-Date: 2026-04-11
+Status: **COMPLETE** (2026-04-12)
+Date: 2026-04-11 (activated) → 2026-04-12 (finalized)
 Owner: Systems Engineering
 
-## 1. Executive Summary
+## Executive Summary — Phase 2 Completion
+
+**Phase 2 is now COMPLETE as of 2026-04-12.**
+
+All mandatory Phase-2 objectives have been delivered and validated:
+1. ✅ Reverse proxy (Caddy) and TLS termination operational
+2. ✅ Build artifact versioning and rollback workflow completed
+3. ✅ API versioning policy (C5) formalized and enforced
+4. ✅ Dashboard Filter Sidebar (C6) implemented and tested
+5. ✅ Audit Timeline infinite scroll (C7) deployed
+6. ✅ KPI Threshold configuration API (C8) fully functional
+7. ✅ Read-path retry/backoff resilience (C9) validated
+8. ✅ Documentation normalization (C10) complete
+
+**LAN exposure gate is signed off** with all operational and technical requirements satisfied.
+
+**Phase 2 roadmap is now archived.** All active planning continues in `planning/implemented/phase-2-implementation-plan.md` (read-only) and future work is tracked in `planning/planned/*` (Phase 3+).
+
+---
+
+## 1. Original Executive Summary
 
 Phase 2 is now activated as the authoritative next design phase for the Web Control Plane.
 The objective is to complete LAN-exposure readiness and deferred Phase 2 operator features

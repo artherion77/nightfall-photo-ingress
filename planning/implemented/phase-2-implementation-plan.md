@@ -370,6 +370,47 @@ Validated policy outcomes:
 6. UI exits loading state on retry exhaustion and surfaces deterministic error state.
 7. UI prevents duplicate overlapping read-page loads while one request is in-flight.
 
+### C10 — Documentation Normalization and Phase-2 Finalization
+
+Goal:
+- Normalize all Phase-2 documentation and finalize Phase-2 implementation.
+- Ensure architecture, design, and implementation plan are fully synchronized.
+- Prepare Phase-2 completion and handoff to Phase-3 readiness.
+
+Status: **COMPLETE (Documentation-only)**
+
+Scope guardrails:
+1. Documentation-only chunk (no code, API, UI, or infra changes).
+2. Focus on link normalization and drift audit.
+3. Migration of completed Phase-2 planning artifacts to implemented/.
+4. Addition of Phase-2 exit confirmation and validation.
+
+Validation evidence:
+1. All Phase-2 planning documents (phase-2-implementation-plan.md, phase-2-architecture-roadmap.md) migrated to `../implemented/`.
+2. All relative links verified and corrected in:
+   - `../../design/web/architecture.md`
+   - `../../design/web/api.md`
+   - `../../design/web/design-decisions.md`
+   - `../../design/infra/*`
+3. Duplication audit completed (duplicates in design-decisions.md removed).
+4. Phase-2 exit confirmation section added to architecture.md with:
+   - All C1-C9 marked complete
+   - Mandatory items delivered checklist
+   - LAN exposure gate validation evidence
+   - API versioning policy active confirmation
+   - UI feature set complete acknowledgment
+   - Retry/backoff resilience validated
+   - No remaining drift noted
+5. Implementation plan marked Phase-2 complete with all chunks (C1-C10) archived to implemented/.
+
+Validated policy outcomes:
+1. Documentation is drift-free and internally consistent.
+2. All Phase-2 chunks (C1-C10) are marked complete.
+3. All Phase-2 documents are synchronized.
+4. All completed artifacts migrated to ../implemented/ with archival immutability enforced.
+5. Architecture and implementation plan contain no inconsistencies.
+6. Phase-2 exit criteria fully documented.
+
 ## 2. Cross-Chunk Invariants
 
 1. /api/v1 path baseline remains stable unless explicitly versioned.

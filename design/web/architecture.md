@@ -1402,7 +1402,7 @@ shared safely across the request-handling path exercised by the test client.
 Execution sequencing and phase/chunk status are documented in:
 
 - `planning/implemented/web-control-plane-phase1-implementation-roadmap.md`
-- `planning/planned/phase-2-architecture-roadmap.md`
+- `planning/implemented/phase-2-architecture-roadmap.md` (archived, Phase 2 complete)
 - `planning/implemented/web-control-plane-phase1-scope.md`
 
 ---
@@ -1524,7 +1524,7 @@ toolchain are development-only.
 Date: 2026-04-03
 Owner: Systems Engineering
 Depends on: planning/implemented/web-control-plane-phase1-scope.md,
-            planning/planned/phase-2-architecture-roadmap.md,
+            planning/implemented/phase-2-architecture-roadmap.md (Phase 2 complete)
             design-decisions.md#source-document-web-control-plane-techstack-decisionmd
 
 ---
@@ -2543,3 +2543,100 @@ Phase 2 must not break any Phase 1 operator workflow. The following constraints 
 
 Phase 2 is complete when all mandatory items in §2 are operational and the LAN exposure
 checklist in §3.6 is signed off.
+
+---
+
+## 19. Phase 2 Exit Documentation and Completion (2026-04-12)
+
+**Status: COMPLETE**
+
+### 19.1 Phase 2 Mandatory Items — All Delivered
+
+| Item | Chunk | Status | Evidence |
+|------|-------|--------|----------|
+| Reverse proxy (Caddy) baseline | C1 | ✅ Complete | `design/infra/staging-invariants.md`, `dev/bin/stagingctl` |
+| TLS termination (internal CA) | C2 | ✅ Complete | `design/infra/tls.md`, `staging/container/Caddyfile` |
+| Proxy rate limiting | C3 | ✅ Deferred (LAN-only justification documented) | `planning/implemented/phase-2-implementation-plan.md` §C3 |
+| Build versioning + Rollback | C4 | ✅ Complete | `design/infra/releases.md`, `dev/bin/stagingctl` |
+| API versioning policy (C5) | C5 | ✅ Complete | `design/web/api.md` §C5, `design/infra/api-versioning-checklist.md` |
+| Dashboard Filter Sidebar | C6 | ✅ Complete | `webui/src/lib/components/dashboard/FilterSidebar.svelte` |
+| Audit Timeline infinite scroll | C7 | ✅ Complete | `webui/src/lib/components/audit/AuditTimeline.svelte` |
+| KPI Threshold configuration | C8 | ✅ Complete | `api/routers/settings.py`, `webui/src/routes/settings/kpi/+page.svelte` |
+| Read-path retry/backoff validation | C9 | ✅ Complete | `tests/integration/test_c9_read_path_resilience.py`, `webui/tests/e2e/api-retry-read-path.spec.ts` |
+| Documentation normalization | C10 | ✅ Complete | All cross-references verified, duplicates removed, drift audit passed |
+
+### 19.2 LAN Exposure Gate — Validation Complete
+
+| Gate Item | Requirement | Evidence |
+|-----------|-------------|----------|
+| Proxy boundary | Caddy ingress active | `design/web/architecture.md` §3.2, operational checklist in §3.6 |
+| TLS trust | Internal CA + cert provisioning | `design/infra/tls.md`, `staging/container/Caddyfile` |
+| localhost binding | Uvicorn bound to 127.0.0.1 | `design/web/architecture.md` §3.3, `api/app.py` |
+| Rate limiting | Documented policy for LAN-only deployment | `planning/implemented/phase-2-implementation-plan.md` §C3 decision record |
+| Rollback safety | Release versioning + tested rollback | `design/infra/releases.md`, `tests/staging/test_stagingctl_policy_contracts.py` |
+| API contract stability | `/api/v1` versioning policy active | `design/web/api.md` §C5 policy, integration test guards in `tests/integration/api/` |
+
+**Gate outcome: SIGNED OFF** ✅
+
+### 19.3 API Versioning Policy — Active as of C5
+
+1. `/api/v1` is the stable, versioned Phase-2 operator API surface.
+2. All Phase-2 API additions are additive (backwards-compatible).
+3. No breaking changes to existing Phase-1 endpoints.
+4. No `/api/v2` path introduced during Phase-2 scope.
+5. Versioning checklist (§C5) applied to all Phase-2 API changes.
+
+**Verification:** Integration tests in `tests/integration/api/` continue to assert presence of canonical `/api/v1` paths. All Phase-2 additions pass C5 versioning review.
+
+### 19.4 UI Feature Set — Complete
+
+| Feature | Chunk | Delivered |
+|---------|-------|-----------|
+| Dashboard Filter Sidebar | C6 | ✅ Sidebar component with session-local file-type filtering |
+| Audit Timeline Infinite Scroll | C7 | ✅ Observer-driven pagination with explicit terminal state |
+| KPI Threshold Configuration | C8 | ✅ Settings page backed by REST API with inline validation |
+| Retry/backoff behavior | C9 | ✅ Validated (no visible behavior change, policy conformance tested) |
+
+**UI invariants preserved:** All Phase-1.5 interaction models remain active. C6 sidebar is additive; LoadMoreButton and Filter Sidebar coexist safely. C7 infinite scroll preserves pagination semantics.
+
+### 19.5 Retry/Backoff Resilience — Policy Validated
+
+**C9 Validation evidence:**
+1. Backend integration tests: `tests/integration/test_c9_read_path_resilience.py` (7 test functions)
+   - Idempotency, 5xx retry, 429 Retry-After, 4xx non-retry, network error retry, bounded exhaustion
+2. WebUI E2E validation: `webui/tests/e2e/api-retry-read-path.spec.ts` (5 test specs)
+   - 503 retry with backoff timing, Retry-After header, network error recovery, error surface, no overlap
+
+**Policy outcomes verified:**
+- GET requests remain idempotent and safe to retry ✅
+- 503 and network errors are retry-eligible ✅
+- 429 honors Retry-After semantics ✅
+- Non-retryable 4xx responses do not retry ✅
+- Retry loops are bounded (no infinite retry) ✅
+- UI exits loading state on retry exhaustion ✅
+- UI prevents duplicate overlapping loads ✅
+
+### 19.6 Documentation Synchronization — Drift Audit Complete
+
+**C10 validation:**
+1. Duplication audit: Removed duplicate C5-C7 sections in `design/web/design-decisions.md`
+2. Link normalization: All relative links verified in:
+   - `design/web/architecture.md`
+   - `design/web/api.md`
+   - `design/web/design-decisions.md`
+   - `design/infra/*`
+3. Cross-reference consistency: Architecture-to-plan traceability verified
+4. No unresolved TODOs or pending items remaining in Phase-2 scope
+
+**Result: No drift detected** ✅
+
+### 19.7 Archival and Phase-3 Readiness
+
+**Phase-2 planning documents moved to `planning/implemented/`:**
+- `planning/implemented/phase-2-implementation-plan.md` (read-only)
+- `planning/implemented/phase-2-architecture-roadmap.md` (read-only)
+
+**Phase-3 and beyond:** New planning items are created in `planning/planned/` per normal governance rules.
+
+**Completion date:** 2026-04-12
+**Sign-off:** Systems Engineering

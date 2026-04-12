@@ -47,4 +47,4 @@ Use this checklist for every API change:
 1. OpenAPI path coverage confirms canonical `/api/v1` surfaces remain present.
 2. Relevant integration tests pass for unchanged endpoints.
 3. Any new endpoint tests are added or existing tests extended.
-4. `planning/planned/phase-2-implementation-plan.md` is updated if the change is part of a Phase 2 chunk.
+4. `planning/implemented/phase-2-implementation-plan.md` (Phase 2 archived) or new Phase 3 planning doc is updated if the change is deferred to future phases.
