@@ -273,10 +273,10 @@ Validation evidence:
 
 ### C6/C7 Infrastructure Extension Summary — Cloudflare Tunnel
 
-1. `stagingctl create` now enforces a single read-only host mount for the Cloudflare tunnel token:
-	- source: `/home/chris/.cloudflare-secrets/npi-staging/tunnel-token`
-	- container path: `/etc/cloudflared/token`
-2. `stagingctl install` now validates the token mount, installs `cloudflared` if missing, and enables/restarts `cloudflared-tunnel.service`.
+1. `stagingctl create` now enforces read-only host mounts for Cloudflare local-managed auth:
+	- source: `/home/chris/.cloudflare-secrets/npi-staging/cloudflared-auth-cert.pem` -> container path: `/etc/cloudflared/cloudflared-auth-cert.pem`
+	- source: `/home/chris/.cloudflare-secrets/npi-staging/tunnel-credentials.json` -> container path: `/etc/cloudflared/tunnel-credentials.json`
+2. `stagingctl install` now validates auth mounts, installs `cloudflared` if missing, and enables/restarts `cloudflared-tunnel.service`.
 3. `stagingctl cloudflared-status` provides operator diagnostics for mount policy, runtime state, tunnel connectivity, and recent logs.
 4. `govctl staging.validate` now fails fast unless both trust-sync (`export-ca`) and Cloudflare tunnel strict status checks pass.
 5. Secret-handling policy is explicit: no Cloudflare credentials may persist in container-local writable filesystem paths.

@@ -88,5 +88,5 @@ This overwrites `tests/ca/staging-ca.pem` and prevents CA drift between staging 
 3. Cloudflare-origin transport can use either:
    - Cloudflare Origin Certificate trust to Caddy, or
    - TLS passthrough policy that still terminates at Caddy in-container.
-4. Token authentication for cloudflared must use a host-mounted, read-only token file at `/etc/cloudflared/token`.
+4. Local-managed authentication for cloudflared must use host-mounted, read-only files for auth cert and tunnel credentials.
 5. Cloudflare credential artifacts must not persist in container-local writable paths.

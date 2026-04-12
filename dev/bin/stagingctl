@@ -61,11 +61,12 @@ CLOUDFLARE_ORIGIN_RUNTIME_DIR="/run/caddy"
 CLOUDFLARE_ORIGIN_RUNTIME_CERT="$CLOUDFLARE_ORIGIN_RUNTIME_DIR/cloudflare-origin.crt"
 CLOUDFLARE_ORIGIN_RUNTIME_KEY="$CLOUDFLARE_ORIGIN_RUNTIME_DIR/cloudflare-origin.key"
 EXPORTED_CA_PATH="$PROJECT_ROOT/tests/ca/staging-ca.pem"
-CF_TUNNEL_ORIGINCERT_HOST_PATH="/home/chris/.cloudflare-secrets/npi-staging/origincert.pem"
-CF_TUNNEL_ORIGINCERT_CT_PATH="/etc/cloudflared/origincert.pem"
+CF_TUNNEL_AUTH_CERT_HOST_PATH="/home/chris/.cloudflare-secrets/npi-staging/cloudflared-auth-cert.pem"
+CF_TUNNEL_AUTH_CERT_CT_PATH="/etc/cloudflared/cloudflared-auth-cert.pem"
 CF_TUNNEL_CREDENTIALS_HOST_PATH="/home/chris/.cloudflare-secrets/npi-staging/tunnel-credentials.json"
 CF_TUNNEL_CREDENTIALS_CT_PATH="/etc/cloudflared/tunnel-credentials.json"
-CF_TUNNEL_ORIGINCERT_DEVICE_NAME="cloudflared-origincert"
+CF_TUNNEL_AUTH_CERT_DEVICE_NAME="cloudflared-auth-cert"
+CF_TUNNEL_AUTH_CERT_LEGACY_DEVICE_NAME="cloudflared-origincert"
 CF_TUNNEL_CREDENTIALS_DEVICE_NAME="cloudflared-credentials"
 CF_TUNNEL_DEVICE_SHIFT="true"
 CF_TUNNEL_SERVICE_NAME="cloudflared-tunnel.service"
@@ -167,19 +168,24 @@ _validate_network_policy() {
 _ensure_cloudflared_token_mount() {
     _require_container_exists
 
-    [[ -f "$CF_TUNNEL_ORIGINCERT_HOST_PATH" ]] || _fail "Cloudflare tunnel origincert missing on host: $CF_TUNNEL_ORIGINCERT_HOST_PATH"
+    [[ -f "$CF_TUNNEL_AUTH_CERT_HOST_PATH" ]] || _fail "Cloudflare tunnel auth cert missing on host: $CF_TUNNEL_AUTH_CERT_HOST_PATH"
     [[ -f "$CF_TUNNEL_CREDENTIALS_HOST_PATH" ]] || _fail "Cloudflare tunnel credentials missing on host: $CF_TUNNEL_CREDENTIALS_HOST_PATH"
 
     lxc exec "$CONTAINER" -- mkdir -p /etc/cloudflared
 
-    if lxc config device show "$CONTAINER" | rg -q "^$CF_TUNNEL_ORIGINCERT_DEVICE_NAME:"; then
-        lxc config device set "$CONTAINER" "$CF_TUNNEL_ORIGINCERT_DEVICE_NAME" source "$CF_TUNNEL_ORIGINCERT_HOST_PATH"
-        lxc config device set "$CONTAINER" "$CF_TUNNEL_ORIGINCERT_DEVICE_NAME" path "$CF_TUNNEL_ORIGINCERT_CT_PATH"
-        lxc config device set "$CONTAINER" "$CF_TUNNEL_ORIGINCERT_DEVICE_NAME" readonly "true"
-        lxc config device set "$CONTAINER" "$CF_TUNNEL_ORIGINCERT_DEVICE_NAME" shift "$CF_TUNNEL_DEVICE_SHIFT"
+    if lxc config device show "$CONTAINER" | rg -q "^$CF_TUNNEL_AUTH_CERT_LEGACY_DEVICE_NAME:"; then
+        _warn "Removing legacy Cloudflare auth device '$CF_TUNNEL_AUTH_CERT_LEGACY_DEVICE_NAME' during rename migration."
+        lxc config device remove "$CONTAINER" "$CF_TUNNEL_AUTH_CERT_LEGACY_DEVICE_NAME"
+    fi
+
+    if lxc config device show "$CONTAINER" | rg -q "^$CF_TUNNEL_AUTH_CERT_DEVICE_NAME:"; then
+        lxc config device set "$CONTAINER" "$CF_TUNNEL_AUTH_CERT_DEVICE_NAME" source "$CF_TUNNEL_AUTH_CERT_HOST_PATH"
+        lxc config device set "$CONTAINER" "$CF_TUNNEL_AUTH_CERT_DEVICE_NAME" path "$CF_TUNNEL_AUTH_CERT_CT_PATH"
+        lxc config device set "$CONTAINER" "$CF_TUNNEL_AUTH_CERT_DEVICE_NAME" readonly "true"
+        lxc config device set "$CONTAINER" "$CF_TUNNEL_AUTH_CERT_DEVICE_NAME" shift "$CF_TUNNEL_DEVICE_SHIFT"
     else
-        lxc config device add "$CONTAINER" "$CF_TUNNEL_ORIGINCERT_DEVICE_NAME" disk \
-            source="$CF_TUNNEL_ORIGINCERT_HOST_PATH" path="$CF_TUNNEL_ORIGINCERT_CT_PATH" readonly=true shift="$CF_TUNNEL_DEVICE_SHIFT"
+        lxc config device add "$CONTAINER" "$CF_TUNNEL_AUTH_CERT_DEVICE_NAME" disk \
+            source="$CF_TUNNEL_AUTH_CERT_HOST_PATH" path="$CF_TUNNEL_AUTH_CERT_CT_PATH" readonly=true shift="$CF_TUNNEL_DEVICE_SHIFT"
     fi
 
     if lxc config device show "$CONTAINER" | rg -q "^$CF_TUNNEL_CREDENTIALS_DEVICE_NAME:"; then
@@ -192,7 +198,7 @@ _ensure_cloudflared_token_mount() {
             source="$CF_TUNNEL_CREDENTIALS_HOST_PATH" path="$CF_TUNNEL_CREDENTIALS_CT_PATH" readonly=true shift="$CF_TUNNEL_DEVICE_SHIFT"
     fi
 
-    _info "Cloudflare local-managed auth mounts configured (origincert + credentials)."
+    _info "Cloudflare local-managed auth mounts configured (auth cert + credentials)."
 }
 
 _ensure_cloudflare_origin_mounts_optional() {
@@ -267,10 +273,10 @@ runuser -u caddy -- test -r '$CLOUDFLARE_ORIGIN_RUNTIME_KEY'"
 _assert_cloudflared_token_mounted_readonly() {
     _require_container_running
 
-    [[ -f "$CF_TUNNEL_ORIGINCERT_HOST_PATH" ]] || _fail "Cloudflare tunnel origincert missing on host: $CF_TUNNEL_ORIGINCERT_HOST_PATH"
+    [[ -f "$CF_TUNNEL_AUTH_CERT_HOST_PATH" ]] || _fail "Cloudflare tunnel auth cert missing on host: $CF_TUNNEL_AUTH_CERT_HOST_PATH"
     [[ -f "$CF_TUNNEL_CREDENTIALS_HOST_PATH" ]] || _fail "Cloudflare tunnel credentials missing on host: $CF_TUNNEL_CREDENTIALS_HOST_PATH"
 
-    for device_name in "$CF_TUNNEL_ORIGINCERT_DEVICE_NAME" "$CF_TUNNEL_CREDENTIALS_DEVICE_NAME"; do
+    for device_name in "$CF_TUNNEL_AUTH_CERT_DEVICE_NAME" "$CF_TUNNEL_CREDENTIALS_DEVICE_NAME"; do
         local existing_ro existing_shift
         existing_ro="$(lxc config device get "$CONTAINER" "$device_name" readonly 2>/dev/null || true)"
         existing_shift="$(lxc config device get "$CONTAINER" "$device_name" shift 2>/dev/null || true)"
@@ -278,18 +284,18 @@ _assert_cloudflared_token_mounted_readonly() {
         [[ "$existing_shift" == "$CF_TUNNEL_DEVICE_SHIFT" ]] || _fail "Cloudflare auth mount '$device_name' must set shift=true"
     done
 
-    lxc exec "$CONTAINER" -- test -s "$CF_TUNNEL_ORIGINCERT_CT_PATH" \
-        || _fail "Cloudflare origincert not visible in container at $CF_TUNNEL_ORIGINCERT_CT_PATH"
+    lxc exec "$CONTAINER" -- test -s "$CF_TUNNEL_AUTH_CERT_CT_PATH" \
+        || _fail "Cloudflare auth cert not visible in container at $CF_TUNNEL_AUTH_CERT_CT_PATH"
     lxc exec "$CONTAINER" -- test -s "$CF_TUNNEL_CREDENTIALS_CT_PATH" \
         || _fail "Cloudflare credentials not visible in container at $CF_TUNNEL_CREDENTIALS_CT_PATH"
 
-    lxc exec "$CONTAINER" -- bash -lc "head -c 1 '$CF_TUNNEL_ORIGINCERT_CT_PATH' >/dev/null" \
-        || _fail "Cloudflare origincert is not readable by cloudflared service runtime"
+    lxc exec "$CONTAINER" -- bash -lc "head -c 1 '$CF_TUNNEL_AUTH_CERT_CT_PATH' >/dev/null" \
+        || _fail "Cloudflare auth cert is not readable by cloudflared service runtime"
     lxc exec "$CONTAINER" -- bash -lc "head -c 1 '$CF_TUNNEL_CREDENTIALS_CT_PATH' >/dev/null" \
         || _fail "Cloudflare credentials are not readable by cloudflared service runtime"
 
-    lxc exec "$CONTAINER" -- bash -lc "mount | grep -F ' on $CF_TUNNEL_ORIGINCERT_CT_PATH ' | grep -q '(ro,'" \
-        || _fail "Cloudflare origincert mount inside container is not read-only"
+    lxc exec "$CONTAINER" -- bash -lc "mount | grep -F ' on $CF_TUNNEL_AUTH_CERT_CT_PATH ' | grep -q '(ro,'" \
+        || _fail "Cloudflare auth cert mount inside container is not read-only"
     lxc exec "$CONTAINER" -- bash -lc "mount | grep -F ' on $CF_TUNNEL_CREDENTIALS_CT_PATH ' | grep -q '(ro,'" \
         || _fail "Cloudflare credentials mount inside container is not read-only"
 }
@@ -347,7 +353,7 @@ Type=simple
 User=root
 Restart=always
 RestartSec=5s
-ExecStart=/bin/bash -lc 'set -euo pipefail; exec /usr/bin/cloudflared --config $CF_CLOUDFLARED_CONFIG_PATH tunnel run'
+ExecStart=/bin/bash -lc 'set -euo pipefail; exec /usr/bin/cloudflared --config $CF_CLOUDFLARED_CONFIG_PATH --origincert $CF_TUNNEL_AUTH_CERT_CT_PATH tunnel run'
 
 [Install]
 WantedBy=multi-user.target
@@ -449,7 +455,6 @@ PY
     lxc exec "$CONTAINER" -- bash -lc "cat > '$CF_CLOUDFLARED_CONFIG_PATH' <<'EOF'
 tunnel: $tunnel_id
 credentials-file: $CF_TUNNEL_CREDENTIALS_CT_PATH
-origincert: $CF_TUNNEL_ORIGINCERT_CT_PATH
 ingress:
   - hostname: npi.pohl-family.org
     service: https://127.0.0.1:8443

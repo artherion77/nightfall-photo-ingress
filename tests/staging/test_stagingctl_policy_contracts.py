@@ -262,20 +262,20 @@ class TestTlsC2:
 
 class TestCloudflareTunnel:
     def test_stagingctl_defines_token_mount_paths(self, stagingctl_text: str) -> None:
-        assert 'CF_TUNNEL_ORIGINCERT_HOST_PATH="/home/chris/.cloudflare-secrets/npi-staging/origincert.pem"' in stagingctl_text
-        assert 'CF_TUNNEL_ORIGINCERT_CT_PATH="/etc/cloudflared/origincert.pem"' in stagingctl_text
+        assert 'CF_TUNNEL_AUTH_CERT_HOST_PATH="/home/chris/.cloudflare-secrets/npi-staging/cloudflared-auth-cert.pem"' in stagingctl_text
+        assert 'CF_TUNNEL_AUTH_CERT_CT_PATH="/etc/cloudflared/cloudflared-auth-cert.pem"' in stagingctl_text
         assert 'CF_TUNNEL_CREDENTIALS_HOST_PATH="/home/chris/.cloudflare-secrets/npi-staging/tunnel-credentials.json"' in stagingctl_text
         assert 'CF_TUNNEL_CREDENTIALS_CT_PATH="/etc/cloudflared/tunnel-credentials.json"' in stagingctl_text
 
     def test_stagingctl_adds_read_only_lxd_disk_mount(self, stagingctl_text: str) -> None:
-        assert 'lxc config device add "$CONTAINER" "$CF_TUNNEL_ORIGINCERT_DEVICE_NAME" disk' in stagingctl_text
+        assert 'lxc config device add "$CONTAINER" "$CF_TUNNEL_AUTH_CERT_DEVICE_NAME" disk' in stagingctl_text
         assert 'lxc config device add "$CONTAINER" "$CF_TUNNEL_CREDENTIALS_DEVICE_NAME" disk' in stagingctl_text
         assert 'readonly=true' in stagingctl_text
 
     def test_stagingctl_installs_and_manages_cloudflared_service(self, stagingctl_text: str) -> None:
         assert 'apt-get install -y cloudflared' in stagingctl_text
         assert 'CF_TUNNEL_SERVICE_NAME="cloudflared-tunnel.service"' in stagingctl_text
-        assert 'cloudflared --config $CF_CLOUDFLARED_CONFIG_PATH tunnel run' in stagingctl_text
+        assert 'cloudflared --config $CF_CLOUDFLARED_CONFIG_PATH --origincert $CF_TUNNEL_AUTH_CERT_CT_PATH tunnel run' in stagingctl_text
         assert '--token' not in stagingctl_text
         assert 'systemctl disable --now "$CF_TUNNEL_SERVICE_NAME"' in stagingctl_text
 
