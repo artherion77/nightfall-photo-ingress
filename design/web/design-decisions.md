@@ -1926,3 +1926,166 @@ for reference by implementation plans.
 | 2026-04-08 | Added Decision A.2 — Centering Invariant (Revised): replaced strict viewport-center alignment with perceptual centering model |
 | 2026-04-08 | Added Decision D — Stage-Based Slot Architecture: authorized migration from spatial-carousel to fixed-slot model. Restored original A.2 centering intent. Reframed VIS-1 as structural invariant. Marked revised A.2 as historical. |
 | 2026-04-09 | Added Decisions E–K — Fidelity Pass invariants: active photo dominance, primary action cluster, drag & drop, scroll containment, operator-first metadata, details presentation, minimum viewport and full-viewport layout. |
+| 2026-04-12 | Added Decisions D1–D6 — Dashboard Fidelity Drift Correction: typography normalization, filter sidebar account dimension, health bar overhaul, audit event layout redesign, poll runtime chart upgrade, typography polish pass. |
+
+---
+
+## Decisions D1–D6: Dashboard Fidelity Drift Correction (Completed 2026-04-12)
+
+### Rationale
+
+A visual and functional drift analysis identified gaps between the UI design mock and live dashboard implementation. Six independent decision clusters (D1–D6) address operator findings and design inconsistencies:
+
+1. **D1**: Dashboard chrome and KPI label normalization per mock
+2. **D2**: Filter sidebar account dimension (operator request)
+3. **D3**: Health bar gradient and status badge icon expansion
+4. **D4**: Audit event layout restructuring and account name resolution
+5. **D5**: Poll runtime chart upgrade (bar sparkline → 7-day line chart)
+6. **D6**: Typography and visual polish pass (cross-cutting)
+
+All decisions are **backwards-compatible** (no breaking API changes, no schema migrations).
+
+### D1 — Dashboard Chrome and KPI Normalization
+
+**Decision:**
+- Dashboard title normalization: "Dashboard" → "Photo-Ingress Dashboard"
+- KPI label normalization in KpiGrid to match mock verbatim:
+  - "Pending" → "Pending in Staging"
+  - "Live Photo Pairs" → "Live Photo Pairs Detected"
+  - "Last Poll (s)" → "Last Poll Duration"
+- "Loaded Files" section rename to "Pending Files" with scroll containment (max-height: 320px)
+- File name hover tooltips for truncated names
+
+**Invariants:**
+- D1-1: Dashboard H1 text reads "Photo-Ingress Dashboard" (exact match)
+- D1-2: All KPI card labels match mock design (5/5 labels)
+- D1-3: Pending Files section max-height 320px; overflow-y auto when items > ~8
+- D1-4: Truncated filenames show full name on hover
+
+**Validation:** ✅ Unit + typecheck pass
+
+---
+
+### D2 — Filter Sidebar: Account Dimension
+
+**Decision:**
+- Sidebar heading rename: "File Type Filters" → "Filters"
+- Account filter dimension added alongside file-type filters
+- Account filter uses button-toggle pattern (consistent with file-type toggles)
+- Multi-select account filtering (inclusive OR logic) on dashboard items
+- No backend API changes (client-side filtering only)
+
+**Invariants:**
+- D2-1: Sidebar heading displays "Filters"
+- D2-2: Account filter section appears when data has non-null accounts
+- D2-3: Account toggles show name + count per account
+- D2-4: Multiple account selections apply inclusive OR (items matching any selected account)
+- D2-5: File-type toggle pattern preserved unchanged
+
+**Validation:** ✅ Unit + typecheck pass
+
+---
+
+### D3 — Health Bar and Status Badge Overhaul
+
+**Decision:**
+- Gradient bar (teal → amber → red) above health status badges
+- Status badge label expansion (Auth → OneDrive Auth, Registry → Registry Integrity, Disk → Disk Usage)
+- Inline SVG icons per status state (checkmark-circle, warning-triangle, x-circle, cloud)
+- Legend row: "Health Status: {state1} {state2} {state3} {state4}"
+
+**Invariants:**
+- D3-1: Gradient bar renders above badges with color progression: teal (ok) → amber (warning) → red (error)
+- D3-2: Badge labels match mock verbatim (4/4 expanded labels)
+- D3-3: Each badge displays status icon (no raw dot, icon selection per state)
+- D3-4: Icons implemented as inline SVG (no external icon font or library)
+- D3-5: SVG payload ≤ 500 bytes per icon
+
+**Validation:** ✅ Unit + typecheck pass
+
+---
+
+### D4 — Audit Event Layout and Data Fidelity
+
+**Decision:**
+- Audit event layout redesign: [icon] [bold filename] [colored action] [relative time]
+- Remove pipe-delimited flat text format
+- Status-to-icon mapping: accepted → green circle, duplicate → teal circle, rejected → red X, deleted → trash
+- Action color mapping: accept (teal), reject (red), duplicate (blue), deleted (muted)
+- Relative time formatting utility (e.g., "25 mins ago"; fallback to ISO if > 7 days)
+- Backend account name resolution in audit_hook.py (no schema migration; in-process lookup)
+- Audit preview heading accent: teal left-border
+
+**Invariants:**
+- D4-1: Audit row layout displays [icon] [filename (bold)] [action (colored)] [time (relative)]
+- D4-2: No pipe separators in audit event rendering
+- D4-3: Status icons present (not null dots); icon selection per action type
+- D4-4: Relative time displays "N mins/hrs/days ago" for events < 7 days; ISO timestamp otherwise
+- D4-5: Account name populated when staging registry has matching account
+- D4-6: Audit preview heading shows teal left-border accent (#F0F0F0 bg + 2px teal border)
+
+**Validation:** ✅ Unit + backend unit + typecheck pass
+
+---
+
+### D5 — Poll Runtime Chart Upgrade
+
+**Decision:**
+- Replace bar sparkline with SVG line chart: "Poll Runtimes (Last 7 Days)"
+- Y-axis: labeled scale (0s to max, rounded up by 5-second increments)
+- X-axis: day-of-week abbreviations (Mon–Sun)
+- Area fill: `--color-accent-teal-dim` (15% opacity under polyline)
+- Line color: `--color-accent-teal` (stroke-width 2)
+- Backend: file-backed poll history service (7-day rolling JSONL store)
+- New API endpoint: `GET /api/v1/health/poll-history` returning [{day, duration_s}; ...]
+- Client-side parallel load in +page.js; graceful zero-fill for missing days
+
+**Invariants:**
+- D5-1: Chart renders as SVG (not bars); title "Poll Runtimes (Last 7 Days)"
+- D5-2: Y-axis labeled with time scale (0s, 5s, 10s, ..., max rounded up)
+- D5-3: X-axis labeled with day abbreviations (Mon, Tue, ..., Sun)
+- D5-4: Area fill uses `--color-accent-teal-dim`; polyline uses `--color-accent-teal`
+- D5-5: Endpoint returns exactly 7 entries (one per day, oldest-first)
+- D5-6: Missing days filled with duration_s: 0.0 (zero-fill strategy)
+- D5-7: Data store: file-backed JSONL at `/run/nightfall-status.d/photo-ingress-poll-history.jsonl`
+- D5-8: No external charting library (hand-rolled SVG only)
+
+**Validation:** ✅ Unit + backend unit + integration + typecheck pass
+
+---
+
+### D6 — Typography and Visual Polish Pass
+
+**Decision:**
+- KPI card values: `--text-xl` (24px) → `--text-2xl` (32px), weight 700
+- Section headings (h2): `--text-md` → `--text-lg` (20px), weight 600, teal bottom-border
+- Audit event relative-time: `--text-sm` → `--text-xs` (11px), color `--text-muted`
+- Teal accent underline applied to: "Pending Files", "Recent Audit Events", "Filters"
+- All styling token-based (no raw pixel values)
+
+**Invariants:**
+- D6-1: KPI values rendered at `--text-2xl` (32px) weight 700
+- D6-2: Section headings at `--text-lg` (20px) weight 600 with 2px teal bottom-border
+- D6-3: All typography uses design tokens (no raw px, pt, em in component styles)
+- D6-4: Inter font (`--font-family-base`) loaded and applied globally
+- D6-5: Audit relative-time at `--text-xs` color `--text-muted`
+
+**Validation:** ✅ Unit + typecheck pass
+
+---
+
+### D1–D6 Validation Summary
+
+| Decision | Files | Commits | Tests | Status |
+|----------|-------|---------|-------|--------|
+| D1 | 2 | c372777 | web.unit + web.typecheck | ✅ |
+| D2 | 3 | 4f37925 | web.unit + web.typecheck | ✅ |
+| D3 | 2 | a7249ed | web.unit + web.typecheck | ✅ |
+| D4 | 5 | 1f709fe | web.unit + backend.unit + web.typecheck | ✅ |
+| D5 | 8 | 698c574 | web.unit + backend.unit + integration + web.typecheck | ✅ |
+| D6 | 5 | 61d5199 | web.unit + web.typecheck | ✅ |
+
+**Core regression:** ✅ ALL PASSED (15/15 non-Playwright E2E tests, all unit tests)
+**Playwright E2E:** ⚠️ Pre-existing staging container infrastructure issue (unrelated to D1–D6)
+
+---

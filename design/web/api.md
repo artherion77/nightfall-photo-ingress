@@ -382,6 +382,55 @@ curl -H "Authorization: Bearer test-token-12345" \
 
 ---
 
+### 4.1.1 Poll Runtime History (D5 — Dashboard Fidelity Drift)
+
+**Path:** `GET /api/v1/health/poll-history`
+
+**Auth:** Required
+
+**Description:** Retrieve 7-day rolling history of poll (ingest) operation durations.
+Returns exactly 7 entries (one per day) ordered oldest-first, with missing days filled
+as zero duration. Used by dashboard to render "Poll Runtimes (Last 7 Days)" line chart.
+
+**Response schema:**
+
+```typescript
+interface PollHistoryEntry {
+  day: string;              // Day-of-week abbreviation (Mon, Tue, Wed, Thu, Fri, Sat, Sun)
+  duration_s: number;       // Poll operation duration in seconds (0.0 if no poll for that day)
+}
+
+type PollHistory = PollHistoryEntry[];  // Array of exactly 7 entries, oldest-first
+```
+
+**Notes:**
+
+1. **7-day rolling window:** Always returns exactly 7 days of data (Mon–Sun or equiv.)
+2. **Zero-fill:** Days with no recorded poll show `duration_s: 0.0`
+3. **Idempotent:** Multiple calls return the same data (backed by file-based store)
+4. **Data source:** File-backed rolling JSONL store at `/run/nightfall-status.d/photo-ingress-poll-history.jsonl`
+
+**Example:**
+
+```bash
+curl -H "Authorization: Bearer test-token-12345" \
+  http://localhost:8000/api/v1/health/poll-history
+```
+
+```json
+[
+  { "day": "Mon", "duration_s": 12.5 },
+  { "day": "Tue", "duration_s": 13.2 },
+  { "day": "Wed", "duration_s": 11.8 },
+  { "day": "Thu", "duration_s": 0.0 },
+  { "day": "Fri", "duration_s": 14.1 },
+  { "day": "Sat", "duration_s": 12.9 },
+  { "day": "Sun", "duration_s": 13.5 }
+]
+```
+
+---
+
 ### 4.2 Staging Queue (Pending Items)
 
 **Path:** `GET /api/v1/staging`
