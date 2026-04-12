@@ -22,3 +22,9 @@
 {"event":"release_created","release_id":"20260412T133357Z-4f6eac87","detail":"wheel=nightfall_photo_ingress-2.0.0-py3-none-any.whl","ts":"2026-04-12T13:33:57Z"}
 {"event":"active_release_switched","release_id":"20260412T133357Z-4f6eac87","detail":"from=20260412T132719Z-19ddf4f9","ts":"2026-04-12T13:33:57Z"}
 {"event":"release_deployed","release_id":"20260412T133357Z-4f6eac87","detail":"container=staging-photo-ingress","ts":"2026-04-12T13:34:13Z"}
+{"event":"release_created","release_id":"20260412T134305Z-d7573570","detail":"wheel=nightfall_photo_ingress-2.0.0-py3-none-any.whl","ts":"2026-04-12T13:43:05Z"}
+{"event":"active_release_switched","release_id":"20260412T134305Z-d7573570","detail":"from=20260412T133357Z-4f6eac87","ts":"2026-04-12T13:43:05Z"}
+{"event":"release_deployed","release_id":"20260412T134305Z-d7573570","detail":"container=staging-photo-ingress","ts":"2026-04-12T13:43:21Z"}
+{"event":"release_created","release_id":"20260412T134716Z-11688821","detail":"wheel=nightfall_photo_ingress-2.0.0-py3-none-any.whl","ts":"2026-04-12T13:47:16Z"}
+{"event":"active_release_switched","release_id":"20260412T134716Z-11688821","detail":"from=20260412T134305Z-d7573570","ts":"2026-04-12T13:47:16Z"}
+{"event":"release_deployed","release_id":"20260412T134716Z-11688821","detail":"container=staging-photo-ingress","ts":"2026-04-12T13:47:32Z"}

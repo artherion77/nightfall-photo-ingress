@@ -25,6 +25,13 @@
 <div class="health-bar" data-testid="health-bar">
   <div class="health-legend">
     <span class="legend-label">Health Status:</span>
+    <div class="health-scale" aria-label="Health status legend">
+      <span class="scale-item"><span class="scale-dot scale-dot--perfect" aria-hidden="true"></span><span>Perfect</span></span>
+      <span class="scale-item"><span class="scale-dot scale-dot--good" aria-hidden="true"></span><span>Good</span></span>
+      <span class="scale-item"><span class="scale-dot scale-dot--degrading" aria-hidden="true"></span><span>Degrading</span></span>
+      <span class="scale-item"><span class="scale-dot scale-dot--warning" aria-hidden="true"></span><span>Warning</span></span>
+      <span class="scale-item"><span class="scale-dot scale-dot--error" aria-hidden="true"></span><span>Error/Issue</span></span>
+    </div>
   </div>
   <div class="health-gradient" aria-hidden="true"></div>
   <div class="health-badges">
@@ -48,6 +55,8 @@
   .health-legend {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-3);
   }
 
   .legend-label {
@@ -55,6 +64,50 @@
     font-weight: var(--text-md-weight);
     line-height: var(--text-sm-line-height);
     color: var(--text-secondary);
+  }
+
+  .health-scale {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+  }
+
+  .scale-item {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+    line-height: var(--text-sm-line-height);
+    white-space: nowrap;
+  }
+
+  .scale-dot {
+    width: 11px;
+    height: 11px;
+    border-radius: 999px;
+    display: inline-block;
+  }
+
+  .scale-dot--perfect {
+    background: #00b3a4;
+  }
+
+  .scale-dot--good {
+    background: #27b36a;
+  }
+
+  .scale-dot--degrading {
+    background: #8dcf52;
+  }
+
+  .scale-dot--warning {
+    background: #ffb400;
+  }
+
+  .scale-dot--error {
+    background: #e5484d;
   }
 
   .health-gradient {

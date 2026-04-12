@@ -1,0 +1,12 @@
+{
+  "release_id": "20260412T134305Z-d7573570",
+  "created_at": "2026-04-12T13:43:05Z",
+  "backend": {
+    "wheel": "nightfall_photo_ingress-2.0.0-py3-none-any.whl",
+    "sha256": "1583d20ec659671f1eeda2af021d2769166311cd13ec69feb2c3242feb829857"
+  },
+  "webui": {
+    "path": "webui/build",
+    "sha256": "ffac80a5bf90d47d5baffbde065cd0a613d01eb21d57863920bad46d1a21371e"
+  }
+}

@@ -97,13 +97,6 @@
         <span class="action" style={`--action-color: ${actionColor(event.action)};`}>{displayAction}</span>
         <time class="relative-time" datetime={event.ts}>{displayTime}</time>
       </div>
-      {#if event.account_name}
-        <div class="event-meta">
-          {#if event.account_name}
-            <span class="meta-item">{event.account_name}</span>
-          {/if}
-        </div>
-      {/if}
     </div>
   </li>
 {:else}
@@ -148,8 +141,8 @@
   }
 
   .status-icon {
-    width: var(--space-4);
-    height: var(--space-4);
+    width: var(--space-7);
+    height: var(--space-7);
     flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
@@ -165,8 +158,6 @@
   .event-main {
     min-width: 0;
     flex: 1 1 auto;
-    display: grid;
-    gap: var(--space-1);
   }
 
   .event-line {
@@ -174,6 +165,7 @@
     align-items: baseline;
     gap: var(--space-2);
     min-width: 0;
+    flex-wrap: wrap;
   }
 
   .event-line .filename {
@@ -194,24 +186,11 @@
   }
 
   .relative-time {
-    margin-left: auto;
     color: var(--text-muted);
     font-size: var(--text-xs);
     line-height: var(--text-xs-line-height);
     white-space: nowrap;
     flex: 0 0 auto;
-  }
-
-  .event-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
-  }
-
-  .meta-item {
-    color: var(--text-muted);
-    font-size: var(--text-xs);
-    line-height: var(--text-xs-line-height);
   }
 
   .message {
