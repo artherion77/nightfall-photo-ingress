@@ -31,6 +31,7 @@ from .adapters.onedrive.client import (
 )
 from .domain.ingest import IngestDecisionEngine, IngestError, StagedCandidate
 from .domain.registry import Registry, RegistryError
+from .hash_import_cli import cmd_hash_import
 from .reject import (
     RejectFlowError,
     accept_sha256,
@@ -129,6 +130,19 @@ def _build_parser() -> argparse.ArgumentParser:
     sync_import.add_argument("--path", default="/etc/nightfall/photo-ingress.conf")
     sync_import.add_argument("--dry-run", action="store_true", help="Show what would be imported.")
     sync_import.set_defaults(handler=_cmd_sync_import)
+
+    hash_import = subparsers.add_parser(
+        "hash-import",
+        help="Import authoritative SHA-256 hashes from a library tree.",
+    )
+    hash_import.add_argument("root_path", help="Root directory containing .hashes.v2 files.")
+    hash_import.add_argument("--path", default="/etc/nightfall/photo-ingress.conf")
+    hash_import.add_argument("--chunk-size", type=int, default=None, help="Override import chunk size.")
+    hash_import.add_argument("--dry-run", action="store_true", help="Validate and report without registry writes.")
+    hash_import.add_argument("--quiet", action="store_true", help="Suppress non-error output.")
+    hash_import.add_argument("--stats", action="store_true", help="Show detailed hash-import statistics.")
+    hash_import.add_argument("--stop-on-error", action="store_true", help="Abort immediately on the first unrecoverable error.")
+    hash_import.set_defaults(handler=_cmd_hash_import)
 
     config_check = subparsers.add_parser("config-check", help="Validate configuration file.")
     config_check.add_argument("--path", default="/etc/nightfall/photo-ingress.conf")
@@ -628,6 +642,12 @@ def _cmd_sync_import(args: argparse.Namespace) -> int:
             details={"error": str(exc)},
         )
         return 2
+
+
+def _cmd_hash_import(args: argparse.Namespace) -> int:
+    """Import authoritative permanent-library hashes into the registry cache."""
+
+    return cmd_hash_import(args, logger=LOGGER, emit_status_snapshot=_emit_status_snapshot)
 
 
 def _cmd_config_check(args: argparse.Namespace) -> int:

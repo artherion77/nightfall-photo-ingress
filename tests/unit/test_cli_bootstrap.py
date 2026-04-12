@@ -27,6 +27,7 @@ def test_cli_commands_are_registered() -> None:
         "purge",
         "process-trash",
         "sync-import",
+        "hash-import",
         "config-check",
         "prune-auth-failures",
     }
