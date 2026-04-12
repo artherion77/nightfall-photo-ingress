@@ -71,8 +71,12 @@
 
 <style>
 	.dashboard {
+		height: 100%;
 		display: grid;
+		grid-template-rows: auto 1fr;
 		gap: var(--space-4);
+		overflow: hidden;
+		min-height: 0;
 	}
 
 	.dashboard h1 {
@@ -87,11 +91,16 @@
 		display: grid;
 		grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
 		gap: var(--space-4);
+		min-height: 0;
+		overflow: hidden;
 	}
 
 	.dashboard-main {
 		display: grid;
+		grid-template-rows: auto auto minmax(0, 1fr);
 		gap: var(--space-4);
+		min-height: 0;
+		overflow: hidden;
 	}
 
 	@media (max-width: 900px) {
@@ -105,5 +114,6 @@
 		grid-template-columns: 1fr minmax(0, 320px);
 		align-items: stretch;
 		gap: var(--space-4);
+		min-height: 0;
 	}
 </style>

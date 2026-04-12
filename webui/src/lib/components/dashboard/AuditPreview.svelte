@@ -35,6 +35,10 @@
     border-left: 3px solid var(--action-primary);
     border-radius: var(--radius-md);
     background: var(--surface-card);
+    display: grid;
+    grid-template-rows: auto 1fr;
+    min-height: 0;
+    overflow: hidden;
   }
 
   .header {
@@ -60,5 +64,7 @@
     list-style: none;
     display: flex;
     flex-direction: column;
+    min-height: 0;
+    overflow: auto;
   }
 </style>

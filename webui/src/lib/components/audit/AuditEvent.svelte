@@ -97,13 +97,10 @@
         <span class="action" style={`--action-color: ${actionColor(event.action)};`}>{displayAction}</span>
         <time class="relative-time" datetime={event.ts}>{displayTime}</time>
       </div>
-      {#if event.account_name || event.client_ip}
+      {#if event.account_name}
         <div class="event-meta">
           {#if event.account_name}
             <span class="meta-item">{event.account_name}</span>
-          {/if}
-          {#if event.client_ip}
-            <span class="meta-item">{event.client_ip}</span>
           {/if}
         </div>
       {/if}

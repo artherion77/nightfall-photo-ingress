@@ -29,7 +29,7 @@
   <div class="health-gradient" aria-hidden="true"></div>
   <div class="health-badges">
     <StatusBadge status={statusFor(health.polling_ok)} label="Polling" />
-    <StatusBadge status={statusFor(health.auth_ok)} label="OneDrive Auth" icon="auth" />
+    <StatusBadge status={statusFor(health.auth_ok)} label="OneDrive Auth" />
     <StatusBadge status={statusFor(health.registry_ok)} label="Registry Integrity" />
     <StatusBadge status={statusFor(health.disk_ok)} label="Disk Usage" />
   </div>
