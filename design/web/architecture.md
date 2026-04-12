@@ -2149,6 +2149,41 @@ pagination flows. No Phase 1 component is removed during this migration.
 Restoring the `LoadMoreButton` variant requires a single component swap in
 `AuditTimeline.svelte`. The API contract is unchanged.
 
+### 14.6 Audit Timeline Paging State Machine (C7)
+
+Phase 2 introduces a dedicated paging store for the audit timeline route.
+The state machine is frontend-only and keeps cursor semantics unchanged.
+
+States:
+1. `idle` — first page loaded, not currently fetching.
+2. `loading-next` — next cursor page in-flight from scroll trigger.
+3. `terminal` — `has_more=false`; no further page loads allowed.
+4. `error` — last next-page request failed; existing entries remain visible.
+
+Transitions:
+1. `idle -> loading-next` when sentinel enters viewport and `terminal=false`.
+2. `loading-next -> idle` on successful page append with `has_more=true`.
+3. `loading-next -> terminal` on successful page append with `has_more=false`.
+4. `loading-next -> error` on request failure; retry remains operator-driven by scrolling again.
+5. `error -> loading-next` on subsequent sentinel-triggered retry.
+6. `* -> idle` on route re-entry initialization (fresh first-page load state).
+
+Guardrails:
+1. In-flight guard prevents overlapping page requests.
+2. Page size remains fixed at 50.
+3. Ordering remains append-only using existing `id DESC` cursor pages.
+4. Terminal state is always rendered explicitly as `End of timeline`.
+
+### 14.7 Infinite-Scroll Interaction Model (C7)
+
+Operator interaction contract:
+1. The explicit `Load more` button is removed from the Audit Timeline route.
+2. A sentinel element at the bottom of the list is observed with `IntersectionObserver`.
+3. When the sentinel is near viewport bottom, the next cursor page is fetched automatically.
+4. While a fetch is active, the timeline shows a loading hint and suppresses overlapping fetches.
+5. When no additional pages exist, sentinel observation stops and terminal marker remains visible.
+6. Error state does not clear existing loaded entries; it renders an inline load error and allows retry via further scroll triggers.
+
 ---
 
 ## 15. KPI Threshold Configuration via API (Phase 2 Mandatory)

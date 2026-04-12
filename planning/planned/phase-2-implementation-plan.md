@@ -239,7 +239,10 @@ Preconditions:
 - C5 policy enforcement active.
 
 Deliverables:
-- Documented interaction contract and paging transition rules.
+- Infinite-scroll migration for Audit Timeline route with preserved cursor-pagination semantics.
+- Dedicated paging store for route state (`currentPage`, accumulated entries, loading, terminal, cursor).
+- Explicit terminal marker and non-overlapping in-flight load guard.
+- C7 unit and e2e validation artifacts.
 
 Validation steps:
 1. Validate pagination semantics preservation under new interaction model.
@@ -247,6 +250,15 @@ Validation steps:
 
 Stop-gates:
 1. No completion without explicit validation of load termination behavior.
+
+Validation evidence:
+1. Audit timeline infinite-scroll UI implemented in `../../webui/src/lib/components/audit/AuditTimeline.svelte`.
+2. Route-level paging orchestration and lifecycle reset implemented in `../../webui/src/routes/audit/+page.svelte`.
+3. Dedicated paging store implemented in `../../webui/src/lib/stores/auditTimelinePaging.svelte.js`.
+4. Paging state transition unit coverage implemented in `../../webui/tests/component/AuditTimelinePagingStore.test.ts`.
+5. Infinite-scroll e2e coverage implemented in `../../webui/tests/e2e/audit.infinite-scroll.spec.ts`.
+6. C7 interaction/state-machine documentation updated in `../../design/web/architecture.md`.
+7. C7 decision posture documented in `../../design/web/design-decisions.md`.
 
 ### C6/C7 Drift Fix Summary — 2026-04-11
 

@@ -1,52 +1,43 @@
 <script lang="ts">
 	import AuditTimeline from '$lib/components/audit/AuditTimeline.svelte';
-	import { getAuditLog } from '$lib/api/audit';
-        import type { AuditEvent as ApiAuditEvent, AuditPage } from '$lib/api/audit';
+	import { onDestroy } from 'svelte';
+	import type { AuditPage } from '$lib/api/audit';
+	import { auditTimelinePaging } from '$lib/stores/auditTimelinePaging.svelte';
 
         interface PageData {
                 audit?: AuditPage;
         }
 
         let { data }: { data: PageData } = $props();
+	let timelineState = $state<any>({
+		currentPage: 0,
+		entries: [],
+		loading: false,
+		terminal: false,
+		error: null,
+	});
+	let filter = $state<string | null>(null);
 
-		let events = $state<ApiAuditEvent[]>([]);
-        let cursor = $state<string | null>(null);
-        let hasMore = $state(false);
-        let loading = $state(false);
-        let filter = $state<string | null>(null);
+	const unsubscribe = auditTimelinePaging.subscribe((value) => {
+		timelineState = value;
+	});
 
 	$effect(() => {
-		events = data.audit?.events ?? [];
-		cursor = data.audit?.cursor ?? null;
-		hasMore = Boolean(data.audit?.has_more);
+		auditTimelinePaging.initialize(data.audit ?? { events: [], cursor: null, has_more: false }, filter);
+	});
+
+	onDestroy(() => {
+		unsubscribe();
+		auditTimelinePaging.reset();
 	});
 
 	async function loadMore() {
-		if (!hasMore || loading) {
-			return;
-		}
-		loading = true;
-		try {
-			const page = await getAuditLog(cursor, 50, filter);
-			events = [...events, ...(page.events ?? [])];
-			cursor = page.cursor ?? null;
-			hasMore = Boolean(page.has_more);
-		} finally {
-			loading = false;
-		}
+		await auditTimelinePaging.loadNext();
 	}
 
 	async function applyFilter(action: string | null) {
-		loading = true;
-		try {
-			filter = action;
-			const page = await getAuditLog(null, 50, action);
-			events = page.events ?? [];
-			cursor = page.cursor ?? null;
-			hasMore = Boolean(page.has_more);
-		} finally {
-			loading = false;
-		}
+		filter = action;
+		await auditTimelinePaging.setFilter(action);
 	}
 </script>
 
@@ -58,7 +49,15 @@
 		<button onclick={() => applyFilter('triage_reject_applied')}>Rejected</button>
 		<button onclick={() => applyFilter('triage_defer_applied')}>Deferred</button>
 	</div>
-	<AuditTimeline {events} {loading} {hasMore} onLoadMore={loadMore} />
+	{#if timelineState.error}
+		<p class="error" data-testid="audit-load-error">{timelineState.error}</p>
+	{/if}
+	<AuditTimeline
+		events={timelineState.entries}
+		loading={timelineState.loading}
+		hasMore={!timelineState.terminal}
+		onLoadMore={loadMore}
+	/>
 </section>
 
 <style>
@@ -79,5 +78,15 @@
 		color: var(--text-primary);
 		border-radius: var(--radius-md);
 		cursor: pointer;
+	}
+
+	.error {
+		margin: 0;
+		padding: var(--space-2) var(--space-3);
+		border: 1px solid var(--status-error);
+		border-radius: var(--radius-md);
+		background: color-mix(in srgb, var(--status-error) 10%, var(--surface-card));
+		color: var(--status-error);
+		font-size: var(--text-sm);
 	}
 </style>

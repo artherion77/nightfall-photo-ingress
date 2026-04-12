@@ -45,6 +45,28 @@ Guardrails:
 2. No server-side filtering logic.
 3. Existing dashboard data loading behavior remains unchanged.
 
+## Phase 2 Decision Addendum: C7 Audit Timeline Infinite Scroll
+
+Date: 2026-04-12
+Owner: Systems Engineering
+
+Decision:
+1. Audit timeline pagination interaction migrates from explicit `LoadMoreButton` to observer-driven infinite scroll.
+2. Migration is strictly frontend-only; `/api/v1/audit-log` contract remains unchanged.
+3. A dedicated paging store owns cursor, current page index, accumulated entries, loading state, and terminal state.
+4. Terminal state must always be explicit and visible (`End of timeline`).
+
+Rationale:
+1. C7 is mandatory Phase 2 UX scope while preserving existing pagination semantics.
+2. Dedicated route-local paging state reduces race conditions from overlapping scroll triggers.
+3. Explicit terminal marker preserves operator clarity and avoids ambiguous list completion.
+
+Guardrails:
+1. Page size remains 50 for audit timeline loads.
+2. Ordering remains backend-defined (`id DESC`) with append-only client accumulation.
+3. In-flight guard is mandatory; overlapping next-page requests are prohibited.
+4. Route navigation reset is mandatory to preserve Phase 1.5 interaction invariants.
+
 
 This document consolidates invariants, decisions, and rationale documents for the web control plane.
 
