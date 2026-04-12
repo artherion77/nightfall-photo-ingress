@@ -551,7 +551,7 @@ Field notes:
 - Implementation Notes:
   - `.hashes.v2` format: `CACHE_SCHEMA v2` header, `DIRECTORY_HASH <40-hex>`,
     then tab-separated `<sha1>\t<sha256>\t<path>` rows. Only SHA-256 column is used.
-  - Registry entry shape: `{sha256, imported: true, first_seen, source: "hash_import"}`.
+  - Registry row shape in `external_hash_cache`: `account_name='__hash_import__', source_relpath=NULL, hash_algo='sha256', hash_value=<sha256>, verified_sha256=<sha256>`.
   - CLI options: `--chunk-size`, `--dry-run`, `--quiet`, `--stats`, `--stop-on-error`.
   - Config: `[import] chunk_size = 1000`. CLI overrides config overrides default.
 - Supersedes:
