@@ -1,17 +1,17 @@
 # Nightfall Metrics Executive Summary
 
-- Run ID: module4-bootstrap
-- Generated At: 2026-04-07T18:19:11.283150+00:00
+- Run ID: module6-20260412T214404-1
+- Generated At: 2026-04-12T21:44:26.169045+00:00
 - Branch: main
-- Commit: 4fd126dc124dcf2388f206f61ea2ee3fc1b97a0c
+- Commit: 8bfc05ddddb1033f57ee91c0ba12a878c1658b7b
 - Collection Status: partial
 - Severity: warning
-- Previous Successful Run: module3-bootstrap
+- Previous Successful Run: module4-bootstrap
 
 ## Indicators
 
 - Failed checks: 0
-- Warning checks: 1
+- Warning checks: 5
 - Delta items: 16
 
 ## Artifact Links
@@ -23,6 +23,10 @@
 ## Warnings
 
 - modules.frontend.metrics.test_coverage not available
+- modules.optional_collectors.collectors.openapi_complexity not available
+- modules.optional_collectors.collectors.api_surface_diff not available
+- modules.optional_collectors.collectors.vitest_coverage not available
+- modules.optional_collectors.collectors.playwright_coverage not available
 
 ## Failures
 
@@ -30,4 +34,6 @@
 
 ## Trend Snippets
 
-- No historical trend data available yet.
+- module4-bootstrap: severity=warning, status=partial, warnings=1, failures=0, delta_items=16
+- module6-20260411T072531-1: severity=warning, status=partial, warnings=5, failures=0, delta_items=16
+- module6-20260409T154148-1: severity=warning, status=partial, warnings=5, failures=0, delta_items=16
