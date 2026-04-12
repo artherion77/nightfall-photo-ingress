@@ -49,7 +49,7 @@
 </script>
 
 <section class="dashboard" data-testid="dashboard-page">
-	<h1>Dashboard</h1>
+	<h1>Photo-Ingress Dashboard</h1>
 	<div class="dashboard-layout">
 		<FilterSidebar
 			options={filterOptions}
@@ -67,7 +67,7 @@
 
 			<section class="dashboard-files" data-testid="dashboard-file-list">
 				<div class="files-header">
-					<h2>Loaded Files</h2>
+					<h2>Pending Files</h2>
 					<p data-testid="dashboard-file-count">{filteredItems.length} of {dashboardItems.length}</p>
 				</div>
 				{#if filteredItems.length === 0}
@@ -77,7 +77,7 @@
 						{#each filteredItems as item}
 							<li data-testid="dashboard-file-list-item">
 								<div class="file-main">
-									<span class="file-name">{item.filename}</span>
+									<span class="file-name" title={item.filename}>{item.filename}</span>
 									<span class="file-type" data-testid="dashboard-file-type-pill">{formatItemType(item.filename)}</span>
 								</div>
 								<span class="file-id">{item.sha256.slice(0, 12)}...</span>
@@ -96,6 +96,14 @@
 	.dashboard {
 		display: grid;
 		gap: var(--space-4);
+	}
+
+	.dashboard h1 {
+		margin: 0;
+		font-size: var(--text-2xl);
+		font-weight: var(--text-2xl-weight);
+		line-height: var(--text-2xl-line-height);
+		color: var(--text-primary);
 	}
 
 	.dashboard-layout {
@@ -143,6 +151,9 @@
 		padding: 0;
 		display: grid;
 		gap: var(--space-2);
+		max-height: var(--space-8);
+		overflow-y: auto;
+		padding-right: var(--space-1);
 	}
 
 	.dashboard-files li {
